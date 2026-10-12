@@ -16,7 +16,6 @@ import {
 } from "./remote-server.ts";
 import type { Handlers } from "./remote-server.ts";
 
-/** `listAsks` (public) lists one ask; `status` (signed in) shows nothing yet. */
 const handlers: Handlers = Layer.mergeAll(
   unanswered,
   Contracts.toLayerHandler("listAsks", () =>
@@ -38,7 +37,6 @@ const handlers: Handlers = Layer.mergeAll(
   )
 );
 
-/** Credentials holding `profile`, or none. */
 const holding = (profile: Option.Option<Profile>) =>
   Layer.succeed(Credentials)({
     current: Effect.succeed(profile),
@@ -52,7 +50,6 @@ const profileOn = (url: string, token: string): Profile => ({
   url,
 });
 
-/** The remote client over `credentials`, with `env` as its whole env. */
 const remote = (
   credentials: Layer.Layer<Credentials>,
   env: Readonly<Record<string, string>> = {}

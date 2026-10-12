@@ -1,9 +1,3 @@
-/**
- * The CLI as it ships: `bun run build` makes one standalone binary, its git
- * credential helper link and the npm `dist/`, and each runs as a process
- * here. The build runs twice for the file (the second run shows the npm
- * files come out the same); every case reads what the second run wrote.
- */
 import { NodeServices } from "@effect/platform-node";
 import { expect, layer } from "@effect/vitest";
 import { Brand } from "@repo/brand";
@@ -20,7 +14,6 @@ import {
 } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
-/** How a process ended, and what it printed. */
 interface Ran {
   readonly exitCode: number;
   readonly stderr: string;
@@ -30,17 +23,12 @@ interface Ran {
 const text = <E>(bytes: Stream.Stream<Uint8Array, E>) =>
   bytes.pipe(Stream.decodeText(), Stream.mkString);
 
-/** The whole env a built binary runs with. */
 interface Bare {
   readonly HOME: string;
   readonly PATH: string;
   readonly XDG_CONFIG_HOME: string;
 }
 
-/**
- * Runs `command` to its end. With `only`, the process gets exactly that env
- * and nothing of this machine's; without it, it inherits this one's.
- */
 const run = (
   command: string,
   args: readonly string[],
@@ -75,10 +63,6 @@ const run = (
     })
   ).pipe(Effect.orDie);
 
-/**
- * The npm build's files in `dist/` (not the binaries), each by its name and
- * a hash of its text, so two builds compare in a short diff.
- */
 const npmFiles = (dist: string) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -98,23 +82,17 @@ const npmFiles = (dist: string) =>
     return files;
   });
 
-/** What `bun run build` did, where it wrote, and a bare env to run it in. */
 class Built extends Context.Service<
   Built,
   {
     readonly build: Ran;
-    /** The build run a second time, and the npm files each run wrote. */
     readonly rebuild: Ran;
     readonly firstFiles: Readonly<Record<string, number>>;
     readonly secondFiles: Readonly<Record<string, number>>;
-    /** The CLI package's folder, and its `dist/`. */
     readonly root: string;
     readonly dist: string;
-    /** `HOME` and `XDG_CONFIG_HOME` in a temp folder, and a `PATH` of one empty folder. */
     readonly bare: Bare;
-    /** `bare`, with the built binaries' folder as the whole `PATH`. */
     readonly onPath: Bare;
-    /** `bare`, with this machine's `PATH`, where `node` is. */
     readonly withNode: Bare;
   }
 >()("cli/test/Built") {}
@@ -153,7 +131,6 @@ const BuiltOnce = Layer.effect(
   })
 ).pipe(Layer.provideMerge(NodeServices.layer));
 
-/** The path of `segments` under `dist/`, once the test has seen the build write it. */
 const written = (...segments: readonly string[]) =>
   Effect.gen(function* () {
     const { dist } = yield* Built;
@@ -169,10 +146,8 @@ const written = (...segments: readonly string[]) =>
     return file;
   });
 
-/** Long enough for a case that starts the built binaries a few times on a busy machine. */
 const spawning = { timeout: 60_000 };
 
-/** The start-here banner `--help` opens with (as `test/main.test.ts` holds it). */
 const banner = [
   "Start here:",
   `${Brand.cli} asks      list the open asks you could take`,
@@ -180,7 +155,6 @@ const banner = [
   `${Brand.cli} check     run the gate's checks locally before you push`,
 ];
 
-/** The banner as `--help` printed it, if it did: four lines from "Start here:". */
 const bannerIn = (stdout: string) => {
   const lines = stdout.split("\n").map((line) => line.trim());
   const start = lines.indexOf("Start here:");
@@ -188,11 +162,6 @@ const bannerIn = (stdout: string) => {
   return start === -1 ? [] : lines.slice(start, start + banner.length);
 };
 
-/**
- * The names a module's source exports, types included: each `export {…}`
- * list by its exported names, and each exported declaration. An `export *`
- * shows as `*`, since its names can't be read off the page.
- */
 const exportedNames = (source: string) => {
   const listed = [
     ...source.matchAll(/\bexport\s+(?:type\s+)?\{(?<list>[^}]*)\}/gu),
@@ -221,15 +190,10 @@ const exportedNames = (source: string) => {
     .toSorted();
 };
 
-/** What git hands a credential helper: the host, then a blank line. */
 const request = "protocol=https\nhost=example.test\n\n";
 
-/**
- * An import, export, `import()` or `require` of a workspace package. A
- * static import or export names its module in quotes, never backticks, so
- * prose in a kept doc comment ("from `@repo/git`'s `treeDiff`") is not one;
- * only a call may take a template literal.
- */
+// A static import or export quotes its module, never with backticks, so
+// prose in a doc comment is not one.
 const workspaceSpecifier =
   /(?:\b(?:from|import)\s*["']|\b(?:import|require)\s*\(\s*["'`])@repo\//u;
 
@@ -258,7 +222,6 @@ layer(BuiltOnce, { excludeTestServices: true, timeout: "180 seconds" })(
           const binary = yield* fs.stat(yield* written("bin", Brand.cli));
 
           expect(binary.type).toBe("File");
-          // The owner's execute bit.
           expect(Math.floor(binary.mode / 0o100) % 2).toBe(1);
 
           // A link, not a shim: the compiled binary sees the name it was
@@ -396,7 +359,6 @@ layer(BuiltOnce, { excludeTestServices: true, timeout: "180 seconds" })(
 
           yield* written("bin", Brand.gitCredentialHelper);
 
-          // Found on the PATH by name, as git finds a helper.
           const helper = yield* run(Brand.gitCredentialHelper, ["get"], {
             only: onPath,
             stdin: request,

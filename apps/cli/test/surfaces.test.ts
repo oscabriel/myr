@@ -49,7 +49,6 @@ const refusal = new StaleBase({
   main,
 });
 
-/** Contracts whose answers always meet a moved main. */
 const stale = Layer.mergeAll(
   unanswered,
   Contracts.toLayerHandler("submitAnswer", () => Effect.fail(refusal))
@@ -66,7 +65,6 @@ const initialize = (protocolVersion: string) => ({
 
 const Initialized = Schema.Struct({ protocolVersion: Schema.String });
 
-/** A tools/call result whose one content block is JSON text. */
 const ToolResult = Schema.Struct({
   content: Schema.Tuple([
     Schema.Struct({
@@ -175,7 +173,6 @@ describe("the CLI's MCP server over stdio", () => {
   );
 });
 
-/** The names of a command's subcommands, in order. */
 const subcommandsOf = (command: Command.Command.Any | undefined) =>
   (command?.subcommands ?? []).flatMap(({ commands: group }) =>
     group.map(({ name }) => name)
@@ -240,7 +237,6 @@ const decideArgs = [
   "accept",
 ];
 
-/** A platform that counts the decisions it is asked to take, and takes none. */
 const deciding = (calls: Ref.Ref<number>) =>
   Layer.mergeAll(
     unanswered,
@@ -345,7 +341,6 @@ describe("a read", () => {
   );
 });
 
-/** A platform that lists no asks, recording the project each listing names. */
 const listing = (asked: Ref.Ref<readonly string[]>) =>
   Layer.mergeAll(
     unanswered,
@@ -354,7 +349,6 @@ const listing = (asked: Ref.Ref<readonly string[]>) =>
     )
   );
 
-/** A fresh git repo whose `origin` is `url`, at its real path. */
 const repoWithOrigin = (url: string) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -445,7 +439,6 @@ const submitArgs = [
   requestId,
 ];
 
-/** An answer's receipt, standing at `outcome`. */
 const receiptAt = (outcome: Outcome) => ({
   ask,
   base,
@@ -455,14 +448,12 @@ const receiptAt = (outcome: Outcome) => ({
   requestId,
 });
 
-/** A platform whose `submitAnswer` gives `receipt` back. */
 const receiving = (receipt: ReturnType<typeof receiptAt>) =>
   Layer.mergeAll(
     unanswered,
     Contracts.toLayerHandler("submitAnswer", () => Effect.succeed(receipt))
   );
 
-/** Each command that names an ask, and what else it takes, as a person types it. */
 const naming = {
   finish: [
     "--project",
@@ -489,7 +480,6 @@ const naming = {
   verdict: ["--project", project],
 } as const satisfies Readonly<Record<string, readonly string[]>>;
 
-/** A platform that records the ask each call names, and answers each call plainly. */
 const recordingAsks = (named: Ref.Ref<readonly string[]>) => {
   const record = (given: string) => Ref.update(named, (all) => [...all, given]);
 

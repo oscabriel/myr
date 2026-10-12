@@ -1,7 +1,3 @@
-/**
- * Today in the terminal, as a decider works it: the keys they press, the
- * screen they read, and the refusal an agent or a script meets instead.
- */
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { createTestRenderer } from "@opentui/core/testing";
@@ -43,7 +39,6 @@ import { TodayView } from "../../src/tui/view.ts";
 import { runProgram } from "../remote-server.ts";
 import { datekit, okonkwo, proposal, stray, today, vouch } from "./fixture.ts";
 
-/** The state after `keys`, one after another, and every call they made. */
 const press = (state: TodayViewState, keys: readonly string[]) => {
   const calls: DecideCall[] = [];
   let now = state;
@@ -117,10 +112,6 @@ describe("the keys a decider presses on Today", () => {
   });
 });
 
-/**
- * The screen `TodayView` draws for `state` on a terminal `height` rows tall
- * (40 unless given), one string per row.
- */
 const screenOf = (state: TodayViewState, height = 40) =>
   Effect.acquireUseRelease(
     Effect.promise(() =>
@@ -141,7 +132,6 @@ const screenOf = (state: TodayViewState, height = 40) =>
       })
   );
 
-/** The rows of a screen that hold `text`. */
 const rowsWith = (rows: readonly string[], text: string) =>
   rows.filter((row) => row.includes(text));
 
@@ -255,10 +245,6 @@ describe("Today as the terminal shows it", () => {
   );
 });
 
-/**
- * Where the TUI may be asked to open: the env and terminals of the process,
- * and a platform that no test here may reach.
- */
 const surroundings = (input: {
   readonly env: Readonly<Record<string, string>>;
   readonly stdoutIsTTY: boolean;
@@ -270,7 +256,6 @@ const surroundings = (input: {
     Layer.mock(Client)({})
   );
 
-/** What `runTodayTui` refused with, as its next command and its one line. */
 const refusalIn = (layer: ReturnType<typeof surroundings>) =>
   runTodayTui({ project: Option.none() }).pipe(
     Effect.flip,
@@ -354,12 +339,7 @@ describe("Today full-screen with no policy given", () => {
   );
 });
 
-/**
- * A screen that reads `keys` in turn (then `q`) and keeps every state it is
- * shown. The keys are pressed before any is read, so `forget` drops every
- * one not read yet, as the terminal drops those pressed while a choice was
- * on its way.
- */
+// Every key is pressed before any is read, so `forget` drops each one not read yet.
 const scripted = (keys: readonly string[]) =>
   Effect.gen(function* () {
     const left = yield* Ref.make(keys);
@@ -374,12 +354,6 @@ const scripted = (keys: readonly string[]) =>
     return { screen, shown };
   });
 
-/**
- * The platform for one decider: `today` lists the fixture's decisions but
- * those decided since, and `decide` takes every choice but those on
- * `closed`, which it refuses as already decided. Returns the client, and
- * every `decide` payload it saw.
- */
 const platform = (closed: ReadonlySet<string>) =>
   Effect.gen(function* () {
     const decided = yield* Ref.make<
@@ -427,7 +401,6 @@ const platform = (closed: ReadonlySet<string>) =>
     return { client, decided };
   });
 
-/** A person at a terminal, with the platform `client` and the screen `screen`. */
 const atTerminal =
   (client: Layer.Layer<Client>, screen: Screen) =>
   <A, E>(effect: Effect.Effect<A, E, Client | Policy | Stdio.Stdio>) =>
@@ -532,7 +505,6 @@ describe("the terminal Today is drawn on", () => {
 
         const screen = yield* screenOn(setup.renderer);
 
-        /** The terminal's rows once `state` is drawn. */
         const drawn = (state: TodayViewState) =>
           Effect.gen(function* () {
             yield* screen.show(state);
@@ -569,27 +541,15 @@ describe("the terminal Today is drawn on", () => {
   );
 });
 
-/** What was printed to a stream, one entry per line however it was written. */
 const lines = (chunks: readonly unknown[]) =>
   chunks.flatMap((chunk) => String(chunk).split("\n"));
 
-/**
- * The `today` contract as the CLI would project it, were the hand-written
- * command not standing in for it: what that command prints without `--tui`
- * is held to it.
- */
 const projectedToday = toCommand(TodayOf, Effect.service(Client), {
   output: Effect.service(Output),
   refusalsIn,
   render: views.today,
 });
 
-/**
- * A `today` command (the tree's own unless given), run on `args` as the
- * process would: the mode from `env`, a terminal on both ends, and the
- * platform `client`; no screen opens. Returns what it printed on stdout and
- * stderr, and how it ended.
- */
 const runToday = (
   args: readonly string[],
   input: {
@@ -601,7 +561,6 @@ const runToday = (
   const policy = policyFor({ env: input.env, isTTY: true });
 
   return Effect.gen(function* () {
-    // Either command's failures, read alike.
     const exit: Exit.Exit<void, unknown> = yield* input.command === undefined
       ? Effect.exit(Command.runWith(todayCommand, { version: "0.0.0" })(args))
       : Effect.exit(Command.runWith(input.command, { version: "0.0.0" })(args));

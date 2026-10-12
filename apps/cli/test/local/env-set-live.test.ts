@@ -1,22 +1,3 @@
-/**
- * `<cli> env set` end to end: the
- * CLI's real `env set`, `env shape` and `ledger` commands, over its remote
- * client as the stored profile, against the platform's Node world with the
- * visibility cartridge composed under the fake env's test `MASTER_KEY`
- * (`apps/platform/test/visibility/serve-cartridge-world.ts`, a process of
- * its own: apps never import apps).
- *
- * ines-v makes datekit and first pushes it with its committed `.env.schema`
- * and config folder, which names her its decider and vouches for bram. She
- * pipes a token into `env set`; bram, not a decider, tries the same; she
- * tries a public item and a short value. Then she opens an ask, bram
- * answers it, and the world's Checker runs the answer's checks. The value
- * shows nowhere: not in what the CLI printed or logged, not in any `/rpc`
- * or `/mcp` body the world sent, any line it logged or printed, the
- * Project DO's event log or ledger, or any job the Checker was given; the
- * DO's `env_values` row holds it sealed. What the world kept, it gives
- * through its `kept` window, once every step has run.
- */
 import { NodeServices } from "@effect/platform-node";
 import { expect, layer } from "@effect/vitest";
 import { Brand } from "@repo/brand";
@@ -72,25 +53,21 @@ import { OutputLive } from "../../src/output.ts";
 import { policyFor } from "../../src/policy.ts";
 import { RemoteClient } from "../../src/remote.ts";
 
-/** The world, from the repo root: the platform's Node world, cartridge composed. */
 const WORLD = "apps/platform/test/visibility/serve-cartridge-world.ts";
 
 const project = ProjectName.make("ines-v/datekit");
 
 const token = EnvKey.make("SENTRY_AUTH_TOKEN");
 
-/** What ines-v pipes in: a token of 24 characters, then the newline `echo` adds. */
 const value = "sk_test_0123456789abcdef";
 
-/** A value of 8 characters, under the 12 a value needs. */
+// Under the 12 characters a value needs.
 const short = "tooshort";
 
-/** The ask ines-v opens and bram answers: one of datekit's own. */
 const ask = AskId.make("parse-iso-week");
 
 interface Person {
   readonly handle: Handle;
-  /** Their platform token, as the world's sessions list it. */
   readonly token: string;
 }
 
@@ -104,7 +81,6 @@ const bram: Person = {
   token: "bram-env-set-live-token-0123456789abcdefgh",
 };
 
-/** Whether datekit's first commit carries a tracked file: the library before anyone asked. */
 const seeded = (file: string) =>
   [
     ".env.schema",
@@ -116,13 +92,10 @@ const seeded = (file: string) =>
   /^src\/[^/]+\.ts$/u.test(file) ||
   /^test\/[^/]+\.test\.ts$/u.test(file);
 
-/** The ask's file and the check it names, as datekit commits them. */
 const askFiles = [
   `${Brand.configDir}/asks/${ask}.ask.ts`,
   `test/asks/${ask}.test.ts`,
 ] as const;
-
-// --------------------------------------------------------------- the world
 
 const Serving = Schema.fromJsonString(
   Schema.Struct({ kept: Schema.String, origin: Schema.String })
@@ -130,20 +103,13 @@ const Serving = Schema.fromJsonString(
 
 const decodeServing = Schema.decodeUnknownOption(Serving);
 
-/** Where the world serves: the platform, and the test's window on what it kept. */
 interface Served {
   readonly origin: string;
   readonly kept: string;
-  /** Everything the world's process printed so far, stdout and stderr. */
   readonly printed: Effect.Effect<string>;
 }
 
-/**
- * The world served by a process of its own for as long as the scope
- * lasts, with ines-v and bram among its sessions. Both of its streams are
- * kept to the end, so it never blocks on a full pipe and every line it
- * printed can be searched.
- */
+// Both streams are drained, so the process never blocks on a full pipe.
 const servedWorld = (root: string) =>
   Effect.gen(function* () {
     const child = yield* spawn("bun", [WORLD], {
@@ -197,7 +163,6 @@ const servedWorld = (root: string) =>
     return { ...where, printed: Ref.get(printed) } satisfies Served;
   });
 
-/** What the world's `kept` window gives: each part as the world encoded it. */
 const Kept = Schema.fromJsonString(
   Schema.Struct({
     bodies: Schema.Array(Schema.String),
@@ -220,7 +185,6 @@ const Kept = Schema.fromJsonString(
   })
 );
 
-/** What the world kept for datekit. */
 const keptBy = (world: Served) =>
   Effect.gen(function* () {
     const http = yield* HttpClient.HttpClient;
@@ -229,7 +193,6 @@ const keptBy = (world: Served) =>
     return yield* Schema.decodeEffect(Kept)(yield* response.text);
   }).pipe(Effect.orDie);
 
-/** Carries every answer run the world has queued. */
 const settle = (world: Served) =>
   Effect.gen(function* () {
     const http = yield* HttpClient.HttpClient;
@@ -252,7 +215,6 @@ const Listed = Schema.fromJsonString(
   })
 );
 
-/** The names of the tools the world's `/mcp` lists to `as`. */
 const toolsListed = (world: Served, as: Person) =>
   Effect.gen(function* () {
     const http = yield* HttpClient.HttpClient;
@@ -301,9 +263,6 @@ const toolsListed = (world: Served, as: Person) =>
     return result.tools.map(({ name }) => name);
   }).pipe(Effect.orDie);
 
-// ----------------------------------------------------------------- people
-
-/** Credentials holding `as`'s profile on the world, as `login` would have stored it. */
 const signedIn = (world: Served, as: Person) =>
   Layer.succeed(Credentials)({
     current: Effect.succeedSome({
@@ -316,17 +275,12 @@ const signedIn = (world: Served, as: Person) =>
     remove: () => Effect.die("the test removes no profile"),
   });
 
-/** The CLI's own client of the contracts, as `as`, for the steps the test sets up. */
 const clientOf = (world: Served, as: Person) =>
   Effect.map(
     Layer.build(RemoteClient.pipe(Layer.provide(signedIn(world, as)))),
     (built) => Context.get(built, Client)
   );
 
-/**
- * `as`'s git: every command through a credential helper that gives their
- * handle and token, as the CLI's helper gives git a stored profile's.
- */
 const gitOf = (helpers: string, as: Person) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -353,9 +307,6 @@ const gitOf = (helpers: string, as: Person) =>
     };
   });
 
-// -------------------------------------------------------------- the CLI
-
-/** What one run of the CLI did: its exit code, and what it printed and logged, by line. */
 interface Ran {
   readonly code: number;
   readonly out: readonly string[];
@@ -363,7 +314,6 @@ interface Ran {
   readonly logged: readonly string[];
 }
 
-/** A terminal that fails any prompt: nothing here may prompt. */
 const noPrompts = Layer.succeed(Terminal.Terminal)(
   Terminal.make({
     columns: Effect.succeed(80),
@@ -374,19 +324,12 @@ const noPrompts = Layer.succeed(Terminal.Terminal)(
   })
 );
 
-/** How the process would exit, by the runtime's own rule. */
 const exitCodeOf = (exit: Exit.Exit<unknown, unknown>) =>
   Exit.isSuccess(exit) ? 0 : Runtime.getErrorExitCode(Cause.squash(exit.cause));
 
-/** Each line of what a stream got, however it was written. */
 const linesOf = (chunks: readonly unknown[]) =>
   chunks.flatMap((chunk) => String(chunk).split("\n"));
 
-/**
- * `<cli> <args>` as `as`, a person at a terminal whose stdin is `stdin`
- * piped in: the real command tree and output, the real remote client over
- * HTTP to the world, and their stored profile.
- */
 const cli = (
   world: Served,
   as: Person,
@@ -434,46 +377,28 @@ const cli = (
     );
   });
 
-// ------------------------------------------------------------ the scenario
-
-/** Everything the scenario did and the world kept, read by each test below. */
 class Scenario extends Context.Service<
   Scenario,
   {
-    /** ines-v's `env set` of the token, its refusals, and bram's. */
     readonly set: Ran;
     readonly byBram: Ran;
     readonly publicItem: Ran;
     readonly tooShort: Ran;
-    /** `env shape --json` and `ledger --json` once the token was set. */
     readonly envView: Ran;
     readonly ledger: Ran;
-    /** bram's push of his answer, as git printed it. */
     readonly answered: { readonly exitCode: number; readonly stderr: string };
-    /** The jobs the Checker was given for the answer: those made while the world settled. */
     readonly answerJobs: readonly CheckJob[];
-    /** The tools `/mcp` lists to ines-v. */
     readonly tools: readonly string[];
     readonly kept: typeof Kept.Type;
-    /** All the world's process printed, stdout and stderr. */
     readonly printed: string;
   }
 >()("test/EnvSetLiveScenario") {}
 
-/**
- * The jobs as the world encoded them: by `CheckJob`'s fields alone, so a
- * job of unlanded code that carries values decodes, and a test refuses it.
- */
+// By `CheckJob`'s fields alone, so a job carrying values still decodes and a test refuses it.
 const decodeJobs = Schema.decodeUnknownEffect(
   Schema.Array(Schema.Struct(CheckJob.fields))
 );
 
-/**
- * The scenario, run once: datekit made and first pushed by ines-v, the
- * token set and the refusals met through the CLI, then an ask opened by
- * ines-v and answered by bram, the answer's checks run, and what the world
- * kept read back.
- */
 const ScenarioOnce = Layer.effect(
   Scenario,
   Effect.gen(function* () {
@@ -496,8 +421,6 @@ const ScenarioOnce = Layer.effect(
     const asInes = yield* clientOf(world, ines);
     const asBram = yield* clientOf(world, bram);
 
-    // ines-v makes datekit and first pushes the library as committed, its
-    // `.env.schema` and its config folder in it.
     const made = yield* asInes.initProject({ project });
     const start = path.join(home, "start");
 
@@ -522,8 +445,6 @@ const ScenarioOnce = Layer.effect(
     yield* gitOk(start, "commit", "--quiet", "--message", "Start datekit");
     yield* inesGit.ok(start, "push", "--quiet", made.remote, "HEAD:main");
 
-    // The token, piped in as `printf '%s\n' "$TOKEN" |` gives it; then bram,
-    // a public item and a short value.
     const setting = (key: string) => [
       "env",
       "set",
@@ -560,8 +481,6 @@ const ScenarioOnce = Layer.effect(
       "--json",
     ]);
 
-    // ines-v opens one of datekit's asks (red first on the world's
-    // Checker); bram claims it and pushes an answer to his claim's fork.
     const files = yield* Effect.forEach(askFiles, (file) =>
       Effect.map(fs.readFileString(path.join(example, file)), (content) => ({
         content,
@@ -603,7 +522,6 @@ const ScenarioOnce = Layer.effect(
 
     yield* settle(world);
 
-    // Last, what MCP lists, then everything the world kept and printed.
     const tools = yield* toolsListed(world, ines);
     const kept = yield* keptBy(world);
 
@@ -623,30 +541,21 @@ const ScenarioOnce = Layer.effect(
   }).pipe(Effect.orDie)
 ).pipe(Layer.provide([NodeServices.layer, FetchHttpClient.layer]));
 
-// ------------------------------------------------------------------ tests
-
 const decodeEnvelope = <A extends Schema.Top>(data: A) =>
   Schema.decodeUnknownEffect(Schema.fromJsonString(Envelope(data)));
 
-/** What a `--json` run printed: its one envelope's data, as encoded, if it was not refused. */
 const dataOf = (ran: Ran) =>
   Effect.map(
     decodeEnvelope(Schema.Unknown)(ran.out.join("\n")).pipe(Effect.orDie),
     (printed) => (printed.ok ? printed.data : undefined)
   );
 
-/** A run's lines, less the empty ones a trailing newline leaves. */
 const filled = (lines: readonly string[]) =>
   lines.filter((line) => line.length > 0);
 
-/** Everything a run printed or logged, as one text. */
 const allOf = (ran: Ran) => [...ran.out, ...ran.err, ...ran.logged].join("\n");
 
-/**
- * The value base64-encoded from `shift` bytes into a longer text, less the
- * characters it shares there with its neighbours: what any base64 text
- * holding the value at that alignment contains.
- */
+// What any base64 text holding the value at this byte alignment must contain.
 const base64At = (shift: number) => {
   const encoded = btoa(`${"\0".repeat(shift)}${value}`);
 
@@ -656,10 +565,6 @@ const base64At = (shift: number) => {
   );
 };
 
-/**
- * The value, and what base64 or base64url leaves of it wherever it starts
- * inside an encoded text.
- */
 const forms = [
   value,
   ...[0, 1, 2]
@@ -667,19 +572,15 @@ const forms = [
     .flatMap((form) => [form, form.replaceAll("+", "-").replaceAll("/", "_")]),
 ];
 
-/** Whether a text holds the value in any form. */
 const holds = (text: string) => forms.some((form) => text.includes(form));
 
-/** When the token was set, as the CLI printed it. */
 const setAtOf = (set: Ran) =>
   / at (?<at>\S+Z)\. /u.exec(filled(set.out)[0] ?? "")?.groups?.at;
 
-/** A ledger's entries as encoded: each one's fields, whatever they are. */
 const Entries = Schema.Struct({
   entries: Schema.Array(Schema.Record(Schema.String, Schema.Unknown)),
 });
 
-/** The token's item in the env shape `env shape --json` printed, if it lists one. */
 const tokenItem = (envView: Ran) =>
   Effect.map(
     decodeEnvelope(EnvSchemaView)(envView.out.join("\n")).pipe(Effect.orDie),
@@ -689,7 +590,6 @@ const tokenItem = (envView: Ran) =>
         : undefined
   );
 
-/** What unlanded code sees in place of the token: its key, made a placeholder. */
 const placeholder = `__${token}_PLACEHOLDER__`;
 
 layer(ScenarioOnce, { excludeTestServices: true, timeout: "240 seconds" })(
@@ -792,8 +692,6 @@ layer(ScenarioOnce, { excludeTestServices: true, timeout: "240 seconds" })(
             printed: false,
           });
 
-          // What was searched holds what happened: the set's reply, its
-          // log line, its sealed row and its ledger event.
           const reply = JSON.stringify({
             key: token,
             setAt: setAtOf(set),

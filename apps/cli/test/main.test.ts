@@ -10,15 +10,10 @@ import { Credentials } from "../src/credentials.ts";
 import { root } from "../src/main.ts";
 import { OutputPlain } from "../src/output.ts";
 
-/** What was printed to stdout, one entry per line however it was written. */
 const printed = Effect.map(TestConsole.logLines, (all) =>
   all.flatMap((chunk) => String(chunk).split("\n"))
 );
 
-/**
- * What the CLI runs with in these tests: a test console, plain output, and
- * a client and credentials no command here calls.
- */
 const services = Layer.mergeAll(
   TestConsole.layer,
   CliOutput.layer(CliOutput.defaultFormatter({ colors: false })),
@@ -27,14 +22,12 @@ const services = Layer.mergeAll(
   OutputPlain
 ).pipe(Layer.provideMerge(NodeServices.layer));
 
-/** The help `root` prints for `--help`, line by line. */
 const help = Effect.gen(function* () {
   yield* Command.runWith(root, { version: "0.0.0" })(["--help"]);
 
   return yield* printed;
 }).pipe(Effect.provide(services));
 
-/** The lines of `lines` between the heading `from` and the next heading. */
 const section = (lines: readonly string[], from: string) => {
   const start = lines.indexOf(from) + 1;
 

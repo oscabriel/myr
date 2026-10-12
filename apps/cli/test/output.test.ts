@@ -15,7 +15,6 @@ const refusal = new StaleBase({
 
 const view = { markdown: "**2** open asks", text: "2 open asks" };
 
-/** What `use` printed through `OutputPlain`: stdout and stderr, as text. */
 const printedBy = (use: (output: Output["Service"]) => Effect.Effect<void>) =>
   Effect.gen(function* () {
     yield* Effect.flatMap(Effect.service(Output), use);

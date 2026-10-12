@@ -1,8 +1,3 @@
-/**
- * One decider's Today, as the TUI's tests read it: three decisions listed
- * out of expiry order, one of them expiring within the day, a budget with
- * room left and one waiting beyond it, and two newcomers to welcome.
- */
 import { RefNameText } from "@repo/protocol/domain/common";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
 import type { Decision, Today } from "@repo/protocol/domain/decision";

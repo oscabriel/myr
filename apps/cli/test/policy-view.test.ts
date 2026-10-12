@@ -1,11 +1,3 @@
-/**
- * `policy` as a person reads it: datekit's evaluated config folder at the
- * landed commit in the people page's words (deciders by path, the vouch
- * rule and its counts, the caps, budget, claim timing and record window),
- * or, with no policy there, why it has not evaluated and what makes it.
- * The view is a pure function of `projectPolicy`'s decoded success; under
- * `--json` the success prints as JSON whatever the view says.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { Contracts, PolicyOf } from "@repo/protocol/contracts";
@@ -21,7 +13,6 @@ const sha = "4c2e6a8b0d2f4a6c8e0b2d4f6a8c0e2b4d6f8a0c";
 
 const decodeSuccess = Schema.decodeSync(PolicyOf.successSchema);
 
-/** datekit's evaluated config folder at `sha`, encoded. */
 const datekitPolicy = {
   agents: "trailer",
   at: sha,
@@ -48,7 +39,6 @@ const datekitPolicy = {
   weakening: { markers: [] },
 } as const satisfies typeof PublicPolicy.Encoded;
 
-/** datekit's policy as `projectPolicy` returns it. */
 const datekit = decodeSuccess({ policy: datekitPolicy });
 
 const noConfig = decodeSuccess({
@@ -59,14 +49,12 @@ const configFailed = decodeSuccess({
   unevaluated: { at: sha, reason: "configFailed" },
 });
 
-/** What a person reads: the view's text, or its Markdown when it has none. */
 const textOf = (success: typeof PolicyOf.successSchema.Type) =>
   Option.match(views.projectPolicy(success), {
     onNone: () => "",
     onSome: ({ markdown, text }) => text ?? markdown,
   });
 
-/** Each non-empty line, its runs of spaces made one. */
 const linesOf = (text: string) =>
   text
     .split("\n")
@@ -174,7 +162,6 @@ const decodeEnvelope = Schema.decodeEffect(
   Schema.fromJsonString(Envelope(Schema.Unknown))
 );
 
-/** A platform whose `projectPolicy` answers `success`. */
 const answering = (success: typeof PolicyOf.successSchema.Type) =>
   Layer.mergeAll(
     unanswered,

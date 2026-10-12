@@ -1,29 +1,3 @@
-/**
- * `bun run build`: the CLI as it ships, in `dist/`.
- *
- * 1. tsdown (`tsdown.config.ts`) writes the npm build: `bin.js`, `rules.js`
- *    and `protocol.js`, every workspace package inlined.
- * 2. tsgo declares the two library entries, workspace packages included,
- *    and tsdown bundles that into `rules.d.ts` and `protocol.d.ts`.
- * 3. `bun build --compile` makes the standalone binary `bin/<cli>` for this
- *    machine, or `bin/<target>/<cli>` for each of `--targets`. It embeds the
- *    sdk and the rules' entry, each bundled whole, and hands their embedded
- *    paths to `src/local/config-runtime.ts` before the CLI starts, so the
- *    binary alone can bundle and evaluate a TypeScript config folder. For
- *    each of `--targets`, the target's native packages (`build-targets.ts`)
- *    are fetched from npm into a temp folder the compile resolves through
- *    `NODE_PATH`: `bun install` left out every other machine's.
- * 4. Beside each binary, `git-credential-<slug>` links to it: the binary
- *    sees the name it was started by (`src/bin.ts`), so the link is git's
- *    credential helper.
- *
- * `--version <semver>` stamps both builds (`versionDefine`): it is what
- * the CLI's `--version` prints. Without it the build says `0.0.0`.
- *
- * A Bun script, outside every Worker's graph. Names come from `Brand`.
- * Importing it builds nothing (`tsdown.config.ts` and the tests read its
- * pure parts): only `bun build.ts` runs the build.
- */
 import { BunRuntime, BunServices } from "@effect/platform-bun";
 import { Brand } from "@repo/brand";
 import {
@@ -50,22 +24,14 @@ import {
   versionDefine,
 } from "./tsdown.config.ts";
 
-// The one define both bundlers get, kept beside tsdown's configs, which
-// this module imports (lint refuses an import cycle).
+// Re-exported: tsdown.config.ts defines it, as importing this module would be a cycle.
 export { versionDefine } from "./tsdown.config.ts";
 
-/** What one build is asked for. */
 export interface BuildOptions {
-  /** Bun targets to cross-compile for, without `bun-`; none builds for this machine. */
   readonly targets: readonly string[];
-  /** The version both builds are stamped with. */
   readonly version: string;
 }
 
-/**
- * `bun build --compile`'s arguments for one binary: `entry` compiled to
- * `outfile`, for `target` (this machine when absent), stamped with `version`.
- */
 export const compileArgs = (input: {
   readonly entry: string;
   readonly outfile: string;
@@ -90,7 +56,6 @@ class BuildFailed extends Data.TaggedError("BuildFailed")<{
   readonly detail: string;
 }> {}
 
-/** A tsconfig the build writes for one step. */
 interface Tsconfig {
   readonly compilerOptions: {
     readonly declaration?: boolean;
@@ -98,7 +63,6 @@ interface Tsconfig {
     readonly noCheck?: boolean;
     readonly noEmit?: boolean;
     readonly outDir?: string;
-    /** Module names onto files: each workspace package's exports. */
     readonly paths: Readonly<Record<string, readonly string[]>>;
     readonly rootDir?: string;
   };
@@ -107,14 +71,12 @@ interface Tsconfig {
   readonly include?: readonly string[];
 }
 
-/** What the build reads of a native package's manifest: its machines' packages. */
 const NativeManifest = Schema.fromJsonString(
   Schema.Struct({
     optionalDependencies: Schema.Record(Schema.String, Schema.String),
   })
 );
 
-/** What the build reads of a workspace package's manifest. */
 const Manifest = Schema.fromJsonString(
   Schema.Struct({
     exports: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)),
@@ -122,10 +84,6 @@ const Manifest = Schema.fromJsonString(
   })
 );
 
-/**
- * Runs `command` with this terminal's output, in `cwd` and with `env` over
- * this process's own when given; any exit but 0 fails `step`.
- */
 const run = (
   step: string,
   command: string,
@@ -157,7 +115,6 @@ const run = (
     Effect.asVoid
   );
 
-/** tsdown over `config`, as one build step. */
 const tsdown = (step: string, config: Parameters<typeof build>[0]) =>
   Effect.tryPromise({
     catch: (cause) => new BuildFailed({ detail: String(cause), step }),
@@ -172,10 +129,6 @@ const make = ({ targets, version }: BuildOptions) =>
     const repo = path.join(root, "..", "..");
     const dist = path.join(root, "dist");
 
-    /**
-     * `paths` that map every workspace package's exports, as its manifest
-     * states them, onto `onto(file)` for each file they name.
-     */
     const workspacePaths = (onto: (file: string) => string) =>
       Effect.gen(function* () {
         const packages = path.join(repo, "packages");
@@ -202,14 +155,12 @@ const make = ({ targets, version }: BuildOptions) =>
         return paths;
       });
 
-    /** Writes `config` as a tsconfig in `dir`, and gives its path. */
     const tsconfigIn = (dir: string, name: string, config: Tsconfig) =>
       Effect.as(
         fs.writeFileString(path.join(dir, name), JSON.stringify(config)),
         path.join(dir, name)
       );
 
-    // 1. The npm build, one entry at a time: the first cleans `dist/`.
     for (const config of npm(version)) {
       yield* tsdown(`tsdown ${Object.keys(config.entry).join(", ")}`, {
         ...config,
@@ -218,10 +169,8 @@ const make = ({ targets, version }: BuildOptions) =>
       });
     }
 
-    // 2. The library entries' types. tsgo declares them in a folder at a
-    // fixed path, removed once the build ends: the bundled `.d.ts` files keep
-    // each source's path in a comment, so a temp folder's random name would
-    // make every build's types differ (and publish this machine's paths).
+    // A fixed path, not a temp folder: the bundled .d.ts files keep each
+    // source path in a comment, so a random name would change every build.
     const scratch = path.join(dist, ".types");
 
     yield* Effect.acquireRelease(
@@ -231,7 +180,6 @@ const make = ({ targets, version }: BuildOptions) =>
 
     const declared = path.join(scratch, "declared");
 
-    /** Where tsgo declares `file` (a source under the repo). */
     const declaration = (file: string) =>
       path.join(declared, path.relative(repo, file)).replace(/\.ts$/u, ".d.ts");
 
@@ -274,11 +222,8 @@ const make = ({ targets, version }: BuildOptions) =>
       cwd: root,
     });
 
-    // 3. What the binary embeds for a TypeScript config folder: the sdk and
-    // the rules' entry, each one file with effect inlined (a machine with
-    // only the binary has no node_modules), and the entry `bun build
-    // --compile` starts from, which hands their embedded paths over before
-    // `src/bin.ts` runs (a module's imports run in order).
+    // Bundled whole (a machine with only the binary has no node_modules);
+    // runtime.ts sets their embedded paths before src/bin.ts runs.
     const compile = path.join(dist, ".compile");
 
     yield* Effect.acquireRelease(
@@ -321,12 +266,7 @@ const make = ({ targets, version }: BuildOptions) =>
       ].join("\n")
     );
 
-    /**
-     * `node_modules` in a temp folder holding the native packages of
-     * `target`'s machine, as each of `NATIVE` pins them: `bun install`
-     * filtered them to this machine's. The versions are the installed
-     * manifests' own exact pins.
-     */
+    /** `bun install` installed only this machine's native packages. */
     const nativeFor = (target: string) =>
       Effect.gen(function* () {
         const machine = yield* Effect.fromOption(npmMachineOf(target)).pipe(
@@ -377,7 +317,6 @@ const make = ({ targets, version }: BuildOptions) =>
         return path.join(folder, "node_modules");
       });
 
-    // 4. The binaries, each with its credential helper link.
     const outputs =
       targets.length === 0
         ? [{ dir: path.join(dist, "bin"), target: Option.none<string>() }]
@@ -426,7 +365,6 @@ const version = Flag.String("version").pipe(
   Flag.optional
 );
 
-/** The build's command line, running `then` with what it asks for. */
 const command = <E, R>(
   then: (options: BuildOptions) => Effect.Effect<void, E, R>
 ) =>
@@ -448,15 +386,11 @@ const command = <E, R>(
     )
   );
 
-/**
- * The build's own `--version` takes a value, so effect/cli's built-in
- * `--version` (a boolean that prints and exits) is left out.
- */
+// The build's `--version` takes a value, so effect/cli's boolean one is dropped.
 const builtIns = CliConfig.make({
   builtIns: GlobalFlag.BuiltIns.filter((flag) => flag !== GlobalFlag.Version),
 });
 
-/** Runs `then` with what `argv`, the build's arguments, asks for. */
 export const parseBuild = <E, R>(
   argv: readonly string[],
   then: (options: BuildOptions) => Effect.Effect<void, E, R>

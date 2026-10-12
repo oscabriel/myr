@@ -63,15 +63,12 @@ import { program } from "../src/main.ts";
 import { OutputPlain } from "../src/output.ts";
 import { SignedOut } from "./signed-out.ts";
 
-/** The repo's top folder, as the session found it. */
 const root = "/work/datekit";
 
-/** The ask's check, one of the ask's own files: no answer may change it. */
 const checkPath = "packages/a/test/week.test.ts";
 
 const landedSha = "4444444444444444444444444444444444444444";
 
-/** Bob's ask `fix-week`, as its file states it: module `a` is its territory. */
 const askWire = {
   askedBy: "bob",
   blockedBy: [],
@@ -93,10 +90,8 @@ const askWire = {
   },
 } as const;
 
-/** The ask, as `showAsk` returns it. */
 const ask = Schema.decodeSync(Ask)(askWire);
 
-/** Alice's claim on `fix-week`, as the hook keeps it. */
 const claim: HookClaim = {
   ask: ask.id,
   base: CommitSha.make("1".repeat(40)),
@@ -106,7 +101,6 @@ const claim: HookClaim = {
   want: ask.brief.want,
 };
 
-/** An unreasoned `.skip(` in the ask's check: the agent's to fix. */
 const weakened = new Weakened({
   at: { line: 3, path: RepoPath.make(checkPath) },
   weakening: { marker: ".skip(" },
@@ -114,7 +108,6 @@ const weakened = new Weakened({
 
 const sha = (digit: string) => CommitSha.make(digit.repeat(40));
 
-/** A session with a claim, before any stop was held. */
 const facts: HookFacts = {
   claim: Option.some(claim),
   holds: 0,
@@ -133,11 +126,9 @@ const input = (fields: Partial<HookInput>): HookInput => ({
   ...fields,
 });
 
-/** A tool call on one file, as Claude Code sends it. */
 const tool = (name: string, toolInput: NonNullable<HookInput["tool_input"]>) =>
   input({ tool_input: toolInput, tool_name: name });
 
-/** Claude Code's PreToolUse deny, with the gateway's own text as the reason. */
 const deny = (refusals: Array.NonEmptyReadonlyArray<Refusal>) => ({
   hookSpecificOutput: {
     hookEventName: "PreToolUse",
@@ -304,11 +295,9 @@ describe("session-start", () => {
   });
 });
 
-/** Claude Code's Stop, as it sends it. */
 const stop = (fields: Partial<HookInput> = {}) =>
   input({ hook_event_name: "Stop", stop_hook_active: false, ...fields });
 
-/** Claude Code's Stop hold, with the gateway's own text as the reason. */
 const hold = (refusals: Array.NonEmptyReadonlyArray<Refusal>) => ({
   decision: "block",
   reason: explain(refusals).join("\n"),
@@ -390,7 +379,6 @@ describe("stop", () => {
 });
 
 describe("the gateway's own reading of a path", () => {
-  /** The policy at the landed SHA: the closure `@repo/checks` computes for it. */
   const policy = Schema.decodeSync(Policy)({
     agents: "trailer",
     asks: [askWire],
@@ -425,7 +413,6 @@ describe("the gateway's own reading of a path", () => {
     weakening: { markers: [] },
   });
 
-  /** Alice's push to her claim's fork, changing `path` alone. */
   const push = (path: string): PushFacts => ({
     addedLines: new Map(),
     ask: Option.some(ask),
@@ -488,9 +475,6 @@ describe("the gateway's own reading of a path", () => {
   );
 });
 
-// ------------------------------------------------------------ the command
-
-/** Alice's live claim on `fix-week`, made when main was at `base`. */
 const liveClaim = (base: string) =>
   Schema.decodeSync(ClaimView)({
     ask: "fix-week",
@@ -506,10 +490,6 @@ const liveClaim = (base: string) =>
     warnsAt: "2026-10-07T14:00:00.000Z",
   });
 
-/**
- * Alice's clone of her claim's fork: a commit with two modules, the config
- * folder and the ask's check, and the fork as `origin`. Its root, real path.
- */
 const aClone = (remote: string) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -559,10 +539,6 @@ const aClone = (remote: string) =>
     return { base: yield* gitOk(dir, "rev-parse", "HEAD"), dir };
   });
 
-/**
- * A platform whose `status` gives alice's claims as `claims` holds them
- * when asked, counting each `status` and each `showAsk`.
- */
 const platformOf = (
   claims: Ref.Ref<readonly ClaimView[]>,
   asked: Ref.Ref<{ readonly showAsk: number; readonly status: number }>
@@ -599,7 +575,6 @@ const platformOf = (
     ])
   );
 
-/** A platform that knows alice's claim, made at `base`, and what it was asked. */
 const platformFor = (base: string) =>
   Effect.gen(function* () {
     const asked = yield* Ref.make({ showAsk: 0, status: 0 });
@@ -613,24 +588,17 @@ const platformFor = (base: string) =>
     };
   });
 
-/** What one run of `<cli> hook …` printed, and the exit code a process would have. */
 interface Ran {
   readonly code: number;
   readonly out: readonly string[];
   readonly err: readonly string[];
 }
 
-/** The env a run reads: where the session's state is kept. */
 interface StateEnv {
   readonly HOME?: string;
   readonly XDG_STATE_HOME?: string;
 }
 
-/**
- * Runs `argv` as a harness would: `stdin` on stdin, the state kept where
- * `env` says (a folder alone is `XDG_STATE_HOME`), with `services` (the
- * platform, a push check) beside the CLI's own.
- */
 const runHook = (
   argv: readonly string[],
   stdin: string,
@@ -670,7 +638,6 @@ const runHook = (
     )
   );
 
-/** `TouchedJudge` for one path. */
 const touchedJudgeOf = (path: string) =>
   new TouchedJudge({ paths: [RepoPath.make(path)] });
 
@@ -854,7 +821,6 @@ describe(`${Brand.cli} hook, as a harness runs it`, () => {
     () =>
       Effect.gen(function* () {
         const { dir } = yield* aClone(fork);
-        // The project the hook asks the platform about, once it asks.
         const asked = yield* Deferred.make<string | undefined>();
 
         const hung = Layer.mock(Client)({
@@ -926,7 +892,6 @@ describe(`${Brand.cli} hook, as a harness runs it`, () => {
           path.join(home, ".local", "state", Brand.slug, "hooks", "s-9.json"),
         ];
 
-        // Each file's permission bits, if it is there.
         expect(
           yield* Effect.forEach(kept, (file) =>
             Effect.map(
@@ -1072,7 +1037,6 @@ describe(`${Brand.cli} hook, as a harness runs it`, () => {
 
         const before = [yield* event("session-start"), yield* edit];
 
-        // The agent claims the ask in its first turn.
         yield* Ref.set(claims, [liveClaim(base)]);
 
         const after = [yield* edit, yield* event("stop"), yield* edit];
@@ -1117,10 +1081,6 @@ const encodeEnvelope = Schema.encodeSync(
   Schema.fromJsonString(Envelope(Schema.Unknown))
 );
 
-/**
- * The default check over a stand-in for the CLI that prints `stdout` and
- * exits `code`, whatever arguments it is given.
- */
 const checkPrinting = (stdout: string, code: number) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;

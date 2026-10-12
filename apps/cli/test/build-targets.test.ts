@@ -1,8 +1,3 @@
-/**
- * A cross-compiled binary needs another machine's native packages, which
- * `bun install` leaves out on this one: the build fetches them for npm's
- * `os` and `cpu`, read here from Bun's target names.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Option } from "effect";
 

@@ -1,29 +1,12 @@
-/**
- * The npm build of the CLI, which `build.ts` runs first: `dist/bin.js`, the
- * command line under Node or Bun, and two library entries, `./rules` (the
- * sdk a config folder imports) and `./protocol` (the types its data has).
- * Workspace packages are inlined, so the published package names none of
- * them; `effect` and `@effect/platform-bun`, the package's own
- * dependencies, stay imports. Each entry is stamped with the version
- * `build.ts` is given (`npm`).
- */
 import { defineConfig } from "tsdown";
 import type { UserConfig } from "tsdown";
 
-/** What a build no release stamped says it is (the release's `UNRELEASED`). */
 export const UNSTAMPED = "0.0.0";
 
-/**
- * What each bundler replaces so `cliVersion` (`src/version.ts`) reads
- * `version`: the expression it reads, onto the version as a string literal.
- * `build.ts` hands it to tsdown here (`npm`) and to every `bun build
- * --compile` (`compileArgs`).
- */
 export const versionDefine = (version: string) => ({
   "import.meta.env.CLI_BUILD_VERSION": JSON.stringify(version),
 });
 
-/** The library entries, by the name each is published under. */
 export const library = {
   protocol: "src/entries/protocol.ts",
   rules: "src/entries/rules.ts",
@@ -43,12 +26,8 @@ const shared = {
 } as const satisfies UserConfig;
 
 /**
- * The library entries' types, bundled from declarations `build.ts` has had
- * tsgo write (tsdown's own declaration step passes tsgo this package as its
- * `rootDir`, and TypeScript declares no file it reached through
- * `node_modules`, so every workspace package would be missing). `entry`
- * names each entry's declaration file; `tsconfig` maps each workspace
- * package onto its declarations, so they are inlined too.
+ * Bundled from tsgo's declarations: tsdown's own step declares no file
+ * reached through node_modules, so workspace packages would be missing.
  */
 export const declarations = (
   entry: Readonly<Record<keyof typeof library, string>>,
@@ -56,17 +35,12 @@ export const declarations = (
 ) =>
   ({
     ...shared,
-    // The npm build wrote `dist/` first; this only adds to it.
     clean: false,
     dts: { dtsInput: true, emitDtsOnly: true, tsconfig },
     entry,
   }) satisfies UserConfig;
 
-/**
- * The npm build stamped with `version` (`src/version.ts`): one define for
- * all three entries, so they agree. `build.ts` builds them in order; only
- * the first cleans `dist/`, so a build one at a time keeps the others' files.
- */
+// Only the first entry cleans `dist/`.
 export const npm = (version: string) => {
   const stamped = { ...shared, define: versionDefine(version), dts: false };
 
@@ -78,5 +52,4 @@ export const npm = (version: string) => {
   ] satisfies UserConfig[];
 };
 
-/** `tsdown` run here by hand builds what no release stamped. */
 export default defineConfig(npm(UNSTAMPED));

@@ -1,10 +1,3 @@
-/**
- * The command rows every listing renders from (the platform's skill, the
- * CLI's MCP prompt, the web's `llms.txt`) against the CLI itself: the tree
- * `root` builds, and what each command's `--help` says it takes. A command
- * without a row, a row without a command, or a row naming flags the command
- * doesn't take fails here, before any listing tells an agent so.
- */
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { commandDocs, contractCommandDocs } from "@repo/agent-kit/command-doc";
@@ -20,7 +13,6 @@ import { root } from "../src/main.ts";
 import { OutputPlain } from "../src/output.ts";
 import { SignedOut } from "./signed-out.ts";
 
-/** What a command's `--help` says it takes, as this test reads it. */
 const Takes = Schema.Struct({
   args: Schema.Array(
     Schema.Struct({ name: Schema.String, required: Schema.Boolean })
@@ -40,7 +32,6 @@ const encodeTakes = Schema.encodeSync(Schema.fromJsonString(Takes));
 
 const decodeTakes = Schema.decodeSync(Schema.fromJsonString(Takes));
 
-/** The parts of a help page this test compares, as one JSON line. */
 const takesOf = (doc: HelpDoc.HelpDoc) =>
   encodeTakes({
     args: (doc.args ?? []).map(({ name, required }) => ({ name, required })),
@@ -53,7 +44,6 @@ const takesOf = (doc: HelpDoc.HelpDoc) =>
 
 const plain = CliOutput.defaultFormatter({ colors: false });
 
-/** effect/cli's own formatter, but help prints what a command takes as JSON. */
 const formatter: CliOutput.Formatter = {
   formatCliError: (error) => plain.formatCliError(error),
   formatError: (error) => plain.formatError(error),
@@ -62,10 +52,6 @@ const formatter: CliOutput.Formatter = {
   formatVersion: (name, version) => plain.formatVersion(name, version),
 };
 
-/**
- * What the CLI runs with here: a test console, that formatter, and a client
- * and credentials `--help` never calls.
- */
 const services = Layer.mergeAll(
   TestConsole.layer,
   CliOutput.layer(formatter),
@@ -74,10 +60,6 @@ const services = Layer.mergeAll(
   OutputPlain
 ).pipe(Layer.provideMerge(NodeServices.layer));
 
-/**
- * What the command at `path` takes, from its own `--help`; help that fails
- * to print fails the test.
- */
 const helpOf = (path: readonly string[]) =>
   Effect.gen(function* () {
     yield* Command.runWith(root, { version: "0.0.0" })([...path, "--help"]);
@@ -94,7 +76,6 @@ interface Node {
   readonly takes: Takes;
 }
 
-/** Every command under `command` in the tree, at any depth, with its help. */
 const below = (
   command: Command.Command.Any,
   path: readonly string[]
@@ -110,16 +91,11 @@ const below = (
       })
   ).pipe(Effect.map((nodes) => nodes.flat()));
 
-/**
- * Whether a node is a command a person runs: one with nothing under it, or
- * one that takes arguments or flags of its own (`ask <ask>` beside `ask
- * open`). A word that only groups commands (`env`) takes none.
- */
+// A word that only groups commands (`env`) takes nothing; `ask <ask>` beside `ask open` does.
 const isRunnable = ({ command, takes }: Node) =>
   command.subcommands.length === 0 ||
   takes.args.length + takes.flags.length > 0;
 
-/** The CLI's runnable commands, by their words. */
 const runnable = below(root, []).pipe(
   Effect.map(
     (nodes) =>
@@ -133,12 +109,7 @@ const rows: readonly CommandDoc[] = commandDocs(Contracts);
 
 const words = ({ path }: CommandDoc) => path.join(" ");
 
-/**
- * A row's flags as the command declares them: `--no-push` is the negation
- * effect/cli gives the boolean flag `push`, so it names that switch, unless
- * the command has a flag of that very name (`--no-browser`). Only a boolean
- * flag has a negation; any other `--no-…` stays as written.
- */
+// `--no-push` names the boolean flag `push`, unless the command has a flag of that very name.
 const declared = (row: CommandDoc, takes: Takes) => {
   const names = new Set(takes.flags.map(({ name }) => name));
 
@@ -156,7 +127,6 @@ const declared = (row: CommandDoc, takes: Takes) => {
   );
 };
 
-/** A payload's JSON Schema, as this test reads it: its fields and the required ones. */
 const PayloadFields = Schema.Struct({
   properties: Schema.optionalKey(Schema.Record(Schema.String, Schema.Json)),
   required: Schema.optionalKey(Schema.Array(Schema.String)),
@@ -164,7 +134,6 @@ const PayloadFields = Schema.Struct({
 
 const decodePayloadFields = Schema.decodeUnknownSync(PayloadFields);
 
-/** The payload of the contract a contract row projects, as JSON Schema. */
 const payloadOf = (row: CommandDoc) => {
   const rpc = Contracts.requests.get(row.contract ?? "");
 
@@ -175,14 +144,9 @@ const payloadOf = (row: CommandDoc) => {
 
 const isBoolean = Schema.is(Schema.Struct({ type: Schema.Literal("boolean") }));
 
-/** A boolean field is a switch, which the CLI never requires. */
 const isSwitch = (field: Schema.Json | undefined) =>
   field !== undefined && isBoolean(field);
 
-/**
- * The required fields the CLI fills from the repo it stands in, so a person
- * there may leave them out (`fromRepoContext` in `apps/cli/src/surfaces.ts`).
- */
 const filledFromRepo = new Set(["project"]);
 
 describe("the command rows against the CLI", () => {
@@ -232,10 +196,6 @@ describe("the command rows against the CLI", () => {
     30_000
   );
 
-  // A contract's flag is required when its payload field is, unless it is a
-  // switch or the CLI fills it from the repo it stands in: `project`, as
-  // `filledFromRepo` above says. A field the CLI starts filling, or stops
-  // filling, fails here until that list says so too.
   it.effect(
     "require a contract's required fields as flags, all but the --project the repo fills",
     () =>

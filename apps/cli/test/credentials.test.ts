@@ -20,7 +20,6 @@ import {
 } from "../src/credentials.ts";
 import type { Profile } from "../src/credentials.ts";
 
-/** The env names the CLI reads, spelled from the brand. */
 const SLUG = Brand.slug.toUpperCase();
 
 const token = "tok-default-0123456789abcdefghijklmnopqrstuvwxyz";
@@ -37,13 +36,11 @@ const aliceProfile: Profile = {
   url: "https://platform-demo.example.workers.dev",
 };
 
-/** A fresh config dir, and the env a shell would give the CLI with it. */
 const configHome = Effect.map(
   Effect.flatMap(FileSystem.FileSystem, (fs) => fs.makeTempDirectoryScoped()),
   (dir) => ({ dir, env: { HOME: "/nonexistent", XDG_CONFIG_HOME: dir } })
 );
 
-/** The `Credentials` the CLI would build in `env`. */
 const credentialsIn = (env: Record<string, string>) =>
   Effect.provide(
     Effect.service(Credentials),
@@ -52,7 +49,6 @@ const credentialsIn = (env: Record<string, string>) =>
     )
   );
 
-/** Each profile's url and handle, and the token's value: what a test compares. */
 const seen = (profile: Option.Option<Profile>) =>
   Option.map(profile, ({ handle, token: secret, url }) => ({
     handle,
@@ -78,7 +74,6 @@ describe("stored credentials", () => {
 
         const info = yield* fs.stat(file);
 
-        // The permission bits: read and write for the owner, nothing else.
         expect(info.mode % 0o1000).toBe(0o600);
         expect(seen(yield* credentials.current)).toStrictEqual(
           seen(Option.some(defaultProfile))

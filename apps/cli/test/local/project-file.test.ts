@@ -6,11 +6,6 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 import { projectFile } from "../../src/local/project-file.ts";
 
-/**
- * What the finder reads from a repo whose CI installs with Bun and whose
- * scripts test, lint and type-check. Lanes come in the order found, which
- * the file keeps.
- */
 const found = {
   run: {
     checks: Object.fromEntries(
@@ -32,7 +27,6 @@ const found = {
   ],
 } as const;
 
-/** What the finder reads from a repo with scripts but no test runner it knows. */
 const noTest = {
   run: {
     checks: { lint: "npm run lint" },
@@ -120,11 +114,6 @@ describe("the proposed project file", () => {
 const text = <E>(bytes: Stream.Stream<Uint8Array, E>) =>
   bytes.pipe(Stream.decodeText(), Stream.mkString);
 
-/**
- * Type-checks `files` (name → content) as a maintainer's repo would, with
- * the published CLI's `/rules` mapped to the workspace SDK: tsc's exit code
- * and what it printed.
- */
 const typeCheck = (files: Readonly<Record<string, string>>) =>
   Effect.scoped(
     Effect.gen(function* () {

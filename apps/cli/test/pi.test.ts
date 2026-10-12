@@ -1,10 +1,3 @@
-/**
- * The pi adapter on a fake pi: a registry that records each `pi.on` handler,
- * and events shaped as pi 1.0.3 types them, fired at those handlers. The
- * policy behind `PiDeps` is a fake for the adapter's own tests; the last
- * group runs the live deps over the hook policy's modules, with a stand-in
- * local check (`hook.test.ts` tests the policy itself).
- */
 import type {
   AgentBeforeSettleEvent,
   BeforeAgentStartEvent,
@@ -48,16 +41,12 @@ import type { PiContext, PiDeps, PiEvents, PiHandlers } from "../src/pi.ts";
 
 const cwd = "/work/datekit";
 
-/** The brief the fake policy gives a session that holds a claim. */
 const briefText = "# Your claim: fix-week in datekit";
 
-/** The config folder's project file: in every judge closure. */
 const projectFile = RepoPath.make(`${Brand.configDir}/project.ts`);
 
-/** A change outside the claim's territory. */
 const outside = new OutOfScope({ paths: [RepoPath.make("README.md")] });
 
-/** What the fake policy answers. */
 interface Policy {
   readonly brief?: Option.Option<string>;
   readonly guard?: (
@@ -66,7 +55,6 @@ interface Policy {
   readonly settle?: () => SettleVerdict;
 }
 
-/** The fake policy, and what the adapter asked it. */
 const fakeDeps = (policy: Policy) => {
   const asked: string[] = [];
 
@@ -94,20 +82,17 @@ const fakeDeps = (policy: Policy) => {
   return { asked, deps };
 };
 
-/** A policy whose every call fails as `failure` does. */
 const broken = (failure: Effect.Effect<never, HookFailed>): PiDeps => ({
   brief: () => failure,
   guardTool: () => failure,
   settle: () => failure,
 });
 
-/** The fake policy's judge: the config folder's project file is in its closure. */
 const judging = (call: GuardedCall) =>
   GuardedCall.$is("Write")(call) && call.file === projectFile
     ? Option.some(Array.of(new TouchedJudge({ paths: [projectFile] })))
     : Option.none();
 
-/** A fake preflight: what `<cli> check` refuses of the work as it stands. */
 const preflight =
   (...refusals: readonly Refusal[]) =>
   (call: GuardedCall) =>
@@ -115,7 +100,6 @@ const preflight =
       ? Option.some(refusals)
       : Option.none();
 
-/** A fake pi: it records each handler the adapter registers, by event. */
 const fakePi = () => {
   const handlers: { -readonly [K in keyof PiHandlers]?: PiHandlers[K] } = {};
   const events: string[] = [];
@@ -132,7 +116,6 @@ const fakePi = () => {
   return { events, handlers, pi };
 };
 
-/** A handler's context in session `id`, with the notes `ui.notify` got. */
 const contextOf = (id: string, withUi = true) => {
   const notes: string[] = [];
   const bare: PiContext = { cwd, sessionManager: { getSessionId: () => id } };
@@ -146,7 +129,6 @@ const contextOf = (id: string, withUi = true) => {
   return { ctx: withUi ? { ...bare, ui } : bare, notes };
 };
 
-/** pi set up with `policy` behind the adapter. */
 const loaded = (policy: Policy) => {
   const { asked, deps } = fakeDeps(policy);
   const { events, handlers, pi } = fakePi();
@@ -156,7 +138,6 @@ const loaded = (policy: Policy) => {
   return { asked, events, handlers };
 };
 
-/** Fires one recorded handler at `event`, as pi does, and awaits it. */
 const fire = <E, R>(
   handler: ((event: E, ctx: PiContext) => Promise<R>) | undefined,
   event: E,
@@ -199,13 +180,8 @@ const bashOf = (command: string): ToolCallEvent => ({
   type: "tool_call",
 });
 
-/**
- * A completed run's settle with `entries` already proposed by earlier
- * handlers, as pi 1.0.3 hands it over: the run ended on the agent's own
- * reply, so the preview says it cannot go on (`canContinue` is false while
- * the last message is the assistant's, `_buildBoundaryContext` in
- * `dist/core/agent-session.js`) until a handler appends a message.
- */
+// pi 1.0.3 previews a run that ended on the agent's reply as unable to go on
+// until a handler appends a message.
 const settleOf = (entries: SessionBoundaryDraft[]): AgentBeforeSettleEvent => ({
   context: {
     canContinue: false,
@@ -457,7 +433,6 @@ describe("the pi adapter", () => {
   });
 
   describe("agent_before_settle", () => {
-    /** What another handler already appended at this boundary. */
     const earlier: SessionBoundaryDraft = {
       customType: "other-extension",
       type: "custom",
@@ -761,11 +736,8 @@ describe("the pi adapter", () => {
   );
 });
 
-// ------------------------------------------------------------ live deps
-
 const want = "An ISO week date parses to the Monday of that week.";
 
-/** Kept facts for a session on `fix-week` in a clone at `root`. */
 const claimedIn = (root: string): SessionState => ({
   claim: {
     ask: AskId.make("fix-week"),
@@ -780,12 +752,6 @@ const claimedIn = (root: string): SessionState => ({
   root,
 });
 
-/**
- * The live deps with their state in a temp folder, a local check that
- * answers `checked`, and a platform that must not be called. Gives the
- * deps, a folder that is no repo, the roots the check ran in, and a way to
- * keep a session's facts.
- */
 const policyWith = (
   checked: Effect.Effect<readonly Refusal[], PushCheckFailed>
 ) =>

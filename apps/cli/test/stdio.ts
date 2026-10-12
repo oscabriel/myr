@@ -26,10 +26,6 @@ const Message = Schema.fromJsonString(
   })
 );
 
-/**
- * Runs `mcp` as a harness would spawn it: `messages` go in on stdin, one JSON
- * line each, then stdin ends. Returns every result it wrote back, by id.
- */
 export const session = (
   handlers: Layer.Layer<Rpc.ToHandler<RpcGroup.Rpcs<typeof Contracts>>>,
   messages: readonly object[]
