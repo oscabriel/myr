@@ -271,7 +271,7 @@ export const piAdapter =
     );
 
     // Only a completed run with an actionable verdict is sent back, at most `most` times.
-      // `event.context.canContinue` is no guide: pi computes it before this handler's entry.
+    // `event.context.canContinue` is no guide: pi computes it before this handler's entry.
     pi.on("agent_before_settle", (event, ctx) => {
       const session = sessionOf(ctx);
       const used = continued.get(session.id) ?? 0;
@@ -299,7 +299,6 @@ export const piAdapter =
       );
     });
   };
-
 
 const factsOf = (session: PiSession, look: boolean) =>
   Effect.gen(function* () {

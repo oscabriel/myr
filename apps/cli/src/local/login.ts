@@ -41,7 +41,6 @@ const SIGN_IN_WAIT = "5 minutes";
 
 const clientIdOf = (origin: string) => `${origin}/oauth/cli`;
 
-
 export const Loopback = Context.Reference<{
   readonly listen: (address: {
     readonly hostname: string;
@@ -111,7 +110,6 @@ export const Browser = Context.Reference<{
   }),
 });
 
-
 export class LoginUsage extends Schema.TaggedError<LoginUsage>()("LoginUsage", {
   reason: Schema.String,
 }) {
@@ -137,7 +135,6 @@ export class GitConfigFailed extends Schema.TaggedError<GitConfigFailed>()(
     return `git did not take this; run it yourself: ${this.command}`;
   }
 }
-
 
 const flags = {
   json: Flag.Boolean("json").pipe(
@@ -250,7 +247,6 @@ const platformOf = (
       reason: `no platform to log in to for profile ${name}: run ${Brand.cli} login --url https://<platform host>${Option.isSome(profile) ? ` --profile ${name}` : ""}`,
     });
   });
-
 
 const tokenFromStdin = Effect.gen(function* () {
   const { stdin } = yield* Stdio.Stdio;

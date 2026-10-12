@@ -71,7 +71,6 @@ const allow = (holds: number, note?: string): HookDecision => ({
   output: {},
 });
 
-
 const normalize = (path: string) => {
   const parts: string[] = [];
 
@@ -171,7 +170,6 @@ const preToolUse = (input: HookInput, facts: HookFacts): HookDecision =>
     },
   });
 
-
 const bullets = (items: readonly string[]) =>
   items.map((item) => `- \`${item}\``);
 
@@ -216,7 +214,6 @@ const sessionStart = (facts: HookFacts): HookDecision =>
       },
     }),
   });
-
 
 export const MAX_HOLDS = 3;
 

@@ -25,7 +25,6 @@ export const askJudge = (
   };
 };
 
-
 const decodeRun = Schema.decodeUnknownOption(RunBlock);
 
 /** The config folder's run block needs the config evaluated, which only `<cli> check` does, so the claim's check command stands in. */
