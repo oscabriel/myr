@@ -1,18 +1,3 @@
-/**
- * One file of a project at a revision, in Code mode (its Why mode is
- * `why/why-view.tsx`, the same page). The file header stays under the
- * context bar: the path once, the file in words, Code | Why, Raw,
- * Permalink (`y`) and Copy. The code takes the pane's whole width and
- * scrolls sideways inside itself, never wrapping: the server sends it
- * highlighted where it highlights its language and size (`ServerCode`,
- * ADR 0027), else as numbered, anchored plain text (`NumberedLines`), and
- * the browser's drawing (`code`, from `client-code.tsx`) replaces it in
- * place.
- *
- * A Markdown file is rendered (its source on `?plain=1`), an image is shown
- * from raw, and a binary file or one past the read cap says its size and
- * links its bytes. The inspector holds "This file".
- */
 import type { CommitView, FileView } from "@repo/protocol/domain/code";
 import type { ProjectName } from "@repo/protocol/ids";
 import type { DateTime } from "effect";
@@ -34,7 +19,6 @@ import {
 
 const LINK = "decoration-rule underline hover:decoration-current";
 
-/** What the server shows of a file that has no text to number. */
 const Bytes = ({
   file,
   project,
@@ -54,7 +38,6 @@ const Bytes = ({
   </div>
 );
 
-/** The file's body: an image, Markdown, numbered text, or its size. */
 const Body = ({
   code,
   file,
@@ -129,14 +112,10 @@ export interface BlobViewProps {
   readonly file: FileView;
   readonly project: ProjectName;
   readonly rev: string;
-  /** The browser's drawing of the text, holding `NumberedLines` as its fallback. */
   readonly code?: ReactNode;
-  /** `?plain=1`: a Markdown file's source, not its rendering. */
   readonly plain?: boolean;
-  /** The commit that last changed the file. */
   readonly last?: CommitView | undefined;
   readonly now: DateTime.Utc;
-  /** The Files button, below the shell's width. */
   readonly files?: ReactNode;
 }
 

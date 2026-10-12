@@ -1,15 +1,3 @@
-/**
- * A file in Why mode (ADR 0019): the same page as its Code mode, the code
- * with a band above each group of lines one commit brought, saying who
- * put them there, ask and answer first and the commit second, with why,
- * one step back. The server sends the bands among numbered plain lines;
- * the browser draws the file highlighted with the same bands as Pierre's
- * annotations (`code`, from `client-why.tsx`), where pressing a line
- * number opens that line's landing whole.
- *
- * A file the walk cannot read as text (binary, or past 1 MiB) has no
- * groups, and the page says so.
- */
 import type { CommitView, FileView, WhyView } from "@repo/protocol/domain/code";
 import type { ProjectName } from "@repo/protocol/ids";
 import type { DateTime } from "effect";
@@ -26,7 +14,6 @@ import { groupsOf } from "./rows.ts";
 
 const LINK = "decoration-rule underline hover:decoration-current";
 
-/** The page's fallback: the numbered lines, each group's band above its first line. */
 export const WhyFallback = ({
   now,
   project,
@@ -64,15 +51,10 @@ export interface WhyLinesProps {
   readonly rev: string;
   readonly view: WhyView;
   readonly now: DateTime.Utc;
-  /** The file at `view.at`: its words, its bytes; absent when it could not be read. */
   readonly file?: FileView | undefined;
-  /** The file's text at `view.at`; absent for a binary or too large file. */
   readonly text?: string;
-  /** The browser's drawing, holding `WhyFallback` as its fallback. */
   readonly code?: ReactNode;
-  /** The commit that last changed the file. */
   readonly last?: CommitView | undefined;
-  /** The Files button, below the shell's width. */
   readonly files?: ReactNode;
 }
 

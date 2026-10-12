@@ -1,17 +1,3 @@
-/**
- * A project's refs as a reader sees them, one row each: main at its landed
- * commit (it moves only by a landing), the tags (newest first, as
- * `listRefs` orders them, `TAGS_PAGE` a page), and the forks: each claim's
- * on one line with its answer, its claimant and the claim's state, then
- * each person's working fork. Only what `listRefs` returns is shown, so
- * the platform's own refs never appear. The page says tags, never
- * releases: a release is something else here.
- *
- * A monorepo's tags version several packages (`@changesets/cli@2.27.1`):
- * when they hold more than one, a list of packages, each with its newest
- * tag and its count, sits above the tags, and `?package=` lists one
- * package's tags alone.
- */
 import { packageOf } from "@repo/protocol/domain/code";
 import type {
   ForkRef,
@@ -40,17 +26,12 @@ import { Workspace } from "../shared/shell/workspace.tsx";
 import { Pager } from "./pager.tsx";
 import { commitHref, shortSha, treeHref } from "./paths.ts";
 
-/** One package's tags: its name, its newest tag and how many it has. */
 interface PackageRun {
   readonly count: number;
   readonly name: string;
   readonly newest: TagRef;
 }
 
-/**
- * The packages the tags version, in the order `listRefs` gives their
- * runs (most tags first), each with the first, so newest, of its tags.
- */
 const packagesOf = (tags: readonly TagRef[]): readonly PackageRun[] => {
   const runs = new Map<string, PackageRun>();
 
@@ -71,16 +52,13 @@ const packagesOf = (tags: readonly TagRef[]): readonly PackageRun[] => {
   return [...runs.values()];
 };
 
-/** How many tags a page lists. */
 export const TAGS_PAGE = 100;
 
-/** The refs page itself. */
 const refsPath = (project: string) => `/${project}/refs`;
 
 /**
- * The refs page from the `from`th tag, of one package's tags or all. The
- * router writes the search, so a name it would read back as JSON (a
- * package called `2048`) is quoted and arrives as the name.
+ * The router writes the search, so a name it would read back as JSON (a package
+ * called `2048`) is quoted.
  */
 const refsHref = (project: string, from: number, only?: string) =>
   `${refsPath(project)}${defaultStringifySearch({
@@ -91,11 +69,9 @@ const refsHref = (project: string, from: number, only?: string) =>
 const plural = (count: number, one: string, many: string) =>
   `${count} ${count === 1 ? one : many}`;
 
-/** A link inside a row's metadata, raised over the row's own link. */
 const META_LINK =
   "decoration-rule relative z-10 underline hover:decoration-current";
 
-/** A commit in a row's metadata: short, whole in its title, linked. */
 const CommitLink = ({
   project,
   sha,
@@ -112,14 +88,12 @@ const CommitLink = ({
   </AppLink>
 );
 
-/** Someone in a row's metadata, linked over the row's own link. */
 const Person = ({ handle }: { readonly handle: ForkRef["handle"] }) => (
   <span className="relative z-10">
     <HandleLink handle={handle} />
   </span>
 );
 
-/** A group of rows, or what it would hold said plainly when it holds none. */
 const Group = ({
   children,
   counts,
@@ -130,7 +104,6 @@ const Group = ({
   readonly name: string;
   readonly counts?: string;
   readonly facts?: ReactNode;
-  /** What the group would hold, when it holds nothing. */
   readonly empty?: string | undefined;
   readonly children: ReactNode;
 }) => (
@@ -148,7 +121,6 @@ const Group = ({
   </div>
 );
 
-/** main: where it stands, and that only a landing moves it. */
 const MainRow = ({ refs }: { readonly refs: Refs }) => {
   const { landed, project } = refs;
 
@@ -160,7 +132,6 @@ const MainRow = ({ refs }: { readonly refs: Refs }) => {
     <RowList label="main">
       <Row
         action={
-          // At the top of the row, on the state word's line, not centred below it.
           <AppLink
             className={`text-ui shrink-0 self-start leading-6 font-medium ${META_LINK}`}
             to={treeHref(project, "main")}
@@ -298,7 +269,6 @@ const WorkingFork = ({ fork }: { readonly fork: ForkRef }) => (
   />
 );
 
-/** What an empty list of tags says: none at all, or none of one package. */
 const noTags = (only: string | undefined) =>
   only === undefined ? "No tags." : `No tags for ${only}.`;
 
@@ -331,11 +301,8 @@ export const RefsView = ({
   platformUrl,
   refs,
 }: {
-  /** The first tag this page lists. */
   readonly from?: number | undefined;
-  /** The one package whose tags this page lists; all when none. */
   readonly package?: string | undefined;
-  /** Where the project is cloned from. */
   readonly platformUrl: string;
   readonly refs: Refs;
 }) => {

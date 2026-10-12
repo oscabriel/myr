@@ -1,14 +1,3 @@
-/**
- * The code pages' file header: the toolbar that stays under the context
- * bar while the code scrolls. Left to right: the Files button (below the
- * shell's width, where the tree is not in a rail), the path as a trail of
- * links with a button that copies it, the file's size in words ("12 lines
- * · 493 bytes · TypeScript"), the Code | Why toggle (one page, two modes,
- * each its own address), then Raw, Permalink (`y`) and Copy.
- *
- * Also here: the `y` key, which rewrites the address to the page at its
- * commit, and the words a file's facts are said in.
- */
 import type { FileView } from "@repo/protocol/domain/code";
 import type { ProjectName } from "@repo/protocol/ids";
 import { Check, Copy, Link2 } from "lucide-react";
@@ -31,14 +20,12 @@ import {
   whyHref,
 } from "./paths.ts";
 
-/** A text's lines, without the empty one after its last newline. */
 export const linesOf = (text: string): readonly string[] => {
   const lines = text.split("\n");
 
   return lines.at(-1) === "" ? lines.slice(0, -1) : lines;
 };
 
-/** The language a file is written in, by its name; none for one this list does not know. */
 const LANGUAGES: readonly (readonly [RegExp, string])[] = [
   [/\.(?:c|m)?tsx?$/u, "TypeScript"],
   [/\.(?:c|m)?jsx?$/u, "JavaScript"],
@@ -65,7 +52,6 @@ const LANGUAGES: readonly (readonly [RegExp, string])[] = [
 export const languageOf = (path: string) =>
   LANGUAGES.find(([pattern]) => pattern.test(path))?.[1];
 
-/** A file in words: its lines, its size, its language. */
 export const fileWords = (file: FileView): readonly string[] => [
   ...(file.text === undefined
     ? []
@@ -79,11 +65,6 @@ export const fileWords = (file: FileView): readonly string[] => [
   ...(languageOf(file.path) === undefined ? [] : [languageOf(file.path) ?? ""]),
 ];
 
-/**
- * Whether `press` asks for the permalink: `y`, with no modifier, outside a
- * field, and only while the single keys are on (the switch in the keys
- * dialog turns this one off too).
- */
 export const permalinkPress = (press: KeyPress, on: boolean) =>
   on &&
   press.key === "y" &&
@@ -92,7 +73,6 @@ export const permalinkPress = (press: KeyPress, on: boolean) =>
   !press.ctrlKey &&
   !press.metaKey;
 
-/** `y` rewrites the address to the page at its commit, keeping the line anchor. */
 export const PermalinkKey = ({ href }: { readonly href: string }) => {
   const on = useKeys()?.on ?? true;
 
@@ -138,7 +118,6 @@ export const PermalinkKey = ({ href }: { readonly href: string }) => {
 const CRUMB =
   "text-muted-foreground hover:text-foreground min-w-0 truncate no-underline transition-colors duration-[120ms]";
 
-/** A button that copies `text` with only its mark showing; its name says what it copies. */
 const CopyMark = ({
   label,
   text,
@@ -167,7 +146,6 @@ const CopyMark = ({
   );
 };
 
-/** The path as links: the project, each folder at `rev`, then the name itself. */
 export const PathTrail = ({
   path,
   project,
@@ -187,8 +165,7 @@ export const PathTrail = ({
       data-slot="breadcrumb"
     >
       <ol className="text-mono flex min-w-0 items-center gap-1 font-mono">
-        {/* On a phone the toolbar has room for the name alone: the folders
-            above it are the Files sheet's. */}
+        {/* On a phone the toolbar has room for the name alone. */}
         <li
           className={`${here === undefined ? "flex" : "tablet:flex hidden"} min-w-0 shrink-0 items-center`}
         >
@@ -250,7 +227,6 @@ export const PathTrail = ({
 const SEGMENT =
   "text-ui hover:bg-surface aria-[current]:bg-foreground aria-[current]:text-background aria-[current]:hover:bg-foreground flex h-7 items-center px-2.5 font-medium no-underline transition-colors duration-150";
 
-/** Code | Why: the file, or why each of its lines is there; one page, two addresses. */
 export const ModeToggle = ({
   mode,
   path,
@@ -286,7 +262,6 @@ const TOOL = buttonVariants({
   variant: "ghost",
 });
 
-/** The file header, as the page's toolbar. */
 export const FileHeader = ({
   file,
   files,
@@ -297,13 +272,9 @@ export const FileHeader = ({
 }: {
   readonly project: ProjectName;
   readonly rev: string;
-  /** The folder or file the page is about; the root when absent. */
   readonly path?: string | undefined;
-  /** Code or Why, on a file's page; nothing on a folder's. */
   readonly mode?: "code" | "why";
-  /** The file, read: its size in words, its bytes and its text to copy. */
   readonly file?: FileView;
-  /** The Files button, below the shell's width. */
   readonly files?: ReactNode;
 }) => (
   <>
@@ -313,7 +284,6 @@ export const FileHeader = ({
     <div className="flex min-w-0 flex-1 items-center gap-3">
       <PathTrail path={path} project={project} rev={rev} />
       {file === undefined ? null : (
-        // From 1440 px the inspector says the same, beside the path.
         <p className="text-ui text-muted-foreground diffsplit:block codefacts:hidden hidden min-w-0 truncate tabular-nums">
           {fileWords(file).join(" · ")}
         </p>

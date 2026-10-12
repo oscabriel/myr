@@ -1,14 +1,6 @@
 /**
- * The file drawn by `@pierre/diffs`, with a band above each group of lines
- * one commit brought (`WhyBand`, the same the server's plain lines carry):
- * an annotation renders after its `lineNumber`, so a group starting at
- * line `n` sits at `n - 1`, and `0` is above line 1. Highlighting runs in
- * the worker pool. Clicking a line number opens a dialog with that line's
- * landing whole.
- *
- * It is Pierre's `File` (as `code-view.tsx` draws a file), which renders
- * on the server too, so its markup can be checked; the page loads it only
- * in the browser (`client-why.tsx`), and the Worker never bundles it.
+ * An annotation renders after its `lineNumber`, so a group starting at line `n`
+ * sits at `n - 1`, and `0` is above line 1.
  */
 import { File } from "@pierre/diffs/react";
 import type { FileOptions, LineAnnotation } from "@pierre/diffs/react";
@@ -38,12 +30,10 @@ registerCodeTheme();
 export interface WhyCodeProps {
   readonly now: DateTime.Utc;
   readonly project: ProjectName;
-  /** The file's text at `view.at`. */
   readonly text: string;
   readonly view: WhyView;
 }
 
-/** The dialog for one clicked line: its landing, or the commit the project adopted. */
 const LineDialog = ({
   line,
   onClose,

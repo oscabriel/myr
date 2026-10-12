@@ -1,16 +1,3 @@
-/**
- * One commit, read as a landing first and a diff second. The head: the
- * subject, the landing's status line ("Landed as 9b1c3e5 · answered
- * format-ordinal", the SHA and the ask linked), the body as prose, and
- * git's own metadata on one muted line. The inspector holds the typed
- * facts: this landing's state, its credit (the trailers, once), the diff's
- * stats split by path, and its provenance. Then the diff, file by file, in
- * a pane of its own: the server's plain text (`PlainDiff`), which the
- * browser's drawing (`drawing`, from `client-code.tsx`) replaces in place.
- *
- * A commit the platform did not land came in with the history the project
- * adopted, and says so; its trailers are listed as written, linking no one.
- */
 import type {
   CommitDiff,
   CommitView as Commit,
@@ -41,13 +28,11 @@ import { ChangeCounts, PlainDiff } from "./plain-diff.tsx";
 
 const LINK = "decoration-rule underline hover:decoration-current";
 
-/** A trailer line: `Key: value`, the key one word of letters and dashes. */
 const TRAILER = /^[A-Za-z][\w-]*:\s/u;
 
 /**
- * The body without its trailers, which the Credit block shows: git's
- * trailer block is the last paragraph when every line of it is a
- * `Key: value`.
+ * Git's trailer block is the last paragraph when every line of it is a `Key:
+ * value`.
  */
 export const bodyWithoutTrailers = (commit: Commit) => {
   const paragraphs = commit.body.trim().split(/\n\s*\n/u);
@@ -60,7 +45,6 @@ export const bodyWithoutTrailers = (commit: Commit) => {
   return (trailers ? paragraphs.slice(0, -1) : paragraphs).join("\n\n").trim();
 };
 
-/** Where the commit stands, in one line: landed as its SHA, and the ask it answered or opened. */
 export const LandingStatus = ({
   commit,
   project,
@@ -114,7 +98,6 @@ export const LandingStatus = ({
   );
 };
 
-/** Git's own metadata, on one line: who wrote it, who committed it, its parents. */
 const GitLine = ({
   commit,
   now,
@@ -174,7 +157,6 @@ const PART_WORDS = {
   tests: "tests",
 } as const;
 
-/** The diff in numbers: files, lines added and removed, then split by path. */
 export const DiffStatsFacts = ({ stats }: { readonly stats: DiffStats }) => (
   <FactBlock label="Diff stats">
     <p
@@ -209,7 +191,6 @@ export const DiffStatsFacts = ({ stats }: { readonly stats: DiffStats }) => (
   </FactBlock>
 );
 
-/** The trailers of a commit the platform did not land, as written, linking no one. */
 const WrittenTrailers = ({ commit }: { readonly commit: Commit }) =>
   commit.trailers.length === 0 ? null : (
     <FactBlock label="Trailers">
@@ -223,7 +204,6 @@ const WrittenTrailers = ({ commit }: { readonly commit: Commit }) =>
     </FactBlock>
   );
 
-/** A landing's credit from the record; a commit the platform did not land, its trailers as written. */
 const LandingCredit = ({ commit }: { readonly commit: Commit }) =>
   commit.landing === undefined ? (
     <WrittenTrailers commit={commit} />
@@ -235,7 +215,6 @@ const LandingCredit = ({ commit }: { readonly commit: Commit }) =>
     />
   );
 
-/** Where the commit comes from: its id, its tree, its people and parents, and the landing's request. */
 const provenanceOf = (commit: Commit): readonly ProvenanceEntry[] => [
   { label: "Commit", value: commit.sha },
   { label: "Tree", value: commit.tree },
@@ -256,7 +235,6 @@ const provenanceOf = (commit: Commit): readonly ProvenanceEntry[] => [
     : [{ label: "Request-Id", value: commit.landing.requestId }]),
 ];
 
-/** The inspector's facts for a commit. */
 const CommitFacts = ({
   commit,
   project,
@@ -296,11 +274,9 @@ const CommitFacts = ({
   );
 };
 
-/** A segmented pair of buttons, the pressed one in ink. */
 const SEGMENT =
   "text-ui hover:bg-surface aria-pressed:bg-foreground aria-pressed:text-background aria-pressed:hover:bg-foreground flex h-7 cursor-pointer items-center gap-1.5 px-2.5 font-medium transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:size-3.5";
 
-/** The diff's toolbar: unified or split, fold or unfold every file, and the counts. */
 export const DiffToolbar = ({
   allFolded,
   files,
@@ -311,11 +287,9 @@ export const DiffToolbar = ({
 }: {
   readonly split: boolean;
   readonly onSplit?: ((split: boolean) => void) | undefined;
-  /** Whether every file is folded now. */
   readonly allFolded: boolean;
   readonly onFoldAll?: ((folded: boolean) => void) | undefined;
   readonly stats: DiffStats;
-  /** The Files button, below the shell's width. */
   readonly files?: ReactNode;
 }) => (
   <>
@@ -367,20 +341,14 @@ export interface CommitViewProps {
   readonly diff: CommitDiff;
   readonly now: DateTime.Utc;
   readonly project: ProjectName;
-  /** The ask's territory, when the commit landed an answer: the stats split by it. */
   readonly territory?: readonly string[] | undefined;
-  /** Old and new side by side. */
   readonly split?: boolean;
   readonly onSplit?: ((split: boolean) => void) | undefined;
-  /** The files folded now; each file's default when absent. */
   readonly folded?: ReadonlySet<string> | undefined;
   readonly onFold?: ((path: string, folded: boolean) => void) | undefined;
   readonly onFoldAll?: ((folded: boolean) => void) | undefined;
-  /** The browser's drawing of the diff, holding `PlainDiff` as its fallback. */
   readonly drawing?: ReactNode;
-  /** The Files button, below the shell's width. */
   readonly files?: ReactNode;
-  /** The diff's files already parsed (`drawnFiles`), so a page parses each once. */
   readonly drawn?: readonly DrawnFile[] | undefined;
 }
 

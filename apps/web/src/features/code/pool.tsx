@@ -1,13 +1,3 @@
-/**
- * Highlighting off the main thread: Pierre's worker pool, which every
- * drawing of code under `CodePool` shares (`File`, `CodeView`). The pool is
- * made once for the tab, the first time a page draws code, and kept: the
- * next code page highlights in workers already warm, and a file drawn once
- * is not highlighted again (each drawing keys its file by blob id).
- *
- * The worker is Pierre's own module, bundled by Vite as a module worker.
- * Only the browser loads this file (through the lazy drawings).
- */
 import { WorkerPoolContext } from "@pierre/diffs/react";
 import { getOrCreateWorkerPoolSingleton } from "@pierre/diffs/worker";
 import { Effect } from "effect";
@@ -16,10 +6,8 @@ import { use, useMemo } from "react";
 
 import { diffsOptions, registerCodeTheme } from "./pierre.ts";
 
-/** Two workers: a page draws one file or one diff at a time, and grammars load once per worker. */
 const POOL_SIZE = 2;
 
-/** The tab's pool: made the first time code is drawn or warmed, the same after. */
 export const workerPool = () => {
   registerCodeTheme();
 
@@ -33,8 +21,7 @@ export const workerPool = () => {
     },
     poolOptions: {
       onWorkerError: () => {
-        // A worker that fails is Pierre's to replace; the code it was
-        // drawing stays as plain text, which is what the page sent.
+        // Pierre replaces a failed worker; its code stays as the page's plain text.
       },
       poolSize: POOL_SIZE,
       workerFactory: () =>
@@ -51,10 +38,8 @@ type Pool = ReturnType<typeof workerPool>;
 const readiness = new WeakMap<Pool, Promise<void>>();
 
 /**
- * Settles once the pool's own highlighter is up (or has failed, when
- * Pierre draws on the main thread instead). Before that, Pierre draws a
- * file it would not highlight (a `.vm`, plain text) as nothing, and never
- * draws it again.
+ * Before the pool's highlighter is up, Pierre draws a file it would not
+ * highlight as nothing, and never draws it again.
  */
 const readyOf = (pool: Pool) => {
   const known = readiness.get(pool);
@@ -63,9 +48,8 @@ const readyOf = (pool: Pool) => {
     return known;
   }
 
-  // A pool already up is marked settled the way React reads a promise it
-  // has seen, so `use` does not hold the drawing back for a turn; one
-  // still starting is marked so once it is up, whoever awaited it first.
+  // Marked settled the way React reads a promise it has seen, so `use` does not
+  // hold the drawing back for a turn.
   const made = pool.isInitialized()
     ? Object.assign(Promise.resolve(), { status: "fulfilled" })
     : Effect.runPromise(
@@ -82,20 +66,10 @@ const readyOf = (pool: Pool) => {
   return made;
 };
 
-/**
- * Settles once the tab's pool is up (at once where there are no workers):
- * a drawing awaited on this then mounts with nothing left to wait for.
- */
 export const poolReady = () =>
   "Worker" in globalThis ? readyOf(workerPool()) : Promise.resolve();
 
-/**
- * The pool, for the drawings under it; none outside a browser. Until the
- * pool is up the drawings wait in their `Suspense`, whose fallback is the
- * server's plain text.
- */
 export const CodePool = ({ children }: { readonly children: ReactNode }) => {
-  // Pierre keeps one pool for the tab: asking again hands back the same.
   const pool = useMemo(
     () => ("Worker" in globalThis ? workerPool() : undefined),
     []

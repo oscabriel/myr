@@ -1,26 +1,3 @@
-/**
- * A set of changed files drawn by Pierre's `CodeView`: one scroller that
- * draws only the files in view, each file's header sticky at its top
- * (with a hairline only while it is stuck), unchanged runs folded into
- * "N unmodified lines" bars, changed words marked inside changed lines,
- * and highlighting done in the worker pool (`pool.tsx`). It sits in a
- * `DiffPane`, over the server's `PlainDiff` (the same hunks, the same
- * measures), which it replaces in place.
- *
- * Unified diffs mark each line `+` or `-`, so a change reads without
- * colour; split diffs mark the side with a bar. Each header has a chevron
- * that folds the file; an added or deleted file past 80 lines starts
- * folded. Lines can be selected, and the selection is kept in the address
- * (`#diff-<path>:L4-L7`); an address naming a file (the tree, `J`/`K`)
- * scrolls to its header.
- *
- * What a page adds, so the finish and waiver pages draw with it unedited:
- * `annotations` (a row under a line, on one side), and per file a header
- * slot (`slots[].header`, a "Mark read" button) and a status (`read`
- * marks the header with a check, `refused` with the refused cross).
- *
- * Only the browser loads this module (`client-code.tsx`).
- */
 import type { CodeViewItem, DiffLineAnnotation } from "@pierre/diffs";
 import { CodeView } from "@pierre/diffs/react";
 import type { CodeViewHandle, CodeViewReactOptions } from "@pierre/diffs/react";
@@ -41,7 +18,6 @@ import { SERVER_FILES } from "./prerender.ts";
 
 registerCodeTheme();
 
-/** A row a page draws under one line of one file's diff, on one side. */
 export interface DiffAnnotation {
   readonly path: string;
   readonly line: number;
@@ -49,7 +25,6 @@ export interface DiffAnnotation {
   readonly render: () => ReactNode;
 }
 
-/** What a page adds to one file's header: a control, and the file's status. */
 export interface DiffFileSlot {
   readonly path: string;
   readonly header?: ReactNode;
@@ -61,22 +36,11 @@ export interface DiffCodeProps {
   readonly split: boolean;
   readonly annotations?: readonly DiffAnnotation[];
   readonly slots?: readonly DiffFileSlot[];
-  /** The files folded now; each file's own default when absent. */
   readonly folded?: ReadonlySet<string> | undefined;
-  /** A header's fold was pressed. */
   readonly onFold?: ((path: string, folded: boolean) => void) | undefined;
-  /**
-   * The files already parsed, in the order to draw them: a decision's diff
-   * comes as a patch, with no whole texts to parse `files` from.
-   */
   readonly drawn?: readonly DrawnFile[] | undefined;
 }
 
-/**
- * The header's hairline, only while it is stuck at the top (where the
- * browser can tell); a plain one where it cannot. Each header also carries
- * a hairline above it, parting one file from the next.
- */
 const HEADER_CSS = `
 [data-diffs-header] { box-shadow: inset 0 1px var(--rule); container-type: scroll-state; }
 [data-diffs-header]::after { content: ""; position: absolute; inset-inline: 0; bottom: 0; height: 1px; background: transparent; }
@@ -88,10 +52,7 @@ const NO_ANNOTATIONS: readonly DiffAnnotation[] = [];
 
 const NO_SLOTS: readonly DiffFileSlot[] = [];
 
-/**
- * An item's version: it changes whenever what the item draws does (folded
- * or not, the lines its annotations sit on), so `CodeView` draws it again.
- */
+/** Changes whenever what the item draws does, so `CodeView` draws it again. */
 const versionOf = (
   folded: boolean,
   annotations: readonly DiffLineAnnotation<DiffAnnotation>[]
@@ -107,7 +68,6 @@ const versionOf = (
   return hash * 2 + annotations.length;
 };
 
-/** One file as `CodeView` holds it; a binary or unsent file as a header with no lines. */
 const itemOf = (
   drawn: DrawnFile,
   folded: boolean,
@@ -135,7 +95,6 @@ const itemOf = (
   };
 };
 
-/** The address's fragment, handed up as it changes; only inside a router. */
 const HashFollower = ({
   onHash,
 }: {
@@ -150,7 +109,6 @@ const HashFollower = ({
   return null;
 };
 
-/** Scroll the pane into place, then the file's header to its top. */
 const reveal = (
   handle: CodeViewHandle<DiffAnnotation, undefined> | null,
   container: HTMLElement | null,
@@ -195,16 +153,14 @@ export const DiffCode = ({
 
   const slotOf = (path: string) => slots.find((slot) => slot.path === path);
 
-  // The folds as they are now, read when the address moves: a fold the
-  // reader makes later must neither unfold the named file again nor
-  // scroll back to it.
+  // Read when the address moves: a fold made later must neither unfold the
+  // named file again nor scroll back to it.
   const folds = useRef({ folded, onFold });
 
   useEffect(() => {
     folds.current = { folded, onFold };
   });
 
-  // An address naming a file scrolls to it, and its lines are selected.
   useEffect(() => {
     const named = parseDiffHash(hash);
 
@@ -249,7 +205,6 @@ export const DiffCode = ({
     [split]
   );
 
-  // A view drawn with no router around it (its own test) follows no address.
   const router = useRouter({ warn: false });
 
   return (
@@ -286,7 +241,6 @@ export const DiffCode = ({
             const slot = slotOf(item.id);
 
             return (
-              // Pierre prints the counts itself; what it cannot say is here.
               <span className="flex items-center gap-3 font-sans">
                 {file === undefined || Option.isSome(file.diff) ? null : (
                   <span className="text-muted-foreground">
@@ -351,12 +305,6 @@ export const DiffCode = ({
   );
 };
 
-/**
- * Ready to draw the first files of a diff highlighted at once: the pool
- * up, and the files a reader sees first (those the server may have sent
- * highlighted) highlighted in it, keyed as `DiffCode` draws them. The rest
- * are highlighted as they scroll into view. Settles either way.
- */
 export const prepareDiffs = ({
   drawn,
   files,

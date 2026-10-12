@@ -1,19 +1,9 @@
 /**
- * Code highlighted on the server: a file, or one file of a diff, drawn by
- * `@pierre/diffs/ssr` with the browser's own options (`pierre.ts`) into
- * the HTML of the drawing's shadow root, which the page sends as a
- * declarative shadow root. The browser's drawing later takes its place
- * with the same highlighting, so the reader sees the code once.
- *
- * Shiki runs on its JavaScript engine (a Worker compiles no WebAssembly),
- * and only with the grammars named here: the Worker's build resolves
- * `shiki` to core alone (`vite.config.ts`), so no other grammar is
- * bundled. Pierre will not resolve a grammar or a theme by name in a
- * Worker's global scope, so each is loaded here and attached to its
+ * Shiki runs on its JavaScript engine (a Worker compiles no WebAssembly), and
+ * the Worker's build resolves `shiki` to core alone (`vite.config.ts`), so only
+ * the grammars named here are bundled. Pierre will not resolve a grammar or a
+ * theme by name in a Worker's global scope, so each is attached to its
  * highlighter directly, once per isolate.
- *
- * Loaded on the server only, by `prerender.ts`, on a page's first
- * highlighted code: the Worker's entry carries none of it.
  */
 import {
   attachResolvedLanguages,
@@ -41,7 +31,6 @@ import type { ServerLanguage } from "./prerender.ts";
 
 type Grammar = () => Promise<{ readonly default: LanguageRegistration[] }>;
 
-/** Each server language's grammar, loaded on first use; `yml` and `zsh` are aliases Pierre names. */
 const GRAMMARS: Record<ServerLanguage, Grammar> = {
   css: () => import("shiki/langs/css.mjs"),
   html: () => import("shiki/langs/html.mjs"),
@@ -57,7 +46,6 @@ const GRAMMARS: Record<ServerLanguage, Grammar> = {
   zsh: () => import("shiki/langs/shellscript.mjs"),
 };
 
-/** The shared highlighter, with the token theme and `language`'s grammar attached. */
 const highlighterFor = (language: ServerLanguage) =>
   Effect.gen(function* () {
     const highlighter = yield* Effect.tryPromise(() =>
@@ -70,8 +58,6 @@ const highlighterFor = (language: ServerLanguage) =>
 
     const grammar = yield* Effect.tryPromise(GRAMMARS[language]);
 
-    // Each is attached once; Pierre skips one already attached. The theme
-    // is normalized as Pierre normalizes a registered one.
     yield* Effect.try(() => {
       attachResolvedThemes(normalizeTheme(codeTheme()), highlighter);
       attachResolvedLanguages(
@@ -81,10 +67,6 @@ const highlighterFor = (language: ServerLanguage) =>
     });
   });
 
-/**
- * A drawing in `language`; if it fails, the same drawing as plain text, so
- * the page still sends Pierre's markup; none if that fails too.
- */
 const draw = <E1, E2>(
   language: Option.Option<ServerLanguage>,
   highlighted: Effect.Effect<string, E1>,
@@ -99,13 +81,11 @@ const draw = <E1, E2>(
       ),
   }).pipe(Effect.orElseSucceed((): string | undefined => undefined));
 
-/** A file drawn as `FileCode` draws it. */
 const fileHtml = (file: FileContents) =>
   Effect.tryPromise(() => preloadFile({ file, options: fileOptions })).pipe(
     Effect.map(({ prerenderedHTML }) => prerenderedHTML)
   );
 
-/** One file, as `FileCode` draws it. */
 export const prerenderFile = (file: {
   readonly path: string;
   readonly sha: string;
@@ -121,16 +101,13 @@ export const prerenderFile = (file: {
 };
 
 /**
- * A diff's body drawn without Pierre's header (the page's own sits above
- * it) sits as it does in the browser's drawing: Pierre drops the code's
- * top gap only after a header, so the lines would otherwise start 8 px
- * lower, and it takes a scrollbar's width from the bottom gap only once
- * its script has measured one, so the next file would start 6 px higher.
+ * Pierre drops the code's top gap only after a header, and takes a scrollbar's
+ * width from the bottom gap only once its script has measured one; this keeps a
+ * headerless body where the browser's drawing puts it.
  */
 const UNDER_HEADER_CSS =
   "[data-code] { padding-top: 0; padding-bottom: var(--diffs-gap-block, var(--diffs-gap-fallback)); }";
 
-/** A diff's body drawn unified, as `DiffCode` draws it, without a header. */
 const diffHtml = (fileDiff: FileDiffMetadata) =>
   Effect.tryPromise(() =>
     preloadDiffHTML({
@@ -143,10 +120,6 @@ const diffHtml = (fileDiff: FileDiffMetadata) =>
     })
   );
 
-/**
- * One file of a diff's body, unified, as `DiffCode` draws it, under the
- * page's own header: none for a file with no lines.
- */
 export const prerenderDiff = (file: DrawnFile) =>
   Option.match(file.diff, {
     onNone: () => Effect.sync((): string | undefined => undefined),

@@ -1,12 +1,4 @@
 import type { Refusal } from "@repo/protocol/refusal";
-/**
- * A code page's 404. A path missing at a revision that exists lands softly
- * on the nearest folder that does, the platform's refusal (`UnknownPath`)
- * as its notice, verbatim, above the folder's entries. Any other refusal
- * (`UnknownProject`, `UnknownRevision`, `UnknownCommit`) is drawn as `git`
- * would print it, with a way onward; an address that can name nothing
- * says why in a sentence.
- */
 import { Option, Schema } from "effect";
 import type { Array } from "effect";
 import type { ReactNode } from "react";
@@ -29,7 +21,6 @@ const LINK = "decoration-rule underline hover:decoration-current";
 export const NOTHING =
   "Nothing is at this address: a code page names a project, then main, a whole 40-hex commit id or a tag, then a path in the project.";
 
-/** A refusal with no folder to land on: verbatim, then the ways onward. */
 const Refused = ({
   refusals,
 }: {
@@ -54,7 +45,6 @@ export const CodeNotFound = ({
   files,
 }: {
   readonly data?: unknown;
-  /** The Files button, below the shell's width, on the folder a missing path lands on. */
   readonly files?: ReactNode;
 }) =>
   Option.match(decodeLanding(data), {

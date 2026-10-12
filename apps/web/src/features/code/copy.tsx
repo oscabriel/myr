@@ -1,7 +1,3 @@
-/**
- * A button that copies `text` and says so for two seconds, as the command
- * lines do (`shared/command.tsx`).
- */
 import { Effect } from "effect";
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";

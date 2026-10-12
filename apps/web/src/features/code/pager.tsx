@@ -1,7 +1,3 @@
-/**
- * Newer and Older, for a list read a page at a time (the log, the tags).
- * Each is a plain link to its page; a side with no page shows nothing.
- */
 import {
   Pagination,
   PaginationContent,
