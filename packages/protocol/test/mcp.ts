@@ -20,7 +20,6 @@ const meta = {
   "io.modelcontextprotocol/protocolVersion": protocol.protocolVersion,
 };
 
-/** The last JSON-RPC message in a reply, which is plain JSON or an event stream. */
 const lastMessage = (response: Response) =>
   Effect.promise(() => response.text()).pipe(
     Effect.map((text) =>
@@ -36,16 +35,11 @@ const lastMessage = (response: Response) =>
 
 const Reply = Schema.fromJsonString(Schema.Struct({ result: Schema.Unknown }));
 
-/** What a request carries: a tool call names its tool and its arguments. */
 interface Params {
   readonly arguments?: Readonly<Record<string, string>>;
   readonly name?: string;
 }
 
-/**
- * Serves the MCP-surfaced contracts' tools over MCP's HTTP transport, the way
- * a Worker's fetch handler would, with `handlers` answering each call.
- */
 export const serve = Effect.fnUntraced(function* (
   handlers: Layer.Layer<Rpc.ToHandler<RpcGroup.Rpcs<typeof Contracts>>>
 ) {
@@ -71,7 +65,6 @@ export const serve = Effect.fnUntraced(function* (
 
   yield* Effect.addFinalizer(() => Effect.promise(dispose));
 
-  /** Sends one request and decodes its result with `result`. */
   const call = Effect.fnUntraced(function* <A>(
     method: string,
     params: Params,

@@ -117,7 +117,6 @@ describe(explain, () => {
     }
   );
 
-  // Each shape refusal says how to repair it, after the reason's first clause.
   it.each([
     {
       ends: "; put those files back, or flag the ask if the want needs them",
@@ -213,8 +212,6 @@ describe(explain, () => {
     ]);
   });
 
-  // A reasoned marker opens a decision instead of a refusal, so a refused one
-  // was declined by a decider: no reason given now changes that.
   it("says a decider declined a reasoned marker, and to take it out", () => {
     const lines = explain([
       new Weakened({
@@ -269,8 +266,6 @@ describe(explain, () => {
     ]);
   });
 
-  // A cap names the limit it reached, and a rate limit when to try again; a
-  // cap with no limit is claims held, as it always was.
   it.each([
     {
       reason: "you already hold 3 claims, the most this project allows",
@@ -333,8 +328,6 @@ describe(explain, () => {
     ]);
   });
 
-  // A code read names what it could not find and how to look with git; a
-  // draft names the proposal, and where to follow it.
   it.each([
     {
       lines: [
@@ -393,8 +386,6 @@ describe(explain, () => {
     ).toBe("UnknownPath: abcdef0 has no file or folder at src/a.ts");
   });
 
-  // The refusal never holds the value, so no reader learns it, or its length,
-  // from the reason.
   it("says a value is too short by the minimum alone", () => {
     expect(
       explain([ValueTooShort.of(EnvKey.make("PAYMENTS_KEY"), 32)])
@@ -405,7 +396,6 @@ describe(explain, () => {
     ]);
   });
 
-  // A log that held a stored value is never kept, and nothing points at it.
   it("says a lane's log was withheld rather than where it is", () => {
     expect(
       explain([
@@ -422,9 +412,6 @@ describe(explain, () => {
     ]);
   });
 
-  // The lane's command reproduces the failure in a clone of the fork; the log
-  // is read through `evidence`, which lets in the answerer and the project's
-  // deciders alone.
   it("says the checks failed on the answer, the command that shows it, and where the log is kept", () => {
     const logRef = "datekit/push-2222222/unit#1";
 
@@ -437,8 +424,6 @@ describe(explain, () => {
     ]);
   });
 
-  // The CLI's local check ran the lane on this machine: no log was kept, so
-  // nothing points at `evidence`.
   it("says a lane the local check ran failed here, with no kept log to read", () => {
     const lines = explain([
       new ChecksFailed({
@@ -456,7 +441,6 @@ describe(explain, () => {
     expect(lines.join("\n")).not.toContain("evidence");
   });
 
-  // `today` across every project raises it too, so it names no project.
   it("tells a caller they are not a decider without naming a project", () => {
     const [line] = explain([new NotDecider({})]);
 
@@ -466,7 +450,6 @@ describe(explain, () => {
     expect(line).not.toContain("this project's");
   });
 
-  // Below the floor no acknowledgement helps, so the next step is another value.
   it("says a value below the floor needs another value, not an acknowledgement", () => {
     expect(
       explain([ValueTooShort.belowFloor(EnvKey.make("PAYMENTS_KEY"), 3)])
@@ -478,7 +461,6 @@ describe(explain, () => {
   });
 });
 
-/** A receipt for `ask` at `main`, where `outcome` says the answer stands. */
 const receiptAt = (outcome: Outcome) => ({
   ask,
   base,

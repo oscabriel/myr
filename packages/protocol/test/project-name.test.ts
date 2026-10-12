@@ -27,8 +27,6 @@ const decoded = (input: string) =>
     onSuccess: (name) => Option.some<string>(name),
   });
 
-// The one parser of a project's name, which every surface reads `<owner>/<name>`
-// through, and which gives the forty made before owners their names (ADR 0032).
 describe("a project's name", () => {
   it.each([
     "oscabriel/datekit",
@@ -212,9 +210,6 @@ const addressOf = (path: string) =>
     ({ legacy, rest, spelled }) => ({ legacy, rest: rest.join("/"), spelled })
   );
 
-// What a path's first segments name, the one reader the web's redirects and
-// its shell both use: a legacy key is one segment, a source path three, any
-// other name two.
 describe("a project's address", () => {
   it.each([
     ["/oscabriel/datekit/tree/main", "oscabriel/datekit", "tree/main", false],
@@ -241,8 +236,6 @@ describe("a project's address", () => {
   );
 });
 
-// A segment may hold `_` (`the_thing`), so a key joins segments with `__`,
-// which no segment holds, and two names never share a key.
 describe("a key of a name whose segments hold underscores", () => {
   it("reads back to its name", () => {
     const name = ProjectName.make("alice/the_thing");

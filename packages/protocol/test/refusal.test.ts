@@ -111,8 +111,6 @@ describe("the refusal union", () => {
     );
   });
 
-  // MCP tool schemas come from this document. A bare `Schema.Number` admits
-  // the strings "Infinity" and "NaN"; a bare `Schema.optional` admits `null`.
   it("has a JSON Schema with no non-finite numbers and no nulls", () => {
     const document = JSON.stringify(Schema.toJsonSchemaDocument(Refusal));
 
@@ -129,7 +127,6 @@ describe("the refusal union", () => {
 
   it("lists all forty-five tags in union order, group by group", () => {
     expect(Refusal.members.map((member) => member.identifier)).toStrictEqual([
-      // Push and claim
       "NotClaimed",
       "ClaimLapsed",
       "NotVouched",
@@ -140,37 +137,29 @@ describe("the refusal union", () => {
       "DirectPush",
       "AskBlocked",
       "Denounced",
-      // Shape
       "OutOfScope",
       "TouchedJudge",
       "Weakened",
       "PrivatePathInPublicTree",
       "ReachedInternals",
-      // Merge
       "StaleBase",
       "StaleLayer",
-      // Checks
       "ChecksFailed",
       "HeldBackFailed",
       "AttemptsExhausted",
-      // Never counted against the answerer
       "Flake",
       "VerifierBlocked",
-      // At ask open
       "NotRedFirst",
       "WeakCheck",
       "IncompleteBrief",
-      // Maintainers only
       "LayerContentInPublicTree",
       "SecretInOutput",
       "UnstatedRequirement",
-      // Decision
       "PostureChange",
       "NotDecider",
       "DecisionClosed",
       "ProposalClosed",
       "DraftInProgress",
-      // Lookup
       "UnknownProject",
       "UnknownAsk",
       "UnknownCommit",
@@ -178,11 +167,9 @@ describe("the refusal union", () => {
       "UnknownPath",
       "UnknownRevision",
       "UnknownProposal",
-      // Setup
       "ProjectExists",
       "NotYourNamespace",
       "ImportFailed",
-      // Env
       "UnknownEnvItem",
       "NotSensitive",
       "ValueTooShort",

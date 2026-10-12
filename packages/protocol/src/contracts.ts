@@ -96,7 +96,6 @@ import {
   Weakened,
 } from "./refusal.ts";
 
-/** The keys every contract is annotated with, for the surfaces that read them. */
 export {
   Audience,
   Cli,
@@ -110,17 +109,9 @@ export {
   Visibility,
 } from "./annotations.ts";
 
-/**
- * The env shape contract's tag. Lint keeps "shape" out of code names, so the
- * tag is spelled once, here, and the contract's class is `EnvSchemaOf`.
- */
+// Lint keeps "shape" out of code names, so the tag is spelled once, here.
 const envSchemaTag = "envShape";
 
-/**
- * The surfaces each contract is served on. Every contract's
- * `Surfaces` annotation is read from this table, and `surfaced` types each
- * surface's group by it, so the type and the annotation cannot disagree.
- */
 const servedOn = {
   claim: ["rpc", "mcp", "cli"],
   credits: SurfaceName.literals,
@@ -138,10 +129,8 @@ const servedOn = {
   landing: SurfaceName.literals,
   ledger: SurfaceName.literals,
   listAsks: SurfaceName.literals,
-  // The code reads an agent without git can use, each capped (1 MiB a file,
-  // 100 commits a page, 200 scanned for why); a commit's diff and every path
-  // stay off MCP until a cap fits a transcript. No command: git reads code
-  // locally.
+  // A commit's diff and every path stay off MCP: no cap fits a transcript.
+  // No command: git reads code locally.
   listPaths: ["rpc", "web"],
   listProjects: SurfaceName.literals,
   listRefs: ["rpc", "mcp", "web"],
@@ -162,19 +151,13 @@ const servedOn = {
   today: SurfaceName.literals,
   verdict: SurfaceName.literals,
   vouch: ["rpc", "mcp", "cli"],
-  // A stream has no tool or command form.
   watch: ["rpc", "web"],
   why: ["rpc", "mcp", "web"],
 } as const satisfies Record<string, readonly SurfaceName[]>;
 
-/**
- * The payload of a contract that takes nothing: an object with no keys. An
- * empty `Schema.Struct` has no object root in JSON Schema, which an MCP tool's
- * input needs; this is the form `Tool.EmptyParams` takes.
- */
+// An empty `Schema.Struct` has no object root in JSON Schema, which an MCP
+// tool's input needs; this is the form `Tool.EmptyParams` takes.
 const NoPayload = Schema.Record(Schema.String, Schema.Never);
-
-// --- Reads ------------------------------------------------------------------
 
 export class ListProjects extends Rpc.make("listProjects", {
   payload: NoPayload,
@@ -233,7 +216,6 @@ export class ShowAsk extends Rpc.make("showAsk", {
   payload: { ask: AskId, project: ProjectName },
   success: Schema.Struct({
     ask: Ask,
-    /** The ask as an answerer reads it first, in Markdown. */
     brief: Schema.NonEmptyString,
   }),
 })
@@ -256,7 +238,6 @@ export class Status extends Rpc.make("status", {
   success: Schema.Struct({
     answers: Schema.Array(AnswerView),
     claims: Schema.Array(ClaimView),
-    /** The caller's own handle, as the platform knows them. */
     handle: Handle,
   }),
 })
@@ -341,7 +322,6 @@ export class TodayOf extends Rpc.make("today", {
     "Show the caller's Today: the decisions to take, held to their budget, each with its evidence and a safe default."
   )
   .annotate(Audience, "decider")
-  // A decider's page: its evidence is for deciders, so no cache keeps it.
   .annotate(Visibility, "maintainers")
   .annotate(ReadOnly, true)
   .annotate(Idempotent, true)
@@ -368,7 +348,6 @@ export class LedgerOf extends Rpc.make("ledger", {
   .annotate(Cli, { name: "ledger" })
   .annotate(Surfaces, servedOn.ledger) {}
 
-/** The env shape contract, named for the file it reads: `.env.schema`. */
 export class EnvSchemaOf extends Rpc.make(envSchemaTag, {
   error: UnknownProject,
   payload: { project: ProjectName },
@@ -391,7 +370,6 @@ export class Watch extends Rpc.make("watch", {
   error: UnknownProject,
   payload: {
     project: ProjectName,
-    /** Replay from the event after this sequence number. */
     since: Schema.optionalKey(Schema.Int),
   },
   stream: true,
@@ -408,8 +386,6 @@ export class Watch extends Rpc.make("watch", {
   .annotate(Destructive, false)
   .annotate(NeedsApproval, false)
   .annotate(Surfaces, servedOn.watch) {}
-
-// --- Code reads (the canonical repo only; git reads it locally too) --------
 
 export class ListRefs extends Rpc.make("listRefs", {
   error: UnknownProject,
@@ -433,7 +409,6 @@ export class ReadTree extends Rpc.make("readTree", {
   payload: {
     /** `main`, a commit or a tag; main's landed commit when absent. */
     at: Schema.optionalKey(Rev),
-    /** The folder; the root when absent. */
     path: Schema.optionalKey(RepoPath),
     project: ProjectName,
   },
@@ -493,13 +468,11 @@ export class LogOf extends Rpc.make("log", {
   error: Schema.Union([UnknownProject, UnknownRevision]),
   payload: {
     at: Schema.optionalKey(Rev),
-    /** How many commits to skip: a page's `next`. */
     from: Schema.optionalKey(NoneOrMore),
     /** 30 when absent. */
     limit: Schema.optionalKey(
       Schema.Int.check(Schema.isBetween({ maximum: 100, minimum: 1 }))
     ),
-    /** Only the commits that changed this path. */
     path: Schema.optionalKey(RepoPath),
     project: ProjectName,
   },
@@ -563,15 +536,8 @@ export class PolicyOf extends Rpc.make("projectPolicy", {
   error: UnknownProject,
   payload: { project: ProjectName },
   success: Schema.Struct({
-    /** Where the project was imported from; absent for one that started empty. */
     importedFrom: Schema.optionalKey(ImportSource),
-    /** Absent while the config folder at the landed commit has not evaluated. */
     policy: Schema.optionalKey(PublicPolicy),
-    /**
-     * Why there is no policy at the landed commit: no config folder, or one
-     * that did not evaluate. Absent before the first landing and once a
-     * policy has evaluated.
-     */
     unevaluated: Schema.optionalKey(PolicyPending),
   }),
 })
@@ -592,7 +558,6 @@ export class ShowProposal extends Rpc.make("showProposal", {
   error: Schema.Union([UnknownProject, UnknownProposal]),
   payload: { project: ProjectName, proposal: ProposalId },
   success: Schema.Struct({
-    /** The files the proposal holds until a decider accepts it. */
     files: Schema.Array(ConfigFile),
     proposal: Proposal,
   }),
@@ -610,20 +575,15 @@ export class ShowProposal extends Rpc.make("showProposal", {
   .annotate(Cli, { name: "proposal", positional: ["proposal"] })
   .annotate(Surfaces, servedOn.showProposal) {}
 
-// --- Writes -----------------------------------------------------------------
-
 export class InitProject extends Rpc.make("initProject", {
   error: Schema.Union([ProjectExists, NotYourNamespace, ImportFailed]),
   payload: {
-    /** A public repo to import, instead of starting empty. */
     import: Schema.optionalKey(ImportSource),
     project: ProjectName,
   },
   success: Schema.Struct({
-    /** Absent until the first push to an empty project. */
     landed: Schema.optionalKey(LandedSha),
     project: ProjectName,
-    /** The project's URL at the gateway. */
     remote: Schema.NonEmptyString,
   }),
 })
@@ -637,7 +597,6 @@ export class InitProject extends Rpc.make("initProject", {
   .annotate(Idempotent, false)
   .annotate(Destructive, false)
   .annotate(NeedsApproval, true)
-  // The local `init` command calls it, with `--remote`.
   .annotate(Cli, { name: "init" })
   .annotate(Surfaces, servedOn.initProject) {}
 
@@ -672,10 +631,6 @@ export class OpenAsk extends Rpc.make("openAsk", {
   .annotate(Cli, { name: "ask open", positional: ["ask"] })
   .annotate(Surfaces, servedOn.openAsk) {}
 
-/**
- * A drafted proposal brings no files and no sealed answer: the platform's
- * agent writes the ask's files.
- */
 const draftsAlone = Schema.makeFilter(
   (payload: {
     readonly draft?: true;
@@ -689,15 +644,11 @@ const draftsAlone = Schema.makeFilter(
 );
 
 export class ProposeAsk extends Rpc.make("proposeAsk", {
-  // `NotVouched` under the `all` mode, or for a sealed answer from someone
-  // unvouched under `forCode` (a vouch admits sealed answers).
   error: Schema.Union([UnknownProject, Denounced, CapReached, NotVouched]),
   payload: Schema.Struct({
-    /** Have the platform's agent draft the ask's files from the want. */
     draft: Schema.optionalKey(Schema.Literal(true)),
     files: Schema.optionalKey(Schema.NonEmptyArray(ConfigFile)),
     project: ProjectName,
-    /** A sealed answer: the commit in the caller's working fork that answers it. */
     sealed: Schema.optionalKey(Schema.Struct({ head: CommitSha })),
     territory: Schema.optionalKey(Schema.NonEmptyString),
     want: Schema.NonEmptyString,
@@ -727,7 +678,6 @@ export class DraftAsk extends Rpc.make("draftAsk", {
     CapReached,
   ]),
   payload: {
-    /** What the draft should do differently, for the agent to read. */
     note: Schema.optionalKey(DraftNote),
     project: ProjectName,
     proposal: ProposalId,
@@ -775,9 +725,6 @@ export class Decide extends Rpc.make("decide", {
     UnknownDecision,
     DecisionClosed,
     NotDecider,
-    // Accepting a proposal opens its ask, red first on main: a blocked
-    // Checker or a main that moved fails the call, and the decider can
-    // accept again.
     VerifierBlocked,
     StaleBase,
   ]),
@@ -794,7 +741,6 @@ export class Decide extends Rpc.make("decide", {
     "Take one decision from Today: accept, decline, adopt or revert."
   )
   .annotate(Audience, "decider")
-  // The decision's evidence is for deciders.
   .annotate(Visibility, "maintainers")
   .annotate(ReadOnly, false)
   .annotate(Idempotent, false)
@@ -865,7 +811,6 @@ export class SubmitAnswer extends Rpc.make("submitAnswer", {
     base: CommitSha,
     head: CommitSha,
     project: ProjectName,
-    /** Offering the same request again returns the same receipt. */
     requestId: RequestId,
   },
   success: AnswerReceipt,
@@ -941,9 +886,7 @@ export class Fork extends Rpc.make("fork", {
   error: Schema.Union([UnknownProject, NotVouched, Denounced]),
   payload: { project: ProjectName },
   success: Schema.Struct({
-    /** `<project>--me--<handle>`. */
     fork: RepoName,
-    /** The fork's URL at the gateway. */
     remote: Schema.NonEmptyString,
   }),
 })
@@ -987,14 +930,12 @@ export class EvidenceOf extends Rpc.make("evidence", {
   error: Schema.Union([UnknownProject, NotDecider]),
   payload: {
     project: ProjectName,
-    /** The `logRef` a verdict's lane or a `ChecksFailed` refusal names. */
     ref: Schema.NonEmptyString,
   },
   success: Schema.Struct({
     lane: LaneName,
     /** The log's tail: its last 256 KiB, where a failure prints. */
     text: Schema.String,
-    /** Whether the log was longer than the tail given back. */
     truncated: Schema.Boolean,
   }),
 })
@@ -1004,7 +945,6 @@ export class EvidenceOf extends Rpc.make("evidence", {
   )
   // The handler lets in the answer's claimant and the project's deciders.
   .annotate(Audience, "signedIn")
-  // A log is for its answerer and the deciders: no cache keeps it.
   .annotate(Visibility, "maintainers")
   .annotate(ReadOnly, true)
   .annotate(Idempotent, true)
@@ -1022,7 +962,6 @@ export class SetEnv extends Rpc.make("setEnv", {
     ValueTooShort,
   ]),
   payload: {
-    /** Store a value shorter than the item's minimum anyway. */
     acknowledgeShort: Schema.optionalKey(Schema.Boolean),
     key: EnvKey,
     project: ProjectName,
@@ -1045,11 +984,9 @@ export class SetEnv extends Rpc.make("setEnv", {
   .annotate(Idempotent, true)
   .annotate(Destructive, false)
   .annotate(NeedsApproval, true)
-  // The local `env set` command reads the value from stdin.
   .annotate(Cli, { name: "env set" })
   .annotate(Surfaces, servedOn.setEnv) {}
 
-/** The one schema: every surface is a projection of this group. */
 export class Contracts extends RpcGroup.make(
   ListProjects,
   FrontPage,
@@ -1089,34 +1026,26 @@ export class Contracts extends RpcGroup.make(
   SetEnv
 ).middleware(Authenticated) {}
 
-/** Every contract in the group, as its handlers and clients see it. */
 export type Contract = RpcGroup.Rpcs<typeof Contracts>;
 
 type ServedOn = typeof servedOn;
 
-/** The tags of the contracts `surface` serves. */
 export type TagOn<S extends SurfaceName> = {
   readonly [Tag in keyof ServedOn]: S extends ServedOn[Tag][number]
     ? Tag
     : never;
 }[keyof ServedOn];
 
-/** The contracts `surface` serves. */
 export type ContractOn<S extends SurfaceName> = Extract<
   Contract,
   { readonly _tag: TagOn<S> }
 >;
 
-/**
- * Whether a contract is served on `surface`, by its `Surfaces` annotation.
- * The annotation is read from `servedOn`, which `ContractOn` reads too.
- */
 const isServedOn =
   <S extends SurfaceName>(surface: S) =>
   (rpc: Contract): rpc is ContractOn<S> =>
     Context.get(rpc.annotations, Surfaces).includes(surface);
 
-/** The group as one surface serves it: the contracts its `Surfaces` include, in order. */
 export const surfaced = <S extends SurfaceName>(
   surface: S
 ): RpcGroup.RpcGroup<ContractOn<S>> =>
@@ -1124,11 +1053,6 @@ export const surfaced = <S extends SurfaceName>(
     ...[...Contracts.requests.values()].filter(isServedOn(surface))
   );
 
-/**
- * A contract's payload, success and error as a client meets them. A stream's
- * success is one of its elements, and its error is the stream's: the call
- * itself never fails outside the stream.
- */
 export const partsOf = (rpc: Contract) =>
   RpcSchema.isStreamSchema(rpc.successSchema)
     ? {
@@ -1142,7 +1066,6 @@ export const partsOf = (rpc: Contract) =>
         success: rpc.successSchema,
       };
 
-/** A way to call the contracts, in process or over the wire. */
 export class Client extends Context.Service<
   Client,
   RpcClient.RpcClient<

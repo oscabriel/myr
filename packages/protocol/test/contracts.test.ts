@@ -380,11 +380,9 @@ const table = [
   },
 ] as const;
 
-/** Whether `proposeAsk` takes `payload`: `Some` when it decodes. */
 const decodes = (payload: typeof Schema.Json.Type) =>
   Schema.decodeUnknownOption(ProposeAsk.payloadSchema)(payload)._tag;
 
-/** The code reads: never a command, since git reads code locally. */
 type CodeRead =
   | "listPaths"
   | "listRefs"
@@ -394,10 +392,8 @@ type CodeRead =
   | "showCommit"
   | "why";
 
-/** The code reads whose output has no cap that fits a transcript: never MCP. */
 type UncappedRead = "listPaths" | "showCommit";
 
-/** Each surface's letter in the table's Surfaces column. */
 const letterOf = {
   cli: "C",
   mcp: "M",
@@ -405,13 +401,11 @@ const letterOf = {
   web: "W",
 } as const satisfies Record<SurfaceName, string>;
 
-/** The surfaces a row's letters name, in the annotation's order. */
 const surfacesOf = (letters: string): readonly SurfaceName[] =>
   SurfaceName.literals.filter((surface) => letters.includes(letterOf[surface]));
 
 const contracts = [...Contracts.requests.values()];
 
-/** A contract's command as the table's CLI column writes it. */
 const commandOf = (rpc: Contract) => {
   const cli = Context.getOrUndefined(rpc.annotations, Cli);
 
@@ -425,7 +419,6 @@ const commandOf = (rpc: Contract) => {
   ].join(" ");
 };
 
-/** The refusals an error schema admits, by name: one, a union of several, or none. */
 const refusalsOf = (error: Schema.Top) => {
   const { ast } = error;
 
@@ -438,7 +431,6 @@ const refusalsOf = (error: Schema.Top) => {
   );
 };
 
-/** A contract's example, decoded with the contract's schemas and encoded back. */
 const roundTrip = (rpc: Contract, example: Example) => {
   const { success } = partsOf(rpc);
 
@@ -511,7 +503,6 @@ describe("the contracts group", () => {
     ).toStrictEqual(table.map(({ cli, tag }) => ({ cli, tag })));
   });
 
-  // Web caching reads it: no cache may keep a response for maintainers.
   it("sets each contract's visibility explicitly, keeping only a decider's Today and decisions, and a lane's log, to maintainers", () => {
     expect(
       contracts.flatMap((rpc) => {
@@ -547,8 +538,8 @@ describe("the contracts group", () => {
     }
   );
 
-  // AGENTS.md "Effect traps": a bare number admits "Infinity" and "NaN", and
-  // `Schema.optional` admits null; MCP tool schemas would carry both.
+  // A bare number admits "Infinity" and "NaN", and `Schema.optional` admits
+  // null; MCP tool schemas would carry both.
   it("gives every payload and success a JSON Schema with no non-finite number and no null", () => {
     const leaky = contracts.flatMap((rpc) => {
       const { success } = partsOf(rpc);
@@ -582,8 +573,6 @@ describe("the contracts group", () => {
     expect(JSON.stringify(decoded)).not.toContain(encoded.value);
   });
 
-  // The platform's agent writes a drafted proposal's files, so one that
-  // brings its own, or a sealed answer, is refused at the boundary.
   it("takes a drafted proposal with no files and no sealed answer", () => {
     const want = { project: "datekit", want: "Parse ISO weeks." };
 

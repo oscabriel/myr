@@ -23,10 +23,8 @@ const head = CommitSha.make("3333333333333333333333333333333333333333");
 
 const project = ProjectName.make("oscabriel/datekit");
 
-/** An answer's arguments, as an agent passes them to `submitAnswer`. */
 const answer = { ask, base, head, project, requestId: "answer-0001" };
 
-/** A tools/call result whose one content block is JSON text. */
 const ToolResult = Schema.Struct({
   content: Schema.Tuple([
     Schema.Struct({
@@ -37,7 +35,6 @@ const ToolResult = Schema.Struct({
   isError: Schema.Boolean,
 });
 
-/** Contracts whose answers always meet a moved main. */
 const stale = (refusal: StaleBase) =>
   Layer.mergeAll(
     unanswered,
@@ -56,7 +53,6 @@ const ToolList = Schema.Struct({
   ),
 });
 
-/** The hints a harness reads before it calls a tool. */
 const HintedTools = Schema.Struct({
   tools: Schema.Array(
     Schema.Struct({
@@ -71,7 +67,6 @@ const HintedTools = Schema.Struct({
   ),
 });
 
-/** Each tool as a client reads it, with its schemas left as JSON. */
 const ListedTools = Schema.Struct({
   tools: Schema.Array(
     Schema.Struct({
@@ -84,7 +79,6 @@ const ListedTools = Schema.Struct({
   ),
 });
 
-/** A struct of one commit, as JSON Schema writes it. */
 const receipt = {
   additionalProperties: true,
   properties: { main: { pattern: "^[0-9a-f]{40}$", type: "string" } },
@@ -121,8 +115,6 @@ describe("the contracts as MCP tools", () => {
       })
   );
 
-  // A stream has no tool form, and a write-only value or a lane's log must
-  // never pass through an agent's transcript.
   it.effect(
     "offers no tool for watching a project, setting a value or reading a log",
     () =>
@@ -175,9 +167,6 @@ describe("the contracts as MCP tools", () => {
       })
   );
 
-  // A claude.ai connector has no shell: these five, each capped, are how it
-  // browses a project. A commit's diff and every path wait for a cap that
-  // fits a transcript.
   it.effect(
     "offers the capped code reads as tools that only read, and neither a commit's diff nor every path",
     () =>
@@ -210,8 +199,6 @@ describe("the contracts as MCP tools", () => {
       })
   );
 
-  // `listTools` is what the CLI's stdio server and `/mcp` both list, so it
-  // says what a client sees.
   it.effect("lists each tool exactly as listTools describes it", () =>
     Effect.gen(function* () {
       const mcp = yield* serve(unanswered);
@@ -242,8 +229,6 @@ describe("the contracts as MCP tools", () => {
     ]);
   });
 
-  // A harness reads each schema as JSON: a bare `Schema.Number` or
-  // `Schema.optional` in a contract would put "Infinity" or `null` there.
   it("gives every tool an input and an output schema, with no leak in either", () => {
     const tools = listTools(
       toToolkit(surfaced("mcp"), Effect.service(Client)).toolkit

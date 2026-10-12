@@ -18,7 +18,6 @@ const project = ProjectName.make("oscabriel/datekit");
 
 const alice = Person.make({ handle: Handle.make("alice") });
 
-/** The credentials the platform knows: one token, alice's. */
 const verify = (credential: string) =>
   Effect.succeed(
     credential === "alice-token" ? Option.some(alice) : Option.none()
@@ -28,11 +27,6 @@ const bearer = (token: string) => ({
   headers: { authorization: `Bearer ${token}` },
 });
 
-/**
- * A client of the contracts whose server side is `authenticated(verify)`.
- * `listAsks` (public) and `status` (signed in) note who called them; `callers`
- * returns everyone noted so far.
- */
 const served = Effect.gen(function* () {
   const noted = yield* Ref.make<readonly Principal[]>([]);
 
@@ -80,8 +74,6 @@ describe("the server side of Authenticated", () => {
     })
   );
 
-  // `today` is for deciders: the handler checks who decides, but nobody
-  // reaches it without a credential.
   it.effect("refuses a decider's contract without a credential", () =>
     Effect.gen(function* () {
       const { client } = yield* served;

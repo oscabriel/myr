@@ -1,16 +1,5 @@
-/**
- * The projects made before owners (ADR 0032): each keeps the flat key it
- * was made with, as its Durable Object's id, its repo's name and its
- * projection rows, and reads as the name here. The two examples are the
- * operator's; each import is at its source path. `ProjectName`'s decode
- * gives a bare key its name, and `keyOf` and `nameOfKey` consult this
- * first; `packages/config/test/legacy-projects.test.ts` holds the rows to
- * the examples and the import plan. Plain strings, read by `ids.ts`, so
- * nothing here imports a schema. A cartridge: re-key the forty, then
- * delete this file with the two tables `ids.ts` builds from it (their
- * readers fall back to the name's own key), and sign-up's reservation of
- * the keys as handles (`apps/platform/src/auth/sign-in.ts`).
- */
+// Projects that keep a flat key from before names had owners. Plain strings,
+// so nothing here imports a schema.
 export const legacyProjects: readonly {
   readonly key: string;
   readonly name: string;

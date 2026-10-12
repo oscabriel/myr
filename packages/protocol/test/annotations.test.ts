@@ -16,8 +16,6 @@ describe("every contract's annotations", () => {
     expect(undescribed).toStrictEqual([]);
   });
 
-  // The default is false, so a destructive contract that says nothing would
-  // tell an agent it is safe: every contract must decide.
   it("say whether the contract is destructive, never leaving it to the default", () => {
     const silent = contracts.flatMap((rpc) =>
       Context.getOrUndefined(rpc.annotations, Destructive) === undefined

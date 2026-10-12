@@ -28,7 +28,6 @@ const held = {
     `you already have ${counted(cap, "open proposal")} here, the most this project allows`,
 } as const satisfies Record<CapLimit, (cap: number) => string>;
 
-// A rate limit counts what one person made across the platform in a window.
 const rated = {
   claims: { noun: "claim", verb: "made" },
   drafts: { noun: "draft", verb: "started" },
@@ -44,7 +43,6 @@ const capReason = ({
     ? held[limit](cap)
     : `you ${rated[limit].verb} ${counted(cap, rated[limit].noun)} in the last minute, the most the platform allows; try again in ${retryAfter}s`;
 
-/** A conflicting path, and the landing that last changed it when one is named. */
 const conflictIn = (path: string, movedBy: readonly MovedBy[]) => {
   const mover = movedBy.find((moved) => moved.path === path);
 
@@ -175,7 +173,6 @@ const block = (refusal: Refusal) => [
   `  retryable: ${refusal.retryable ? "yes" : "no"}`,
 ];
 
-/** The reason on git's `ng` line: the first refusal's tag, and how many follow. */
 export const headline = (refusals: Array.NonEmptyReadonlyArray<Refusal>) => {
   const [first, ...rest] = refusals;
 
@@ -184,20 +181,9 @@ export const headline = (refusals: Array.NonEmptyReadonlyArray<Refusal>) => {
     : `${first._tag} and ${rest.length} more`;
 };
 
-/**
- * What a person reads, one line each, for git `remote:` lines and the CLI:
- * every refusal's reason, where it points, its next command and whether
- * retrying can help.
- */
 export const explain = (refusals: Array.NonEmptyReadonlyArray<Refusal>) =>
   refusals.flatMap(block);
 
-/**
- * Where an answer's receipt stands, in one line for git's `remote:` output
- * and the CLI's `submit`: the answer is checking, waits on a
- * decision, a finish or its parent ask, or landed. A refused answer gives
- * its refusals back, for `explain`.
- */
 export const receiptLine = (
   receipt: AnswerReceipt
 ): Result.Result<string, readonly Refusal[]> => {

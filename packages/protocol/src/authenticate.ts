@@ -9,23 +9,15 @@ import {
 } from "./principal.ts";
 import type { Person, Principal } from "./principal.ts";
 
-/**
- * The credential in an `authorization: Bearer <token>` header, if it holds
- * one; the scheme matches in any case (RFC 7235 §2.1). A host's HTTP gate
- * reads it with this too, so the gate and the server side agree on what a
- * credential is.
- */
 export const bearerToken = (authorization: string | undefined) =>
   Option.fromNullishOr(
     /^Bearer (?<token>\S+)$/iu.exec(authorization ?? "")?.groups?.token
   );
 
 /**
- * Server side of `Authenticated`: a credential names a Person; no credential
- * is Anonymous only for a `public` contract. A credential `verify` doesn't
- * know is refused, never taken for anyone, and so is an `authorization`
- * header that holds no bearer token. A `verify` that fails can't say who is
- * calling, so the call dies rather than run as anyone.
+ * An unknown credential, or an `authorization` header with no bearer token,
+ * is refused, never taken for anyone; a failing `verify` kills the call
+ * rather than run it as anyone.
  */
 export const authenticated = <E, R>(
   verify: (credential: string) => Effect.Effect<Option.Option<Person>, E, R>

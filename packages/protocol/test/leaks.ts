@@ -1,9 +1,5 @@
-/**
- * The two ways Effect's JSON Schema leaks a non-JSON value into a tool's
- * schema (AGENTS.md "Effect traps"): a number that admits the strings
- * "Infinity", "-Infinity" and "NaN", and an optional key whose value may be
- * `null`. `leaks` names each one found anywhere in a schema.
- */
+// Effect's JSON Schema leaks non-JSON values two ways: a number admitting
+// "Infinity", "-Infinity" and "NaN", and an optional key admitting `null`.
 import type { Schema } from "effect";
 import { Predicate } from "effect";
 
@@ -23,13 +19,11 @@ const children = (value: Schema.Json): readonly Schema.Json[] => {
   return isJsonObject(value) ? Object.values(value) : [];
 };
 
-/** Every value nested anywhere in a JSON value, itself included. */
 const nested = (value: Schema.Json): readonly Schema.Json[] => [
   value,
   ...children(value).flatMap(nested),
 ];
 
-/** Whether a JSON Schema admits `null`, directly or through a union member. */
 const admitsNull = (schema: Schema.Json): boolean => {
   if (!isJsonObject(schema)) {
     return false;
@@ -48,7 +42,6 @@ const admitsNull = (schema: Schema.Json): boolean => {
   );
 };
 
-/** Each leak in a JSON Schema, in the order a walk of it meets them. */
 export const leaks = (schema: Schema.Json): readonly string[] =>
   nested(schema).flatMap((value) => {
     if (Predicate.isString(value) && NON_FINITE.has(value)) {

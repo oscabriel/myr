@@ -7,7 +7,6 @@ import { AskId, Handle, KindName, ProjectName } from "../src/ids.ts";
 import { CurrentPrincipal, Principal } from "../src/principal.ts";
 import { asPerson, asTester, unanswered } from "../src/testing.ts";
 
-/** Contracts whose one listed ask wants whoever called: their handle, or `anyone`. */
 const echoCaller = Layer.mergeAll(
   unanswered,
   Contracts.toLayerHandler("listAsks", () =>
@@ -33,7 +32,6 @@ const echoCaller = Layer.mergeAll(
   )
 );
 
-/** Who the server side took the call to be, as `echoCaller` reports it. */
 const caller = Effect.gen(function* () {
   const client = yield* RpcTest.makeClient(Contracts);
 

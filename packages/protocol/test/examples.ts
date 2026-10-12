@@ -76,7 +76,6 @@ const key = EnvKey.make("PAYMENTS_KEY");
 
 const proposal = ProposalId.make("prop-000001");
 
-// One of each member, in the union's order.
 export const examples: readonly Refusal[] = [
   NotClaimed.of(ask),
   ClaimLapsed.of(ask),

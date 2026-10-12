@@ -6,31 +6,19 @@ import { legacyProjects } from "./legacy.ts";
 // parts (`<project>--<ask>--<handle>`), and no leading or trailing dash.
 const Words = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 
-// A name in the config folder: a kind, a layer, an area, a lane, a ratchet.
 const ConfigName = /^[a-z][a-zA-Z0-9-]*$/u;
 
-// A git object id in SHA-1 format: 40 lowercase hex digits.
 const GitId = /^[0-9a-f]{40}$/u;
 
-// What the platform mints from a project's sequence: `prop-000001`, `dec-0a1b2c`.
 const Minted = /^[a-z]+-[0-9a-z]{6,26}$/u;
 
-/**
- * Words an ask may not be named: `me` names a person's working fork
- * (`<project>--me--<handle>`), `layer` names a layer's repo, and `open` and
- * `flag` are subcommands of `<cli> ask <ask>`, which would shadow an ask so
- * named.
- */
+// `me` and `layer` name working forks and layer repos; `open` and `flag` are
+// subcommands of `<cli> ask <ask>`, which would shadow an ask so named.
 const reservedAskIds = ["me", "layer", "open", "flag"] as const;
 
 const isReserved = (name: string) =>
   reservedAskIds.some((reserved) => reserved === name);
 
-/**
- * An ask's name. Lowercase words joined by single dashes, so a command that
- * names it (`<cli> claim <ask>`) is safe to paste into a shell and a fork's
- * name splits back into its parts. `me`, `layer`, `open` and `flag` are taken.
- */
 export const AskId = Schema.String.pipe(
   Schema.check(
     Schema.isPattern(Words),
@@ -53,7 +41,6 @@ export const AskId = Schema.String.pipe(
 
 export type AskId = typeof AskId.Type;
 
-/** A git commit id: 40 lowercase hex digits, git's SHA-1 object format. */
 export const CommitSha = Schema.String.pipe(
   Schema.check(Schema.isPattern(GitId)),
   Schema.brand("CommitSha")
@@ -61,15 +48,11 @@ export const CommitSha = Schema.String.pipe(
 
 export type CommitSha = typeof CommitSha.Type;
 
-/**
- * A commit the platform itself landed on main. Rules are read only from one
- * of these (ADR 0005), never from a commit someone pushed.
- */
+/** A commit the platform itself landed. Rules are read only from one, never from a pushed commit. */
 export const LandedSha = CommitSha.pipe(Schema.brand("LandedSha"));
 
 export type LandedSha = typeof LandedSha.Type;
 
-/** A git tree id: the exact tree a check ran on. */
 export const TreeSha = Schema.String.pipe(
   Schema.check(Schema.isPattern(GitId)),
   Schema.brand("TreeSha")
@@ -77,7 +60,6 @@ export const TreeSha = Schema.String.pipe(
 
 export type TreeSha = typeof TreeSha.Type;
 
-/** A git blob id: one file's content at one moment. */
 export const BlobSha = Schema.String.pipe(
   Schema.check(Schema.isPattern(GitId)),
   Schema.brand("BlobSha")
@@ -85,11 +67,7 @@ export const BlobSha = Schema.String.pipe(
 
 export type BlobSha = typeof BlobSha.Type;
 
-/**
- * An answer's change set, as the platform identifies it: SHA-256 over the
- * sorted (path, blob before, blob after) triples it changes. It moves exactly
- * when a file the answer touches moved underneath it.
- */
+/** SHA-256 over the sorted (path, blob before, blob after) triples an answer changes. */
 export const PatchId = Schema.String.pipe(
   Schema.check(Schema.isPattern(/^[0-9a-f]{64}$/u)),
   Schema.brand("PatchId")
@@ -97,10 +75,6 @@ export const PatchId = Schema.String.pipe(
 
 export type PatchId = typeof PatchId.Type;
 
-/**
- * The key that makes an answer, a finish or a landing request safe to send
- * twice: the second one with the same key converges on the first.
- */
 export const RequestId = Schema.String.pipe(
   Schema.check(Schema.isPattern(/^[A-Za-z0-9_-]{8,64}$/u)),
   Schema.brand("RequestId")
@@ -108,15 +82,11 @@ export const RequestId = Schema.String.pipe(
 
 export type RequestId = typeof RequestId.Type;
 
-/**
- * A per-claim credential, reserved: today the person's platform token is the
- * credential. It is redacted wherever it is printed, so it is never logged.
- */
+/** Reserved: today the person's platform token is the credential. */
 export const ClaimToken = Schema.RedactedFromValue(Schema.String);
 
 export type ClaimToken = typeof ClaimToken.Type;
 
-/** A proposal's id, minted from its project's sequence: `prop-000001`. */
 export const ProposalId = Schema.String.pipe(
   Schema.check(Schema.isPattern(Minted)),
   Schema.brand("ProposalId")
@@ -124,7 +94,6 @@ export const ProposalId = Schema.String.pipe(
 
 export type ProposalId = typeof ProposalId.Type;
 
-/** A decision's id, minted from its project's sequence: `dec-000001`. */
 export const DecisionId = Schema.String.pipe(
   Schema.check(Schema.isPattern(Minted)),
   Schema.brand("DecisionId")
@@ -132,7 +101,6 @@ export const DecisionId = Schema.String.pipe(
 
 export type DecisionId = typeof DecisionId.Type;
 
-/** A landing's id, minted from its project's sequence: `land-000001`. */
 export const LandingId = Schema.String.pipe(
   Schema.check(Schema.isPattern(Minted)),
   Schema.brand("LandingId")
@@ -140,7 +108,6 @@ export const LandingId = Schema.String.pipe(
 
 export type LandingId = typeof LandingId.Type;
 
-/** An ask kind's name, as the config folder declares it: `fix`, `lintToZero`. */
 export const KindName = Schema.String.pipe(
   Schema.check(Schema.isPattern(ConfigName)),
   Schema.brand("KindName")
@@ -148,11 +115,8 @@ export const KindName = Schema.String.pipe(
 
 export type KindName = typeof KindName.Type;
 
-/**
- * A layer's name, as the config folder declares it: `maintainers`. In an
- * ask's words (lowercase, single hyphens): its repo is `<project>--<layer>`,
- * and a `--` in the name would read as a claim fork's.
- */
+// Single hyphens only: its repo is `<project>--<layer>`, and a `--` in the
+// name would read as a claim fork's.
 export const LayerName = Schema.String.pipe(
   Schema.check(Schema.isPattern(Words)),
   Schema.brand("LayerName")
@@ -160,7 +124,6 @@ export const LayerName = Schema.String.pipe(
 
 export type LayerName = typeof LayerName.Type;
 
-/** An area held-back checks are counted and reported by: `parse`. */
 export const AreaName = Schema.String.pipe(
   Schema.check(Schema.isPattern(ConfigName)),
   Schema.brand("AreaName")
@@ -168,7 +131,6 @@ export const AreaName = Schema.String.pipe(
 
 export type AreaName = typeof AreaName.Type;
 
-/** One of the project's own check commands, by name: `lint`, `types`, `unit`. */
 export const LaneName = Schema.String.pipe(
   Schema.check(Schema.isPattern(ConfigName)),
   Schema.brand("LaneName")
@@ -176,7 +138,6 @@ export const LaneName = Schema.String.pipe(
 
 export type LaneName = typeof LaneName.Type;
 
-/** A ratchet's name, as the config folder declares it: `anyCount`. */
 export const RatchetName = Schema.String.pipe(
   Schema.check(Schema.isPattern(ConfigName)),
   Schema.brand("RatchetName")
@@ -184,7 +145,6 @@ export const RatchetName = Schema.String.pipe(
 
 export type RatchetName = typeof RatchetName.Type;
 
-/** An item's key in a project's env shape: `PAYMENTS_KEY`. */
 export const EnvKey = Schema.String.pipe(
   Schema.check(Schema.isPattern(/^[A-Za-z_][A-Za-z0-9_]*$/u)),
   Schema.brand("EnvKey")
@@ -192,7 +152,6 @@ export const EnvKey = Schema.String.pipe(
 
 export type EnvKey = typeof EnvKey.Type;
 
-/** A commitment: the salted SHA-256 root of a held-back suite. */
 export const SuiteRoot = Schema.String.pipe(
   Schema.check(Schema.isPattern(/^sha256:[0-9a-f]{64}$/u)),
   Schema.brand("SuiteRoot")
@@ -200,23 +159,13 @@ export const SuiteRoot = Schema.String.pipe(
 
 export type SuiteRoot = typeof SuiteRoot.Type;
 
-/**
- * What a check run's result depends on besides the tree: the check kind, the
- * version of the rules it was declared with, and its commands
- * (`redThenGreen@0.0.0+<hash>`). A verdict is reused only for the same tree
- * and the same version.
- */
+/** A verdict is reused only for the same tree and version: `redThenGreen@0.0.0+<hash>`. */
 export const CheckVersion = Schema.NonEmptyString.pipe(
   Schema.brand("CheckVersion")
 );
 
 export type CheckVersion = typeof CheckVersion.Type;
 
-/**
- * A repo's name in its namespace: letters, digits, dots, dashes, underscores.
- * A claim's fork is `<project>--<ask>--<handle>`, a layer's repo
- * `<project>--<layer>`.
- */
 export const RepoName = Schema.String.pipe(
   Schema.check(Schema.isPattern(/^[A-Za-z0-9._-]+$/u)),
   Schema.brand("RepoName")
@@ -224,22 +173,13 @@ export const RepoName = Schema.String.pipe(
 
 export type RepoName = typeof RepoName.Type;
 
-/** A path inside a repo, as git prints it. */
 export const RepoPath = Schema.NonEmptyString.pipe(Schema.brand("RepoPath"));
 
 export type RepoPath = typeof RepoPath.Type;
 
-/**
- * Words no owner may be named: the web serves its own pages and files at
- * these first path segments (`/asks`, `/home`, `/docs`, `/import`,
- * `/agents`, `/today`, `/people/<handle>`, `/auth/…`, `/rpc`,
- * `/releases/…`, `/icons/…` and the client build's `/assets/…`), and an
- * owner is the first segment of a project's address, so a project so owned
- * would be unreachable at `<web>/<owner>/<name>`. A name with a dot
- * (`llms.txt`, `agents.md`, `install.sh`, `.well-known`) is no handle
- * anyway. `apps/web/test/routes.test.ts` holds this list to the web's
- * routes, and sign-up refuses each as a handle.
- */
+// The web serves its own pages at these first path segments, so a project
+// owned by one would be unreachable. `apps/web/test/routes.test.ts` holds
+// this list to the web's routes.
 export const reservedProjectNames = [
   "agents",
   "asks",
@@ -258,13 +198,6 @@ export const reservedProjectNames = [
 const isReservedOwner = (owner: string) =>
   reservedProjectNames.some((reserved) => reserved === owner);
 
-/**
- * The hosts a repo may be imported from under its own name: an import
- * from one of these is owned by its source namespace, `<host>/<account>`,
- * unless the importer takes it under their handle. Every account on each
- * is letters, digits, dots, dashes and underscores. The list grows by a
- * line.
- */
 export const sourceHosts = [
   "github.com",
   "gitlab.com",
@@ -309,14 +242,8 @@ const FullNamePattern = new RegExp(
   "u"
 );
 
-// What a request may spell before the parser lowercases it and reads a
-// legacy key: one to three segments of the characters a name may hold.
 const SpelledPattern = /^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+){0,2}$/u;
 
-/**
- * A source namespace: the host and account a repo was imported from,
- * `github.com/pallets`, as an owner (ADR 0032).
- */
 export const SourceNamespace = Schema.String.pipe(
   Schema.check(Schema.isPattern(SourceNamespacePattern)),
   Schema.brand("SourceNamespace")
@@ -324,12 +251,7 @@ export const SourceNamespace = Schema.String.pipe(
 
 export type SourceNamespace = typeof SourceNamespace.Type;
 
-/**
- * A project's owner: a person's handle in lowercase (`oscabriel`), or a
- * source namespace (`github.com/pallets`). Never a word the web serves its
- * own pages at. A name is a person or a namespace, never both: a handle
- * holds no dot, a host always does.
- */
+// A handle holds no dot and a host always does, so an owner is never both.
 export const Owner = Schema.String.pipe(
   Schema.check(
     Schema.isPattern(OwnerPattern),
@@ -352,16 +274,10 @@ export const Owner = Schema.String.pipe(
 
 export type Owner = typeof Owner.Type;
 
-/** Whether an owner is a source namespace, not a person. */
 export const isSourceNamespace = (
   owner: Owner
 ): owner is Owner & SourceNamespace => SourceNamespacePattern.test(owner);
 
-/**
- * A project's short name, the last segment of its name: `datekit`,
- * `commander.js`. Lowercase, single separators, so a command that names
- * the project is safe to paste into a shell and never holds `--`.
- */
 export const ShortName = Schema.String.pipe(
   Schema.check(Schema.isPattern(ShortNamePattern)),
   Schema.brand("ShortName")
@@ -369,11 +285,6 @@ export const ShortName = Schema.String.pipe(
 
 export type ShortName = typeof ShortName.Type;
 
-/**
- * A project's full name as every surface reads it: `<owner>/<name>`,
- * `oscabriel/datekit` or `github.com/pallets/click`. The canonical form,
- * with its owner checked.
- */
 const FullName = Schema.String.pipe(
   Schema.check(
     Schema.isPattern(FullNamePattern),
@@ -396,16 +307,9 @@ const FullName = Schema.String.pipe(
   Schema.brand("ProjectName")
 );
 
-/**
- * The flat key a project keeps inside the platform: its Durable Object's
- * id, its repo's name, its code cache's key and its projection rows. The
- * name with each `/` made `__` (`oscabriel__foo`,
- * `github.com__pallets__click`), or the key a project made before owners
- * kept (`datekit`). A segment of a name never holds two separators in a
- * row, so `__` occurs in no name and a key reads back to its name, even
- * one whose segments hold `_` (`alice/the_thing`). Never `--`, which
- * separates a fork's parts.
- */
+// Each `/` becomes `__`. No segment holds two separators in a row, so a key
+// reads back to its name even when segments hold `_`. Never `--`, which
+// separates a fork's parts.
 export const ProjectKey = Schema.String.pipe(
   Schema.check(Schema.isPattern(/^(?!.*--)[a-z0-9._-]+$/u)),
   Schema.brand("ProjectKey")
@@ -413,7 +317,6 @@ export const ProjectKey = Schema.String.pipe(
 
 export type ProjectKey = typeof ProjectKey.Type;
 
-// The forty made before owners, keyed both ways (`legacy.ts`).
 const legacyNameByKey: Readonly<Record<string, string>> = Object.fromEntries(
   legacyProjects.map(({ key, name }) => [key, name])
 );
@@ -422,26 +325,14 @@ const legacyKeyByName: Readonly<Record<string, string>> = Object.fromEntries(
   legacyProjects.map(({ key, name }) => [name, key])
 );
 
-/**
- * What a request spelled, read as a name: lowercased, and a bare legacy
- * key given its name. A bare word that is no legacy key stays as it is, and
- * the full name's pattern then refuses it, saying what a name looks like.
- */
 const spelledToName = (spelled: string): string => {
   const lower = spelled.toLowerCase();
 
   return lower.includes("/") ? lower : (legacyNameByKey[lower] ?? lower);
 };
 
-/**
- * A project's name, `<owner>/<name>`, on every surface: the web's address,
- * the gateway's path, the CLI's `--project`, every contract's `project`
- * field. One parser: it lowercases what was spelled and reads a key a
- * project kept from before owners (`datekit`) as its name
- * (`oscabriel/datekit`), so a stored event, an old clone's remote and an
- * agent's `project: "datekit"` all mean the same project. It encodes only
- * the full name. ADR 0032.
- */
+// Decoding lowercases and reads a bare legacy key (`datekit`) as its full name,
+// so stored events and old remotes still resolve. It encodes only the full name.
 export const ProjectName = Schema.String.pipe(
   Schema.check(Schema.isPattern(SpelledPattern)),
   Schema.decodeTo(FullName, {
@@ -452,25 +343,20 @@ export const ProjectName = Schema.String.pipe(
 
 export type ProjectName = typeof ProjectName.Type;
 
-/** A project's owner, the name before its last slash. */
 export const ownerOf = (name: ProjectName): Owner =>
   Owner.make(name.slice(0, name.lastIndexOf("/")));
 
-/** A project's short name, after its last slash. */
 export const shortNameOf = (name: ProjectName): ShortName =>
   ShortName.make(name.slice(name.lastIndexOf("/") + 1));
 
-/** The name an owner and a short name make. */
 export const projectNameOf = (owner: Owner, short: ShortName): ProjectName =>
   ProjectName.make(`${owner}/${short}`);
 
-/** The key a project keeps inside the platform for its name. */
 export const keyOf = (name: ProjectName): ProjectKey =>
   ProjectKey.make(legacyKeyByName[name] ?? name.replaceAll("/", "__"));
 
 const decodeFullName = Schema.decodeOption(FullName);
 
-/** The name a key reads back to; none for a key no project can have. */
 export const nameOfKey = (key: ProjectKey): Option.Option<ProjectName> => {
   const legacy = legacyNameByKey[key];
 
@@ -488,11 +374,6 @@ const decodeName = Schema.decodeOption(ProjectName);
 const SOURCE_URL =
   /^https:\/\/(?<host>[^/?#]+)\/(?<account>[^/?#]+)\/(?<repo>[^/?#]+?)(?:\.git)?\/?$/u;
 
-/**
- * A project's name read from its key, where a surface carries the key in
- * one segment (an MCP resource's URI, a projection row): a key no project
- * can have stays as it is, and the name's pattern then refuses it.
- */
 export const ProjectNameFromKey = ProjectKey.pipe(
   Schema.decodeTo(FullName, {
     decode: SchemaGetter.transform((key: string) =>
@@ -504,10 +385,6 @@ export const ProjectNameFromKey = ProjectKey.pipe(
   })
 );
 
-/**
- * A name split at its first `--`: what comes before, and the fork's parts
- * from the `--` on (`""` when there are none).
- */
 const forkPartsOf = (name: string) => {
   const dashes = name.indexOf("--");
 
@@ -516,13 +393,6 @@ const forkPartsOf = (name: string) => {
     : { head: name.slice(0, dashes), suffix: name.slice(dashes) };
 };
 
-/**
- * The repo a gateway address names, the `.git` already stripped:
- * `oscabriel/datekit` is the project's key, `oscabriel/datekit--fix--alice`
- * is `<key>--fix--alice`, and a one-segment address is a legacy key with
- * its fork's parts as they are. The parts after `--` are kept verbatim;
- * `repoKind` reads them. None for an address no project can have.
- */
 export const repoNameOfAddress = (address: string): Option.Option<RepoName> => {
   const slash = address.lastIndexOf("/");
   const { head: short, suffix } = forkPartsOf(address.slice(slash + 1));
@@ -533,11 +403,6 @@ export const repoNameOfAddress = (address: string): Option.Option<RepoName> => {
   );
 };
 
-/**
- * The gateway address of a repo: its project's name, then its fork's parts
- * as the repo's name spells them (`oscabriel/datekit--fix--alice`). None for
- * a repo whose key no project can have.
- */
 export const addressOfRepo = (repo: RepoName): Option.Option<string> => {
   const { head: first, suffix } = forkPartsOf(repo);
 
@@ -547,23 +412,12 @@ export const addressOfRepo = (repo: RepoName): Option.Option<string> => {
   );
 };
 
-/** A path read as a project's address: its name as spelled, and the segments after it. */
 export interface ProjectAddress {
-  /** The name's segments as the path spelled them, joined: `OscaBriel/datekit`, `datekit`. */
   readonly spelled: string;
-  /** Whether the name is a key a project kept from before owners, one segment. */
   readonly legacy: boolean;
-  /** The segments after the name: a page's (`tree`, `main`, `src`). */
   readonly rest: readonly string[];
 }
 
-/**
- * A path's segments (decoded) read as a project's address: one segment when
- * the first is a key a project kept from before owners (`datekit`), three
- * when it is a source host (`github.com/pallets/click`), else two
- * (`oscabriel/datekit`). None when fewer remain. It spells nothing: the
- * name's own decode lowercases it and checks it.
- */
 export const projectAddressOf = (
   segments: readonly string[]
 ): Option.Option<ProjectAddress> => {
@@ -586,11 +440,6 @@ export const projectAddressOf = (
       });
 };
 
-/**
- * The source namespace an import's URL names, when its host is one the
- * platform knows: `https://github.com/Pallets/click.git` is
- * `github.com/pallets`.
- */
 export const sourceNamespaceOf = (
   url: string
 ): Option.Option<SourceNamespace> => {
@@ -605,7 +454,6 @@ export const sourceNamespaceOf = (
     : Schema.decodeOption(SourceNamespace)(`${host}/${account}`);
 };
 
-/** A person's handle on the platform, as their sign-in provider spells it. */
 export const Handle = Schema.String.pipe(
   Schema.check(Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9-]*$/u)),
   Schema.brand("Handle")
@@ -613,21 +461,10 @@ export const Handle = Schema.String.pipe(
 
 export type Handle = typeof Handle.Type;
 
-/**
- * Whether two handles name one person: without case, as the platform's own
- * accounts tell handles apart (an account's key is its handle lowercased)
- * and as claim forks name them, so a vouch file's or a policy's
- * `Alice` is the person signed in as `alice`. The one rule every package
- * compares handles by.
- */
+/** Handles compare without case, as accounts and claim forks do. Every package compares by this. */
 export const sameHandle = (one: Handle, other: Handle): boolean =>
   one.toLowerCase() === other.toLowerCase();
 
-/**
- * A claim's fork: `<key>--<ask>--<handle in lowercase>`, by the project's
- * key (ADR 0032). The one spelling the platform makes a fork by and the CLI
- * and the web's dev world name one by.
- */
 export const claimForkName = (
   project: ProjectName,
   ask: AskId,

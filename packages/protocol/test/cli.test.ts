@@ -50,7 +50,6 @@ const project = ProjectName.make("oscabriel/datekit");
 
 const requestId = RequestId.make("answer-0001");
 
-/** An answer's flags, as a person types them. */
 const answer = [
   "--project",
   project,
@@ -73,7 +72,6 @@ const listing = (territory: string) => ({
   want: "Parse a comma",
 });
 
-/** `listAsks` echoes its project as the territory. */
 const quiet = Layer.mergeAll(
   unanswered,
   Contracts.toLayerHandler("listAsks", ({ project: echoed }) =>
@@ -81,7 +79,6 @@ const quiet = Layer.mergeAll(
   )
 );
 
-/** Contracts whose answers always meet a moved main. */
 const stale = (refusal: StaleBase) =>
   Layer.mergeAll(
     unanswered,
@@ -92,23 +89,16 @@ type HandedTo<Method extends keyof CommandOutput> = Parameters<
   CommandOutput[Method]
 >[0];
 
-/** What a command handed its output, in order. */
 type Printed =
   | { readonly kind: "success"; readonly input: HandedTo<"success"> }
   | { readonly kind: "refused"; readonly input: HandedTo<"refused"> }
   | { readonly kind: "plan"; readonly input: HandedTo<"plan"> };
 
-/** What was printed, one entry per line however it was written. */
 const lines = (output: Effect.Effect<readonly unknown[]>) =>
   Effect.map(output, (all) =>
     all.flatMap((chunk) => String(chunk).split("\n"))
   );
 
-/**
- * Runs the command `build` makes over a recording output on `args`, its
- * calls answered by `handlers`. Returns how it ended, what it handed the
- * output, and what it printed itself.
- */
 const run = <Name extends string, Input, E, R, ContextInput>(
   handlers: Layer.Layer<Rpc.ToHandler<RpcGroup.Rpcs<typeof Contracts>>>,
   build: (
@@ -150,13 +140,11 @@ const run = <Name extends string, Input, E, R, ContextInput>(
     )
   );
 
-/** A handler's answer, after counting the call in `calls`. */
 const counting = <A, E>(calls: Ref.Ref<number>, reply: Effect.Effect<A, E>) =>
   Ref.update(calls, (count) => count + 1).pipe(Effect.andThen(reply));
 
 const decision = DecisionId.make("dec-000001");
 
-/** A decision someone else already took: the call fails, typed. */
 const decided = Effect.fail(new DecisionClosed({ decision }));
 
 describe("a contract as a CLI command", () => {
@@ -336,7 +324,6 @@ describe("a contract as a CLI command", () => {
       })
   );
 
-  // A field that is `true` or absent takes a bare switch: `--draft`.
   it.effect(
     "takes a switch as on when named, and leaves it out otherwise",
     () =>
@@ -568,7 +555,6 @@ describe("defaults", () => {
   );
 });
 
-/** The group's commands, with a view for `listAsks` only. */
 const commands = (built: Effect.Effect<CommandOutput>) =>
   toCommands(Contracts, Effect.service(Client), {
     exclude: [],

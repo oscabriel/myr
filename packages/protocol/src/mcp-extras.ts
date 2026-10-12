@@ -1,15 +1,3 @@
-/**
- * What MCP serves beside the contracts' tools: each ask's brief
- * as a resource at `<scheme>ask/<project>/<ask>`, the projects as one at
- * `<scheme>projects`, and a skill as the prompt `contribute`. Each reads
- * through the `Client` the tools call through, so a host that sends the
- * tools' calls as its caller sends these as the caller too. A refusal comes
- * back as an MCP error whose message is the refusal as `render` explains it
- * to git and the CLI.
- *
- * The skill is an argument: protocol never imports the generator that
- * writes it (`@repo/agent-kit`); each app passes the one it made.
- */
 import { Brand } from "@repo/brand";
 import { DateTime, Effect, Layer, Option, Schema } from "effect";
 import { McpSchema, McpServer } from "effect/ai";
@@ -23,29 +11,19 @@ import { explain } from "./render.ts";
 
 const MARKDOWN = "text/markdown";
 
-/**
- * Where an ask's brief is read: `<scheme>ask/<key>/<ask>`, by the
- * project's key (`datekit`, `alice__datekit`): a resource template's
- * parameter is one segment, and a name has two or three (ADR 0032).
- */
+// By the project's key: a resource template's parameter is one segment, and
+// a name has two or three.
 const briefUri = (project: ProjectName, ask: AskId) =>
   `${Brand.urlScheme}ask/${keyOf(project)}/${ask}`;
 
-/** Where the platform's projects are read. */
 const projectsUri = `${Brand.urlScheme}projects`;
 
-/** One resource's text, as Markdown. */
 const markdown = (uri: string, text: string) => ({
   contents: [{ mimeType: MARKDOWN, text, uri }],
 });
 
 const isRefusal = Schema.is(Refusal);
 
-/**
- * A refusal as the MCP error a read fails with: its message is what
- * `render` says of it, tag first, so the client reads the same lines git
- * and the CLI print. Any other failure is left to the server.
- */
 const refusedAsText = <A, E, R>(read: Effect.Effect<A, E, R>) =>
   Effect.catchIf(read, isRefusal, (refusal) =>
     Effect.fail(
@@ -53,11 +31,7 @@ const refusedAsText = <A, E, R>(read: Effect.Effect<A, E, R>) =>
     )
   );
 
-/**
- * The projects as a Markdown table. Every cell is a decoded value whose
- * schema already keeps out `|` and line breaks (a `ProjectName`, a
- * `Posture`, a count, an ISO time), so none needs escaping.
- */
+// Every cell's schema already keeps out `|` and line breaks, so none is escaped.
 const projectsTable = (projects: readonly ProjectListing[]) =>
   projects.length === 0
     ? "No projects yet."
@@ -75,18 +49,12 @@ const projectsTable = (projects: readonly ProjectListing[]) =>
         ),
       ].join("\n");
 
-/**
- * The URI template of a brief: the tagged-template parts of
- * `<scheme>ask/{project}/{ask}`. The scheme is a value, so it joins the
- * first part rather than being a parameter.
- */
 const briefParts = [`${Brand.urlScheme}ask/`, "/", ""];
 
 const briefTemplate: TemplateStringsArray = Object.assign(briefParts, {
   raw: briefParts,
 });
 
-/** An ask's brief, read as `showAsk` gives it. */
 const askBrief = McpServer.resource(
   briefTemplate,
   McpSchema.param("project", ProjectNameFromKey),
@@ -105,7 +73,6 @@ const askBrief = McpServer.resource(
   name: "ask brief",
 });
 
-/** Every project, as `listProjects` gives them. */
 const projectList = McpServer.resource({
   content: Effect.gen(function* () {
     const client = yield* Client;
@@ -130,19 +97,14 @@ const projectList = McpServer.resource({
   uri: projectsUri,
 });
 
-/** Each ask's brief, and the projects, as resources over the `Client`. */
 export const briefResources: Layer.Layer<never, never, Client> = Layer.mergeAll(
   askBrief,
   projectList
 );
 
-// --- The skill as a prompt ----------------------------------------------------
-
-/** A skill, as the prompt `contribute` serves it. */
 export interface Skill {
   readonly name: string;
   readonly description: string;
-  /** Its Markdown, after the frontmatter. */
   readonly body: string;
 }
 
@@ -154,11 +116,9 @@ const decodeQuoted = Schema.decodeUnknownOption(
   Schema.fromJsonString(Schema.String)
 );
 
-/** A frontmatter value: a double-quoted one as JSON reads it, a plain one as it stands. */
 const scalar = (raw: string) =>
   raw.startsWith('"') ? decodeQuoted(raw) : Option.some(raw);
 
-/** The frontmatter's top-level `key: value` lines, by key. */
 const fieldsOf = (head: string) =>
   new Map(
     head.split("\n").flatMap((line) => {
@@ -169,11 +129,6 @@ const fieldsOf = (head: string) =>
     })
   );
 
-/**
- * A skill as its `SKILL.md` states it (Agent Skills frontmatter, as
- * `@repo/agent-kit` writes it): the frontmatter's `name` and `description`,
- * and the Markdown after it. None for a file without them.
- */
 const skillOf = (file: string): Option.Option<Skill> => {
   const close = file.startsWith(OPEN)
     ? file.indexOf(CLOSE, OPEN.length - 1)
@@ -195,11 +150,6 @@ const skillOf = (file: string): Option.Option<Skill> => {
   });
 };
 
-/**
- * The skill in the one `SKILL.md` a generator makes, such as agent-kit's
- * `platformSkill`. A generator that writes none, or one without its
- * frontmatter, is a defect.
- */
 export const skillIn = <E, R>(
   generated: Effect.Effect<readonly { readonly content: string }[], E, R>
 ): Effect.Effect<Skill, E, R> =>
@@ -216,7 +166,6 @@ export const skillIn = <E, R>(
     )
   );
 
-/** One open ask, as the prompt lists it: its want, its kind and territory, and where its brief is. */
 const askLines =
   (project: ProjectName) =>
   ({ ask, blockedBy, claimed, kind, territory, want }: AskListing) => {
@@ -233,7 +182,6 @@ const askLines =
     ];
   };
 
-/** A project's open asks, as a section after the skill. */
 const openAsks = (project: ProjectName) =>
   Effect.gen(function* () {
     const client = yield* Client;
@@ -253,10 +201,6 @@ const openAsks = (project: ProjectName) =>
     ].join("\n");
   });
 
-/**
- * The prompt `contribute`: the skill's Markdown, and, when the client names
- * a project, that project's open asks after it.
- */
 export const skillPrompt = (skill: Skill): Layer.Layer<never, never, Client> =>
   McpServer.prompt({
     content: ({ project }) =>
