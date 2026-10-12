@@ -6,11 +6,6 @@ import { Option } from "effect";
 import { commands } from "../../features/agents/catalog.ts";
 import { markdown } from "../../features/agents/respond.ts";
 
-// `/docs/<page>.md`: a page of the docs as Markdown (a literal `.` is `[.]`
-// in a route file's name; `{$page}` keeps the param apart from it), the
-// same text the page draws, for the web's own origin.
-
-/** The route's handler as a function of the platform's URL, which its test hands in. */
 export const docsMarkdownHandler =
   (platformUrl: string) =>
   ({

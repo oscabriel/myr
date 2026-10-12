@@ -1,15 +1,3 @@
-/**
- * Git for the dev world: commits written the way git writes them, so the
- * memory repo host takes them by a push like any other, and files read back
- * through `RepoHost`.
- *
- * The world writes three kinds of commit: each example project's first
- * push, an answerer's commit on their claim's fork, and what the dev Lander
- * composes and lands. Each is written whole, every blob and tree of its
- * files, as loose objects in a scratch git directory in memory; a push
- * copies only what the repo lacks. Text files only: the examples hold
- * nothing else.
- */
 import { ObjectId, RepoHost } from "@repo/artifacts/repo-host";
 import type { PushSource, TreeEntry } from "@repo/artifacts/repo-host";
 import { Brand } from "@repo/brand";
@@ -17,47 +5,37 @@ import { BlobSha, CommitSha } from "@repo/protocol/ids";
 import type { Handle, RepoName } from "@repo/protocol/ids";
 import { Array, DateTime, Effect, Option, Predicate } from "effect";
 
-/** A tree's files, by path, as text: what the world writes. */
 export type Files = ReadonlyMap<string, string>;
 
-/** A file as a commit holds it: its blob's id, and its text. */
 export interface Held {
   readonly blob: BlobSha;
   readonly text: string;
 }
 
-/** A commit's files, by path, as read back. */
 export type Snapshot = ReadonlyMap<string, Held>;
 
-/** The name and email an author or committer line carries. */
 export interface Identity {
   readonly email: string;
   readonly name: string;
 }
 
-/** The platform, which commits every landing. */
 export const platformIdentity: Identity = {
   email: `platform@${Brand.domain}`,
   name: Brand.name,
 };
 
-/** A person, as the author of their own commits and of their landings. */
 export const personIdentity = (handle: Handle): Identity => ({
   email: `${handle}@users.${Brand.domain}`,
   name: handle,
 });
 
-/** A snapshot's text alone. */
 export const textOf = (snapshot: Snapshot): Files =>
   new Map([...snapshot].map(([path, { text }]) => [path, text]));
 
-/** `files` with `changed` written over them. */
 export const overlay = (
   files: Files,
   changed: Iterable<readonly [string, string]>
 ): Files => new Map([...files, ...changed]);
-
-// --------------------------------------------------------------- objects
 
 const encoder = new TextEncoder();
 
@@ -83,7 +61,6 @@ const hex = (bytes: ArrayBuffer) =>
 const bytesOfHex = (id: string) =>
   Uint8Array.from(id.match(/../gu) ?? [], (pair) => Number.parseInt(pair, 16));
 
-/** git's zlib stream, as a loose object holds it. */
 const deflate = (bytes: Uint8Array) =>
   Effect.promise(() =>
     new Response(
@@ -93,7 +70,6 @@ const deflate = (bytes: Uint8Array) =>
     ).arrayBuffer()
   ).pipe(Effect.map((buffer) => new Uint8Array(buffer)));
 
-/** An object's header and content, and its id: the SHA-1 of both. */
 const framed = (kind: "blob" | "tree" | "commit", content: Uint8Array) => {
   const raw = concat([
     encoder.encode(`${kind} ${content.byteLength}\0`),
@@ -134,18 +110,14 @@ const treeBytes = (entries: readonly TreeEntry[]) =>
     ])
   );
 
-/**
- * A commit message as git keeps it: no carriage returns, no blank lines
- * first, and one newline last (isomorphic-git writes it back so when the
- * memory host copies the commit, and the id must not change).
- */
+// No carriage returns, no leading blank lines, one trailing newline: isomorphic-git writes it back so when the
+// memory host copies the commit, and the id must not change.
 const messageOf = (message: string) =>
   `${message.replaceAll("\r", "").replace(/^\n+/u, "").replace(/\n+$/u, "")}\n`;
 
 const signature = (who: Identity, at: DateTime.Utc) =>
   `${who.name} <${who.email}> ${Math.floor(DateTime.toEpochMillis(at) / 1000)} +0000`;
 
-/** A commit to write: its tree, parents, people, time and message. */
 export interface CommitInput {
   readonly tree: ObjectId;
   readonly parents: readonly CommitSha[];
@@ -167,8 +139,6 @@ const commitBytes = (input: CommitInput) =>
     ].join("\n")
   );
 
-// ------------------------------------------------------------ the source
-
 const failure = (code: string, path: string) =>
   Promise.reject(Object.assign(new Error(`${code}: ${path}`), { code }));
 
@@ -178,7 +148,6 @@ const clean = (path: string) =>
     .filter((part) => part !== "")
     .join("/")}`;
 
-/** How isomorphic-git asks for a file: as bytes, or as text in "utf8", alone or as `{ encoding }`. */
 type ReadOptions = string | { readonly encoding?: string } | undefined;
 
 const UTF8 = /^utf-?8$/iu;
@@ -188,7 +157,6 @@ const wantsText = (options: ReadOptions) =>
     ? UTF8.test(options)
     : UTF8.test(options?.encoding ?? "");
 
-/** A write to the scratch directory through the file system: it only reads. */
 const readOnly = (raw: string) => failure("EROFS", clean(raw));
 
 const stats = (kind: "file" | "dir", size: number) => ({
@@ -205,11 +173,6 @@ const stats = (kind: "file" | "dir", size: number) => ({
   uid: 1,
 });
 
-/**
- * The part of `fs.promises` isomorphic-git calls when a push reads its
- * source (`docs/fs.md` there), over loose objects kept by path. It only
- * reads: the scratch directory is written by `scratch`, never through it.
- */
 const readOnlyFs = (files: ReadonlyMap<string, Uint8Array>) => {
   const childrenOf = (dir: string) => {
     const prefix = dir === "/" ? "/" : `${dir}/`;
@@ -275,17 +238,14 @@ const readOnlyFs = (files: ReadonlyMap<string, Uint8Array>) => {
   };
 };
 
-/** A git directory in memory that a push takes objects from, and how to write into it. */
 export interface Scratch {
   readonly source: PushSource;
-  /** Every blob and tree of `files`, and the root tree's id. */
   readonly tree: (files: Files) => Effect.Effect<ObjectId>;
   readonly commit: (input: CommitInput) => Effect.Effect<CommitSha>;
 }
 
 const GITDIR = "/scratch.git";
 
-/** A fresh scratch git directory: loose, zlib-deflated objects named by their ids. */
 export const scratch: Effect.Effect<Scratch> = Effect.sync(() => {
   const objects = new Map<string, Uint8Array>();
 
@@ -347,9 +307,6 @@ export const scratch: Effect.Effect<Scratch> = Effect.sync(() => {
   };
 });
 
-// ----------------------------------------------------------------- reads
-
-/** One file of a snapshot: its path, its blob's id and its text. */
 const fileOf =
   (path: string, blob: ObjectId) =>
   (bytes: Uint8Array): Snapshot =>
@@ -357,7 +314,6 @@ const fileOf =
       [path, { blob: BlobSha.make(blob), text: decoder.decode(bytes) }],
     ]);
 
-/** Every file under the tree `tree` of `repo`, by path; none when the repo lacks an object. */
 const snapshotOf = (
   repo: RepoName,
   tree: ObjectId,
@@ -389,7 +345,6 @@ const snapshotOf = (
     );
   });
 
-/** `repo`'s files at `commit`; none when the repo or the commit is not there. */
 export const filesAt = (
   repo: RepoName,
   commit: CommitSha

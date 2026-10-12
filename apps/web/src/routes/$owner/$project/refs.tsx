@@ -14,11 +14,6 @@ import { notFoundFor } from "../../../features/shared/refusals.ts";
 import { branchPage } from "../../../server/cache-headers.ts";
 import { serverClient } from "../../../server/client.ts";
 
-// Main, the tags and the forks, read on the server; `?from=` pages the
-// tags, and `?package=` lists one package's tags alone. Where the project
-// is cloned from comes with them.
-
-/** The refs for their page, or a not-found carrying the platform's refusal. */
 export const readRefsPage = (name: string) =>
   Effect.gen(function* () {
     const project = yield* Effect.fromOption(projectOf(name));
@@ -36,7 +31,6 @@ const refsPage = createServerFn({ method: "GET" })
   .handler(({ data }) =>
     Effect.runPromise(
       readRefsPage(data).pipe(
-        // Where the project is cloned from rides with its refs.
         Effect.map((refs) => ({ platformUrl: env.PUBLIC_PLATFORM_URL, refs })),
         Effect.provide(serverClient(env))
       )
@@ -70,7 +64,6 @@ export const Route = createFileRoute("/$owner/$project/refs")({
     package: Option.getOrUndefined(packageParamOf(search.package)),
   }),
   loader: ({ params }) => refsPage({ data: params.project }),
-  // Refs move with the next landing or claim: kept briefly, read again behind.
   headers: () => branchPage,
   head: ({ params: { project } }) =>
     pageHead({

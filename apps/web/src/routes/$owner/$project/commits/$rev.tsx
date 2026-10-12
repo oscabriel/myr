@@ -21,11 +21,6 @@ import { notFoundFor } from "../../../../features/shared/refusals.ts";
 import { branchPage } from "../../../../server/cache-headers.ts";
 import { serverClient } from "../../../../server/client.ts";
 
-// The landings: the log from a revision, a page at a time (`?from=` is
-// where the page starts), only the commits that changed `?path=` when
-// given, filtered to the answers or the asks' openings by `?show=`; read
-// on the server, so the page arrives whole.
-
 const LogPageData = Schema.Struct({
   commits: Schema.Array(CommitView),
   from: Schema.Int,
@@ -36,7 +31,6 @@ const LogPageData = Schema.Struct({
   rev: Schema.String,
 });
 
-/** The kinds of commit a page may be filtered to. */
 const SHOWS: readonly LogShow[] = ["answers", "openings"];
 
 interface LogParams {
@@ -46,7 +40,6 @@ interface LogParams {
   readonly rev: string;
 }
 
-/** The page of the log, or a not-found carrying the platform's refusal. */
 export const readLogPage = (params: LogParams) =>
   Effect.gen(function* () {
     const project = yield* Effect.fromOption(projectOf(params.project));

@@ -1,10 +1,3 @@
-/**
- * One row for every list: the thing's own words are the link (never its
- * id), its metadata on a second line with nothing meaningless in it, its
- * state as a word at the right, and its command as text a crawler and a
- * screen reader read, inside the row's copy button. Rendered inside the
- * app's router, as the lists are.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { AskListing } from "@repo/protocol/domain/ask";
@@ -33,7 +26,6 @@ const listing = (territory: string) =>
 
 const rowsAt = (element: ReactElement) => renderAt("/", <ul>{element}</ul>);
 
-/** Each anchor in `markup`, as `[href, text]`. */
 const anchors = (markup: string) =>
   [...markup.matchAll(/<a\b(?<attributes>[^>]*)>(?<body>.*?)<\/a>/gsu)].map(
     (match) => [
@@ -183,7 +175,6 @@ describe(AskRow, () => {
   );
 });
 
-/** The classes on each element whose text is `word`, in `markup`. */
 const wordClasses = (markup: string, word: string) =>
   [
     ...markup.matchAll(

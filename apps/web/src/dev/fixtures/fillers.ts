@@ -1,10 +1,3 @@
-/**
- * Six small fictional projects beside the others, so a list of projects
- * runs past what fits beside it, each made through the project service as
- * datekit is, in its decider's namespace (`okafor/amberlog`): created, its
- * first commit pushed, one ask opened by its decider. `mossgate` opens none: a visitor's proposal is all it holds, so
- * it lists with no open asks.
- */
 import { Brand } from "@repo/brand";
 import { CheckSpec } from "@repo/protocol/domain/check";
 import type { Handle } from "@repo/protocol/ids";
@@ -105,13 +98,11 @@ const fillers: readonly Filler[] = [
   }),
 ];
 
-/** `drain-on-shutdown` → `drainOnShutdown`: the export an ask's check looks for. */
 export const exportNameOf = (ask: string) =>
   ask.replaceAll(/-(?<letter>[a-z0-9])/gu, (_match, letter: string) =>
     letter.toUpperCase()
   );
 
-/** A check that fails on main by its assertion: the module exports no function by the ask's name. */
 export const checkOf = (module: string, ask: string, want: string) =>
   [
     'import { expect, test } from "bun:test";',
@@ -124,7 +115,6 @@ export const checkOf = (module: string, ask: string, want: string) =>
     "",
   ].join("\n");
 
-/** The ask a filler states, as its `policy.json` holds it. */
 const statedOf = (
   project: Filler,
   ask: NonNullable<Filler["ask"]>
@@ -194,11 +184,6 @@ const filesOf = (project: Filler, stated: readonly StatedAsk[]): Files =>
     ],
   ]);
 
-/**
- * Every filler made and adopted, one every three minutes from `minute`,
- * each one's ask (or, in mossgate, a visitor's proposal) a minute after its
- * first push.
- */
 export const seedFillers = (minute: number) =>
   Effect.forEach(
     fillers,

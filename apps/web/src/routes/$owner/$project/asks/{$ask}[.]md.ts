@@ -11,32 +11,18 @@ import {
 } from "../../../../features/ask/markdown.ts";
 import { serverClient } from "../../../../server/client.ts";
 
-// An ask as Markdown, always: `/<project>/asks/<ask>.md` (a literal `.` is
-// `[.]` in a route file's name; `{$ask}` keeps the param apart from it). The
-// ask page's own URL answers the same with `Accept: text/markdown`
-// (`$ask.tsx`), so a harness reads an ask with one plain fetch.
-
-/** The path params an ask's routes are handed, not yet decoded. */
 export interface AskParams {
   readonly ask: string;
   readonly project: string;
 }
 
-/** An ask's path, decoded: names the platform could hold. */
 export const AskPath = Schema.Struct({ ask: AskId, project: ProjectName });
 
-/** The protocol client a route calls the platform with, for the request it answers. */
 export type ClientFor = (request: Request) => Layer.Layer<Client>;
 
-/** `showAsk` is public, so its Markdown may be cached; the annotation says so, not this file. */
+// `showAsk` is public, so its Markdown may be cached; the annotation says so.
 const visibility = Context.get(ShowAsk.annotations, Visibility);
 
-/**
- * The `.md` route's handler as a function of its client, which its test
- * drives with a stub platform: the brief `showAsk` gives, with the banner
- * naming this host's indexes under its title, a refusal as a 404, or a 404 without asking
- * when the path can name no ask.
- */
 export const askMarkdownHandler =
   (clientFor: ClientFor) =>
   ({

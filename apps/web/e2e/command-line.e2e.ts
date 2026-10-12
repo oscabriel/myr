@@ -1,27 +1,12 @@
-/**
- * The command line's layout, as a browser lays it out: a word never breaks
- * while its row has room for it, on a phone or a desk. A line's first row
- * has the box's whole width; a row the column breaks off hangs, and has the
- * box's width less the hang (a URL longer than that still breaks,
- * anywhere). A short command once broke its own words (`<cli> today` read
- * "tod" / "<cli> ay"): its box hugged the line, and the 6ch hang left its
- * last word too little room.
- *
- * It runs only against `WEB_URL` (a stage's web origin, or a `vite dev`
- * with the dev fixtures) and is skipped without it. It only reads, signed
- * out.
- */
 import { expect, test } from "@playwright/test";
 import { Config, Effect, Option } from "effect";
 
-/** Where the web lives. */
 const web = Effect.runSync(
   Config.option(Config.NonEmptyString("WEB_URL")).pipe(
     Effect.map(Option.map((url) => url.replace(/\/+$/u, "")))
   )
 );
 
-/** Pages that show command lines to a reader who is not signed in. */
 const PAGES = ["/today", "/home", "/agents"];
 
 const WIDTHS = [390, 1280];
@@ -66,7 +51,6 @@ test.describe("the command line", () => {
 
                     const word = span.getBoundingClientRect();
 
-                    // Its own width on one row: set it so, read it, set it back.
                     span.style.whiteSpace = "pre";
                     span.style.maxWidth = "none";
                     const natural = span.getBoundingClientRect().width;

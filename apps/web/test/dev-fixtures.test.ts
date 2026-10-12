@@ -1,8 +1,3 @@
-/**
- * The dev world with its fixtures switched on: every state a page draws,
- * served through the contracts the pages call, beside datekit and burrow.
- * Each case reads a fresh world the way a browser would, over `/rpc`.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Client, Contracts } from "@repo/protocol/contracts";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
@@ -36,7 +31,6 @@ const ask = (id: string) => AskId.make(id);
 
 const signedIn = (handle: string) => devToken(Handle.make(handle));
 
-/** A client of `handler`'s `/rpc`, whose calls carry `token` as their bearer when there is one. */
 const connect = (
   handler: (request: Request) => Promise<Response>,
   token?: string
@@ -67,7 +61,6 @@ const connect = (
 
 type Reader = Effect.Success<ReturnType<typeof connect>>;
 
-/** A fresh world with `options`, served, and `read` run against it. */
 const inWorld = <A, E>(
   options: DevWorldOptions,
   read: (
@@ -86,18 +79,15 @@ const inWorld = <A, E>(
 
 const withFixtures: DevWorldOptions = { fixtures: "on" };
 
-/** vellum's events, as `watch` replays them from the first. */
 const eventsOf = (client: Reader) =>
   Effect.map(
     Stream.runCollect(client.watch({ project: vellum })),
     (events): readonly ProjectEvent[] => events
   );
 
-/** The `AskClosed` events among `events`. */
 const closedIn = (events: readonly ProjectEvent[]) =>
   events.filter(ProjectEvent.guards.AskClosed);
 
-/** The tag of each answer state's verdict outcome, by ask. */
 const ANSWERS = {
   "carry-footnotes-to-epub": "Landed",
   "cli-version-flag": "Landed",
@@ -144,17 +134,11 @@ const answersRead = inWorld(withFixtures, (as) =>
   })
 );
 
-/** Each refusal of a refused outcome, as its tag and the place it points at. */
 const refusalsOf = (outcome: Outcome | undefined) =>
   outcome !== undefined && Outcome.guards.Refused(outcome)
     ? outcome.refusals
     : [];
 
-/**
- * Each hunk of a unified diff, as its header declares its old and new
- * lengths and as its lines count them, so a patch a diff view cannot parse
- * shows as a mismatch.
- */
 const hunksOf = (patch: string) => {
   const hunks: { declared: string; counted: string }[] = [];
   let old = 0;
@@ -190,10 +174,7 @@ const hunksOf = (patch: string) => {
   return hunks;
 };
 
-/**
- * Each test seeds a whole world with its fixtures while turbo runs every
- * package's tests at once, as `dev-backend.test.ts` does.
- */
+// Each test seeds a whole world while turbo runs every package's tests at once.
 const seededWorlds = { timeout: 30_000 };
 
 describe("the dev world's fixtures", seededWorlds, () => {
@@ -729,14 +710,9 @@ describe("the dev world's live landing", seededWorlds, () => {
   );
 });
 
-/** `at`'s distance from `from`, in milliseconds. */
 const millisFrom = (from: DateTime.DateTime, at: DateTime.DateTime) =>
   Duration.toMillis(DateTime.distance(from, at));
 
-/**
- * The open decisions ines-v takes across her projects, and two instants
- * the world stamps on what it makes, a little apart: its present then.
- */
 const timesIn = (options: DevWorldOptions) =>
   inWorld(options, (as) =>
     Effect.gen(function* () {
@@ -764,21 +740,10 @@ const timesIn = (options: DevWorldOptions) =>
     })
   );
 
-/** A decision, keyed as the platform counts it: its id within its project. */
 const keyOf = ({ id, project }: Decision) => `${project}/${id}`;
 
-/**
- * A fixed world stands at the calendar's `end` once seeded; a world at
- * the present has every instant moved by one whole number of minutes, so
- * `end` is the minute it was built in, and its clock runs on from there,
- * with every decision still to come.
- *
- * Today lists as many decisions as the day's budget allows, and the budget
- * counts a UTC day: which of the story's taken decisions fall on the
- * present day moves with the time of day the world is built at. So the
- * two worlds are held to the same open count, listed and overflowing
- * together, and the decisions both list are held to the one shift.
- */
+// Today's budget counts a UTC day, so which taken decisions fall on the present day moves with the time of day
+// the world is built at: the two worlds are held to the same open count, and shared decisions to one shift.
 const placedAtThePresent = (fixtures: FixtureMode, end: DateTime.Utc) =>
   Effect.gen(function* () {
     const fixed = yield* timesIn({ fixtures });

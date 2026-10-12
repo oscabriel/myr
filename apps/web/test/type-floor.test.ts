@@ -1,9 +1,3 @@
-/**
- * The web's type floor is 13 px: nothing a person reads is set at 12 or
- * 11. Tailwind's `text-xs` is 12 px, and an arbitrary size can hide a
- * smaller one, so the web's source names neither; code-sized text is the
- * `text-mono` step of the scale, never a copy of its value.
- */
 import { describe, expect, it } from "@effect/vitest";
 
 const sources: Readonly<Record<string, string>> = import.meta.glob(
@@ -11,18 +5,11 @@ const sources: Readonly<Record<string, string>> = import.meta.glob(
   { eager: true, import: "default", query: "?raw" }
 );
 
-/**
- * A size class under the floor, or the mono step spelled as a literal:
- * `text-xs` with any variant before it, and an arbitrary `text-[…]` size
- * in px or rem.
- */
 const sizeClass =
   /(?<![\w-])text-(?:xs|\[(?<size>\d*\.?\d+)(?<unit>px|rem)\])(?![\w-])/gu;
 
-/** The floor, in px; the rem steps count 16 px each. */
 const FLOOR = 13;
 
-/** Each size class in `source` that breaks the floor, or spells the mono step. */
 const offending = (source: string) =>
   [...source.matchAll(sizeClass)].flatMap((match) => {
     const { size, unit } = match.groups ?? {};

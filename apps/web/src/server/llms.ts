@@ -1,10 +1,3 @@
-/**
- * The agents' indexes as handlers of a request, each a function of its
- * client and the platform's URL: `/llms.txt` for the platform and
- * `/<owner>/<name>/llms.txt` for one project. Their routes serve them, and the
- * front page and a project's page answer a request for Markdown with them,
- * so the text is written once.
- */
 import { Client } from "@repo/protocol/contracts";
 import { ProjectName } from "@repo/protocol/ids";
 import { Array as Arr, Effect, Option, Schema } from "effect";
@@ -19,13 +12,8 @@ import {
 import { markdown, unavailable } from "../features/agents/respond.ts";
 import { stillWaiting } from "../features/front/families.ts";
 
-/** A route's client, for the request it answers. */
 export type ClientFor = (request: Request) => Layer.Layer<Client>;
 
-/**
- * `/llms.txt`: the platform for an agent, with the projects it lists now,
- * read through the same backend the browser's calls take.
- */
 export const frontLlmsHandler =
   (clientFor: ClientFor, platformUrl: string) =>
   ({ request }: { readonly request: Request }): Promise<Response> =>
@@ -50,10 +38,6 @@ export const frontLlmsHandler =
 
 const decodeProject = Schema.decodeUnknownOption(ProjectName);
 
-/**
- * `/<owner>/<name>/llms.txt`: one project for an agent, as the platform lists
- * it, with its open asks. A name the platform does not list is not found.
- */
 export const projectLlmsHandler =
   (clientFor: ClientFor, platformUrl: string) =>
   ({

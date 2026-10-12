@@ -1,14 +1,3 @@
-/**
- * What the code pages' rail and Files sheet hold, loaded in the browser
- * only (`-code-rail.tsx`): the ref line (main, a tag or a commit, as a
- * switcher), then the tree with its filter, filling the rest; choosing a
- * file moves the page with the router, never reloading the document. On
- * a commit's page, the files it changed, open, marked A, M or D with their
- * `+n −m`; choosing one scrolls the diff to it.
- *
- * `J` and `K` move to the next or previous file, in the tree's order.
- * Not a route: the `-` prefix keeps the router from reading it as one.
- */
 import { useAtomValue } from "@effect/atom-react";
 import type { ChangedFile } from "@repo/protocol/domain/code";
 import { ProjectName } from "@repo/protocol/ids";
@@ -44,7 +33,6 @@ const decode = Schema.decodeUnknownOption(CommitPageData);
 
 const NONE: readonly ChangedFile[] = [];
 
-/** The files the commit on the page changed; none while its data is not there. */
 const useCommitFiles = (): readonly ChangedFile[] => {
   const data: unknown = useMatch({
     from: "/$owner/$project/commit/$sha",
@@ -52,7 +40,6 @@ const useCommitFiles = (): readonly ChangedFile[] => {
     shouldThrow: false,
   });
 
-  // Decoded once per read, not on every move between files.
   return useMemo(
     () =>
       Option.match(decode(data), {
@@ -63,10 +50,8 @@ const useCommitFiles = (): readonly ChangedFile[] => {
   );
 };
 
-/** Which page of a file the address is: its folder, its code, or why. */
 type Kind = "blob" | "tree" | "why";
 
-/** Where the reader is in the code: the project, the revision and the path, and which page. */
 const useCodeAddress = () => {
   const params = useParams({ strict: false });
 
@@ -89,7 +74,6 @@ const useCodeAddress = () => {
   return { kind, path, project, rev };
 };
 
-/** The page of `kind` for `path` at `rev`. */
 const hrefFor = (
   project: ProjectName,
   kind: Kind,
@@ -103,7 +87,6 @@ const hrefFor = (
   return (kind === "why" ? whyHref : blobHref)(project, rev, path);
 };
 
-/** The ref line: the revision, and the switcher to the same page at another. */
 const RefLine = ({
   kind,
   path,
@@ -128,7 +111,6 @@ const RefLine = ({
   );
 };
 
-/** The tree of every path at the revision, and the keys between its files. */
 const ProjectTree = ({
   kind,
   path,
@@ -140,7 +122,6 @@ const ProjectTree = ({
   readonly path: string | undefined;
   readonly project: ProjectName;
   readonly rev: string;
-  /** Whether the tree is on screen here (the rail is not below the shell's width). */
   readonly shown: boolean;
 }) => {
   const router = useRouter();
@@ -173,7 +154,6 @@ const ProjectTree = ({
   ) : null;
 };
 
-/** A folder's, a file's or a why page's files: the ref line, then the tree. */
 export const CodeFiles = ({
   always = false,
 }: {
@@ -200,7 +180,6 @@ export const CodeFiles = ({
   );
 };
 
-/** A commit's changed files, marked by how, and the keys between them. */
 export const CommitFiles = ({
   always = false,
 }: {
@@ -251,7 +230,6 @@ export const CommitFiles = ({
   ) : null;
 };
 
-/** The rail's body: a commit's changed files, or the project's. */
 const RailBody = ({ commit }: { readonly commit: boolean }) =>
   commit ? <CommitFiles /> : <CodeFiles />;
 

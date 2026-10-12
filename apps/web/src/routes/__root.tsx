@@ -25,26 +25,14 @@ import { themeColors } from "../features/shared/theme.ts";
 
 import styles from "../styles.css?url";
 
-// The document every page shares, and the shell inside it: the rail, the
-// bars, and each page's own panes (its `Workspace`). The document is the
-// route's shell component, so a failure in this route's own read still
-// draws inside a whole document. Pages read the site's facts from this
-// route's loader data (`getRouteApi("__root__").useLoaderData()`).
+// The document is the route's shell component, so a failure in this route's own read still draws inside a whole document.
 
-/**
- * What every page may need from the Worker's env: where a browser reaches
- * the platform (its git remotes and the CLI's install line). Read on the
- * server; the loader's data rides into the page with the first render.
- */
 const siteFacts = createServerFn({ method: "GET" }).handler(() => ({
   platformUrl: env.PUBLIC_PLATFORM_URL,
 }));
 
-/**
- * The browser's chrome colour for each scheme. Rendered into the head
- * directly, not through `rootHead`: both metas are named `theme-color`, and
- * TanStack's `HeadContent` keeps one meta per name.
- */
+// Rendered into the head directly, not through `rootHead`: both metas are named `theme-color`,
+// and TanStack's `HeadContent` keeps one meta per name.
 export const ThemeColors = () => (
   <>
     <meta
@@ -73,7 +61,6 @@ const Document = ({ children }: Readonly<{ children: ReactNode }>) => (
   </html>
 );
 
-/** The decider's Today, read in the browser for the rail's count. */
 const railToday = todayAtom();
 
 const TodayWaiting = () => {
@@ -90,11 +77,6 @@ const TodayWaiting = () => {
   );
 };
 
-/**
- * How many decisions wait on the signed-in decider, beside Today in the
- * rail: read once the page is up and only for someone signed in, never on
- * the server, so it never holds a page back.
- */
 const TodayCount = () => {
   const hydrated = useHydrated();
   const signedIn = useSignedIn();
@@ -103,7 +85,6 @@ const TodayCount = () => {
 };
 
 const Root = () => {
-  // Read in the browser after the page is up; the rail draws without it first.
   const listed = useAtomValue(projectsAtom);
 
   return (
@@ -120,21 +101,13 @@ const Root = () => {
   );
 };
 
-/**
- * What a shared link to any page unfurls with until the page gives its own
- * (`pageHead`): what the platform is, in a sentence.
- */
 export const SITE_DESCRIPTION =
   "A git platform where a project says what it wants as asks, anyone may answer, and a change lands on main only by passing a typed gate, with credit for every person involved.";
 
-/** The site's icon, drawn to scale (`public/icons/icon.svg`). */
 const ICON_PATH = "/icons/icon.svg";
 
-/**
- * A font every page draws with, fetched with the page rather than once the
- * stylesheet names it. Fonts are fetched without credentials whatever their
- * origin, so the preload says so too, or the browser fetches the file twice.
- */
+// Fonts are fetched without credentials whatever their origin, so the preload says so too,
+// or the browser fetches the file twice.
 const fontPreload = (href: string) =>
   ({
     as: "font",
@@ -144,13 +117,7 @@ const fontPreload = (href: string) =>
     type: "font/woff2",
   }) as const;
 
-/**
- * The document's head on every page: the stylesheet, the latin fonts (the
- * latin-ext files load only when a page needs them), the manifest, the icon
- * and the metas. TanStack keeps one meta per `name` (the last a route gives),
- * so each meta here must have a name of its own; the two theme colours are
- * `ThemeColors`, in the document itself.
- */
+// TanStack keeps one meta per `name` (the last a route gives), so each meta here must have a name of its own.
 export const rootHead = () => ({
   links: [
     { href: styles, rel: "stylesheet" },

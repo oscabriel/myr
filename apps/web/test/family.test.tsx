@@ -1,11 +1,3 @@
-/**
- * A family drawn as a fan: one node per child the parent stores, each its
- * mark and its short name, an arrow to the delete child that waits on
- * them, and "n of N landed" counted against the stored children, never the
- * listing's remaining ones. A child that landed while the page was open
- * settles with the stamp, once. Its states come from the event fold, built
- * here from hand-made events.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import type { Ask } from "@repo/protocol/domain/ask";
@@ -115,7 +107,6 @@ const strip = (props: {
     />
   );
 
-/** The `<li>`s of the list named `label`, each as its text. */
 const itemsOf = (markup: string, label: string) => {
   const start = markup.indexOf(`aria-label="${label}"`);
   const end = markup.indexOf("</ol>", start);

@@ -1,11 +1,3 @@
-/**
- * An owner's address alone: `/<handle>` leads to the person's page,
- * `/people/<handle>` in lowercase (handles compare without case), by a 302
- * (a handle may yet become a page of its own); an owner that is no handle,
- * a source host among them, and a word the web keeps for itself are not
- * found. The app's own router reaches the route for `/<handle>` and still
- * reaches its own pages by their words.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { reservedProjectNames } from "@repo/protocol/ids";
 import { isNotFound, isRedirect } from "@tanstack/react-router";
@@ -18,14 +10,12 @@ import {
 } from "../src/routes/$owner/index.tsx";
 import { Route as ImportRoute } from "../src/routes/import.tsx";
 
-/** What the loader's load came to for `owner`: a redirect, a 404, or neither. */
 interface Outcome {
   readonly location?: string | null;
   readonly notFound: boolean;
   readonly status?: number;
 }
 
-/** What the route's loader rejects with for `owner`, as an outcome. */
 const outcomeFor = (owner: string) =>
   Effect.tryPromise({
     catch: (thrown): Outcome =>
@@ -39,7 +29,6 @@ const outcomeFor = (owner: string) =>
     try: () => ownerLoader({ params: { owner } }),
   }).pipe(Effect.flip);
 
-/** The route the app's own tree finds for `pathname`. */
 const routeAt = (pathname: string) => getRouter().getMatchedRoutes(pathname)[2];
 
 describe("an owner's address alone", () => {

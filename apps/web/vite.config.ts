@@ -12,11 +12,7 @@ import {
   webManifestText,
 } from "./src/features/agents/manifest.ts";
 
-/**
- * The web app manifest, made from `Brand.name` rather than kept
- * as a file that would spell the name: written into the client output at
- * each build, beside `public/`'s icons, and served by the dev server.
- */
+// Made from `Brand.name` rather than kept as a file that would spell the name.
 const webAppManifest = (): Plugin => ({
   configureServer: (server) => {
     server.middlewares.use(MANIFEST_PATH, (_request, response) => {
@@ -36,24 +32,15 @@ const webAppManifest = (): Plugin => ({
   name: "web-app-manifest",
 });
 
-/** Shiki's WebAssembly, as the Worker's build resolves it: nothing. */
 const NO_WASM = "\0worker-no-shiki-wasm";
 
-/** What the Worker's build resolves in place of a package entry, by the entry. */
 const WORKER_IN_PLACE = new Map([
   ["@pierre/theming/themes", "src/server/pierre-themes.ts"],
   ["shiki", "src/server/shiki.ts"],
 ]);
 
-/**
- * The Worker's Shiki: core and the JavaScript engine alone
- * (`src/server/shiki.ts`), with no theme collection
- * (`src/server/pierre-themes.ts`), so the server's highlighting bundles
- * only the grammars it names: never Shiki's map of every grammar (about
- * 10 MB) and theme, Pierre's themes, or Shiki's WebAssembly, which a
- * Worker cannot compile. The browser's build keeps the whole packages;
- * their grammars and themes are chunks fetched only when used.
- */
+// The Worker's Shiki: core and the JavaScript engine alone, with no theme collection, so the server bundles only
+// the grammars it names, never Shiki's 10 MB map, Pierre's themes or WebAssembly. The browser keeps the whole packages.
 const workerShiki = (): Plugin => ({
   applyToEnvironment: (environment) => environment.name === "ssr",
   enforce: "pre",

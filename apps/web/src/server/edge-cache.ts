@@ -1,50 +1,22 @@
-/**
- * What the edge may keep of the web's answers (ADR 0026). Workers Cache
- * stands in front of the deployed web Worker and keys an answer by its path
- * and query string alone: not by the host, and not by the `Cookie` or the
- * `Authorization` a request carries. A request with a cookie is served what
- * the cache holds for its path, unless the stored answer varies by
- * `Cookie`; an answer without `Cache-Control` is kept by a heuristic (two
- * hours for a 200). Every answer the Worker gives passes through
- * `forTheEdge` (`src/server.ts`), which holds two rules:
- *
- * - An answer to a request that carries any cookie or an `Authorization`,
- *   an answer that sets a cookie, and an answer that says nothing of how
- *   long it may be kept, is kept nowhere: `private, no-store`, which the
- *   cache bypasses. So nothing read with a reader's credential is ever
- *   stored, and a route that forgets its headers keeps nothing.
- * - Any other answer the cache may store varies by `Cookie`: it was made for
- *   a request with no cookie, and is served only to one, so a signed-in
- *   reader is never handed a page kept from a signed-out one.
- *
- * `CDN-Cache-Control` and `Cloudflare-CDN-Cache-Control` would outrank
- * `Cache-Control` at the edge; the web sets neither, and drops any an
- * answer it passes on carries.
- */
+// Workers Cache keys an answer by path and query alone, not by host, `Cookie` or `Authorization`.
+// An answer to a request with a credential, one that sets a cookie, or one with no `Cache-Control` is kept nowhere;
+// any other varies by `Cookie`, so a signed-in reader is never handed a page kept from a signed-out one.
 import { Effect } from "effect";
 
-/** The `Cache-Control` of an answer kept by nobody: no shared cache, no browser. */
 export const KEPT_NOWHERE = "private, no-store";
 
-/** Headers that would decide what the edge keeps over `Cache-Control`. */
 const EDGE_OVERRIDES = ["cdn-cache-control", "cloudflare-cdn-cache-control"];
 
-/** The directives of a `Cache-Control` value, each as `name` or `name=value`, lower-cased. */
 const directivesOf = (cacheControl: string) =>
   cacheControl
     .split(",")
     .map((directive) => directive.trim().toLowerCase())
     .filter((directive) => directive !== "");
 
-/** Whether the request says who is reading it: any cookie, or an `Authorization`. */
 const speaksForSomeone = (request: Request) =>
   request.headers.has("cookie") || request.headers.has("authorization");
 
-/**
- * Whether `cacheControl` must be replaced by `KEPT_NOWHERE`: it is missing,
- * or it names a field (`private="set-cookie"`, `no-cache="…"`), the form
- * that lets the cache store the answer with that field stripped.
- */
+// A field-naming directive (`private="set-cookie"`) lets the cache store the answer with that field stripped.
 const unsafeFor = (cacheControl: string | null) =>
   cacheControl === null ||
   directivesOf(cacheControl).some(
@@ -52,13 +24,11 @@ const unsafeFor = (cacheControl: string | null) =>
       directive.startsWith("private=") || directive.startsWith("no-cache=")
   );
 
-/** Whether the cache bypasses an answer under `cacheControl`. */
 const keptNowhere = (cacheControl: string) =>
   directivesOf(cacheControl).some(
     (directive) => directive === "private" || directive === "no-store"
   );
 
-/** `vary` with `Cookie` among its headers. */
 const varyingByCookie = (vary: string | null) => {
   const names = (vary ?? "")
     .split(",")
@@ -70,7 +40,6 @@ const varyingByCookie = (vary: string | null) => {
     : [...names, "Cookie"].join(", ");
 };
 
-/** `response`'s headers as the edge may see them, for `request`. */
 const edgeHeaders = (request: Request, response: Response) => {
   const headers = new Headers(response.headers);
 
@@ -97,10 +66,6 @@ const edgeHeaders = (request: Request, response: Response) => {
   return headers;
 };
 
-/**
- * `response` as the edge may keep it, for `request`: the same status and
- * body (a stream stays a stream), under the two rules above.
- */
 export const forTheEdge = (request: Request, response: Response): Response =>
   new Response(response.body, {
     headers: edgeHeaders(request, response),
@@ -108,7 +73,6 @@ export const forTheEdge = (request: Request, response: Response): Response =>
     statusText: response.statusText,
   });
 
-/** A Worker's `fetch`, as TanStack Start's server entry gives it. */
 interface Entry<Rest extends readonly unknown[]> {
   readonly fetch: (
     request: Request,
@@ -116,15 +80,10 @@ interface Entry<Rest extends readonly unknown[]> {
   ) => Promise<Response> | Response;
 }
 
-/** The Worker's `fetch` once every answer passes through `forTheEdge`. */
 interface EdgeEntry<Rest extends readonly unknown[]> {
   readonly fetch: (request: Request, ...rest: Rest) => Promise<Response>;
 }
 
-/**
- * `entry` with every answer it gives passed through `forTheEdge`; its other
- * arguments (the Worker's env and context) go on to it untouched.
- */
 export const edgeEntry = <Rest extends readonly unknown[]>(
   entry: Entry<Rest>
 ): EdgeEntry<Rest> => ({

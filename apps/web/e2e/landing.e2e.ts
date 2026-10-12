@@ -1,21 +1,8 @@
-/**
- * The landing as a first-time reader meets it in a browser: the page as
- * sent names its projects, so a reader with no script sees them; its first
- * action takes them to the open asks; and on the narrowest phone it scrolls
- * nothing sideways and axe finds no serious or critical violation, in
- * either scheme.
- * `a11y.e2e.ts` checks it with every other page at 1440 and 390 px.
- *
- * It runs only against `WEB_URL` (a stage's web origin, or a `vite dev`
- * with the dev fixtures) and is skipped without it. It only reads, signed
- * out.
- */
 import { expect, test } from "@playwright/test";
 import { Config, Effect, Option } from "effect";
 
 import { axeOn, sideways } from "./axe.ts";
 
-/** Where the web lives. */
 const web = Effect.runSync(
   Config.option(Config.NonEmptyString("WEB_URL")).pipe(
     Effect.map(Option.map((url) => url.replace(/\/+$/u, "")))
@@ -24,7 +11,6 @@ const web = Effect.runSync(
 
 const at = (path: string) => `${Option.getOrElse(web, () => "")}${path}`;
 
-/** The narrowest phone the web is drawn for. */
 const NARROWEST = 360;
 
 test.describe("the landing", () => {
@@ -33,8 +19,7 @@ test.describe("the landing", () => {
     "WEB_URL is not set: point it at a web's origin to run this check"
   );
 
-  // A seeded stage, or the dev world: a platform with no project yet sends
-  // an empty list, which is a page of its own and not this check's.
+  // A platform with no project yet sends an empty list, which is a page of its own.
   test("names its projects in the page as sent, before any script runs", ({
     page,
   }) =>

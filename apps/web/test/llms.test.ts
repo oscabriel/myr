@@ -1,10 +1,3 @@
-/**
- * What an agent reads first on the web host: `/llms.txt` for
- * the platform and `/<project>/llms.txt` for one project, as Markdown, and
- * the MCP card at `/.well-known/mcp.json`. Each is a pure function of what
- * the platform lists and of the CLI's commands (`@repo/agent-kit`'s one
- * list); every name in them comes from `Brand`.
- */
 import { describe, expect, it } from "@effect/vitest";
 import type { CommandDoc } from "@repo/agent-kit/command-doc";
 import { fullLlms } from "@repo/agent-kit/full-llms";
@@ -50,7 +43,6 @@ const datekit = ProjectName.make("oscabriel/datekit");
 
 const burrow = ProjectName.make("oscabriel/burrow");
 
-/** A command row as `@repo/agent-kit`'s command list holds it. */
 const row = (
   path: readonly [string, ...string[]],
   summary: string,
@@ -335,7 +327,6 @@ describe("the command catalog", () => {
     const words = catalog.map(({ path }) => path.join(" "));
 
     expect(catalog.length).toBeGreaterThan(20);
-    // A contract the CLI projects, and commands written by hand in it.
     expect(words).toContain("asks");
     expect(words).toContain("env set");
     expect(words).toContain("login");
@@ -347,7 +338,6 @@ describe("the command catalog", () => {
   });
 });
 
-/** A platform that lists `listed` as its projects, and answers nothing else. */
 const listing = (listed: readonly ProjectListing[]) => () =>
   platformWith(
     Contracts.toLayerHandler("listProjects", () =>
@@ -355,12 +345,10 @@ const listing = (listed: readonly ProjectListing[]) => () =>
     )
   );
 
-/** A platform that cannot be reached: every call dies on the way. */
 const unreachable = () => unreachablePlatform;
 
 const getFull = () => new Request(`${webUrl}/llms-full.txt`);
 
-/** A fork's gateway address: its project's name, then the fork's parts. */
 const addressed = (repo: RepoName) =>
   Option.getOrElse(addressOfRepo(repo), () => repo);
 
@@ -407,14 +395,12 @@ describe("/llms-full.txt", () => {
     const parseIso = AskId.make("parse-iso");
     const ada = Handle.make("Ada");
 
-    /** A name pattern the doc states, with its placeholders filled in. */
     const filled = (pattern: string) =>
       pattern
         .replaceAll("<owner>/<name>", datekit)
         .replaceAll("<ask>", parseIso)
         .replaceAll("<handle>", ada.toLowerCase());
 
-    /** The patterns in the doc's code spans that name a fork. */
     const patterns = [
       ...text.matchAll(/`(?<name><owner>\/<name>--[^`]+)`/gu),
     ].map((match) => match.groups?.name ?? "");
@@ -450,7 +436,6 @@ describe(mcpCard, () => {
   });
 });
 
-/** A platform that lists `listed` as its projects and `listedAsks` as datekit's asks. */
 const listingWithAsks =
   (listed: readonly ProjectListing[], listedAsks: readonly AskListing[]) =>
   () =>
@@ -463,14 +448,12 @@ const listingWithAsks =
       )
     );
 
-/** A request for `path` on the web host, accepting `accept`. */
 const getAt = (path: string, accept: string) =>
   new Request(`${webUrl}${path}`, { headers: { accept } });
 
 const BROWSER =
   "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8";
 
-/** What a handler answered: a response, or the page it fell through to. */
 const answered = (result: Promise<Response> | "the page") =>
   result === "the page"
     ? Effect.void
@@ -483,7 +466,6 @@ const answered = (result: Promise<Response> | "the page") =>
           }))
       );
 
-/** The head's link naming `href` as a page's Markdown. */
 const alternate = (href: string) => ({
   href,
   rel: "alternate",

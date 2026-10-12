@@ -1,21 +1,13 @@
-/**
- * What a page puts in the document's head: its title, and the description
- * a shared link unfurls with (`description` and the Open Graph trio). The
- * router keeps one meta per name (or Open Graph property), the last a route
- * gives, so each one here has a name of its own and a page's replace the
- * root's.
- */
+// The router keeps one meta per name (or Open Graph property), the last a route gives, so a page's replace the root's.
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 
 import { pageHead } from "../src/features/shared/head.ts";
 import { rootHead } from "../src/routes/__root.tsx";
 
-/** Each meta's key as the router dedupes it: its `name`, else its `property`. */
 const keyOf = (meta: Readonly<Record<string, string>>) =>
   meta.name ?? meta.property ?? (meta.title === undefined ? "" : "title");
 
-/** The metas of `head` as `key: content` pairs (the title as `title`). */
 const metasOf = (head: {
   readonly meta: readonly Readonly<Record<string, string>>[];
 }) =>

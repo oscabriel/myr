@@ -1,9 +1,3 @@
-/**
- * A project's home's reads on the server, and its answer to an agent: what
- * its loader reads (its asks, its own ledger, its events, its policy, its
- * root folder and README, then each family's parent in full), and its GET,
- * which gives a request for Markdown the project's `llms.txt`.
- */
 import { Client, PolicyOf } from "@repo/protocol/contracts";
 import { Ask, AskListing } from "@repo/protocol/domain/ask";
 import { FileView, TreeListing } from "@repo/protocol/domain/code";
@@ -31,7 +25,6 @@ import type { ClientFor } from "./llms.ts";
 
 export const decodeName = Schema.decodeUnknownOption(ProjectName);
 
-/** What the loader carries from the server, each read there when the platform gave it. */
 export const ProjectPageData = Schema.Struct({
   asks: Schema.optionalKey(Schema.Array(AskListing)),
   code: Schema.optionalKey(
@@ -44,7 +37,6 @@ export const ProjectPageData = Schema.Struct({
   ledger: Schema.optionalKey(Ledger),
   now: Schema.DateTimeUtcFromString,
   parents: Schema.Array(Ask),
-  /** The project's policy, and where it was imported from, as `projectPolicy` gives them. */
   policy: Schema.optionalKey(PolicyOf.successSchema),
   project: ProjectName,
 });
@@ -53,11 +45,6 @@ export type ProjectPageData = typeof ProjectPageData.Type;
 
 const isUnknownProject = Schema.is(UnknownProject);
 
-/**
- * A read the page can do without: its value, or none when the platform
- * cannot give it now (whatever went wrong on the way); a project it does
- * not know is a 404.
- */
 const optional = <A, E, R>(read: Effect.Effect<A, E, R>) =>
   read.pipe(
     Effect.asSome,
@@ -68,13 +55,8 @@ const optional = <A, E, R>(read: Effect.Effect<A, E, R>) =>
     )
   );
 
-/** Four reads at once: a project holds a few families, each read once. */
 const AT_ONCE = 4;
 
-/**
- * The project's home, read over `Client`, or a not-found for a name that is
- * none or a project the platform does not know.
- */
 export const readProjectPage = (name: string) =>
   Effect.gen(function* () {
     const project = yield* Effect.fromOption(decodeName(name));
@@ -143,11 +125,6 @@ export const readProjectPage = (name: string) =>
     }).pipe(Effect.orDie);
   }).pipe(Effect.catchTag("NoSuchElementError", () => Effect.fail(notFound())));
 
-/**
- * The page's GET, as a function of its client: a request that asks for
- * Markdown gets the project's `llms.txt`, varied by `Accept`; any other
- * falls through to the page.
- */
 export const projectPageHandler =
   (clientFor: ClientFor, platformUrl: string) =>
   <Next>({

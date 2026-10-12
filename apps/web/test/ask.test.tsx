@@ -1,9 +1,3 @@
-/**
- * The ask page, as a person reads it: the brief (want, current behaviour,
- * out of scope, terms, context), its kind, territory, check and state, who
- * asked, its parent and blockers, and the exact lines that clone, claim and
- * check it. Rendered to HTML with `react-dom/server`.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { Client, Contracts } from "@repo/protocol/contracts";
@@ -55,19 +49,15 @@ import { textIn } from "./markup.ts";
 
 const platformUrl = "https://platform-test.example.workers.dev";
 
-/** The markup inside the first `<pre>`. */
 const inPre = (markup: string) =>
   /<pre\b[^>]*>(?<inner>.*?)<\/pre>/su.exec(markup)?.groups?.inner;
 
-/** The page's main pane, without the inspector. */
 const mainOf = (markup: string) =>
   /<main\b[^>]*>(?<inner>.*)<\/main>/su.exec(markup)?.groups?.inner ?? "";
 
-/** The inspector. */
 const asideOf = (markup: string) =>
   /<aside\b[^>]*>(?<inner>.*)<\/aside>/su.exec(markup)?.groups?.inner ?? "";
 
-/** The context bar's trail. */
 const trailOf = (markup: string) =>
   /<nav aria-label="Breadcrumb"[^>]*>(?<inner>.*?)<\/nav>/su.exec(markup)
     ?.groups?.inner ?? "";
@@ -84,7 +74,6 @@ const page = (shown = ask, more: Partial<AskProps> = {}) => (
   />
 );
 
-/** The check's source, as the platform reads it. */
 const checkSource = (lines: number) => ({
   path: RepoPath.make("test/parse-week.test.ts"),
   sha: "f".repeat(40),
@@ -493,7 +482,6 @@ describe(NoSuchAsk, () => {
   });
 });
 
-/** What the stub platform was asked. */
 interface Asked {
   readonly asks: number;
   readonly files: number;
@@ -506,17 +494,11 @@ const nothingAsked: Asked = { asks: 0, files: 0, replays: 0, verdicts: 0 };
 const count = (asked: Ref.Ref<Asked>, key: keyof Asked) =>
   Ref.update(asked, (seen) => ({ ...seen, [key]: seen[key] + 1 }));
 
-/** Events in datekit: tamsin claimed the ask, and another ask was claimed too. */
 const replay = [
   claimedEvent(1, "tamsin"),
   claimedEvent(2, "okafor", AskId.make("format-week")),
 ];
 
-/**
- * A platform that knows datekit's ask (`shown`, under its id) and the
- * family parent, its events, no verdict yet, and the check's file when
- * `readable`.
- */
 const platformOf = (
   asked: Ref.Ref<Asked>,
   {

@@ -1,10 +1,3 @@
-/**
- * A project's ledger, rendered to HTML with `react-dom/server` from fixtures
- * decoded with the protocol's own schemas: the posture label, each declared
- * layer, each sealed area folded from the entries (count, authors, root,
- * admission), and the entries newest first. The ledger carries no path, no
- * check name and no file name, and the view adds none.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { Client, Contracts } from "@repo/protocol/contracts";
@@ -50,7 +43,6 @@ const maintainers = LayerName.make("maintainers");
 
 const decodeLedger = Schema.decodeSync(Ledger);
 
-/** The ledger's own fields, decoded from the wire as `ledger` returns them. */
 const datekitRead = decodeLedger({
   entries: [],
   layers: [
@@ -71,7 +63,6 @@ const datekitRead = decodeLedger({
   project: "datekit",
 });
 
-/** Its entries, each made (and checked) by the protocol's own constructors. */
 const entries: readonly LedgerEntry[] = [
   LedgerEntry.cases.LayerDeclared.make({
     at: DateTime.makeUnsafe("2026-10-09T10:00:00.000Z"),
@@ -138,7 +129,6 @@ const parserArea = AreaName.make("parser");
 
 const parserRoot = SuiteRoot.make(`sha256:7fbe4b${"2c3d".repeat(14)}a1`);
 
-/** The `parser` suite's commitment, published as the release landed. */
 const parserCommitment = LedgerEntry.cases.CommitmentPublished.make({
   area: parserArea,
   at: DateTime.makeUnsafe("2026-10-12T08:00:00.000Z"),
@@ -148,13 +138,11 @@ const parserCommitment = LedgerEntry.cases.CommitmentPublished.make({
   suite: parserRoot,
 });
 
-/** datekit's ledger once its maintainers layer holds the `export` and `parser` suites. */
 const datekit: Ledger = {
   ...datekitRead,
   entries: [...entries, parserCommitment],
 };
 
-/** A project with no visibility config: the platform's neutral ledger. */
 const open = decodeLedger({
   entries: [],
   layers: [],
@@ -165,31 +153,26 @@ const open = decodeLedger({
 
 const page = <LedgerView ledger={datekit} now={now} />;
 
-/** The entries' sequence numbers, in the order the page lists them. */
 const seqsOf = (markup: string) =>
   [...markup.matchAll(/data-seq="(?<seq>\d+)"/gu)].map((found) =>
     Number(found.groups?.seq)
   );
 
-/** The words of the first `<time>` after `marker` in `markup`. */
 const whenOf = (markup: string, marker: string) =>
   /<time\b[^>]*>(?<when>[^<]*)<\/time>/u.exec(
     markup.slice(markup.indexOf(marker))
   )?.groups?.when;
 
-/** Each history row's markup, in the order the page lists them. */
 const historyRowsOf = (markup: string) =>
   [
     ...mainOf(markup).matchAll(/<li\b[^>]*data-entry="[^"]*"[\s\S]*?<\/li>/gu),
   ].map(([row]) => row);
 
-/** Each history row's typed word, in order. */
 const wordsOf = (markup: string) =>
   historyRowsOf(markup).map((row) =>
     plainText(elementWith(row, "data-entry-word")).trim()
   );
 
-/** Whether a history row's word is drawn in the sealed role or in ink. */
 const toneOf = (row: string) =>
   /text-sealed/u.test(elementWith(row, "data-entry-word")) ? "sealed" : "ink";
 
@@ -500,7 +483,6 @@ describe(areaSummaries, () => {
   });
 });
 
-/** A platform that knows only datekit, counting the ledgers it is asked for. */
 const platformHandlers = (asked: Ref.Ref<number>) =>
   Layer.mergeAll(
     unanswered,
@@ -518,7 +500,6 @@ const platformHandlers = (asked: Ref.Ref<number>) =>
     asTester
   );
 
-/** That platform, as the page's loader reaches it on the server. */
 const platformOf = (asked: Ref.Ref<number>) =>
   Layer.effect(Client, RpcTest.makeClient(Contracts)).pipe(
     Layer.provide(platformHandlers(asked))
@@ -572,7 +553,6 @@ describe(readLedger, () => {
   );
 });
 
-/** Lets the atoms' fibers run until `done` holds, or long enough that it would have. */
 const runUntil = (done: Effect.Effect<boolean>) =>
   Effect.yieldNow.pipe(
     Effect.andThen(done),

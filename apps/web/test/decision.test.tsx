@@ -1,14 +1,3 @@
-/**
- * Deciding from Today: the `decide` atom sends the decider's choice as the
- * contract's payload, and on success reads Today and the project again, so
- * the decision leaves the list and the project shows what it changed. A
- * decision someone else closed first comes back as the `DecisionClosed`
- * refusal, shown as such, and Today reads again without it.
- *
- * The atoms run in an `AtomRegistry` whose `ContractsClient` is the protocol's
- * own client over in-process handlers that record each call (`RpcTest`); no
- * HTTP and no platform.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { Contracts } from "@repo/protocol/contracts";
@@ -62,7 +51,6 @@ import { ContractsClient, webContracts } from "../src/surfaces.ts";
 
 const markupOf = (element: ReactElement) => renderToStaticMarkup(element);
 
-/** What a reader sees of `markup`: the text without its tags. */
 const plainTextOf = (markup: string) =>
   markup
     .replaceAll(/<[^>]+>/gu, " ")
@@ -71,7 +59,6 @@ const plainTextOf = (markup: string) =>
     .replaceAll("&amp;", "&")
     .replaceAll(/\s+/gu, " ");
 
-/** Today as the page reads it from the atom: listed, or why not. */
 const readOf = (result: AsyncResult.AsyncResult<Today, unknown>): TodayRead => {
   if (AsyncResult.isSuccess(result)) {
     return TodayRead.cases.Read.make({ today: result.value });
@@ -113,7 +100,6 @@ const todayWith = (decisions: readonly Decision[]): Today => ({
   unattended: [],
 });
 
-/** What the platform was asked, call by call. */
 interface Asked {
   readonly decide: readonly unknown[];
   readonly listAsks: number;
@@ -127,11 +113,6 @@ type Decide = (payload: {
   DecisionClosed | UnknownDecision
 >;
 
-/**
- * The web's `ContractsClient`, answered in process: `today` answers the
- * stray push until a decision is taken and nothing after, `listAsks` answers
- * an empty list, and `decide` answers `answer`. Each call is recorded.
- */
 const contracts = (asked: Ref.Ref<Asked>, answer: Decide) => {
   const decided = Ref.makeUnsafe(false);
 
@@ -167,7 +148,6 @@ const contracts = (asked: Ref.Ref<Asked>, answer: Decide) => {
   );
 };
 
-/** A registry whose atoms reach `contracts` instead of `/rpc`. */
 const registryOver = (
   layer: Layer.Layer<ContractsClient | Reactivity.Reactivity>
 ) =>
@@ -191,7 +171,6 @@ const projectAsks = ContractsClient.query(
   { reactivityKeys: keys.project(datekit) }
 );
 
-/** Today and a read of the project, both on screen, read once; then `input` decided. */
 const decideOnce = (
   answer: Decide,
   input: {
@@ -326,7 +305,6 @@ describe("the decide atom", () => {
   );
 });
 
-/** The Accept button's opening tag. */
 const acceptOf = (markup: string) =>
   /<button[^>]*data-choice="accept"[^>]*>/u.exec(markup)?.[0] ?? "";
 
@@ -363,7 +341,6 @@ describe("DecisionCard for an OpenProposal", () => {
       />
     );
 
-  /** `showProposal`'s answer for the proposal, its draft at `draft`. */
   const shown = (draft?: DraftState) => {
     const wanted = {
       expiresAt: opening.expiresAt,
@@ -382,7 +359,6 @@ describe("DecisionCard for an OpenProposal", () => {
     };
   };
 
-  /** The card once the browser's read of the proposal answered with `draft`. */
   const cardRead = (draft?: DraftState) =>
     markupOf(
       <DecisionCard
@@ -519,7 +495,6 @@ describe("DecisionCard for an OpenProposal", () => {
 
 const vellum = ProjectName.make("oscabriel/vellum");
 
-/** A waiver on the answer to escape-attribute-quotes, carrying the answer's diff of the marker's file. */
 const waiver: Decision = {
   deciders: [okonkwo],
   default: "decline",

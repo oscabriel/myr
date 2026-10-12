@@ -1,14 +1,3 @@
-/**
- * The code browser's pages, rendered to HTML with `react-dom/server` from
- * fixtures decoded with the protocol's own schemas: a folder (`TreeView`), a
- * file (`BlobView`), the landings (`LogView`), one commit (`CommitView`), a
- * missing path's soft landing; the refs page has its own test
- * (`refs.test.tsx`). Each is what the server sends before the browser
- * loads Pierre: the tree and the
- * highlighted code are client-only, so none of these pages carries a
- * `<file-tree-container` or a `<diffs-container`; a commit's diff arrives as
- * plain text at the drawing's measures.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Client, Contracts } from "@repo/protocol/contracts";
 import type { Contract } from "@repo/protocol/contracts";
@@ -68,7 +57,6 @@ import { reachingTransport } from "./transport.ts";
 
 const markupOf = (element: ReactElement) => renderToStaticMarkup(element);
 
-/** What a reader sees: the markup without its tags, entities decoded. */
 const textOf = (element: ReactElement) =>
   markupOf(element)
     .replaceAll(/<[^>]+>/gu, " ")
@@ -79,13 +67,11 @@ const textOf = (element: ReactElement) =>
     .replaceAll("&amp;", "&")
     .replaceAll(/\s+/gu, " ");
 
-/** Every `href` in `markup`, in order, entities decoded. */
 const hrefsOf = (markup: string) =>
   [...markup.matchAll(/href="(?<href>[^"]*)"/gu)].map((match) =>
     (match.groups?.href ?? "").replaceAll("&amp;", "&")
   );
 
-/** The markup from the element marked `marker` to the next element marked the same way. */
 const slice = (markup: string, marker: string, value: string) => {
   const start = markup.indexOf(`${marker}="${value}"`);
   const next = markup.indexOf(`${marker}="`, start + 1);
@@ -95,7 +81,6 @@ const slice = (markup: string, marker: string, value: string) => {
     : markup.slice(start, next === -1 ? undefined : next);
 };
 
-/** The `<nav>` marked `attribute` (`data-slot="breadcrumb"`), whole. */
 const navOf = (markup: string, attribute: string) =>
   new RegExp(`<nav\\b[^>]*${attribute}[^>]*>[\\s\\S]*?</nav>`, "u").exec(
     markup
@@ -156,7 +141,6 @@ const nested = decodeTree({
   path: "src/format/locale",
 });
 
-/** A tag with a slash and an at sign: one URL-encoded segment. */
 const TAG = "@datekit/core@1.0.0";
 
 const TAG_SEGMENT = "%40datekit%2Fcore%401.0.0";
@@ -307,19 +291,15 @@ const diff = decodeDiff({
   truncated: false,
 });
 
-/** The markup of `<main>` alone: the page, without its inspector. */
 const mainOf = (markup: string) =>
   /<main\b[\s\S]*?<\/main>/u.exec(markup)?.[0] ?? "";
 
-/** The markup of the inspector alone. */
 const inspectorOf = (markup: string) =>
   /<aside\b[^>]*data-facts="inspector"[\s\S]*?<\/aside>/u.exec(markup)?.[0] ??
   "";
 
-/** How many times `part` appears in `text`. */
 const countIn = (text: string, part: string) => text.split(part).length - 1;
 
-/** The `<a …>` that reads `label`, in `markup`. */
 const anchorOf = (markup: string, label: string) =>
   new RegExp(`<a\\b[^>]*>${label}</a>`, "u").exec(markup)?.[0];
 
@@ -423,7 +403,6 @@ describe(TreeView, () => {
   );
 });
 
-/** Where a file's facts link their permalink, on the page of `mode`. */
 const permalink = (mode: "code" | "why") =>
   /href="(?<href>[^"]*)"[^>]*>Permalink</u.exec(
     markupOf(
@@ -523,7 +502,6 @@ describe(BlobView, () => {
   it("names the path once in the page, in its file header", () => {
     const main = mainOf(markupOf(page));
 
-    // The trail's segments, read as text, spell the path: once.
     expect(
       countIn(main.replaceAll(/<[^>]+>/gu, ""), "src/format/parse.ts")
     ).toBe(1);
@@ -917,13 +895,11 @@ describe(LogView, () => {
   });
 });
 
-/** Lines `1` to `count`, as a file's text. */
 const linesUpTo = (count: number) =>
   `${Array.from({ length: count }, (_, index) => `line ${index + 1}`).join(
     "\n"
   )}\n`;
 
-/** `diff`, with an added file of 120 lines: long enough to start folded. */
 const long = decodeDiff({
   ...Schema.encodeSync(CommitDiff)(diff),
   files: [
@@ -1155,22 +1131,18 @@ describe(CommitView, () => {
   });
 });
 
-/** A payload the platform was sent: one of the contracts'. */
 type Sent = Rpc.Payload<Contract>;
 
-/** Datekit, or the refusal for any other project. */
 const knownProject = (name: ProjectName) =>
   name === datekit
     ? Effect.void
     : Effect.fail(new UnknownProject({ project: name }));
 
-/** Main, or its commit `AT`, or the refusal for any other revision. */
 const knownRevision = (at: string | undefined) =>
   at === undefined || at === "main" || at === AT
     ? Effect.void
     : Effect.fail(new UnknownRevision({ rev: at }));
 
-/** Datekit's refs with main landed and no tags or forks. */
 const landedOnly = Schema.decodeSync(Refs)({
   forks: [],
   landed: LANDED,
@@ -1178,15 +1150,9 @@ const landedOnly = Schema.decodeSync(Refs)({
   tags: [],
 });
 
-/** The refusal for a path datekit lacks at `AT`. */
 const noPath = (path: RepoPath) =>
   new UnknownPath({ commit: CommitSha.make(AT), path });
 
-/**
- * A platform that holds datekit at main (commit `AT`): its root (with a
- * README), the folder `src/format/locale`, the README, a page of the log
- * and one commit. Every payload it is sent is kept, in order.
- */
 const platformOf = (calls: Ref.Ref<readonly Sent[]>) => {
   const sent = (payload: Sent) => Ref.update(calls, (all) => [...all, payload]);
 
@@ -1259,15 +1225,11 @@ const platformOf = (calls: Ref.Ref<readonly Sent[]>) => {
   );
 };
 
-/** What a page's read that ended in a not-found asked and carried. */
 interface Refused {
-  /** Every payload it sent the platform. */
   readonly calls: readonly Sent[];
-  /** The refusals its not-found carried, as `git` prints them; none when it carried none. */
   readonly refused: Option.Option<readonly string[]>;
 }
 
-/** Runs a page's read against `platformOf`, which must end in a not-found. */
 const refusedBy = <A, E>(
   read: Effect.Effect<A, E, Client>
 ): Effect.Effect<Refused> =>
@@ -1282,7 +1244,6 @@ const refusedBy = <A, E>(
 
     const data: unknown = isNotFound(failed) ? failed.data : undefined;
 
-    // A missing path lands on its nearest folder, its refusal beside it.
     const carried = Option.orElse(
       Schema.decodeUnknownOption(Refusals)(data),
       () =>
@@ -1445,7 +1406,6 @@ describe("the code pages' reads", () => {
   );
 });
 
-/** The soft landing a page's read ended in. */
 const landingOf = <A, E>(read: Effect.Effect<A, E, Client>) =>
   Effect.gen(function* () {
     const calls = yield* Ref.make<readonly Sent[]>([]);
@@ -1572,15 +1532,11 @@ describe("a missing path", () => {
   });
 });
 
-/** The line every code page's route answers its headers with. */
 const HEADERS_LINE = "headers: () => branchPage";
 
 describe("a code page's caching", () => {
-  // A commit never changes, but its page is more than the commit: it
-  // carries the commit's landing, which the project records only after
-  // main has moved (a read between the two finds none), and words such as
-  // "2 minutes ago", reckoned from when it was read. Kept for good, such a
-  // page would never show the landing, and its times would never move.
+  // A commit's page carries its landing, recorded after main has moved, and times reckoned from the read,
+  // so it is never kept for good.
   const routes: Readonly<Record<string, string>> = import.meta.glob(
     "../src/routes/$owner/$project/{tree,blob,why}/$rev/$.tsx",
     { eager: true, import: "default", query: "?raw" }

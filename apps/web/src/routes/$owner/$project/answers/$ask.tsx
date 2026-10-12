@@ -26,25 +26,15 @@ import { pageHead } from "../../../../features/shared/head.ts";
 import { branchPage } from "../../../../server/cache-headers.ts";
 import { serverClient } from "../../../../server/client.ts";
 
-// The answer page: where the latest answer to an ask stands, stage by
-// stage, or with `?head=<sha>` an earlier answer. It updates live while
-// open, from the project's events.
-
 const answerPage = createServerFn({ method: "GET" })
   .validator((address: AnswerAddress) => address)
   .handler(({ data }) =>
     Effect.runPromise(readAnswer(data).pipe(Effect.provide(serverClient(env))))
   );
 
-/** No landing to read: what the page reads while the answer has not landed. */
 const noLanding = Atom.make(Option.none<LandingView>());
 
-/**
- * The landing at `sha`, from its atom (seeded when the loader read it), or
- * as the loader read it. One hook whether or not the answer landed, so the
- * page keeps its place in the tree when the answer lands while it is open
- * (its outcome settles in rather than the page drawing anew).
- */
+// One hook whether or not the answer landed, so the page keeps its place in the tree when it lands while open.
 const useLanding = (
   read: AnswerPageData,
   sha: LandedSha | undefined
@@ -64,11 +54,6 @@ const useLanding = (
   );
 };
 
-/**
- * The page over its atoms, which start from what the loader read and read
- * again as the project's events arrive: the verdict, the ask, its landing,
- * and the events the fold reads.
- */
 const FreshAnswer = ({
   read,
   viewer,
@@ -76,7 +61,6 @@ const FreshAnswer = ({
   readonly read: AnswerPageData;
   readonly viewer: Handle | undefined;
 }) => {
-  // Live: each event the project hears reads again what it changed.
   useAtomMount(watchAtom(read.project));
 
   const { verdict } = Option.getOrElse(
@@ -149,7 +133,6 @@ const AnswerPage = () => {
   );
 };
 
-/** An address with no refusal behind it: a name that can name nothing, or a `?head=` that is no commit id. */
 const NOTHING =
   "Nothing is at this address: a project's and an ask's names are lowercase words joined by single dashes, and ?head= takes an answer's whole commit id, 40 hex digits.";
 
@@ -173,7 +156,6 @@ export const Route = createFileRoute("/$owner/$project/answers/$ask")({
           description: loaderData.askRead.brief.want,
           title: `Answer to ${params.ask} · ${params.project}`,
         }),
-  // An answer moves with each push and verdict: kept briefly, asked again.
   headers: () => branchPage,
   component: AnswerPage,
   notFoundComponent: AnswerNotFound,

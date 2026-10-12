@@ -1,12 +1,3 @@
-/**
- * A decider's session on the web. The platform's access token
- * lives only in an HttpOnly cookie on the web's origin: sign-in sends the
- * browser to the platform's `/authorize` with PKCE, the callback trades the
- * code at the platform's `/token` over `PLATFORM` and sets the cookie, and
- * every forward to the platform turns that cookie into an HTTP
- * `Authorization` header and drops the cookie itself. The
- * browser never chooses the credential, and never sees the token.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Handle } from "@repo/protocol/ids";
 import { untouchable } from "@repo/testkit/untouchable";
@@ -50,7 +41,6 @@ const TOKEN_ANSWER = {
   token_type: "bearer",
 };
 
-/** What a backend or a binding was handed, read whole. */
 const seenOf = (request: Request) =>
   Effect.map(
     Effect.promise(() => request.text()),
@@ -63,7 +53,6 @@ const seenOf = (request: Request) =>
     })
   );
 
-/** A fetch-shaped stub that keeps each request it is handed and answers `answer`. */
 const recorder = (answer: (request: Request) => Response) => {
   const handed: Request[] = [];
 
@@ -76,7 +65,6 @@ const recorder = (answer: (request: Request) => Response) => {
   return { fetch, seen: Effect.suspend(() => Effect.forEach(handed, seenOf)) };
 };
 
-/** A web Worker env whose PLATFORM binding answers `fetch` and nothing else. */
 const envWith = (fetch: (request: Request) => Promise<Response>): Env => ({
   PLATFORM: untouchable<Fetcher>("PLATFORM", {
     fetch: (input, init) => fetch(new Request(input, init)),
@@ -84,7 +72,6 @@ const envWith = (fetch: (request: Request) => Promise<Response>): Env => ({
   PUBLIC_PLATFORM_URL: PLATFORM_URL,
 });
 
-/** An env whose PLATFORM throws when touched: the handler must not reach the platform. */
 const unreachable: Env = {
   PLATFORM: untouchable<Fetcher>("PLATFORM"),
   PUBLIC_PLATFORM_URL: PLATFORM_URL,
@@ -100,7 +87,6 @@ const listAsksPost = (headers: Readonly<Record<string, string>> = {}) =>
 const get = (path: string, headers: Readonly<Record<string, string>> = {}) =>
   new Request(`${WEB_URL}${path}`, { headers });
 
-/** A response's `Set-Cookie` lines, each split into its name, value and attributes. */
 const cookiesOf = (response: Response) =>
   response.headers.getSetCookie().map((line) => {
     const [pair = "", ...attributes] = line
@@ -117,37 +103,27 @@ const cookiesOf = (response: Response) =>
     };
   });
 
-/** Each cookie a response sets, by name, with whether it expires now. */
 const expiriesOf = (response: Response) =>
   cookiesOf(response).map(({ attributes, name }) => [
     name,
     attributes.includes("max-age=0"),
   ]);
 
-/** The `Max-Age` of a cookie, in seconds. */
 const maxAgeOf = (attributes: readonly string[]) =>
   Number(
     attributes.find((attribute) => attribute.startsWith("max-age="))?.slice(8)
   );
 
-/** The attributes a session or state cookie must carry, lowercased. */
 const LOCKED_DOWN = ["httponly", "secure", "samesite=lax", "path=/"] as const;
 
-/** Whether a cookie carries every attribute in `LOCKED_DOWN`. */
 const lockedDown = (attributes: readonly string[] = []) =>
   LOCKED_DOWN.every((attribute) => attributes.includes(attribute));
 
 const textOf = (response: Response) => Effect.promise(() => response.text());
 
-/** Named query parameters of `url`. */
 const paramsOf = (url: URL, names: readonly string[]) =>
   Object.fromEntries(names.map((name) => [name, url.searchParams.get(name)]));
 
-/**
- * A stream that reads a whole RPC call and writes the platform's reply to
- * it: `exit` for the call's request id, echoed as the call wrote it (a
- * number or a string).
- */
 const replyingWith = (exit: string) => {
   const parts: string[] = [];
 
@@ -164,7 +140,6 @@ const replyingWith = (exit: string) => {
   });
 };
 
-/** The platform's `/rpc` answer to a `status` call: `exit`. */
 const statusReply = (exit: string) => (request: Request) =>
   new Response(
     (request.clone().body ?? new Blob().stream())
@@ -390,7 +365,6 @@ describe("the production backend", () => {
   );
 });
 
-/** Signs in at the web and returns where the browser went and the state cookie it holds. */
 const signIn = (path: string) =>
   Effect.gen(function* () {
     const response = yield* Effect.promise(() =>
@@ -403,21 +377,14 @@ const signIn = (path: string) =>
     return { location, response, state };
   });
 
-/** The protocol client a server route calls the platform with, through the production backend in process. */
 const clientOver = (env: Env) => (request: Request) =>
   serverClientOver(backend)(env, request);
 
-/** A callback whose platform must not be reached. */
 const unreachableCallback = callbackHandler(
   unreachable,
   clientOver(unreachable)
 );
 
-/**
- * Signs in, then comes back to the callback with `code` and the state sign-in
- * sent, to a platform that answers `/token` with `answer` and `/rpc` (the
- * callback's `status`) with `status`.
- */
 const signInAndBack = (
   path: string,
   code: string,
@@ -450,7 +417,6 @@ const signInAndBack = (
     return { location, response, seen: yield* platform.seen, state };
   });
 
-/** Where the callback sends the browser after a sign-in asked to come back to `path`. */
 const backTo = (path: string) =>
   Effect.map(
     signInAndBack(`/auth/signin?return=${encodeURIComponent(path)}`, "c0de"),
@@ -725,7 +691,6 @@ describe("sign-out", () => {
   });
 });
 
-/** `/auth/whoami` with `headers`, asking the platform through the production backend in process. */
 const whoami = (env: Env, headers: Readonly<Record<string, string>> = {}) =>
   Effect.promise(() =>
     whoamiHandler((request) => serverClientOver(backend)(env, request))({
@@ -818,7 +783,6 @@ describe("whoami", () => {
   );
 });
 
-/** The `Cookie` header a browser sends back after `response`: each cookie it set and did not expire. */
 const sentBack = (response: Response) =>
   cookiesOf(response)
     .filter(({ attributes }) => !attributes.includes("max-age=0"))
@@ -917,7 +881,6 @@ describe("the handle kept beside the session", () => {
   );
 });
 
-/** A JSON object, read as data. */
 const decodeDocument = Schema.decodeUnknownEffect(
   Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknown))
 );

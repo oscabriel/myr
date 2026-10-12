@@ -1,14 +1,3 @@
-/**
- * How a fixture project's record is written: a story told in the order
- * things happened, each step writing what the service would have written
- * for it (the events `watch` replays, numbered in order, the asks, each
- * round's verdict, the claims and the landings). A landing is a real
- * commit on the project's canonical `main` in the world's repo host,
- * committed by the platform with its credit trailers, so the code pages,
- * the log and every landing link read real git. An answer's head names no
- * commit the world holds (its fork is never made): it is a stable id made
- * from the step's name, as are merged trees, patch ids and suite roots.
- */
 import { RefName, RefOutcome, RepoHost } from "@repo/artifacts/repo-host";
 import { Brand } from "@repo/brand";
 import { formatLanding } from "@repo/git/trailers";
@@ -56,12 +45,8 @@ import { overlay, personIdentity, platformIdentity, scratch } from "../git.ts";
 import type { Files } from "../git.ts";
 import type { FixtureRecord, HeldProposal, KeptLog } from "./record.ts";
 
-// ------------------------------------------------------------- ids
-
-/** The largest prime below 2^32: each block of eight digits is a hash modulo it. */
 const MODULUS = 4_294_967_291;
 
-/** `count` hex digits made from `label` alone: a polynomial hash, a fresh seed per eight digits. */
 export const hexOf = (label: string, count: number): string => {
   let out = "";
 
@@ -78,7 +63,6 @@ export const hexOf = (label: string, count: number): string => {
   return out.slice(0, count);
 };
 
-/** `{ [key]: value }` when there is a value, else nothing: an optional key, spread. */
 export const present = <K extends string, A>(
   key: K,
   value: A | undefined
@@ -88,23 +72,16 @@ export const present = <K extends string, A>(
     onSome: (held) => Record.singleton(key, held),
   });
 
-/** A commit id made from `label`: an answer's head, which no repo of the world holds. */
 export const headOf = (label: string) => CommitSha.make(hexOf(label, 40));
 
-/** A held-back suite's commitment, made from its area's name. */
 export const suiteOf = (area: string) =>
   SuiteRoot.make(`sha256:${hexOf(`suite:${area}`, 64)}`);
 
-/** An instant of the dev world's calendar (`clock.ts`), from `2026-10-07T10:00`, in UTC. */
 export const instant = (text: string): DateTime.Utc =>
   DateTime.toUtc(DateTime.makeUnsafe(`${text}:00Z`));
 
-// ----------------------------------------------------------- lanes
-
-/** The project's own lanes, by name, with their commands. */
 export type Lanes = Readonly<Record<string, string>>;
 
-/** The lane an ask's own check reports as, and its command. */
 const askLane = (ask: Ask, test: string): readonly [string, string] =>
   CheckSpec.match(ask.check, {
     LintToZero: ({ command }) => ["lintToZero", command],
@@ -114,9 +91,6 @@ const askLane = (ask: Ask, test: string): readonly [string, string] =>
     SymbolAbsent: ({ count }) => ["symbolAbsent", count],
   });
 
-// ------------------------------------------------------------ story
-
-/** What one landing carries beside its commit. */
 interface LandingInput {
   readonly assisted?: readonly AgentTrailer[];
   readonly at: DateTime.Utc;
@@ -131,7 +105,6 @@ interface LandingInput {
   readonly verdict?: Verdict;
 }
 
-/** One claim as the story keeps it. */
 interface Held {
   readonly at: DateTime.Utc;
   readonly base: LandedSha;
@@ -141,10 +114,6 @@ interface Held {
   readonly suite?: SuiteRoot;
 }
 
-/**
- * A story over `project`'s canonical repo, whose `main` stands at `base`
- * with `files`: each step writes what the service would, in order.
- */
 export const storyOf = (input: {
   readonly base: LandedSha;
   readonly files: Files;
@@ -176,7 +145,6 @@ export const storyOf = (input: {
 
     const nextSeq = () => events.length + 1;
 
-    /** One event, numbered next. */
     const tell = (made: (seq: number) => ProjectEvent) => {
       events.push(made(nextSeq()));
     };
@@ -212,7 +180,6 @@ export const storyOf = (input: {
       claims.set(id, [...all.slice(0, -1), change(last)]);
     };
 
-    /** A commit of `changes` on main, by the platform for `author`, at `at`. */
     const commit = (landing: LandingInput) =>
       Effect.gen(function* () {
         const into = yield* scratch;
@@ -273,7 +240,6 @@ export const storyOf = (input: {
         return view;
       });
 
-    /** The child of a family that waits on the rest opens once they have all closed. */
     const familyMoves = (landed: Ask, at: DateTime.Utc) => {
       if (landed.parent === undefined) {
         return;
@@ -329,14 +295,8 @@ export const storyOf = (input: {
       );
 
     return {
-      /** An ask's id, read back; the story names only asks it opened. */
       ask: askOf,
 
-      /**
-       * The asks a decider opens in one landing: their files on main, an
-       * `AskOpened` for each that opens now (a child waiting on the rest
-       * opens later), and the landing, which names the first as opened.
-       */
       open: (step: {
         readonly asks: Array.NonEmptyReadonlyArray<
           Omit<Ask, "openedAt" | "openedIn" | "project">
@@ -398,7 +358,6 @@ export const storyOf = (input: {
           return landing;
         }),
 
-      /** `who` claims `id`; an answer to it is judged by `suite` when its claim pins one. */
       claim: (id: AskId, who: Handle, at: DateTime.Utc, suite?: SuiteRoot) => {
         claims.set(id, [
           ...(claims.get(id) ?? []),
@@ -421,7 +380,6 @@ export const storyOf = (input: {
         );
       },
 
-      /** The claimant pushes to the claim's fork: its head, named for `round`. */
       push: (id: AskId, at: DateTime.Utc, round = 1) => {
         const claimed = claimOf(id);
         const pushed = headOf(`${project}/${id}/${claimed.claimant}/${round}`);
@@ -434,10 +392,6 @@ export const storyOf = (input: {
         return pushed;
       },
 
-      /**
-       * The answer at `pushed` checked: its verdict, kept as a round of the
-       * ask, and a `Judged` event with where it stands.
-       */
       judge: (
         id: AskId,
         pushed: CommitSha,
@@ -506,12 +460,6 @@ export const storyOf = (input: {
         return verdict;
       },
 
-      /**
-       * The ask's last judged answer lands: a platform commit of `changes`
-       * crediting the asker, the answerer and anyone who decided on it,
-       * then `Landed` and `AskClosed`, and the family's next step opens
-       * once every sibling has landed.
-       */
       land: (
         id: AskId,
         step: {
@@ -606,11 +554,6 @@ export const storyOf = (input: {
           return view;
         }),
 
-      /**
-       * The checks still running on the ask's last answer finish with
-       * `lanes`, and it passes every stage: its verdict, kept, stands at the
-       * last stage until it lands.
-       */
       finishChecks: (
         id: AskId,
         lanes: Readonly<Record<string, LaneOutcome>>
@@ -635,7 +578,6 @@ export const storyOf = (input: {
         }
       },
 
-      /** A landing that answers no ask: a release from a layer, a decider's own change. */
       landOwn: (step: {
         readonly at: DateTime.Utc;
         readonly author: Handle;
@@ -658,32 +600,27 @@ export const storyOf = (input: {
           return view;
         }),
 
-      /** The claim is warned: no push for a while. */
       warn: (id: AskId, at: DateTime.Utc) => {
         moveClaim(id, (held) => ({ ...held, state: "warned" }));
         tell((seq) => ProjectEvent.cases.Warned.make({ ask: id, at, seq }));
       },
 
-      /** The claim lapsed, and the ask is open again. */
       lapse: (id: AskId, at: DateTime.Utc) => {
         moveClaim(id, (held) => ({ ...held, state: "lapsed" }));
         setAsk({ ...askOf(id), state: "open" });
         tell((seq) => ProjectEvent.cases.Lapsed.make({ ask: id, at, seq }));
       },
 
-      /** The claimant let the ask go, and it is open again. */
       release: (id: AskId, at: DateTime.Utc) => {
         moveClaim(id, (held) => ({ ...held, state: "released" }));
         setAsk({ ...askOf(id), state: "open" });
         tell((seq) => ProjectEvent.cases.Released.make({ ask: id, at, seq }));
       },
 
-      /** A decision put to its deciders. */
       decision: (decision: Decision) => {
         decisions.push(decision);
       },
 
-      /** A decider takes a decision put earlier. */
       decide: (id: Decision["id"], taken: NonNullable<Decision["decided"]>) => {
         const index = decisions.findIndex((each) => each.id === id);
         const found = decisions[index];
@@ -703,7 +640,6 @@ export const storyOf = (input: {
         );
       },
 
-      /** A ledger entry, numbered next in the ledger, and its event. */
       record: (entry: (seq: number) => LedgerEntry) => {
         const made = entry(ledger.length + 1);
 
@@ -717,7 +653,6 @@ export const storyOf = (input: {
         );
       },
 
-      /** A proposal opened, as anyone reads it now, and its events. */
       propose: (
         held: HeldProposal,
         settled?: { readonly at: DateTime.Utc; readonly ready: boolean }
@@ -743,7 +678,6 @@ export const storyOf = (input: {
         }
       },
 
-      /** A later round of a proposal's draft settled. */
       drafted: (id: ProposalId, at: DateTime.Utc, ready: boolean) => {
         tell((seq) =>
           ProjectEvent.cases.ProposalDrafted.make({
@@ -755,7 +689,6 @@ export const storyOf = (input: {
         );
       },
 
-      /** A decider accepted the proposal: it is closed, and its ask opens. */
       accepted: (id: ProposalId) => {
         const held = proposals.get(id);
 
@@ -767,7 +700,6 @@ export const storyOf = (input: {
         }
       },
 
-      /** A tag on `sha`, as a release names it. */
       tag: (name: string, sha: LandedSha) =>
         Effect.gen(function* () {
           const into = yield* scratch;
@@ -783,10 +715,8 @@ export const storyOf = (input: {
           );
         }),
 
-      /** Main's landed commit now. */
       head: () => head,
 
-      /** The record the story wrote, with what it keeps apart from the story. */
       told: (
         apart: Pick<FixtureRecord, "env" | "ledger"> & {
           readonly working: readonly Handle[];
@@ -848,5 +778,4 @@ export const storyOf = (input: {
     };
   });
 
-/** A story under way: its steps, and the record it has written so far. */
 export type Story = Effect.Success<ReturnType<typeof storyOf>>;

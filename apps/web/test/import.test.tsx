@@ -1,12 +1,3 @@
-/**
- * The import page, `/import`, rendered to HTML with `react-dom/server`: a
- * signed-in person pastes a public repo's HTTPS URL, may name a branch,
- * picks the owner (their handle, or the URL's source namespace when its
- * host is one the platform knows, which is the default then) and the name,
- * prefilled from the URL, and imports it through `initProject`. Signed out,
- * the page links to sign-in, coming back to it. A refusal reads as the
- * platform gave it. The page is about its reader, so no cache keeps it.
- */
 import { RegistryContext } from "@effect/atom-react";
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
@@ -49,11 +40,9 @@ const oscabriel = Option.some(Handle.make("oscabriel"));
 const signedIn = (url = CLICK) =>
   markupOf(<ImportView handle={oscabriel} here="/import" url={url} />);
 
-/** An input's opening tag, by its `name`. */
 const inputNamed = (markup: string, name: string) =>
   new RegExp(`<input[^>]*name="${name}"[^>]*>`, "u").exec(markup)?.[0] ?? "";
 
-/** Where a sign-in link in `markup` comes back to. */
 const returnOf = (markup: string) => {
   const href = /href="(?<href>\/auth\/signin[^"]*)"/u
     .exec(markup)
@@ -240,7 +229,6 @@ describe(sourceUrlOf, () => {
   });
 });
 
-/** `initProject`'s answer: the project made. */
 const made = (project: string) =>
   Schema.decodeSync(InitProject.successSchema)({
     project,
@@ -314,13 +302,7 @@ describe("a refused import", () => {
   });
 });
 
-/**
- * The page as its route draws it, the hook's importer over `registry`,
- * handing each render's importer to `seen`, as the press would reach it.
- * A server's render always reads who is signed in as not yet known (the
- * page's first paint, `whoAtom`), so this one says, as the browser would
- * once it knows, that oscabriel is.
- */
+// A server's render always reads who is signed in as not yet known, so this one says, as the browser would, that oscabriel is.
 const Page = ({
   seen,
 }: {
@@ -353,10 +335,6 @@ const PageOver = ({
   </RegistryContext.Provider>
 );
 
-/**
- * A browser signed in as oscabriel, over a platform whose `initProject`
- * answers with `answer`, every payload it is sent kept in `sent`.
- */
 const browserWith = (
   sent: ImportPayload[],
   answer: (
@@ -391,7 +369,6 @@ const browserWith = (
     ],
   });
 
-/** The form's fields as the page drew them: what pressing Import sends. */
 const fieldsIn = (markup: string) => {
   const value = (name: string) =>
     /value="(?<value>[^"]*)"/u
@@ -406,7 +383,6 @@ const fieldsIn = (markup: string) => {
   };
 };
 
-/** Presses Import on the page drawn over `registry`, and waits for the answer. */
 const pressImport = (registry: AtomRegistry.AtomRegistry) =>
   Effect.gen(function* () {
     const importers: Importer[] = [];

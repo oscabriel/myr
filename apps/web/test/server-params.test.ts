@@ -1,18 +1,10 @@
-/**
- * What a project route's server handler is handed as `params`. TanStack
- * Start runs every matched route's `params.parse` before a server handler
- * (`withParsedParams` in `@tanstack/start-server-core`'s
- * `createStartHandler`), so a handler under `$owner/$project` reads the
- * project's full name as `project`, once: parsing it again would name
- * `oscabriel/oscabriel/datekit`. Each case reads the params as Start does,
- * from the app's own router and rewrite.
- */
+// Start runs every matched route's `params.parse` before a server handler, so the handler reads the full name
+// once: parsing it again would name `oscabriel/oscabriel/datekit`.
 import { describe, expect, it } from "@effect/vitest";
 
 import { getRouter } from "../src/router.tsx";
 import { addressRewrite } from "../src/server/addresses.ts";
 
-/** The params Start hands the server handler at `pathname`. */
 const handedAt = (pathname: string) => {
   const router = getRouter();
 

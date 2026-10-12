@@ -1,10 +1,3 @@
-/**
- * The shell every page sits in, rendered to HTML inside a router at an
- * address (`render.tsx`): the rail's sections and the project's, main with
- * its context bar, the inspector when the page has facts, the phone's
- * bottom bar, and a skip link. Its links are the router's, so a click moves
- * without reloading the document.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { ProjectName } from "@repo/protocol/ids";
@@ -32,13 +25,11 @@ import { Workspace } from "../src/features/shared/shell/workspace.tsx";
 import { EIGHT_LEADING, TEN_LISTED } from "./listings.ts";
 import { renderAt } from "./render.tsx";
 
-/** The element `tag` whose opening tag carries `attribute`, whole (no nested `tag`). */
 const elementOf = (markup: string, tag: string, attribute: string) =>
   new RegExp(`<${tag}\\b[^>]*${attribute}[^>]*>[\\s\\S]*?</${tag}>`, "u").exec(
     markup
   )?.[0] ?? "";
 
-/** Each link in `markup`: its text, href, and the router's marks on it. */
 const linksOf = (markup: string) =>
   [...markup.matchAll(/<a\b(?<attributes>[^>]*)>(?<text>[\s\S]*?)<\/a>/gu)].map(
     ({ groups }) => {
@@ -56,7 +47,6 @@ const linksOf = (markup: string) =>
     }
   );
 
-/** What a reader sees of `markup`, tags gone and spaces folded. */
 const textOf = (markup: string) =>
   markup
     .replaceAll(/<[^>]+>/gu, " ")
@@ -80,7 +70,6 @@ const ledgerPage = (facts: boolean) => (
   </AppShell>
 );
 
-/** What a code page puts in the rail's slot. */
 const Tree = () => (
   <RailSlot>
     <p>src/add.ts</p>
@@ -360,7 +349,6 @@ describe("the shell", () => {
   );
 });
 
-/** The project route's params as the page reads them, and a link to the same page. */
 const ProjectParamsView = () => {
   const { owner, project } = useParams({ strict: false });
 
@@ -375,7 +363,6 @@ const ProjectParamsView = () => {
   );
 };
 
-/** The projects named in `markup`'s rail rows, in order. */
 const railProjectsOf = (markup: string) =>
   [
     ...elementOf(markup, "nav", 'aria-label="Site"').matchAll(
@@ -383,7 +370,6 @@ const railProjectsOf = (markup: string) =>
     ),
   ].map(({ groups }) => groups?.project);
 
-/** The ledger page at `url`, its rail fed the ten listed projects. */
 const listedAt = (url: string) =>
   renderAt(
     url,

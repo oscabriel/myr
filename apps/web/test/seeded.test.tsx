@@ -1,9 +1,3 @@
-/**
- * A page whose loader read its data on the server renders its atoms from
- * that data, in a registry of the page's own: two pages rendered from two
- * loaders' reads each see only their own, and the registry every request
- * on the Worker shares never holds either.
- */
 import { useAtomValue } from "@effect/atom-react";
 import { describe, expect, it } from "@effect/vitest";
 import { Atom } from "effect/reactivity";
@@ -11,7 +5,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import { seed, SeededAtoms } from "../src/client/seeded.ts";
 
-/** An atom a page reads, unread until a loader seeds it. */
 const verdictWord = Atom.make("unread");
 
 const Reader = () => <p>{useAtomValue(verdictWord)}</p>;

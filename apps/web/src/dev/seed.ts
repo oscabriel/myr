@@ -1,24 +1,3 @@
-/**
- * The dev world's seed: both fictional projects (`examples.ts`) brought to
- * a state where every page has something to show, by the project service's
- * own methods, in the order people would act. The seed plays the people and
- * the platform's other parts: the initializer's first push and the gateway
- * that reports it, a decider opening asks, a contributor claiming one,
- * pushing an answer to the claim's fork through a harness and offering it
- * as custody does (it lands, through the answer's run, in the same call,
- * with the harness disclosed as `Assisted-by:`), people proposing
- * and flagging, the decider declining two, and someone pushing straight to
- * `main`, reported as the push event would be.
- *
- * Each step happens at its own whole minute of the world's calendar
- * (`devMinute`), so every time the world holds comes from one start and
- * two seeds on the same start give the same world. The world then serves
- * from the last step's minute, `seedEnd`.
- *
- * What the service can't be brought to through its methods is left out:
- * a `Finish` decision (nothing opens one yet) and an
- * answer refused `OutOfScope` (a refused answer is never recorded).
- */
 import { RefName, RefOutcome, RepoHost } from "@repo/artifacts/repo-host";
 import type { ProjectApi } from "@repo/project/project";
 import { Projects } from "@repo/project/projects";
@@ -44,14 +23,12 @@ import type { Files } from "./git.ts";
 
 const mainRef = RefName.make("refs/heads/main");
 
-/** People who propose and flag in datekit; nobody vouched for them. */
 export const visitors = {
   flagger: Handle.make("sefa"),
   proposer: Handle.make("tove"),
   regular: Handle.make("wren"),
 } as const;
 
-/** Everyone in the seed: the people a dev token may sign in as. */
 export const devPeople: readonly Handle[] = [
   operator,
   datekitPeople.decider,
@@ -66,16 +43,11 @@ export const devPeople: readonly Handle[] = [
 
 const as = (handle: Handle) => Person.make({ handle });
 
-/**
- * The harness bram answers through, as the CLI's credential helper names it
- * to the gateway and custody reports it: audit metadata, never a credit.
- */
 const bramsHarness = {
   harness: "claude-code",
   model: "haiku",
 } as const satisfies HarnessAudit;
 
-/** A commit of `files` on `parent` (or a first commit), by `author`, at the world's time. */
 const commitOf = (input: {
   readonly author: Handle;
   readonly files: Files;
@@ -98,7 +70,6 @@ const commitOf = (input: {
     return { commit, source: into.source };
   });
 
-/** A commit pushed to `repo`'s main with a compare-and-swap from `parent`. */
 const pushed = (repo: RepoName, input: Parameters<typeof commitOf>[0]) =>
   Effect.gen(function* () {
     const host = yield* RepoHost;
@@ -115,21 +86,14 @@ const pushed = (repo: RepoName, input: Parameters<typeof commitOf>[0]) =>
     return commit;
   });
 
-/** The files of `repo` at `commit`, which the seed itself pushed. */
 const filesOf = (repo: RepoName, commit: CommitSha) =>
   Effect.flatMap(filesAt(repo, commit), Effect.fromOption);
 
-/** Moves the world's clock to the calendar's minute `minute`. */
 const at = (minute: number) =>
   Effect.flatMap(Effect.service(DevClock), (clock) =>
     clock.set(devMinute(minute))
   );
 
-/**
- * A project made and adopted at the calendar's instant `when`: its
- * initializer creates it, pushes its first commit a minute later, and the
- * gateway reports the push.
- */
 export const startedAt = (
   project: ProjectName,
   initializer: Handle,
@@ -159,7 +123,6 @@ export const startedAt = (
     return { api, landed };
   });
 
-/** A project made and adopted at the calendar's minute `minute`. */
 const started = (
   project: ProjectName,
   initializer: Handle,
@@ -171,7 +134,6 @@ const started = (
     ({ api }) => api
   );
 
-/** Each ask opened by `decider` from its files, a minute apart from `minute`. */
 export const opened = (
   api: ProjectApi,
   decider: Handle,
@@ -188,12 +150,6 @@ export const opened = (
     { discard: true }
   );
 
-/**
- * An answer to `ask` from `answerer`, who holds its claim: a commit of
- * `files` on the claim's base, pushed to the claim's fork through `audit`'s
- * harness, reported as the gateway's custody reports it, then offered as
- * the answer.
- */
 const answered = (
   api: ProjectApi,
   answerer: Handle,
@@ -242,7 +198,6 @@ const answered = (
     });
   });
 
-/** The decision that puts proposal `proposal` to `decider`. */
 const decisionOn = (api: ProjectApi, decider: Handle, proposal: ProposalId) =>
   Effect.flatMap(api.today(as(decider)), ({ decisions }) =>
     Effect.fromOption(
@@ -255,13 +210,11 @@ const decisionOn = (api: ProjectApi, decider: Handle, proposal: ProposalId) =>
     )
   );
 
-/** Proposals from a regular that datekit's decider declines, each on its own minute. */
 const DECLINED = [
   "parseISO accepts two-digit years.",
   "datekit wraps the Temporal API.",
 ];
 
-/** datekit: four asks opened, one answered and landed, one claimed, decisions waiting. */
 const seedDatekit = Effect.gen(function* () {
   const { contributor, decider } = datekitPeople;
   const api = yield* started(datekit.project, operator, datekit.files, 0);
@@ -317,23 +270,15 @@ const seedDatekit = Effect.gen(function* () {
   return api;
 });
 
-/** burrow: the migrate ask opened as its family, six children and a delete child waiting on them. */
 const seedBurrow = Effect.flatMap(
   started(burrow.project, operator, burrow.files, 15),
   (api) => opened(api, burrowPeople.decider, burrow.asks, 17)
 );
 
-/** The seed's last minute: the stray push. */
 const STRAY_MINUTE = 21;
 
-/** The calendar's instant the seed leaves the world's clock at. */
 export const seedEnd = devMinute(STRAY_MINUTE);
 
-/**
- * Someone with access to datekit's storage pushes to `main` past the
- * platform, and the push event reports it: a `StrayPush` decision whose
- * default is to revert.
- */
 const strayPush = (api: ProjectApi) =>
   Effect.gen(function* () {
     const host = yield* RepoHost;
@@ -362,10 +307,6 @@ const strayPush = (api: ProjectApi) =>
     });
   });
 
-/**
- * Both projects, seeded; the world's clock left at the last step. Any
- * refusal on the way is a defect of the seed's, never a state to serve.
- */
 export const seedDev: Effect.Effect<
   void,
   never,

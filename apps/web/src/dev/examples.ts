@@ -1,24 +1,4 @@
-/**
- * The dev world's two fictional projects, as files: each one's first push,
- * the files a decider opens each ask with (its ask file, and its check when
- * the check is a file), and the commits its people push. The projects and
- * their people are invented; any likeness to a real one is not meant.
- *
- * `datekit` is a small date library (the people of
- * `examples/datekit`): `ines-v` decides everything, `okonkwo` the time zones, and
- * `bram` is a vouched contributor. `burrow` is a six-package monorepo with
- * a legacy helper to migrate away from and a lint count to ratchet down
- * (`examples/burrow`), decided by `okafor` and `lin-h`. These are
- * cut-down copies: just enough for every page of the web to have something
- * real to show.
- *
- * A project's rules are its committed `policy.json`, the config folder the
- * `/json` rules evaluator reads, with every ask it will open stated there;
- * an ask opens when a decider lands its files. Each ask file is written
- * from the ask `policy.json` states, as the SDK call a maintainer writes,
- * so the two never disagree. datekit's `policy.json` also states the ask
- * the dev world's drafter drafts, which only an accepted draft opens.
- */
+// The projects and their people are invented; any likeness to a real one is not meant.
 import { Brand } from "@repo/brand";
 import { cannedDraft } from "@repo/drafting/draft-runs/canned";
 import { CheckSpec, RatchetMeasure } from "@repo/protocol/domain/check";
@@ -38,13 +18,10 @@ const decodeCheck = Schema.decodeSync(CheckSpec);
 
 const encodeMeasure = Schema.encodeSync(RatchetMeasure);
 
-/** What a project's `policy.json` states, as the file holds it. */
 export type Stated = typeof PolicyInput.Encoded;
 
-/** One ask as `policy.json` states it. */
 export type StatedAsk = Stated["asks"][number];
 
-/** A `policy.json` from what its project states, with every default written out. */
 export const policyJson = (stated: Stated) =>
   `${JSON.stringify(
     Schema.encodeSync(PolicyInput)(Schema.decodeSync(PolicyInput)(stated)),
@@ -52,16 +29,13 @@ export const policyJson = (stated: Stated) =>
     2
   )}\n`;
 
-/** One file an ask opens with. */
 export interface AskFile {
   readonly content: string;
   readonly path: RepoPath;
 }
 
-/** The files a decider opens one ask with: its ask file, then its check's file if it has one. */
 export type Opening = Array.NonEmptyReadonlyArray<AskFile>;
 
-/** The args a kind takes for an ask's check, as its ask file passes them (`packages/sdk`'s `kinds`). */
 interface KindArgs {
   readonly command?: string;
   readonly count?: string;
@@ -72,18 +46,12 @@ interface KindArgs {
   readonly to?: string | undefined;
 }
 
-/** A string, or a list of them, as TypeScript source spells it. */
 const spelled = (value: string | readonly string[]): string =>
   Predicate.isString(value)
     ? JSON.stringify(value)
     : `[${value.map(spelled).join(", ")}]`;
 
-/**
- * The args an ask's kind takes for its check, as the ask file spells them.
- * No SDK call states a `SymbolAbsent` check (a migrate's split opens its
- * delete step), so that file spells the nearest one: a migrate
- * with no `to`, every use gone.
- */
+// No SDK call states a `SymbolAbsent` check, so the file spells the nearest one: a migrate with no `to`.
 const checkArgs = (check: StatedAsk["check"]) =>
   CheckSpec.match(decodeCheck(check), {
     LintToZero: ({ command, rule }): KindArgs => ({ command, rule }),
@@ -93,13 +61,11 @@ const checkArgs = (check: StatedAsk["check"]) =>
     SymbolAbsent: ({ count, symbol }): KindArgs => ({ count, from: symbol }),
   });
 
-/** An ask's territory as its file spells it: the repo-wide builder for `.`, else the data itself. */
 const territoryOf = ({ module, paths }: StatedAsk["territory"]) =>
   module === "."
     ? `territory.paths(${paths.map(spelled).join(", ")})`
     : `{ module: ${spelled(module)}, paths: ${spelled(paths)} }`;
 
-/** An ask's file: the SDK call that states `stated`, as its maintainer writes it. */
 export const askFileOf = (stated: StatedAsk): AskFile => {
   const territory = territoryOf(stated.territory);
 
@@ -136,14 +102,6 @@ export const askFileOf = (stated: StatedAsk): AskFile => {
   };
 };
 
-// ------------------------------------------------------------- datekit
-
-/**
- * The operator, who makes the dev world's examples in their namespace as
- * the stages' were made, so `oscabriel/datekit` is theirs and the legacy
- * address `/datekit` leads to it. They decide nothing: each project's
- * config folder names its deciders.
- */
 export const operator = Handle.make("oscabriel");
 
 export const datekitPeople = {
@@ -163,18 +121,11 @@ const fix = {
   strength: "assertion",
 } satisfies typeof AskKind.Encoded;
 
-/** One datekit ask: as `policy.json` states it, and the check file it opens with. */
 interface DatekitAsk {
   readonly stated: StatedAsk;
   readonly test: AskFile;
 }
 
-/**
- * One datekit ask, from its id, the module file it fixes, its brief and its
- * check's one test (red on main, by an assertion). One held for a newcomer
- * names the maintainer who mentors them. datekit is one package, so every
- * territory is in the repo-wide module, `.`.
- */
 const datekitAsk = (input: {
   readonly id: string;
   readonly file: string;
@@ -238,7 +189,6 @@ const datekitAsks: readonly DatekitAsk[] = [
     current: 'format prints "11st", "12nd" and "13rd".',
     file: "format",
     id: "format-ordinal",
-    // Held for a newcomer, whom its asker mentors.
     mentor: datekitPeople.decider,
     test: {
       assertion: 'expect(format(parseISO("2026-10-11"), "Do")).toBe("11th");',
@@ -279,12 +229,6 @@ const datekitAsks: readonly DatekitAsk[] = [
   }),
 ];
 
-/**
- * The ask the dev world's drafter drafts for any want (`cannedDraft`),
- * stated beside datekit's own so the `/json` rules evaluator finds it once
- * a draft's files are composed; nobody opens it in the seed. A decider who
- * accepts the draft opens it.
- */
 const draftedAsk: StatedAsk = {
   askedBy: datekitPeople.decider,
   blockedBy: [],
@@ -462,7 +406,6 @@ export const datekit = {
   ),
   files: library,
   project: ProjectName.make("oscabriel/datekit"),
-  /** A commit someone pushed straight to main, past the platform. */
   stray: {
     files: new Map([
       [
@@ -480,8 +423,6 @@ export const datekit = {
     message: "Mention time zones in the README",
   },
 } as const;
-
-// -------------------------------------------------------------- burrow
 
 export const burrowPeople = {
   decider: Handle.make("okafor"),
@@ -509,12 +450,6 @@ const migrateCheck = encodeCheck(
 
 const PARENT = "drop-legacy-fetch";
 
-/**
- * The one ask burrow's decider opens: the migrate. Its callers sit in all
- * six packages, so the platform opens it as a family: a child
- * per package and a delete child waiting on the six, their files written
- * beside the parent's in the same landing.
- */
 const burrowAsks: readonly StatedAsk[] = [
   {
     askedBy: burrowPeople.decider,
@@ -669,11 +604,9 @@ export const burrow = {
   project: ProjectName.make("oscabriel/burrow"),
 } as const;
 
-/** How many times `text` calls `symbol`, as burrow's `scripts/count-callers.ts` counts. */
 const callsIn = (text: string, symbol: string) =>
   text.split(`${symbol}(`).length - 1;
 
-/** What burrow's count command prints on its first commit: each package's calls of `legacyFetch`. */
 const burrowCallers = () => {
   const byModule = Object.fromEntries(
     PACKAGES.map((pkg) => [
@@ -694,10 +627,6 @@ const burrowCallers = () => {
   });
 };
 
-/**
- * What each count command of the examples prints, by the command: the dev
- * Checker runs none, so a count lane prints this wherever it runs.
- */
 export const printedBy: ReadonlyMap<string, string> = new Map([
   [COUNT, burrowCallers()],
 ]);

@@ -1,10 +1,3 @@
-/**
- * The code pages' files below the shell's width: a sheet from the left on
- * a tablet, the whole screen on a phone, holding the ref line and the
- * tree (or a commit's changed files). Choosing a file moves the page, and
- * the sheet closes. Loaded on the first press of Files. Not a route: the
- * `-` prefix keeps the router from reading it as one.
- */
 import { useLocation } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 
@@ -30,7 +23,6 @@ const FilesSheet = ({
 
   const opened = useRef(href);
 
-  // The reader chose a file: the page moved, so the sheet has done its work.
   useEffect(() => {
     if (href !== opened.current) {
       onOpenChange(false);

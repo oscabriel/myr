@@ -22,15 +22,8 @@ import { ProposeView } from "../../../../features/propose/propose-view.tsx";
 import type { About } from "../../../../features/propose/propose-view.tsx";
 import { pageHead } from "../../../../features/shared/head.ts";
 
-// `/$project/proposals/new`: the propose form. Who is signed in and the
-// project's top folders are read in the browser (the server paints the
-// page while it checks); a proposal made goes to its own page, a refusal
-// shows under the form. `?about=<path>&line=<n>&at=<sha>` (the why page's
-// "Propose an ask about this line") starts the want at that line.
-
 const decodeProject = Schema.decodeUnknownOption(ProjectName);
 
-/** The line a why page points at, when the address names all three parts. */
 const AboutParts = Schema.Struct({
   about: RepoPath,
   at: CommitSha,
@@ -43,7 +36,6 @@ const decodeText = Schema.decodeUnknownOption(Schema.String);
 
 const decodeLine = Schema.decodeUnknownOption(Schema.Int);
 
-/** The address's line, as the form takes it. */
 const aboutOf = (search: {
   readonly about?: string | undefined;
   readonly at?: string | undefined;
@@ -55,7 +47,6 @@ const aboutOf = (search: {
     path: about,
   }));
 
-/** The form for `project`, once the browser knows who is signed in. */
 const Propose = ({ project }: { readonly project: ProjectName }) => {
   const navigate = useNavigate();
   const search = Route.useSearch();

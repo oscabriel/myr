@@ -1,18 +1,4 @@
-/**
- * The web's tokens, read from `styles.css` as text and measured the way
- * WCAG 2.2 measures them: each colour converted to sRGB (oklch through
- * oklab, by Björn Ottosson's published matrices; hex directly), then
- * compared by relative luminance. Light is `:root`; dark is `:root` with
- * the `prefers-color-scheme: dark` block laid over it, as a browser
- * resolves it.
- *
- * What holds: text at 4.5:1 and state colours at 5:1 on paper and on the
- * surface; control borders at 3:1 (SC 1.4.11); a skeleton's stroke that can
- * be seen; diff signs readable apart from the state colours; code coloured
- * with low chroma, far from every state hue; the kit's controls never under
- * 13 px; and Pierre's shadow roots fed from the tokens, never from the
- * state colours (bar the viewer's own selection).
- */
+// Measured as WCAG 2.2 does: oklch to sRGB through oklab by Björn Ottosson's published matrices, then relative luminance.
 import { describe, expect, it } from "@effect/vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -25,7 +11,6 @@ import styles from "../src/styles.css?raw";
 /** The stylesheet with its comments gone, so a comment never reads as a rule. */
 const css = styles.replaceAll(/\/\*[\s\S]*?\*\//gu, "");
 
-/** The text between the brace at `open` and the one that closes it. */
 const blockFrom = (open: number): string => {
   let depth = 0;
 
@@ -44,14 +29,12 @@ const blockFrom = (open: number): string => {
   return "";
 };
 
-/** The block a selector opens, searched from `from`; empty when there is none. */
 const blockOf = (selector: string, from = 0): string => {
   const at = css.indexOf(`${selector} {`, from);
 
   return at === -1 ? "" : blockFrom(css.indexOf("{", at));
 };
 
-/** Each `--name: value;` a block declares. */
 const declarations = (block: string): ReadonlyMap<string, string> =>
   new Map(
     [...block.matchAll(/--(?<name>[\w-]+):\s*(?<value>[^;]+);/gu)].map(
@@ -76,14 +59,12 @@ type Scheme = "dark" | "light";
 const tokensOf = (scheme: Scheme) =>
   scheme === "light" ? lightTokens : darkTokens;
 
-/** A colour as oklch, the form the tokens are written in. */
 interface Oklch {
   readonly chroma: number;
   readonly hue: number;
   readonly lightness: number;
 }
 
-/** A token's value with every `var(--x)` alias followed. */
 const valueOf = (scheme: Scheme, name: string): string => {
   const value = tokensOf(scheme).get(name);
 
@@ -96,7 +77,6 @@ const valueOf = (scheme: Scheme, name: string): string => {
   return alias === undefined ? value : valueOf(scheme, alias);
 };
 
-/** A token as oklch; fails when it is written in any other form. */
 const oklchOf = (scheme: Scheme, name: string): Oklch => {
   const value = valueOf(scheme, name);
 
@@ -116,13 +96,11 @@ const oklchOf = (scheme: Scheme, name: string): Oklch => {
   };
 };
 
-/** One sRGB channel, 0–1, made linear. */
 const linear = (channel: number) =>
   channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
 
 const clamp = (channel: number) => Math.min(1, Math.max(0, channel));
 
-/** Linear sRGB of an oklch colour, clipped into the gamut. */
 const linearOfOklch = ({ chroma, hue, lightness }: Oklch) => {
   const a = chroma * Math.cos((hue * Math.PI) / 180);
   const b = chroma * Math.sin((hue * Math.PI) / 180);
@@ -137,7 +115,6 @@ const linearOfOklch = ({ chroma, hue, lightness }: Oklch) => {
   ] as const;
 };
 
-/** Relative luminance of a token, written as oklch or as `#rrggbb`. */
 const luminanceOf = (scheme: Scheme, name: string) => {
   const value = valueOf(scheme, name);
 
@@ -150,7 +127,6 @@ const luminanceOf = (scheme: Scheme, name: string) => {
   return 0.2126 * (red ?? 0) + 0.7152 * (green ?? 0) + 0.0722 * (blue ?? 0);
 };
 
-/** WCAG's contrast ratio between two tokens. */
 const contrast = (scheme: Scheme, one: string, other: string) => {
   const [lighter, darker] = [
     luminanceOf(scheme, one),
@@ -160,10 +136,8 @@ const contrast = (scheme: Scheme, one: string, other: string) => {
   return ((lighter ?? 0) + 0.05) / ((darker ?? 0) + 0.05);
 };
 
-/** The colours that mean a state, and nothing else may borrow. */
 const STATES = ["landed", "checking", "waiting", "refused", "sealed"] as const;
 
-/** The syntax colours code is drawn in. */
 const SYNTAX = [
   "syntax-keyword",
   "syntax-function",
@@ -175,7 +149,6 @@ const SYNTAX = [
   "syntax-link",
 ] as const;
 
-/** The degrees between two hues, the short way round. */
 const hueDistance = (one: number, other: number) => {
   const apart = Math.abs(one - other) % 360;
 
@@ -188,7 +161,6 @@ const hueDistance = (one: number, other: number) => {
  */
 const NEUTRAL_CHROMA = 0.02;
 
-/** The states whose hue sits within 30° of `hue`. */
 const statesNear = (scheme: Scheme, hue: number) =>
   STATES.filter((state) => hueDistance(hue, oklchOf(scheme, state).hue) < 30);
 

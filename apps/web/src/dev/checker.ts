@@ -1,13 +1,3 @@
-/**
- * The dev world's Checker: the scripted `/memory` adapter, with a script it
- * writes as it goes, by one rule. A commit is checked only when a decider's
- * ask files are composed onto main, where the ask's check is red first, so
- * every lane fails there, the same way each time; a tree is checked only
- * when an answer is merged, and every lane passes there. A count lane (a
- * migrate ask's callers) prints what the examples state its command prints
- * on the project's first commit (`printedBy`), wherever it runs. No check
- * runs: the world shows the platform's flow, not a project's tests.
- */
 import { CheckAt, CheckRunner } from "@repo/checks/check-runner";
 import type { CheckJob } from "@repo/checks/check-runner";
 import { CheckRunnerMemory, scriptKey } from "@repo/checks/check-runner/memory";
@@ -16,7 +6,6 @@ import { Context, Effect, Layer } from "effect";
 
 import { printedBy } from "./examples.ts";
 
-/** What a lane comes to where it runs: red on a composed commit, green on a merged tree. */
 const scripted = (
   job: CheckJob,
   lane: CheckJob["lanes"][number]

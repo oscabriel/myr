@@ -1,10 +1,3 @@
-/**
- * A commit's diff as the server sends it and the browser draws it: both
- * parse a file's two texts with the drawing's own parser, so the plain
- * text holds the drawing's hunks line for line; a file's counts, which
- * files start folded, the order a tree lists paths in, the stats split by
- * the ask's territory, and the keys that move between files.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { ChangedFile } from "@repo/protocol/domain/code";
 import { Option, Schema } from "effect";
@@ -25,7 +18,6 @@ import { stepFrom } from "../src/features/code/file-keys.ts";
 
 const decode = Schema.decodeSync(ChangedFile);
 
-/** Lines `from` to `to`, as a file's text. */
 const lines = (from: number, to: number) =>
   `${Array.from(
     { length: to - from + 1 },

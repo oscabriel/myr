@@ -1,29 +1,6 @@
-/**
- * A decider's session on the web. The platform is the OAuth
- * authorization server; the web is one of its public clients, and
- * signs a person in with PKCE: `/auth/signin` sends the browser to the
- * platform's `/authorize`, `/auth/callback` trades the code at the
- * platform's `/token` over `PLATFORM`, and the access token goes into one
- * HttpOnly cookie on the web's origin. The page's JavaScript never sees it,
- * no URL, log line or response body carries it, and the web holds no
- * secret: PKCE needs none, and the web's client is a Client ID Metadata
- * Document the web serves itself (`/auth/client`).
- *
- * Every forward to the platform (`backend.ts`) turns that cookie into the
- * HTTP `Authorization` header, the only credential the platform reads,
- * and drops the browser's own cookies and any `authorization` it
- * set: the browser never chooses the credential.
- *
- * Who is signed in is kept beside the token, in a second HttpOnly cookie
- * (`HANDLE_COOKIE`): the callback asks the platform's `status` once, with
- * the new token, and keeps the handle it names, bound to that token by its
- * SHA-256, so `/auth/whoami` answers every page from the cookie with no
- * platform call. The handle only shapes what a page shows: every read and
- * write still carries the token, and the platform decides who the caller
- * is. A handle kept for another token is not believed, a session from
- * before the handle was kept asks `status` once, and sign-out and any
- * `Unauthenticated` expire both cookies.
- */
+// The access token lives only in an HttpOnly cookie: no URL, log line or response body carries it, and the web
+// holds no secret (PKCE, and a Client ID Metadata Document it serves itself). The handle cookie beside it only
+// shapes what a page shows; every call carries the token, and the platform decides who the caller is.
 import { Brand } from "@repo/brand";
 import { Client } from "@repo/protocol/contracts";
 import { Handle as HandleSchema } from "@repo/protocol/ids";
@@ -31,21 +8,13 @@ import type { Handle } from "@repo/protocol/ids";
 import { Data, Effect, Option, Redacted, Schema } from "effect";
 import type { Layer } from "effect";
 
-/**
- * The session cookie: the platform's access token. `__Host-` keeps it to
- * this exact origin over HTTPS, so no sibling host under the same site
- * (another Worker on the account's `workers.dev` subdomain) can set or
- * shadow it.
- */
+// `__Host-` keeps it to this exact origin over HTTPS, so no sibling host on the same `workers.dev` subdomain can set or shadow it.
 export const SESSION_COOKIE = "__Host-session";
 
-/** The cookie the signed-in handle is kept in beside the session, for `whoami`. */
 export const HANDLE_COOKIE = "__Host-handle";
 
-/** The cookie a sign-in in progress waits in: its state, PKCE verifier and way back. */
 const SIGN_IN_COOKIE = "__Host-sign-in";
 
-/** How long a sign-in in progress waits for its callback: ten minutes. */
 const SIGN_IN_SECONDS = 600;
 
 /**
@@ -54,34 +23,23 @@ const SIGN_IN_SECONDS = 600;
  */
 const SESSION_MARGIN_SECONDS = 60;
 
-/** The web's own sign-in paths that this module names in what it answers. */
 const AUTH_PATHS = {
   callback: "/auth/callback",
   client: "/auth/client",
   signIn: "/auth/signin",
 } as const;
 
-/** What a route's server handler is handed, of what it uses. */
 export interface Handled {
   readonly request: Request;
 }
 
-// --- The cookie -------------------------------------------------------------
-
-/**
- * A platform token as the session cookie carries it: no space, quote,
- * comma, semicolon or backslash. The callback keeps only such a token and
- * `credentialFrom` reads back only such a token, so a cookie is never set
- * that no later request could be signed in with.
- */
+// Only such a token is kept and read back, so a cookie is never set that no later request could sign in with.
 const Token = Schema.NonEmptyString.check(Schema.isPattern(/^[^\s",;\\]+$/u));
 
 const isToken = Schema.is(Token);
 
-/** A cookie value as it was set, if it decodes. */
 const decodedValue = Option.liftThrowable(decodeURIComponent);
 
-/** The value of the cookie `name` the request carries, if it carries one. */
 const cookieValue = (request: Request, name: string) =>
   Option.fromNullishOr(request.headers.get("cookie")).pipe(
     Option.flatMap((header) =>
@@ -96,15 +54,9 @@ const cookieValue = (request: Request, name: string) =>
     Option.flatMap(decodedValue)
   );
 
-/** The session cookie's value: the platform token this browser signed in with. */
 export const credentialFrom = (request: Request): Option.Option<string> =>
   cookieValue(request, SESSION_COOKIE).pipe(Option.filter(isToken));
 
-/**
- * `request` as the platform should see it: without the browser's cookies
- * and without any `authorization` the browser set, and with `Authorization:
- * Bearer <token>` when there is a session.
- */
 export const withCredential = (
   request: Request,
   token: Option.Option<string>
@@ -121,18 +73,14 @@ export const withCredential = (
   return new Request(request, { headers });
 };
 
-/** A cookie only this origin's HTTP requests carry, never the page's JavaScript. */
 const lockedCookie = (name: string, value: string, maxAgeSeconds: number) =>
   `${name}=${encodeURIComponent(value)}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${Math.max(0, Math.floor(maxAgeSeconds))}`;
 
-/** The `Set-Cookie` value that holds `token` for `maxAgeSeconds`. */
 export const sessionCookie = (token: string, maxAgeSeconds: number) =>
   lockedCookie(SESSION_COOKIE, token, maxAgeSeconds);
 
-/** The `Set-Cookie` value that ends the session now. */
 export const clearedCookie = () => lockedCookie(SESSION_COOKIE, "", 0);
 
-/** The `Set-Cookie` values that end the session and forget its handle, now. */
 export const clearedCookies = () => [
   clearedCookie(),
   lockedCookie(HANDLE_COOKIE, "", 0),
@@ -140,7 +88,6 @@ export const clearedCookies = () => [
 
 const clearedSignIn = () => lockedCookie(SIGN_IN_COOKIE, "", 0);
 
-/** `headers`, also setting each of `cookies` (each its own `Set-Cookie` line). */
 export const settingCookies = (
   headers: HeadersInit,
   cookies: readonly string[]
@@ -154,18 +101,14 @@ export const settingCookies = (
   return all;
 };
 
-// --- PKCE -------------------------------------------------------------------
-
 const encodeBase64Url = Schema.encodeEffect(Schema.Uint8ArrayFromBase64Url);
 
-/** `size` bytes from WebCrypto's `getRandomValues`, in base64url. */
 const randomText = (size: number) =>
   Effect.sync(() => crypto.getRandomValues(new Uint8Array(size))).pipe(
     Effect.flatMap(encodeBase64Url),
     Effect.orDie
   );
 
-/** The S256 code challenge for `verifier`: `BASE64URL(SHA256(verifier))`. */
 export const challengeOf = (verifier: string) =>
   Effect.promise(() =>
     crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))
@@ -174,7 +117,6 @@ export const challengeOf = (verifier: string) =>
     Effect.orDie
   );
 
-/** A fresh PKCE verifier and its challenge, and a fresh state, each 32 random bytes. */
 export const pkce = Effect.gen(function* () {
   const verifier = yield* randomText(32);
 
@@ -185,16 +127,8 @@ export const pkce = Effect.gen(function* () {
   };
 });
 
-// --- The handle kept beside the session --------------------------------------
-
-/**
- * How long a handle `whoami` learned for a session from before handles were
- * kept is kept: the session's own lifetime is not known there. Bound to its
- * token, it is never believed past the session.
- */
 const HANDLE_LEARNED_SECONDS = 24 * 60 * 60;
 
-/** The token's SHA-256, in base64url: what binds a kept handle to its session. */
 const fingerprintOf = (token: string) =>
   Effect.promise(() =>
     crypto.subtle.digest("SHA-256", new TextEncoder().encode(token))
@@ -203,11 +137,7 @@ const fingerprintOf = (token: string) =>
     Effect.orDie
   );
 
-/**
- * The `Set-Cookie` value that keeps `handle` for the session `token`, for
- * `maxAgeSeconds`: `<fingerprint>.<handle>` (a fingerprint is base64url,
- * which has no `.`).
- */
+// `<fingerprint>.<handle>`: a fingerprint is base64url, which has no `.`.
 const handleCookie = (token: string, handle: Handle, maxAgeSeconds: number) =>
   Effect.map(fingerprintOf(token), (fingerprint) =>
     lockedCookie(HANDLE_COOKIE, `${fingerprint}.${handle}`, maxAgeSeconds)
@@ -215,7 +145,6 @@ const handleCookie = (token: string, handle: Handle, maxAgeSeconds: number) =>
 
 const decodeHandle = Schema.decodeUnknownOption(HandleSchema);
 
-/** The handle kept for the session `token`, if the request carries one kept for it. */
 const keptHandle = (request: Request, token: string) =>
   Effect.map(fingerprintOf(token), (fingerprint) =>
     Option.flatMap(cookieValue(request, HANDLE_COOKIE), (value) => {
@@ -227,7 +156,6 @@ const keptHandle = (request: Request, token: string) =>
     })
   );
 
-/** The handle the platform's `status` names for the session `token`, asked through `clientFor`. */
 const handleOf = (
   clientFor: (request: Request) => Layer.Layer<Client>,
   origin: string,
@@ -245,20 +173,11 @@ const handleOf = (
     )
   );
 
-// --- Where the browser goes -------------------------------------------------
-
-/** The web's OAuth client id at `origin`: the URL of its metadata document. */
 const clientIdOf = (origin: string) => `${origin}${AUTH_PATHS.client}`;
 
-/** Where the platform sends the browser back to, at `origin`. */
 const redirectUriOf = (origin: string) => `${origin}${AUTH_PATHS.callback}`;
 
-/**
- * Where to go after signing in or out: `wanted` when it is a path on this
- * web (resolved against its origin, so `//host`, `/\host` and a full URL
- * elsewhere all fall back) and not a sign-in path itself; the front page
- * otherwise.
- */
+// Resolved against the origin, so `//host`, `/\host` and a full URL elsewhere all fall back to the front page.
 export const returnPath = (origin: string, wanted: string | null) =>
   Option.fromNullishOr(wanted).pipe(
     Option.filter((path) => path.startsWith("/")),
@@ -269,7 +188,6 @@ export const returnPath = (origin: string, wanted: string | null) =>
     Option.getOrElse(() => "/")
   );
 
-/** A 302 to `location` that sets `cookies` and is never cached. */
 export const redirect = (location: string, cookies: readonly string[]) =>
   new Response(null, {
     headers: settingCookies(
@@ -283,7 +201,6 @@ export const redirect = (location: string, cookies: readonly string[]) =>
     status: 302,
   });
 
-/** A short page that says why signing in stopped, and how to start again. */
 const stoppedPage = (
   status: number,
   reason: string,
@@ -303,9 +220,6 @@ const stoppedPage = (
   );
 };
 
-// --- Sign-in ----------------------------------------------------------------
-
-/** A sign-in in progress, as its cookie holds it. */
 const PendingSignIn = Schema.Struct({
   return: Schema.String,
   state: Schema.String,
@@ -320,11 +234,6 @@ const encodePending = Schema.encodeEffect(PendingCookie);
 
 const decodePending = Schema.decodeOption(PendingCookie);
 
-/**
- * `GET /auth/signin[?return=<path>]`: to the platform's `/authorize` with a
- * fresh PKCE challenge and state; the verifier, the state and the way back
- * wait in a short-lived HttpOnly cookie for the callback.
- */
 export const signInHandler =
   (env: Env) =>
   ({ request }: Handled): Promise<Response> =>
@@ -356,9 +265,6 @@ export const signInHandler =
       })
     );
 
-// --- The callback -----------------------------------------------------------
-
-/** Signing in stopped before a session: a 400 the person reads, or a 502 when the platform could not be asked. */
 class SignInStopped extends Data.TaggedError("SignInStopped")<{
   readonly reason: string;
   readonly status: 400 | 502;
@@ -380,7 +286,6 @@ const unreachablePlatform = new SignInStopped({
   status: 502,
 });
 
-/** What the platform's `/token` answers a good code with, of what the web keeps. */
 const TokenAnswer = Schema.Struct({
   access_token: Schema.RedactedFromValue(Token),
   expires_in: Schema.Int.check(Schema.isGreaterThan(0)),
@@ -391,7 +296,6 @@ const decodeTokenAnswer = Schema.decodeEffect(
   Schema.fromJsonString(TokenAnswer)
 );
 
-/** Trades `code` for an access token at the platform's `/token`, over `PLATFORM`. */
 const exchange = (
   env: Env,
   input: {
@@ -442,15 +346,6 @@ const exchange = (
     return answer;
   });
 
-/**
- * `GET /auth/callback?code=…&state=…`: the state must be the one this
- * browser's sign-in cookie holds; then the code and its verifier go to the
- * platform's `/token`, and the token comes back only as the session cookie,
- * set to expire before the token does, on a 302 to the way back. The
- * platform's `status`, asked once with the new token through `clientFor`,
- * names the handle kept beside it for as long; a `status` that fails keeps
- * none, and the first `whoami` asks again.
- */
 export const callbackHandler =
   (env: Env, clientFor: (request: Request) => Layer.Layer<Client>) =>
   ({ request }: Handled): Promise<Response> =>
@@ -500,13 +395,9 @@ export const callbackHandler =
       )
     );
 
-// --- Sign-out, who, and the client -------------------------------------------
-
-/** `POST` (or a plain link's `GET`) `/auth/signout`: the session and its kept handle end, and the browser goes home. */
 export const signOutHandler = (_handled: Handled): Response =>
   redirect("/", clearedCookies());
 
-/** `/auth/whoami`'s answer: the handle signed in, or nothing (`features/auth/who.ts` reads it). */
 const whoAnswer = (
   who: { readonly handle?: Handle },
   cookies: readonly string[] = []
@@ -515,16 +406,6 @@ const whoAnswer = (
     headers: settingCookies({ "cache-control": "no-store" }, cookies),
   });
 
-/**
- * `GET /auth/whoami`: `{ handle }` for the session, or `{}`, with no
- * platform call when the handle kept beside the session was kept for its
- * token. A session without one (from before handles were kept, or whose
- * kept handle is another token's) asks the platform's `status` once and
- * keeps the handle it names. With no session the platform is not asked,
- * and a handle left over is expired. A session the platform no longer
- * knows answers `Unauthenticated` (the backend asks again with no
- * credential), so both cookies are expired here.
- */
 export const whoamiHandler =
   (clientFor: (request: Request) => Layer.Layer<Client>) =>
   ({ request }: Handled): Promise<Response> =>
@@ -561,12 +442,6 @@ export const whoamiHandler =
       })
     );
 
-/**
- * The web's OAuth client at `origin`, as a Client ID Metadata Document: a
- * public client (PKCE, no secret) whose id is this document's URL and whose
- * one redirect is the web's callback. The platform reads it when the
- * browser arrives at `/authorize`, so nothing is registered there.
- */
 export const webClientMetadata = (origin: string) => ({
   client_id: clientIdOf(origin),
   client_name: `${Brand.name} web`,
@@ -577,7 +452,6 @@ export const webClientMetadata = (origin: string) => ({
   token_endpoint_auth_method: "none",
 });
 
-/** `GET /auth/client`: the web's Client ID Metadata Document. */
 export const clientMetadataHandler = ({ request }: Handled): Response =>
   Response.json(webClientMetadata(new URL(request.url).origin), {
     headers: { "cache-control": "public, max-age=300" },

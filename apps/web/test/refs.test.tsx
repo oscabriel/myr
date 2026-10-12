@@ -1,11 +1,3 @@
-/**
- * A project's refs page, rendered to HTML with `react-dom/server` from
- * fixtures decoded with the protocol's own schemas (`RefsView` from
- * `listRefs`): main as a row that moves only by a landing, the tags newest
- * first (a monorepo's by package, a page at a time), and the forks, each
- * claim's on one line with its claimant and the claim's state. Only what
- * `listRefs` returns is shown, so the platform's own refs never appear.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { RefsView as Refs } from "@repo/protocol/domain/code";
@@ -22,16 +14,13 @@ import { renderAt } from "./render.tsx";
 
 const markupOf = (element: ReactElement) => renderToStaticMarkup(element);
 
-/** What a reader sees: the markup without its tags, entities decoded. */
 const textOf = (element: ReactElement) => plainText(markupOf(element));
 
-/** Every `href` in `markup`, in order, entities decoded. */
 const hrefsOf = (markup: string) =>
   [...markup.matchAll(/href="(?<href>[^"]*)"/gu)].map((match) =>
     (match.groups?.href ?? "").replaceAll("&amp;", "&")
   );
 
-/** The markup from the element marked `marker` to the next element marked the same way. */
 const slice = (markup: string, marker: string, value: string) => {
   const start = markup.indexOf(`${marker}="${value}"`);
   const next = markup.indexOf(`${marker}="`, start + 1);
@@ -41,7 +30,6 @@ const slice = (markup: string, marker: string, value: string) => {
     : markup.slice(start, next === -1 ? undefined : next);
 };
 
-/** Where the project is cloned from. */
 const platformUrl = "https://platform-test.example.workers.dev";
 
 const LANDED = "1".repeat(40);
@@ -50,7 +38,6 @@ const IMPORTED = "2".repeat(40);
 
 const OLDER = "3".repeat(40);
 
-/** A tag with a slash and an at sign: one URL-encoded segment. */
 const TAG_SEGMENT = "%40datekit%2Fcore%401.0.0";
 
 describe(RefsView, () => {
@@ -205,13 +192,11 @@ describe(RefsView, () => {
   );
 });
 
-/** The refs page over `refs`, from the `from`th tag of `only`'s. */
 const viewOf = (refs: Refs, only?: string, from?: number) => (
   <RefsView from={from} package={only} platformUrl={platformUrl} refs={refs} />
 );
 
 describe("a monorepo's refs page", () => {
-  /** Tags as `listRefs` orders them: plain, then each package's run. */
   const monorepo = Schema.decodeSync(Refs)({
     forks: [],
     landed: LANDED,

@@ -1,14 +1,3 @@
-/**
- * Finishing an answer from its diff: a `Finish` decision's page lays the
- * answer's diff out as the code browser does. The server sends it as plain
- * text (the browser draws it over in place), its files with the ask's
- * territory first, then tests, then the rest; a refusal from an earlier
- * round sits under the line it pointed at; each file can be marked read in
- * this browser alone; a newer head says so above the diff; and the three
- * lines that fetch the head and finish it are numbered. The diff comes only
- * from the decision's own `patch` evidence; without one the page shows the
- * lines and no diff. Rendered with `react-dom/server`.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import type { Verdict } from "@repo/protocol/domain/answer";
@@ -52,7 +41,6 @@ import {
   writeMark,
 } from "../src/features/finish/read-marks.ts";
 
-/** The entities React writes for text, and what each reads as. */
 const ENTITIES: ReadonlyMap<string, string> = new Map([
   ["&#x27;", "'"],
   ["&amp;", "&"],
@@ -63,7 +51,6 @@ const ENTITIES: ReadonlyMap<string, string> = new Map([
 
 const markupOf = (element: ReactElement) => renderToStaticMarkup(element);
 
-/** What a reader sees of `markup`: the text without its tags, entities decoded. */
 const textIn = (markup: string) =>
   markup
     .replaceAll(/<[^>]+>/gu, " ")
@@ -73,7 +60,6 @@ const textIn = (markup: string) =>
     )
     .replaceAll(/\s+/gu, " ");
 
-/** What a reader sees of `element`. */
 const textOf = (element: ReactElement) => textIn(markupOf(element));
 
 const PLATFORM_URL = "https://platform-test.example.workers.dev";
@@ -88,7 +74,6 @@ const base = CommitSha.make("1".repeat(40));
 
 const okonkwo = Handle.make("okonkwo");
 
-/** Two files changed, one added, one removed, one renamed. */
 const PATCH = [
   "diff --git a/src/parse.ts b/src/parse.ts",
   "index 1111111..2222222 100644",
@@ -216,13 +201,11 @@ const pageOf = (
   />
 );
 
-/** The files the server's diff draws, in its order. */
 const drawnFilesOf = (markup: string) =>
   [...markup.matchAll(/<section aria-label="(?<file>[^"]+)" data-file=/gu)].map(
     (match) => match.groups?.file
   );
 
-/** A refusal from the answer's first round, at line 2 of its test. */
 const placed: PlacedRefusal = {
   line: 2,
   path: "test/parse.test.ts",
@@ -375,7 +358,6 @@ describe("a finish taken on its page", () => {
   });
 });
 
-/** A browser storage over a map, as `localStorage` behaves. */
 const storageOver = (kept: Map<string, string>): Storage => ({
   clear: () => {
     kept.clear();
@@ -393,7 +375,6 @@ const storageOver = (kept: Map<string, string>): Storage => ({
   },
 });
 
-/** A storage that refuses every read and write, as a private window's may. */
 const refusing: Storage = {
   clear: () => {
     throw new Error("refused");

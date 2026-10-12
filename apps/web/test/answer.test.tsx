@@ -1,12 +1,3 @@
-/**
- * The answer page: the latest verdict on an ask's answer, stage by stage.
- * The gate's stages in a strip, each lane's result and time, held-back
- * checks only as one line per area (its counts and suite root, nothing
- * more), the outcome, and a refusal as `git push` printed it. A landed
- * answer shows its landing's credit trailers and the commit. The base and
- * the landing link their commit pages; the head and the merged tree, which
- * live in the claim's fork, do not.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { Client, Contracts } from "@repo/protocol/contracts";
@@ -69,7 +60,6 @@ const refused = verdictOf(
   Outcome.cases.Refused.make({ refusals: [checksFailed, heldBackFailed] })
 );
 
-/** Each element that names a stage, as `[stage, state]`. */
 const stagesOf = (markup: string) =>
   [...markup.matchAll(/<li\b[^>]*>/gu)].flatMap(([tag]) => {
     const stage = /data-stage="(?<value>[^"]+)"/u.exec(tag)?.groups?.value;
@@ -78,7 +68,6 @@ const stagesOf = (markup: string) =>
     return stage === undefined || state === undefined ? [] : [[stage, state]];
   });
 
-/** Each lane, in page order, as `[lane, result]`. */
 const lanesOf = (markup: string) =>
   [...markup.matchAll(/<[a-z]+\b[^>]*data-lane="[^"]*"[^>]*>/gu)].flatMap(
     ([tag]) => {
@@ -89,7 +78,6 @@ const lanesOf = (markup: string) =>
     }
   );
 
-/** Each link to a commit page, in page order, as `[href, text]`. */
 const commitLinksOf = (markup: string) =>
   [
     ...markup.matchAll(
@@ -101,7 +89,6 @@ const commitLinksOf = (markup: string) =>
       : [[groups.href, plainText(groups.inner).trim()]]
   );
 
-/** The hero, and the run after it. */
 const heroOf = (markup: string) =>
   /<section aria-label="Outcome"[^>]*>(?<inner>.*?)<\/section>/su.exec(markup)
     ?.groups?.inner ?? "";
@@ -109,11 +96,9 @@ const heroOf = (markup: string) =>
 const runOf = (markup: string) =>
   markup.slice(markup.indexOf('id="answer-gate"'), markup.indexOf("</main>"));
 
-/** The page's main pane, without the inspector. */
 const mainOf = (markup: string) =>
   /<main\b[^>]*>(?<inner>.*)<\/main>/su.exec(markup)?.groups?.inner ?? "";
 
-/** The inspector. */
 const asideOf = (markup: string) =>
   /<aside\b[^>]*>(?<inner>.*)<\/aside>/su.exec(markup)?.groups?.inner ?? "";
 
@@ -545,7 +530,6 @@ describe(durationText, () => {
   });
 });
 
-/** What the stub platform was asked: verdicts, landings, asks and replays. */
 interface Asked {
   readonly asks: number;
   readonly landings: number;
@@ -553,7 +537,6 @@ interface Asked {
   readonly verdicts: number;
 }
 
-/** Events in datekit: bram claimed the ask and pushed, and another ask was claimed too. */
 const replay = [
   claimedEvent(1, "bram"),
   claimedEvent(2, "okafor", AskId.make("format-week")),
@@ -563,11 +546,6 @@ const replay = [
 const count = (asked: Ref.Ref<Asked>, key: keyof Asked) =>
   Ref.update(asked, (seen) => ({ ...seen, [key]: seen[key] + 1 }));
 
-/**
- * A platform whose datekit ask's latest answer ended in `outcome`, as the
- * answer page's loader calls it; `landingKnown` says whether it still finds
- * the landing a landed verdict names.
- */
 const platformAt = (
   asked: Ref.Ref<Asked>,
   outcome: Outcome,

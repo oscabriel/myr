@@ -22,23 +22,14 @@ import { CommitRail } from "../tree/-code-rail.tsx";
 import { CommitPageData } from "../tree/-commit-files.ts";
 import { FilesButton } from "../tree/-files-button.tsx";
 
-// One commit and what it changed, read on the server, with the territory
-// of the ask it answered (the diff's stats split by it): the page arrives
-// with the landing and the diff, its first files highlighted where the
-// server highlights them (`features/code/prerender.ts`) and the rest as
-// plain text, and the browser's drawing then takes its place, the changed
-// files as a tree in the rail. A commit never
-// changes, but its page carries its landing, which the project records
-// after main has moved, and times reckoned from the read: a browser keeps
-// it briefly, as a page at `main`. Within a visit the router keeps what it
-// read, so a change of layout never reads the diff again.
+// A commit never changes, but its page carries its landing, which the project records after main has moved,
+// and times reckoned from the read: a browser keeps it briefly, as a page at `main`.
 
 interface CommitParams {
   readonly project: string;
   readonly sha: string;
 }
 
-/** The commit for its page, or a not-found carrying the platform's refusal. */
 export const readCommitPage = (params: CommitParams) =>
   Effect.gen(function* () {
     const project = yield* Effect.fromOption(projectOf(params.project));
@@ -52,8 +43,6 @@ export const readCommitPage = (params: CommitParams) =>
       })
     );
 
-    // The ask the landing answered, for its territory; a page without it
-    // splits its stats into tests and the rest.
     const answered = Option.fromUndefinedOr(diff.commit.landing?.ask);
 
     const territory = Option.isNone(answered)
@@ -96,11 +85,8 @@ const CommitPage = () => {
   const asked = Route.useSearch().style === "split";
   const [chosen, setChosen] = useState(asked);
   const roomy = useMedia(SPLIT_QUERY);
-  // Split only where the screen has room for two sides.
   const split = chosen && roomy;
 
-  // Each file parsed once for the page: the head's stats, the plain text
-  // and the folds all read this.
   const drawn = useMemo(() => drawnFiles(diff.files), [diff.files]);
 
   // The files the server sends highlighted: the same on both sides, since
@@ -142,7 +128,6 @@ const CommitPage = () => {
     [diff.files]
   );
 
-  // The layout is the reader's: kept in the address, with no read again.
   const onSplit = (next: boolean) => {
     setChosen(next);
 

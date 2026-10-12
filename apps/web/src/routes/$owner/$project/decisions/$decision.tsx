@@ -51,12 +51,7 @@ import { pageHead } from "../../../../features/shared/head.ts";
 import { personalPage } from "../../../../server/cache-headers.ts";
 import { serverClient } from "../../../../server/client.ts";
 
-// `/$project/decisions/$decision`: one decision from the reader's Today in
-// that project, read on the server with their own session; for a finish,
-// the answer's diff, its ask and verdict, and where an earlier round was
-// refused. The decision comes from `today` alone: someone who decides
-// nothing there sees what a decision is and no evidence. A page about its
-// reader is kept by no cache.
+// The decision comes from `today` alone: someone who decides nothing there sees no evidence.
 
 const root = getRouteApi("__root__");
 
@@ -73,11 +68,9 @@ const decisionPage = createServerFn({ method: "GET" })
     )
   );
 
-/** The decision the page found, when it found one. */
 const foundOf = (read: DecisionRead): Option.Option<FoundDecision> =>
   DecisionRead.guards.Found(read) ? Option.some(read) : Option.none();
 
-/** The finish the page found, when the decision is one. */
 const finishOf = (read: DecisionRead) =>
   Option.flatMap(foundOf(read), (found) =>
     isFinishDecision(found.decision)
@@ -85,7 +78,6 @@ const finishOf = (read: DecisionRead) =>
       : Option.none()
   );
 
-/** The decision as the reader's choice left it, once taken on this page. */
 const takenHere = (
   decided: AsyncResult.AsyncResult<{ readonly decision: Decision }, unknown>,
   decision: Decision
@@ -100,7 +92,6 @@ const takenHere = (
     )
   );
 
-/** A finish's page: its files, folds, layout, read marks and keys. */
 const Finish = ({
   busy,
   decision,
@@ -122,7 +113,6 @@ const Finish = ({
   const router = useRouter();
   const { ask, head } = decision.subject;
 
-  // Live: a push to the answer while the page is open says so.
   useAtomMount(watchAtom(decision.project));
   const events = useAtomValue(projectEventsAtom(decision.project));
 
@@ -161,7 +151,6 @@ const Finish = ({
 
   const [chosen, setChosen] = useState(false);
   const roomy = useMedia(SPLIT_QUERY);
-  // Split only where the screen has room for two sides.
   const split = chosen && roomy;
 
   const defaults = useMemo(
@@ -249,8 +238,6 @@ const Finish = ({
 const DecisionPage = () => {
   const loaded = Route.useLoaderData();
 
-  // Decoded once per read, so what is built from it (the diff's parsed
-  // files above all) is built once too.
   const data = useMemo(
     () => Schema.decodeSync(DecisionPageData)(loaded),
     [loaded]
@@ -259,8 +246,6 @@ const DecisionPage = () => {
   const [decided, decide] = useAtom(decideAtom);
   const here = useLocation({ select: hereOf });
 
-  // A choice that failed says why where the choices are: its refusal, the
-  // way to sign in, or that the platform did not answer.
   const failure = AsyncResult.isFailure(decided) ? (
     <ProposalFailure
       cause={decided.cause}

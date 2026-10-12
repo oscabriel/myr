@@ -1,10 +1,3 @@
-/**
- * A folder and its README, read on the server: the read both the project's
- * page (its root at main) and a folder's page (`/$project/tree/$rev/$`)
- * render from, so either arrives whole, README included, before the
- * browser runs anything. It lives here, not in `features/code/`, because
- * it calls the contracts and the views there import no transport.
- */
 import { Client } from "@repo/protocol/contracts";
 import type { FileView, Rev, TreeListing } from "@repo/protocol/domain/code";
 import type { ProjectName } from "@repo/protocol/ids";
@@ -18,21 +11,10 @@ import type {
 import { Effect, Option } from "effect";
 import type { RpcClientError } from "effect/rpc";
 
-/** The name most folders give their README, read beside the folder rather than after it. */
 const GUESS = "README.md";
 
-/**
- * The folder `path` (the root when none) of `project` at `rev`, and its
- * README; a README that cannot be read leaves the folder without it, while
- * a folder that cannot be read is the platform's refusal (or the call's
- * own failure: the platform did not answer, or turned the credential
- * away).
- *
- * The folder and a `README.md` in it are read at once, saving a round trip
- * on most pages. The guess stands only when it is the README the folder
- * names, read at the folder's commit (`main` may move between the two
- * reads); otherwise the folder's own README is read at its commit.
- */
+// The folder and a `README.md` in it are read at once. The guess stands only when it is the README the folder
+// names at the folder's commit (`main` may move between the two reads).
 export const readFolderWithReadme = (input: {
   readonly path: Option.Option<RepoPath>;
   readonly project: ProjectName;

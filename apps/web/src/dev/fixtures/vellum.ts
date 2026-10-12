@@ -1,31 +1,3 @@
-/**
- * vellum: the fixture project, a six-package library that reads and
- * writes a small document format, with its held-back checks in two areas
- * (export and parser) and a write-only token for its error reports. Its
- * record is told as a story (`story.ts`) from its first asks in September
- * to the morning the world stands at, so each state a page draws is there
- * once, reached the way the service would reach it:
- *
- * - answers: checking, waiting on a decision, waiting for a finish,
- *   waiting on another ask, refused at Shape, at the held-back stage and at
- *   the checks, landed with a decision and held-back results, landed with
- *   neither, and one in its third round;
- * - asks: open, held for newcomers, claimed with and without a push, a
- *   released claim, a lapsed one, and a want too long for a title;
- * - two families: one with a child in every mark and its delete child
- *   waiting, one whose children all landed and whose delete child opened;
- * - a decision of every kind, two taken this morning, one due within the
- *   day; proposals drafting, ready and failed;
- * - a ledger with a layer, two committed areas and history of every kind,
- *   an env shape with a write-only item someone set, and a policy that
- *   names deciders by path and one denounced person.
- *
- * Its people are the examples' own (`examples.ts`, `seed.ts`): `ines-v`
- * decides, `okonkwo` decides the export package, the env schema and the
- * vouch file, `lin-h` decides the config folder with her; `bram`,
- * `okafor` and `lin-h` have answered here for weeks; `tove` and `sefa`
- * are new; `wren` is denounced.
- */
 import { Brand } from "@repo/brand";
 import { childId, deleteChildId } from "@repo/project/migrate";
 import type { HeldBackResult } from "@repo/protocol/domain/answer";
@@ -81,10 +53,8 @@ import type { Story } from "./story.ts";
 
 export const vellum = ProjectName.make("oscabriel/vellum");
 
-/** The calendar's instant the world's clock stands at once the fixtures are told. */
 export const fixturesNow = instant("2026-10-07T10:00");
 
-/** When vellum's first commit was pushed, by its initializer, on the calendar. */
 export const vellumStart = instant("2026-08-24T09:00");
 
 const dir = Brand.configDir;
@@ -100,7 +70,6 @@ const people = {
   wren: visitors.regular,
 } as const;
 
-/** vellum's initializer: the operator, in whose namespace it is made. */
 export { operator as vellumInitializer } from "../examples.ts";
 
 const MODULES = [
@@ -140,7 +109,6 @@ const WIDER_HOSTS = Schema.decodeSync(Subject.cases.ProxyWidened.fields.hosts)([
   "ingest.sentry.io",
 ]);
 
-// The areas whose checks the maintainers hold back, and their commitments.
 const EXPORT = AreaName.make("export");
 
 const PARSER = AreaName.make("parser");
@@ -159,8 +127,6 @@ const held = (
   suite: area === EXPORT ? exportSuite : parserSuite,
   total,
 });
-
-// --------------------------------------------------------------- files
 
 const encodeCheck = Schema.encodeSync(CheckSpec);
 
@@ -181,7 +147,6 @@ const packageJson = (module: Module) =>
     2
   )}\n`;
 
-/** A module's entry, calling the old tokenizer twice. */
 const entryOf = (module: Module, tokenize: string) =>
   [
     `import { ${tokenize} } from "@vellum/parser/tokenize";`,
@@ -193,7 +158,6 @@ const entryOf = (module: Module, tokenize: string) =>
     "",
   ].join("\n");
 
-/** A module's page settings, under the old name or the new. */
 const pageOf = (module: Module, name: string) =>
   [
     `/** ${moduleName(module)}'s page: A4 unless a theme says otherwise. */`,
@@ -225,10 +189,8 @@ const ENV_SCHEMA = [
   "",
 ].join("\n");
 
-/** How many decisions a vellum decider takes a day (its `policy.json`'s budget). */
 export const decisionsPerDay = 5;
 
-/** How long a claim goes without a push before it is warned, then lapses. */
 const CLAIMS = { lapseAfter: { hours: 96 }, warnAfter: { hours: 48 } } as const;
 
 const HOUR_MS = 3_600_000;
@@ -297,7 +259,6 @@ const policy = policyJson({
   weakening: { markers: [".skip(", ".only(", ".todo("] },
 });
 
-/** vellum's first push: six packages, its config folder and its env schema. */
 export const vellumFiles: Files = new Map([
   [
     "README.md",
@@ -402,15 +363,11 @@ export const vellumFiles: Files = new Map([
   ],
 ]);
 
-// ---------------------------------------------------------------- asks
-
-/** An ask as the story opens it: everything but where and when it opened. */
 type Stated = Omit<Ask, "openedAt" | "openedIn" | "project">;
 
 const fix = (input: {
   readonly id: string;
   readonly module: Module;
-  /** A territory other than the module's own. */
   readonly territory?: Territory;
   readonly want: string;
   readonly current?: string;
@@ -447,7 +404,6 @@ const fix = (input: {
   };
 };
 
-/** The ask's file as its maintainer writes it, and its check's test. */
 const filesOf = (asks: readonly Stated[]): Files =>
   new Map(
     asks.flatMap((ask) => {
@@ -478,7 +434,6 @@ const filesOf = (asks: readonly Stated[]): Files =>
     })
   );
 
-/** A migrate ask split as the service splits one: a child per module, then the delete child. */
 const familyOf = (input: {
   readonly id: string;
   readonly from: string;
@@ -672,7 +627,6 @@ const ask = {
   }),
 } as const;
 
-/** An answer's change: one file in the ask's own module. */
 const answerFiles = (stated: Stated, body: string): Files => {
   const home =
     stated.territory.module === "."
@@ -691,8 +645,6 @@ const passed = { lint: "passed", types: "passed", unit: "passed" } as const;
 
 const allPassed = (askLane: string) =>
   ({ ...passed, [askLane]: "passed" }) as const;
-
-// ----------------------------------------------------------- decisions
 
 const decisionId = (n: number) =>
   DecisionId.make(`dec-${String(n).padStart(6, "0")}`);
@@ -720,7 +672,6 @@ const decision = (input: {
   subject: input.subject,
 });
 
-/** The finish's diff: the answer's second round, whose test the first round had narrowed with `.only(`. */
 const WRAP_PATCH = [
   "diff --git a/packages/render/src/table.ts b/packages/render/src/table.ts",
   "index 5d1c0e2..a8f4b71 100644",
@@ -770,9 +721,6 @@ const WRAP_PATCH = [
   "",
 ].join("\n");
 
-// ---------------------------------------------------------------- ledger
-
-/** The ledger's standing parts; its entries are told with the story. */
 const ledger: Ledger = {
   entries: [],
   layers: [
@@ -793,10 +741,6 @@ const ledger: Ledger = {
   project: vellum,
 };
 
-/**
- * The env shape at `at`: four items, one write-only and set at `setAt`,
- * none with a value or placeholder.
- */
 const envAt = (at: LandedSha, setAt: DateTime.Utc): EnvSchemaView => ({
   at,
   file: RepoPath.make(".env.schema"),
@@ -842,8 +786,6 @@ const envAt = (at: LandedSha, setAt: DateTime.Utc): EnvSchemaView => ({
   project: vellum,
 });
 
-// ------------------------------------------------------------- proposals
-
 const proposal = (input: {
   readonly n: number;
   readonly at: DateTime.Utc;
@@ -864,7 +806,6 @@ const proposal = (input: {
   ...present("draft", input.draft),
 });
 
-/** A drafted ask's three files: its ask file, its check, and the document the check reads. */
 const draftedFiles = (id: string, module: Module, want: string) => {
   const stated = fix({ id, module, want });
   const [askFile, testFile] = [...filesOf([stated])];
@@ -881,20 +822,12 @@ const draftedFiles = (id: string, module: Module, want: string) => {
   );
 };
 
-/** A family child's change: its module's entry on the new tokenizer. */
 const childEntry = (module: Module): Files =>
   new Map([[`packages/${module}/src/index.ts`, entryOf(module, "tokenize")]]);
 
-/** A family child's change: its module's page settings under the new name. */
 const childPage = (module: Module): Files =>
   new Map([[`packages/${module}/src/page.ts`, pageOf(module, "pageFormat")]]);
 
-// ------------------------------------------------------------- the story
-
-/**
- * The record vellum's story writes, over its canonical repo standing at
- * `base`: each instant written on the calendar, placed in this world.
- */
 export const tellVellum = (base: LandedSha) =>
   Effect.gen(function* () {
     const { place } = yield* DevClock;
@@ -945,7 +878,6 @@ export const tellVellum = (base: LandedSha) =>
         });
       });
 
-    // September: the first asks, answered by the people who have been here longest.
     yield* story.open({
       asks: [ask.quotes],
       at: t("2026-09-01T10:00"),
@@ -986,7 +918,6 @@ export const tellVellum = (base: LandedSha) =>
 
     yield* story.tag("v0.8.0", palette.sha);
 
-    // The maintainers' layer, and the posture change that seals its checks.
     story.decision(
       decision({
         at: t("2026-09-28T09:00"),
@@ -1060,7 +991,6 @@ export const tellVellum = (base: LandedSha) =>
       })
     );
 
-    // October 4: the second family opens, and the standalone asks.
     yield* story.open({
       asks: pageSize.asks,
       at: t("2026-10-04T09:30"),
@@ -1190,7 +1120,6 @@ export const tellVellum = (base: LandedSha) =>
       changes: childPage("cli"),
     });
 
-    // October 5.
     story.record((seq) =>
       LedgerEntry.cases.Admitted.make({
         area: EXPORT,
@@ -1448,7 +1377,6 @@ export const tellVellum = (base: LandedSha) =>
       parserSuite
     );
 
-    // October 6.
     story.decision(
       decision({
         at: t("2026-10-06T07:00"),
@@ -1847,7 +1775,6 @@ export const tellVellum = (base: LandedSha) =>
       })
     );
 
-    // October 7, this morning.
     story.claim(
       ask.exportErrors.id,
       people.tove,
@@ -1969,10 +1896,6 @@ export const tellVellum = (base: LandedSha) =>
     return { story, told: () => story.told(apart) };
   });
 
-/**
- * The live landing: the first family's lint child, checking since this
- * morning, passes its last lanes and lands at `at`, one more of six.
- */
 export const landLintChild = (story: Story, at: DateTime.Utc) =>
   Effect.gen(function* () {
     const child = tokenizer.child("lint");

@@ -1,10 +1,3 @@
-/**
- * A folder and its README, read on the server for the project's page and a
- * folder's page: the README is asked for beside the folder, not after it,
- * as `README.md`, the name most folders give it, and the folder's own
- * README is read when it names another (or the guess was read at another
- * commit). Over a stub platform that answers `readTree` and `readFile`.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Client, Contracts } from "@repo/protocol/contracts";
 import type { FileView, TreeListing } from "@repo/protocol/domain/code";
@@ -33,7 +26,6 @@ const fileAt = (path: string, at = landed): FileView => ({
   truncated: false,
 });
 
-/** A folder at the landed commit holding nothing but its README, when `readme` names one. */
 const folder = (readme?: string, path?: string): TreeListing => {
   const listing: Types.Mutable<TreeListing> = {
     at: landed,
@@ -54,12 +46,6 @@ const folder = (readme?: string, path?: string): TreeListing => {
   return listing;
 };
 
-/**
- * A platform whose `readTree` answers `listing` once `treeWaits` lets it,
- * and whose `readFile` answers each path in `files` with the file kept
- * there (at its own commit), refusing any other; every path `readFile` is
- * asked for is kept in `asked`, and the first ask lets `readStarted` go.
- */
 const platform = (input: {
   readonly asked: Ref.Ref<readonly string[]>;
   readonly files: ReadonlyMap<string, FileView>;
@@ -92,7 +78,6 @@ const platform = (input: {
     ])
   );
 
-/** The folder at `path` (the root when none) at main, with the paths of its README and the files asked for. */
 const readWith = (
   input: Omit<Parameters<typeof platform>[0], "asked">,
   path?: string

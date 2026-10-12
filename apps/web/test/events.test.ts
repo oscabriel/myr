@@ -1,11 +1,3 @@
-/**
- * One fold over a project's `watch` replay, which every page reads the same
- * way: who holds each ask, its rounds and latest outcome, whether it landed;
- * whose move an outcome leaves; a family's marks counted against the
- * parent's stored children; and which landings a page that is open should
- * stamp, on the stream and on the poll alike. Events are built with their
- * cases, never a literal tag.
- */
 import { describe, expect, it } from "@effect/vitest";
 import type { Ask } from "@repo/protocol/domain/ask";
 import { ProjectEvent } from "@repo/protocol/domain/event";
@@ -214,7 +206,6 @@ describe(whoseMove, () => {
   });
 });
 
-/** A child of `drop-legacy-fetch`, one per module. */
 const child = (module: string) => AskId.make(`drop-legacy-fetch-${module}`);
 
 describe(familyMarks, () => {
@@ -329,7 +320,6 @@ describe(lastSeq, () => {
   });
 });
 
-/** The 40-hex sha of the `n`th landing. */
 const shaOf = (n: number) => LandedSha.make(n.toString(16).padStart(40, "0"));
 
 describe(recentLandings, () => {

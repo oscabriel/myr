@@ -1,36 +1,5 @@
-/**
- * The dev world's fixtures: the states a page draws that the default world
- * never reaches, served through the same contracts, beside datekit and
- * burrow. Off unless the dev server is started with the switch:
- *
- *     VITE_DEV_FIXTURES=1 bun run --cwd apps/web dev     # the fixtures
- *     VITE_DEV_FIXTURES=live bun run --cwd apps/web dev  # and the live landing
- *
- * The switch is a `VITE_` variable because the dev world runs in the
- * Worker's runtime, which sees no other variable of the shell that started
- * Vite; Vite writes `VITE_` ones into the modules it serves.
- *
- * With the switch on the world holds, beside the default two:
- *
- * - six small projects made through the project service, as the seed makes
- *   datekit (`fixtures/fillers.ts`), so the project list runs past eight,
- *   one of them with no open asks;
- * - `vellum`, whose record is told as a story (`fixtures/vellum.ts`). Its
- *   repo and policy are real: the service made the project and took its
- *   first push, and every landing is a commit on its `main`. What the
- *   service cannot reach in a world with no visibility cartridge (a ledger
- *   with layers, sealed areas, an env item someone set, a refusal at Shape
- *   kept as a verdict, a finish put to a decider) is in the record, which
- *   answers vellum's reads in place of the service's own: its asks,
- *   events, verdicts, landings, decisions and Today, ledger, env shape,
- *   proposals, claims and forks. Writes other than a decision reach the
- *   service underneath, which holds none of the record's asks.
- *
- * In live mode the lint child of vellum's first family, checking since the
- * morning, lands `LIVE_AFTER` after the world first answers vellum's
- * `watch`: on the first read of vellum after that, as the dev world's pages
- * poll, so a page left open sees one more landing arrive.
- */
+// The switch is a `VITE_` variable because the dev world runs in the Worker's runtime,
+// which sees no other variable of the shell that started Vite.
 import { RepoHost } from "@repo/artifacts/repo-host";
 import { envSchemaMethod } from "@repo/project/deciders";
 import type { ProjectApi } from "@repo/project/project";
@@ -90,12 +59,10 @@ import { DevProjected } from "./projection.ts";
 import { seedDev, startedAt } from "./seed.ts";
 import { devWorldWith } from "./world.ts";
 
-/** Off, on, or on with the live landing. */
 export type FixtureMode = "off" | "on" | "live";
 
 const Switch = Schema.Literals(["1", "on", "live"]);
 
-/** The switch, read once from where Vite puts it. */
 export const fixturesMode: FixtureMode = Option.match(
   Schema.decodeUnknownOption(Switch)(import.meta.env.VITE_DEV_FIXTURES),
   {
@@ -104,30 +71,23 @@ export const fixturesMode: FixtureMode = Option.match(
   }
 );
 
-/** Whether the dev world adds the fixtures. */
 export const fixturesOn = fixturesMode !== "off";
 
-/** How long after vellum's `watch` is first answered its lint child lands, in live mode. */
 export const LIVE_AFTER = Duration.seconds(20);
 
-/** vellum's story, and the record it has told so far, decoded. */
 interface Told {
   readonly record: FixtureRecord;
   readonly story: Story;
   readonly told: () => FixtureRecord;
 }
 
-/** The fixtures' state in one world: vellum's story once told, and the live landing's clock. */
 export class Fixtures extends Context.Service<
   Fixtures,
   {
     readonly told: Ref.Ref<Option.Option<Told>>;
-    /** How long after the first `watch` the live landing waits; none, no live landing. */
     readonly liveAfter: Option.Option<Duration.Duration>;
-    /** When vellum's `watch` was first answered, by the monotonic clock. */
     readonly armedAt: Ref.Ref<Option.Option<bigint>>;
     readonly landed: Ref.Ref<boolean>;
-    /** One write to the story at a time. */
     readonly lock: Semaphore.Semaphore;
   }
 >()("web/dev/Fixtures") {}
@@ -146,17 +106,14 @@ const fixturesLayer = (liveAfter: Option.Option<Duration.Duration>) =>
     })
   );
 
-/** The person calling, when someone signed in is. */
 const callerOf = (principal: Principal) =>
   Principal.match(principal, {
     Anonymous: () => Option.none<Person>(),
     Person: (person) => Option.some(person),
   });
 
-/** Whether `project` is one whose reads the fixtures answer. */
 const isFixture = (project: ProjectName) => project === vellum;
 
-/** The ask as an answerer reads it first, in Markdown. */
 const briefOf = (ask: Ask): string =>
   [
     `# ${ask.brief.want}`,
@@ -174,10 +131,6 @@ const briefOf = (ask: Ask): string =>
     "",
   ].join("\n");
 
-/**
- * vellum's reads answered from its record, everything else by the service
- * underneath; and the projection's events with vellum's from the record.
- */
 const overlay: Layer.Layer<
   Projects | DevProjected,
   never,
@@ -201,7 +154,6 @@ const overlay: Layer.Layer<
         Effect.provideService(DevClock, devClock)
       );
 
-    /** The record's latest, once told. */
     const current = Effect.flatMap(Ref.get(fixtures.told), (told) =>
       Option.match(told, {
         onNone: () => Effect.die("vellum's story is not told yet"),
@@ -209,7 +161,6 @@ const overlay: Layer.Layer<
       })
     );
 
-    /** A write to the story, under the lock, and the record told again. */
     const write = <A, E>(
       step: (story: Story) => Effect.Effect<A, E, RepoHost | DevClock>
     ) =>
@@ -229,13 +180,7 @@ const overlay: Layer.Layer<
         })
       );
 
-    /**
-     * vellum's `watch` was read from `since`: the first read arms the live
-     * landing, and a read once it is due lands the lint child first. Only a
-     * read's start counts (from the first event, or from the last one, as a
-     * page that follows the stream asks); a later page of the same replay
-     * never lands it in the middle of the replay.
-     */
+    // Only a read's start counts, so a later page of the same replay never lands it mid-replay.
     const heard = (since: number) =>
       Option.match(fixtures.liveAfter, {
         onNone: () => Effect.void,
@@ -249,7 +194,6 @@ const overlay: Layer.Layer<
 
             const at = yield* Clock.monotonicTimeNanos;
 
-            // The read before this one armed it, or this read arms it.
             const armed = yield* Ref.modify(
               fixtures.armedAt,
               (was): readonly [Option.Option<bigint>, Option.Option<bigint>] =>
@@ -313,8 +257,7 @@ const overlay: Layer.Layer<
               .map((event) => ({ event, seq: event.seq }))
           )
         ),
-      // As the service answers: a decider here or the log's claimant may
-      // read; anyone else hears `NotDecider` whether or not a log is kept,
+      // Anyone but a decider or the log's claimant hears `NotDecider` whether or not a log is kept,
       // so the reply tells no one which logs exist.
       evidence: (caller, ref) =>
         Effect.gen(function* () {
@@ -383,7 +326,6 @@ const overlay: Layer.Layer<
             Effect.mapError(() => new UnknownProposal({ proposal: id }))
           )
         ),
-      // The posture vellum's record's ledger shows, which no clock moves.
       standing: () =>
         Effect.map(current, (record) => ({
           posture: record.ledger.posture,
@@ -441,12 +383,6 @@ const overlay: Layer.Layer<
   })
 );
 
-/**
- * The fixtures told into a world the default seed has seeded: the fillers,
- * then vellum (made and first pushed through the service, its record told
- * over its repo), and the world's clock left at the record's morning,
- * `fixturesNow`.
- */
 const seedFixtures = Effect.gen(function* () {
   const fixtures = yield* Fixtures;
 
@@ -466,11 +402,6 @@ const seedFixtures = Effect.gen(function* () {
   yield* (yield* DevClock).set(fixturesNow);
 }).pipe(Effect.orDie);
 
-/**
- * A fresh world with the fixtures, seeded, its calendar starting at
- * `start`: the default seed, then the fixtures. In `live` mode the lint
- * child lands `liveAfter` after vellum's `watch` is first answered.
- */
 export const withFixtures = (
   mode: "on" | "live",
   liveAfter: Duration.Duration = LIVE_AFTER,

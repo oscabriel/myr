@@ -1,9 +1,3 @@
-/**
- * A landing's credit, as the commit carries it: the trailers in the order
- * of their roles, each person linked, the held-back commitment on its own
- * line and the agents apart; and its one-line form for a row, which names
- * the people by role and never the agents.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Handle } from "@repo/protocol/ids";
 import { Schema } from "effect";

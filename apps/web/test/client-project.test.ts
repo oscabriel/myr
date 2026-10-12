@@ -1,8 +1,3 @@
-/**
- * A project page's reads, as the web's atoms make them: its open asks,
- * and its events, replayed and folded.
- * Over the dev world in process (`dev-browser.ts`).
- */
 import { describe, expect, it } from "@effect/vitest";
 import { ProjectName } from "@repo/protocol/ids";
 import { Effect, Exit } from "effect";

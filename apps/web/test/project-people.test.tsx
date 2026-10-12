@@ -1,11 +1,3 @@
-/**
- * A project's policy page (its route is `/$project/people`), rendered to HTML with `react-dom/server` from
- * fixtures decoded with the protocol's own schemas (`PublicPolicy` from
- * `projectPolicy`, `Ledger` from `ledger`): who decides which paths, who is
- * vouched for and denounced, each layer's readers and writers, the caps,
- * budget and timings, and where each comes from at the landed commit. The
- * page is read-only, and it shows nothing the two contracts don't carry.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { commandDocs } from "@repo/agent-kit/command-doc";
 import { Brand } from "@repo/brand";
@@ -34,7 +26,6 @@ const decodePolicy = Schema.decodeSync(PublicPolicy);
 
 const decodeLedger = Schema.decodeSync(Ledger);
 
-/** What every policy below shares: the parts the page doesn't show. */
 const unshown = {
   judge: { paths: [`${Brand.configDir}/**`], pointers: [] },
   kinds: [],
@@ -44,7 +35,6 @@ const unshown = {
   weakening: { markers: [] },
 };
 
-/** datekit's evaluated config folder at `sha`, as `projectPolicy` returns it. */
 const datekitPolicy = decodePolicy({
   ...unshown,
   agents: "trailer",
@@ -67,7 +57,6 @@ const datekitPolicy = decodePolicy({
   ],
 });
 
-/** datekit's ledger: one maintainers layer. */
 const datekitLedger = decodeLedger({
   entries: [],
   layers: [
@@ -88,7 +77,6 @@ const datekitLedger = decodeLedger({
   project: "datekit",
 });
 
-/** An imported repo with no `project.ts` in its config folder: the platform's defaults, its initializer deciding. */
 const burrowPolicy = decodePolicy({
   ...unshown,
   agents: "trailer",
@@ -103,7 +91,6 @@ const burrowPolicy = decodePolicy({
   vouches: [],
 });
 
-/** Why an import with no config folder, whose defaults found no test command, has no policy at `sha`. */
 const noConfig = Schema.decodeSync(PolicyPending)({
   at: sha,
   reason: "noConfig",
@@ -126,7 +113,6 @@ const page = (
   />
 );
 
-/** The markup of the section whose heading has the id `id`. */
 const sectionOf = (markup: string, id: string) => {
   const heading = markup.indexOf(`id="${id}"`);
 
@@ -135,10 +121,6 @@ const sectionOf = (markup: string, id: string) => {
     : elementWith(markup.slice(markup.lastIndexOf("<section", heading)), "");
 };
 
-/**
- * Each shell line the page offers to copy, as typed: one command, its
- * continuation lines (` \` then a new line) joined back into one.
- */
 const commandsOf = (markup: string) =>
   [
     ...markup.matchAll(/<code\b[^>]*select-all[^>]*>(?<line>.*?)<\/code>/gsu),
@@ -146,14 +128,12 @@ const commandsOf = (markup: string) =>
     plainText((found.groups?.line ?? "").replaceAll(/ \\\n\s*/gu, " ")).trim()
   );
 
-/** The CLI command a line runs: the longest command path it starts with. */
 const commandOf = (line: string) =>
   commandDocs(Contracts)
     .filter(({ path }) => line.startsWith(`${Brand.cli} ${path.join(" ")} `))
     .toSorted((one, other) => other.path.length - one.path.length)
     .at(0);
 
-/** Each deciders row's text, in order. */
 const decidersOf = (markup: string) =>
   elementsWith(mainOf(markup), "data-paths=").map((row) =>
     plainText(row).trim()
@@ -547,7 +527,6 @@ describe("a project's policy page", () => {
   });
 });
 
-/** A platform that knows only datekit, counting the reads it is asked for. */
 const platformOf = (
   asked: Ref.Ref<number>,
   read: {

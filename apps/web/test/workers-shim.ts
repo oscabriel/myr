@@ -1,10 +1,5 @@
-/**
- * `cloudflare:workers` for tests in Node: `vitest.config.ts` aliases the
- * module here (config aliasing, not module mocking), so a route module that
- * reads the Worker's `env` loads outside workerd. The env is the local
- * stage's, and its `PLATFORM` binding throws when touched: a test that means
- * to reach the platform passes its own env to the handler under test.
- */
+// `vitest.config.ts` aliases `cloudflare:workers` here so a route module loads outside workerd;
+// its `PLATFORM` throws when touched, so a test that reaches the platform passes its own env.
 import { untouchable } from "@repo/testkit/untouchable";
 
 export const env: Env = {

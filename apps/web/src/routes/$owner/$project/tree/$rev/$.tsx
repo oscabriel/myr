@@ -25,12 +25,6 @@ import { branchPage } from "../../../../../server/cache-headers.ts";
 import { serverClient } from "../../../../../server/client.ts";
 import { readFolderWithReadme } from "../../../../../server/folder.ts";
 
-// A folder at a revision: its entries and its README, read on the server,
-// so the page arrives whole; the tree in the rail and what last changed
-// each entry are the browser's. A path missing at a revision that exists
-// lands on the nearest folder above it, the refusal as its notice; any
-// other address naming nothing is a 404 showing the platform's refusal.
-
 const TreePageData = Schema.Struct({
   listing: TreeListing,
   now: Schema.DateTimeUtcFromString,
@@ -45,7 +39,6 @@ interface TreeParams {
   readonly rev: string;
 }
 
-/** The folder for its page, or a not-found carrying the platform's refusal. */
 export const readTreePage = (params: TreeParams) =>
   Effect.gen(function* () {
     const project = yield* Effect.fromOption(projectOf(params.project));

@@ -1,8 +1,3 @@
-/**
- * A revision in one path segment: `main` and a 40-hex SHA as they are, a
- * tag name (which may hold `/` and `@`) encoded so it stays one segment,
- * and a segment that cannot be decoded names no revision.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Option } from "effect";
 

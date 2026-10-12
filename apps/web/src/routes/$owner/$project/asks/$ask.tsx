@@ -30,16 +30,6 @@ import { serverClient } from "../../../../server/client.ts";
 import { AskPath, askMarkdownHandler } from "./{$ask}[.]md.ts";
 import type { AskParams, ClientFor } from "./{$ask}[.]md.ts";
 
-// The ask page: where the ask stands, its brief, its check and its answers,
-// and the lines that take it; live while open. The same
-// URL answers `Accept: text/markdown` with the brief as Markdown (the GET
-// handler below), and its `.md` twin always does (`{$ask}[.]md.ts`).
-
-/**
- * The ask page's GET, as a function of its client: a request that asks for
- * Markdown gets the ask's Markdown, as at its `.md` URL; any other falls
- * through to the page.
- */
 export const askPageHandler =
   (clientFor: ClientFor) =>
   <Next,>({
@@ -55,11 +45,7 @@ export const askPageHandler =
       ? askMarkdownHandler(clientFor)({ params, request })
       : next();
 
-/**
- * The page's headers: that the URL answers by `Accept`, and, for a path that
- * can name an ask, its Markdown as an alternate. A path that cannot (a 404)
- * names none, so no raw path text reaches a header.
- */
+// A path that cannot name an ask names no Markdown, so no raw path text reaches a header.
 export const askPageHeaders = ({
   params,
 }: {
@@ -81,11 +67,6 @@ const askPage = createServerFn({ method: "GET" })
 
 const root = getRouteApi("__root__");
 
-/**
- * The page over its atoms, which start from what the loader read and read
- * again as the project's events arrive: the ask, its latest verdict, and
- * the events the fold reads.
- */
 const FreshAsk = ({
   platformUrl,
   read,
@@ -97,7 +78,6 @@ const FreshAsk = ({
 }) => {
   const { project } = read.ask;
 
-  // Live: each event the project hears reads again what it changed.
   useAtomMount(watchAtom(project));
 
   const { ask, brief } = Option.getOrElse(
@@ -184,7 +164,6 @@ export const Route = createFileRoute("/$owner/$project/asks/$ask")({
           description: loaderData.ask.brief.want,
           title: `${params.ask} · ${params.project}`,
         }),
-  // An ask moves with each claim and landing: kept briefly, asked again.
   headers: (context) => ({ ...branchPage, ...askPageHeaders(context) }),
   component: AskPage,
   notFoundComponent: AskNotFound,

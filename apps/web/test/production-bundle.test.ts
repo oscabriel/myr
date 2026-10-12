@@ -1,27 +1,5 @@
-/**
- * The web as it deploys (AGENTS.md principle 6): the production
- * `vite build`, run as `infra/deploy.ts` and bytes:check run it
- * (`NODE_ENV=production`), into a folder of its own, once for every test
- * here. Its client output carries the web app manifest and every icon the
- * manifest names; its server output serves `llms.txt` (the platform's and
- * each project's) and the MCP card, and passes the skills, the install
- * script and the releases on; `#backend` resolves to the forward to
- * `PLATFORM`; and nothing in it comes from the dev world: no `src/dev/`
- * module, no memory adapter, no seed, no dev sign-in and no test kit.
- *
- * Its root route, whose chunks every page preloads, carries no Markdown
- * renderer, no grammar and nothing of the server's highlighting, and stays
- * under a size ceiling, and the hashed assets it serves are kept by
- * browsers for good (`public/_headers`). The Worker bundles the grammars
- * it highlights in and no others, none on its entry, and no theme
- * collection or WebAssembly (ADR 0027).
- *
- * Modules are read from the build's source maps (each map's `sources`),
- * strings from every other file it wrote. The Cloudflare plugin rewrites
- * `.wrangler/deploy/config.json` at each build to point at its output; the
- * redirect is put back as it was, so a deploy never follows it into a
- * folder this test removed.
- */
+// The Cloudflare plugin rewrites `.wrangler/deploy/config.json` at each build to point at its output;
+// the redirect is put back as it was, so a deploy never follows it into a folder this test removed.
 import { NodeServices } from "@effect/platform-node";
 import { expect, layer } from "@effect/vitest";
 import { Brand } from "@repo/brand";
@@ -37,10 +15,8 @@ import {
 } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
-/** A production build takes a few seconds; a cold one on a busy machine, longer. */
 const BUILD = 180_000;
 
-/** Text only the dev world, the test kit or the memory adapters' engine carry. */
 const DEV_STRINGS = [
   "src/dev/",
   "devWorld",
@@ -53,31 +29,18 @@ const DEV_STRINGS = [
   "isomorphic-git",
 ] as const;
 
-/** The memory adapters the dev world runs on, as module folders. */
 const DEV_MODULES = [
   "packages/project/src/project-store/memory",
   "packages/artifacts/src/repo-host/memory",
 ] as const;
 
-/**
- * The most the chunks every page preloads (the root route's) may weigh,
- * gzipped: about 10% above what they weighed (244,172 bytes in 47 chunks)
- * once the landing read its projects on the server (243,991 before; 222,169
- * in 19 chunks when the Markdown renderer left them, 322,049 in 31 before
- * that). Raised on the user's sign-off, 2026-10-10. A route's `head`,
- * `loader` and server functions ride in the route tree every page loads,
- * so what they import counts here; its view does not, and the landing's
- * must not: the next case holds it out.
- */
+// About 10% above what the root's preloads weighed once the landing read its projects on the server.
+// A route's `head`, `loader` and server functions ride in the route tree every page loads, so what they import counts here.
 const ROOT_PRELOADS_GZIP = 268_000;
 
-/** A Shiki grammar module, by its name. */
 const GRAMMAR = /node_modules\/@shikijs\/langs\/dist\/(?<name>[\w-]+)\.mjs$/u;
 
-/**
- * The grammars the Worker highlights in (`features/code/prerender-server.ts`,
- * ADR 0027), by Shiki's module names: HTML brings JavaScript and CSS with it.
- */
+// By Shiki's module names: HTML brings JavaScript and CSS with it.
 const SERVER_GRAMMARS = [
   "css",
   "html",
@@ -92,11 +55,9 @@ const SERVER_GRAMMARS = [
   "yaml",
 ];
 
-/** Whether a file's modules hold the server's highlighting. */
 const drawing = (held: readonly string[]) =>
   held.some((module) => module.endsWith("features/code/prerender-server.ts"));
 
-/** Files whose bytes are not text: fonts and images. */
 const BINARY = /\.(?:ico|png|woff2)$/u;
 
 const decodeSourceMap = Schema.decodeUnknownEffect(
@@ -114,15 +75,10 @@ const decodeManifest = Schema.decodeUnknownEffect(
   )
 );
 
-/** What one build wrote. */
 interface Output {
-  /** Every file but the source maps, by its path under the output folder, as text. */
   readonly texts: ReadonlyMap<string, string>;
-  /** Every path the build wrote, under the output folder. */
   readonly paths: ReadonlySet<string>;
-  /** Every module it bundled, by its path from the repo root, without a query. */
   readonly modules: ReadonlySet<string>;
-  /** The modules each file holds, by the file's path under the output folder. */
   readonly holding: ReadonlyMap<string, readonly string[]>;
 }
 
@@ -133,7 +89,6 @@ const where = Effect.gen(function* () {
   return { repo: path.resolve(web, "../.."), web };
 });
 
-/** Puts the Cloudflare plugin's deploy redirect back as it was when the scope ends. */
 const keepDeployRedirect = (web: string) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -149,7 +104,6 @@ const keepDeployRedirect = (web: string) =>
     );
   });
 
-/** The modules a source map at `map` names, from the repo root. */
 const modulesIn = (map: string, text: string, repo: string) =>
   Effect.gen(function* () {
     const path = yield* Path.Path;
@@ -163,7 +117,6 @@ const modulesIn = (map: string, text: string, repo: string) =>
     );
   });
 
-/** Reads every file under `out`: the source maps as modules, the rest as text. */
 const readOutput = (out: string, repo: string) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -199,7 +152,6 @@ const readOutput = (out: string, repo: string) =>
     return { holding, modules, paths, texts } satisfies Output;
   });
 
-/** The web's production build, into a folder of its own, read back whole. */
 const productionBuild = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -234,28 +186,20 @@ const productionBuild = Effect.gen(function* () {
   return yield* readOutput(out, repo);
 }).pipe(Effect.scoped, Effect.orDie, Effect.provide(NodeServices.layer));
 
-/** The one production build every test here reads. */
 class Built extends Context.Service<Built, Output>()("test/Built") {}
 
-/** The files under `folder` of the output, as text. */
 const textsUnder = (output: Output, folder: "client" | "server") =>
   [...output.texts].filter(([at]) => at.startsWith(`${folder}/`));
 
-/** Whether some file under `folder` holds `pattern`. */
 const holds = (output: Output, folder: "client" | "server", pattern: RegExp) =>
   textsUnder(output, folder).some(([, text]) => pattern.test(text));
 
-/** A route's path, as the route tree spells it in a quoted string. */
 const routePath = (path: string) =>
   new RegExp(
     `(?<quote>["'\`])${path.replaceAll(/[$.]/gu, "\\$&")}\\k<quote>`,
     "u"
   );
 
-/**
- * The chunks every page preloads: the root route's, as Start's manifest in
- * the server output names them (`/assets/…`).
- */
 const rootPreloads = (output: Output) => {
   const manifest = textsUnder(output, "server").find(([at]) =>
     at.includes("tanstack-start-manifest")
@@ -275,7 +219,6 @@ const rootPreloads = (output: Output) => {
   );
 };
 
-/** `text`'s size gzipped, in bytes. */
 const gzipped = (text: string) =>
   Stream.fromReadableStream({
     evaluate: () =>
@@ -336,9 +279,7 @@ layer(Layer.effect(Built, productionBuild), { timeout: BUILD })(
         })
     );
 
-    // A build that resolves `#backend` to `src/dev/backend.ts` fails here
-    // (`devBackend`) and in the next case (the dev world's modules): checked
-    // by a planted fault, once the dev world had its code.
+    // A build that resolves `#backend` to `src/dev/backend.ts` fails here and in the next case.
     it.effect("resolves #backend to the forward to PLATFORM", () =>
       Effect.gen(function* () {
         const output = yield* Built;

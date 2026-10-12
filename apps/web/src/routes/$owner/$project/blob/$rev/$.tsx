@@ -24,14 +24,6 @@ import { CodeRail } from "../../tree/-code-rail.tsx";
 import { FilesButton } from "../../tree/-files-button.tsx";
 import { softLanding } from "../../tree/-soft-landing.ts";
 
-// A file at a revision, read on the server with the commit that last
-// changed it: its text arrives highlighted when the server highlights its
-// language and size (`features/code/prerender.ts`), else as numbered,
-// anchored lines, and the browser's drawing then takes its place, the
-// `#L10-L20` selection kept in the address. `?plain=1` shows a Markdown file's source. A path missing at a
-// revision that exists lands on the nearest folder above it; any other
-// address naming nothing is a 404 showing the platform's refusal.
-
 const BlobPageData = Schema.Struct({
   file: FileView,
   last: Schema.optionalKey(CommitView),
@@ -46,7 +38,6 @@ interface BlobParams {
   readonly rev: string;
 }
 
-/** The file for its page, or a not-found carrying the platform's refusal. */
 export const readBlobPage = (params: BlobParams) =>
   Effect.gen(function* () {
     const project = yield* Effect.fromOption(projectOf(params.project));
@@ -145,7 +136,6 @@ export const Route = createFileRoute("/$owner/$project/blob/$rev/$")({
       const plain =
         new URLSearchParams(location.searchStr).get("plain") === "1";
 
-      // A failed read rejects as it would have (the router's not-found).
       return Effect.runPromise(
         Effect.gen(function* () {
           const data = yield* Effect.promise(() => page);

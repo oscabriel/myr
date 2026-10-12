@@ -1,14 +1,3 @@
-/**
- * Today, as a decider reads it: decisions, not diffs, against the day's
- * budget, said in one sentence. The decisions sit in sections (due today,
- * then the rest by expiry), each row's link the subject in plain words;
- * then how many wait for tomorrow, the newcomers to welcome and the
- * landings that needed nobody. Every choice says what it does under it.
- * A choice taken leaves its row where it was, reading what it did.
- *
- * Rendered to HTML with `react-dom/server`, and read through the route's
- * loader over the dev world with its fixtures, signed in as a decider.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { RefNameText } from "@repo/protocol/domain/common";
@@ -50,7 +39,6 @@ import {
 import { Route, todayHeaders } from "../src/routes/today.tsx";
 import { fixturesClient } from "./dev-client.ts";
 
-/** The entities React writes for text, and what each reads as. */
 const ENTITIES: ReadonlyMap<string, string> = new Map([
   ["&#x27;", "'"],
   ["&amp;", "&"],
@@ -61,7 +49,6 @@ const ENTITIES: ReadonlyMap<string, string> = new Map([
 
 const markupOf = (element: ReactElement) => renderToStaticMarkup(element);
 
-/** What a reader sees of `markup`: the text without its tags, entities decoded. */
 const textIn = (markup: string) =>
   markup
     .replaceAll(/<[^>]+>/gu, " ")
@@ -73,7 +60,6 @@ const textIn = (markup: string) =>
 
 const textOf = (element: ReactElement) => textIn(markupOf(element));
 
-/** Each row's markup, by the decision it stands for, in the order the page lists them: from its `<li>` to the next row or the end of its list. */
 const rowsOf = (markup: string) => {
   const starts = [
     ...markup.matchAll(/<li[^>]*data-decision="(?<id>[^"]+)"[^>]*>/gu),
@@ -94,7 +80,6 @@ const rowsOf = (markup: string) => {
   });
 };
 
-/** The choices each row offers, as `id: choice choice`. */
 const choicesOf = (markup: string) =>
   rowsOf(markup).map(
     ({ body, id }) =>
@@ -103,7 +88,6 @@ const choicesOf = (markup: string) =>
         .join(" ")}`
   );
 
-/** The section headers, in the order the page shows them. */
 const sectionsOf = (markup: string) => {
   const main = markup.includes("<aside")
     ? markup.slice(0, markup.indexOf("<aside"))
@@ -126,7 +110,6 @@ const datekit = ProjectName.make("oscabriel/datekit");
 
 const burrow = ProjectName.make("oscabriel/burrow");
 
-/** A stray push to datekit's main, expiring in 22 hours: soon. */
 const stray: Decision = {
   deciders: [okonkwo],
   default: "revert",
@@ -142,7 +125,6 @@ const stray: Decision = {
   }),
 };
 
-/** A vouch for lin-h, expiring in two days. */
 const vouch: Decision = {
   deciders: [okonkwo],
   default: "decline",
@@ -154,7 +136,6 @@ const vouch: Decision = {
   subject: DecisionSubject.cases.Vouch.make({ handle: Handle.make("lin-h") }),
 };
 
-/** A proposal in burrow, expiring last. */
 const proposal: Decision = {
   deciders: [okonkwo],
   default: "decline",
@@ -574,7 +555,6 @@ describe(consequenceOf, () => {
 
 const vellum = ProjectName.make("oscabriel/vellum");
 
-/** The page the route renders from what `readToday` sent, as the browser decodes it. */
 const pageFrom = (encoded: typeof TodayPageData.Encoded) => {
   const data = Schema.decodeSync(TodayPageData)(encoded);
 

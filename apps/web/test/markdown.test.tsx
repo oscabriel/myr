@@ -1,9 +1,3 @@
-/**
- * A project's Markdown file, rendered to HTML with `react-dom/server`, as
- * the Worker renders it: GitHub-flavoured Markdown and the README's own
- * HTML, its links and images pointing into the project at the commit it
- * was read at, and nothing that could run script or post a form.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { CommitSha, ProjectName } from "@repo/protocol/ids";
 import {
@@ -27,13 +21,11 @@ const sha = CommitSha.make("0123456789abcdef0123456789abcdef01234567");
 
 const project = ProjectName.make("oscabriel/p");
 
-/** The file `<dir>/README.md` at `sha`, rendered with no router around it, as a view's test renders it. */
 const rendered = (source: string, dir = "") =>
   renderToString(
     <RepoMarkdown at={sha} dir={dir} project={project} source={source} />
   );
 
-/** The same, inside a router at `location`, as the app renders it. */
 const routed = (element: ReactElement, location = "/p") =>
   renderToString(
     <RouterContextProvider
@@ -46,7 +38,6 @@ const routed = (element: ReactElement, location = "/p") =>
     </RouterContextProvider>
   );
 
-/** Each `<a …>` opening tag in `markup`. */
 const anchorsOf = (markup: string) => markup.match(/<a\b[^>]*>/gu) ?? [];
 
 describe("what a README cannot carry", () => {
@@ -102,7 +93,6 @@ describe("what a README cannot carry", () => {
   });
 });
 
-/** `docs/README.md`, rendered. */
 const readme = (source: string) => rendered(source, "docs");
 
 describe("links and images in docs/README.md", () => {
@@ -246,13 +236,11 @@ describe("GitHub-flavoured Markdown", () => {
   describe("a footnote", () => {
     const markup = rendered("Text[^1]\n\n[^1]: Note.");
 
-    /** The `href` of the anchor carrying `attribute`, without its `#`. */
     const targetOf = (attribute: string) =>
       anchorsOf(markup)
         .find((anchor) => anchor.includes(attribute))
         ?.match(/href="#(?<id>[^"]+)"/u)?.groups?.id;
 
-    /** The `id` of the element whose opening tag carries `attribute`. */
     const idOf = (attribute: string) =>
       new RegExp(`<[a-z]+\\b[^>]*${attribute}[^>]*>`, "u")
         .exec(markup)?.[0]
@@ -311,7 +299,6 @@ describe("GitHub-flavoured Markdown", () => {
   });
 });
 
-/** The classes on the prose wrapper of a README with code and a title. */
 const proseClasses = () => {
   const markup = rendered(
     "# datekit\n\nCall `format()` first.\n\n```ts\nconst a = () => 1;\n```"

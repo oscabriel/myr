@@ -20,12 +20,6 @@ import { pageHead } from "../../../features/shared/head.ts";
 import { branchPage } from "../../../server/cache-headers.ts";
 import { serverClient } from "../../../server/client.ts";
 
-// A project's ledger, as anyone may read it. The loader reads it on the
-// server, so the page arrives whole and an address naming no project is a
-// 404 showing the platform's `UnknownProject` refusal; in the browser the
-// ledger reads again as the platform appends entries.
-
-/** What the page's loader carries from the server, encoded: the ledger, and when it was read. */
 const LedgerPageData = Schema.Struct({
   ledger: Ledger,
   now: Schema.DateTimeUtcFromString,
@@ -33,7 +27,6 @@ const LedgerPageData = Schema.Struct({
 
 type LedgerPageData = typeof LedgerPageData.Type;
 
-/** The ledger of the project `name`, or a not-found when there is no such project (a 404). */
 export const readLedger = (name: string) =>
   Effect.gen(function* () {
     const project = yield* Schema.decodeEffect(ProjectName)(name).pipe(
@@ -58,7 +51,6 @@ const ledgerPage = createServerFn({ method: "GET" })
     Effect.runPromise(readLedger(data).pipe(Effect.provide(serverClient(env))))
   );
 
-/** The page over the ledger's atom, which starts from what the loader read and reads again when the ledger changes. */
 const FreshLedger = ({
   atom,
   read,
@@ -66,7 +58,6 @@ const FreshLedger = ({
   readonly atom: ReturnType<typeof ledgerAtom>;
   readonly read: LedgerPageData;
 }) => {
-  // Live: each entry the platform appends makes the ledger read again.
   useAtomMount(watchAtom(read.ledger.project));
 
   const ledger = Option.getOrElse(
@@ -101,7 +92,6 @@ const Unknown = () => {
 
 export const Route = createFileRoute("/$owner/$project/ledger")({
   loader: ({ params }) => ledgerPage({ data: params.project }),
-  // A ledger moves with the project's next entry: kept briefly, read again behind.
   headers: () => branchPage,
   head: ({ params: { project } }) =>
     pageHead({

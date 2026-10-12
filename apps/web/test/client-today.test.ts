@@ -1,9 +1,3 @@
-/**
- * Today's reads and a decider's writes, as the web's atoms make them: kept
- * from an anonymous browser, a decider's own, and refetched once a decision
- * is taken.
- * Over the dev world in process (`dev-browser.ts`).
- */
 import { describe, expect, it } from "@effect/vitest";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
 import { Unauthenticated } from "@repo/protocol/principal";
@@ -106,12 +100,10 @@ describe("Today, through the web's atoms", seededWorld, () => {
           : undefined;
 
         expect(taken?.choice).toBe("decline");
-        // The world serves at the instant its seed left the clock.
         expect(
           taken === undefined ? undefined : DateTime.formatIso(taken.at)
         ).toBe("2026-10-07T09:21:00.000Z");
 
-        /** Whether Today, in `where`, still holds the decision, and the budget it has used. */
         const todayIn = (where: typeof registry) =>
           Effect.map(settled(where, todayAtom), (today) =>
             Exit.isSuccess(today)

@@ -23,25 +23,11 @@ import { branchPage } from "../server/cache-headers.ts";
 import { serverClient } from "../server/client.ts";
 import { landingHandler } from "../server/front-page.ts";
 
-// `/`, the landing: the one page drawn outside the shell. It is the same
-// page for every reader, so the edge may keep it; its server GET sends a
-// reader who carries a session to `/home` before the page is drawn, and
-// gives an agent `llms.txt`. A signed-in reader who reaches it by a link
-// is moved on once the browser knows who they are. Its projects are read
-// on the server as nobody, so every reader, script or not, is sent the
-// same page with its projects in.
-
 const root = getRouteApi("__root__");
 
-/** Where the page's Markdown is. */
 const MARKDOWN = "/llms.txt";
 
-/**
- * The projects to read, as nobody (the client without the request, so no
- * cookie reaches the platform), encoded for the loader to carry. The list
- * ignores the caller, so nobody's read is everyone's, and the page stays
- * one the edge may keep.
- */
+// Read as nobody (no cookie reaches the platform): the list ignores the caller, so the page stays one the edge may keep.
 const landingData = createServerFn({ method: "GET" }).handler(() =>
   Effect.runPromise(
     readLandingProjects.pipe(
@@ -51,14 +37,12 @@ const landingData = createServerFn({ method: "GET" }).handler(() =>
   )
 );
 
-/** The landing's headers: kept briefly, varied by `Accept`, its Markdown named. */
 export const landingHeaders = () => ({
   ...branchPage,
   link: markdownLink(MARKDOWN),
   vary: "Accept",
 });
 
-/** The landing's head: its title, its own sentence to unfurl with, and its Markdown. */
 export const landingHead = () => ({
   ...pageHead({
     description: LEDE,
@@ -67,7 +51,6 @@ export const landingHead = () => ({
   links: [markdownAlternateLink(MARKDOWN)],
 });
 
-/** A signed-in reader who came by a link goes on to their home. */
 const useHomeOnceSignedIn = () => {
   const signedIn = useSignedIn();
   const router = useRouter();

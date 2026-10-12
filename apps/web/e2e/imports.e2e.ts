@@ -1,51 +1,18 @@
-/**
- * The open-source repos imported onto a dev stage (`scripts/import-examples.ts`),
- * as a browser shows them: for each project its home page (README rendered,
- * clone box), a nested folder, a file at line 5, the log, the newest
- * commit, the refs, the people and why each line of that file is there,
- * each asserted on its key text and saved as one screenshot under
- * `e2e/out/imports/<project>/`. Then what each repo was picked to
- * exercise: ky's lowercase `readme.md` and its SVG logo through raw,
- * awesome's relative links, changesets' deep tree and scoped tags, stb's
- * 730 KB header and a PNG, fuzzel's submodule, click's second log page and
- * anyhow's annotated tags. The first view of `tree`, `why` and
- * `commits?path=` on changesets and click is timed and printed. The thirty
- * well-known imports after them each show their home with its README, the
- * root folder, a file at line 5, the log, and why that file's lines are
- * there.
- *
- * It runs only against `WEB_URL` (a dev stage's web origin) and is skipped
- * without it. `WEB_IMPORTS` narrows it to some projects, a comma list of
- * full names (`github.com/pallets/click`), for a run while the imports go
- * in one at a time. Every address it visits or expects is the project's
- * full name (ADR 0032). It only reads.
- */
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 import { Brand } from "@repo/brand";
 import { ProjectName } from "@repo/protocol/ids";
 import { Config, Console, Effect, Option, Schema } from "effect";
 
-/** One imported project: where its pages look, and what they must show. */
 interface Imported {
   readonly project: string;
-  /** A phrase of its README, as the home page renders it. */
   readonly readme: string;
-  /** A folder at least two levels down. */
   readonly dir: string;
-  /** An entry of `dir`, listed on its page. */
   readonly entry: string;
-  /** A text file of at least five lines. */
   readonly file: string;
-  /**
-   * Whether its policy evaluated: an import with no config folder takes the
-   * defaults, and its run block from its CI; where the finder finds no test
-   * command there, the policy never evaluates and the people page says so.
-   */
   readonly evaluated: boolean;
 }
 
-/** The eight imports, in the order the script imports them. */
 const imports: readonly Imported[] = [
   {
     dir: "tests/ui",
@@ -88,7 +55,6 @@ const imports: readonly Imported[] = [
     readme: "Programming Languages",
   },
   {
-    // Six folders down; its file is the seventh level.
     dir: "packages/cli/src/commands/status/__tests__",
     entry: "packages/cli/src/commands/status/__tests__/status.test.ts",
     evaluated: true,
@@ -114,14 +80,12 @@ const imports: readonly Imported[] = [
   },
 ];
 
-/** One of the well-known imports: a file at its root of at least five lines, and its README's name. */
 interface Known {
   readonly project: string;
   readonly file: string;
   readonly readme: string;
 }
 
-/** The thirty well-known imports, in the order the script imports them. */
 const known: readonly Known[] = [
   { file: "package.json", project: "hono", readme: "README.md" },
   { file: "package.json", project: "express", readme: "Readme.md" },
@@ -155,7 +119,6 @@ const known: readonly Known[] = [
   { file: "package.json", project: "nvm", readme: "README.md" },
 ];
 
-/** What the check reads of its env: where the web lives, and which imports to visit. */
 const settings = Effect.runSync(
   Effect.gen(function* () {
     return {
@@ -168,25 +131,14 @@ const settings = Effect.runSync(
   })
 );
 
-/**
- * A project's full name, read by the one parser (ADR 0032): an import's
- * key from before owners (`click`) reads as its source path
- * (`github.com/pallets/click`), and a full name as itself.
- */
 const nameOf = (spelled: string): ProjectName =>
   Schema.decodeSync(ProjectName)(spelled);
 
-/** `text` as a regular expression matches it, literally. */
 const escaped = (text: string) =>
   text.replaceAll(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 
-/** A project's address on the web: its full name. */
 const homeOf = (project: string) => `/${nameOf(project)}`;
 
-/**
- * Those of `all` this run visits: `WEB_IMPORTS`' full names
- * (`github.com/pallets/click`), or all of them.
- */
 const visitedOf = <A extends { readonly project: string }>(
   all: readonly A[]
 ): readonly A[] =>
@@ -203,27 +155,21 @@ const visitedOf = <A extends { readonly project: string }>(
 
 const visited = visitedOf(imports);
 
-/** Where screenshots go: `e2e/out/imports/<project>/<shot>.png`. */
 const out = decodeURIComponent(
   new URL("out/imports/", import.meta.url).pathname
 );
 
-/** What a page says when the platform did not answer it. */
 const UNREACHABLE = "The platform did not answer";
 
-/** What a code page said before its view was built. */
 const NOT_BUILT = "not built";
 
-/** What the router's error boundary says when a page throws. */
 const CRASHED = "Something went wrong";
 
-/** `path` on the web. */
 const at = (path: string) =>
   `${Option.getOrElse(settings.web, () => "")}${path}`;
 
 const awaited = <A>(promise: () => Promise<A>) => Effect.promise(promise);
 
-/** The page says none of the things a broken page says. */
 const whole = (browser: Page) =>
   Effect.forEach(
     [UNREACHABLE, NOT_BUILT, CRASHED],
@@ -239,10 +185,6 @@ const shoot = (browser: Page, project: string, shot: string) =>
     })
   );
 
-/**
- * Opens `path`, checks it answered 200, waits for each of `texts` and
- * `selectors`, checks it is whole, and saves the screenshot `shot`.
- */
 const visit = (
   browser: Page,
   project: string,
@@ -276,11 +218,6 @@ const visit = (
     yield* shoot(browser, project, shot);
   });
 
-/**
- * The first view of `path`, timed from the request until the network is
- * quiet (the browser's own reads, the file tree's included) and `selector`
- * shows; printed and kept as an annotation.
- */
 const timed = (
   browser: Page,
   project: string,
@@ -313,7 +250,6 @@ const timed = (
     yield* shoot(browser, project, shot);
   });
 
-/** An image on the page has loaded its bytes. */
 const loaded = (browser: Page, selector: string) =>
   awaited(() =>
     expect
@@ -328,7 +264,6 @@ const loaded = (browser: Page, selector: string) =>
       .toBeGreaterThan(0)
   );
 
-/** The newest commit's page, as the log links it. */
 const newestCommit = (browser: Page, project: string) =>
   Effect.gen(function* () {
     const response = yield* awaited(() =>
@@ -350,11 +285,6 @@ const newestCommit = (browser: Page, project: string) =>
     return href ?? "";
   });
 
-/**
- * A project's home: its README rendered, and the facts' Take part steps,
- * which clone it with plain git. The facts render inline and in the
- * inspector, one of them hidden at each width, so the visible one is asked.
- */
 const homeWanted = (project: string, readme: string) => ({
   selectors: [
     "[data-readme]",
@@ -363,7 +293,6 @@ const homeWanted = (project: string, readme: string) => ({
   texts: [readme],
 });
 
-/** The pages every import shows. */
 const pages = ({ dir, entry, evaluated, file, project, readme }: Imported) => {
   const timedProject = project === "changesets" || project === "click";
 
@@ -519,7 +448,6 @@ const pages = ({ dir, entry, evaluated, file, project, readme }: Imported) => {
   }
 };
 
-/** The pages each well-known import shows. */
 const knownPages = ({ file, project, readme }: Known) => {
   test(`${project}'s home renders its ${readme}`, ({ page: browser }) =>
     Effect.runPromise(
@@ -573,14 +501,11 @@ const knownPages = ({ file, project, readme }: Known) => {
     ));
 };
 
-/** What each repo was picked to exercise. */
 const specifics = new Map<string, (browser: Page) => Effect.Effect<void>>([
   [
     "anyhow",
     (browser) =>
       Effect.gen(function* () {
-        // Annotated tags, listed peeled to their commits: a tag's tree opens.
-        // The newest come first, a hundred a page: 1.0.0 is on the second.
         yield* visit(
           browser,
           "anyhow",
@@ -612,7 +537,6 @@ const specifics = new Map<string, (browser: Page) => Effect.Effect<void>>([
     "awesome",
     (browser) =>
       Effect.gen(function* () {
-        // The 78 KB README renders, its relative links pinned to a commit.
         yield* visit(browser, "awesome", homeOf("awesome"), "readme-links", {
           texts: ["Contribution guide", "Front-End Development"],
         });
@@ -636,7 +560,6 @@ const specifics = new Map<string, (browser: Page) => Effect.Effect<void>>([
     "changesets",
     (browser) =>
       Effect.gen(function* () {
-        // Seven levels down: the deepest folder's file opens.
         yield* visit(
           browser,
           "changesets",
@@ -645,7 +568,6 @@ const specifics = new Map<string, (browser: Page) => Effect.Effect<void>>([
           { texts: ["Permalink"] }
         );
 
-        // Scoped tags (`@changesets/cli@…`), on whichever page of 100 holds one.
         let from = 0;
         let found = false;
 
@@ -691,7 +613,6 @@ const specifics = new Map<string, (browser: Page) => Effect.Effect<void>>([
     "click",
     (browser) =>
       Effect.gen(function* () {
-        // Past the first 30 commits, by Older.
         yield* visit(
           browser,
           "click",
@@ -716,7 +637,6 @@ const specifics = new Map<string, (browser: Page) => Effect.Effect<void>>([
     "fuzzel",
     (browser) =>
       Effect.gen(function* () {
-        // A gitlink lists as a submodule, with no page of its own.
         yield* visit(
           browser,
           "fuzzel",
@@ -737,7 +657,6 @@ const specifics = new Map<string, (browser: Page) => Effect.Effect<void>>([
     "ky",
     (browser) =>
       Effect.gen(function* () {
-        // Lowercase `readme.md`, and its SVG logo shown through raw.
         yield* visit(browser, "ky", homeOf("ky"), "readme-logo", {
           selectors: ['[data-readme="readme.md"]'],
         });
@@ -751,7 +670,6 @@ const specifics = new Map<string, (browser: Page) => Effect.Effect<void>>([
     "stb",
     (browser) =>
       Effect.gen(function* () {
-        // A 730 KB header opens, cut or drawn, never a crash.
         yield* visit(
           browser,
           "stb",
@@ -760,7 +678,6 @@ const specifics = new Map<string, (browser: Page) => Effect.Effect<void>>([
           { texts: ["glext.h"] }
         );
 
-        // A PNG shows as an image.
         yield* visit(
           browser,
           "stb",

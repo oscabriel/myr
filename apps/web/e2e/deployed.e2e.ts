@@ -1,30 +1,8 @@
-/**
- * The deployed web, as a browser shows it: the front page, a
- * project's page, an ask's page and the same ask as Markdown,
- * `/llms.txt`, and the project's code (a folder, a file at a line, the
- * log, a commit and the refs), each asserted on its key text, each saved
- * as one screenshot in `e2e/out/` for the shot list.
- *
- * It runs only against `WEB_URL` (a stage's web origin) and is skipped
- * without it. `WEB_PROJECT` picks the project (datekit unless given) and
- * `WEB_ASK` the ask, `WEB_FILE` the file opened at line 3 (its first folder
- * is the one the code page must list) and `WEB_README_PHRASE` a phrase of
- * the project's README, which its page must carry as the server sends it.
- * Each defaults to the seeded example's own (`examples`: datekit's
- * format-ordinal, `src/add.ts` and opening words; burrow's
- * drop-legacy-fetch, `packages/kit/src/http.ts` and "six small TypeScript
- * packages"), so `WEB_PROJECT=burrow` alone checks burrow. It only reads.
- */
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 import { ProjectName } from "@repo/protocol/ids";
 import { Config, Effect, Option } from "effect";
 
-/**
- * What the check looks at in each seeded example unless told otherwise: an
- * ask the seed opens, a file whose first folder the code page lists, and a
- * phrase of its README.
- */
 const examples = {
   burrow: {
     ask: "drop-legacy-fetch",
@@ -38,10 +16,8 @@ const examples = {
   },
 } as const;
 
-/** What the check reads of its env: where the web lives, and which ask to look at. */
 const settings = Effect.runSync(
   Effect.gen(function* () {
-    // Read by the one parser: `burrow` and `oscabriel/burrow` alike.
     const project = yield* Config.schema(ProjectName, "WEB_PROJECT").pipe(
       Config.withDefault(ProjectName.make("oscabriel/datekit"))
     );
@@ -70,29 +46,18 @@ const settings = Effect.runSync(
 
 const { ask, file: FILE, project, readme: README_PHRASE } = settings;
 
-/** The root folder `FILE` sits in, which the project's code page lists. */
 const FOLDER = FILE.split("/")[0] ?? FILE;
 
-/** Where each page's screenshot goes: `e2e/out/<shot>.png`. */
 const out = decodeURIComponent(new URL("out/", import.meta.url).pathname);
 
-/** What every page that could not reach the platform says instead of its content. */
 const UNREACHABLE = "The platform did not answer";
 
-/** What a code page said before its view was built; a deployed page never says it. */
 const NOT_BUILT = "not built";
 
-/** `url` on the web. */
 const at = (path: string) =>
   `${Option.getOrElse(settings.web, () => "")}${path}`;
 
-/**
- * Opens `path` as a page, waits for each of `texts` on screen, checks the
- * platform answered it, and saves the screenshot `shot`. A text may also sit
- * in markup a width hides (the facts render once as the inspector and once
- * inline, and a folded family keeps its children's rows), so each text is
- * found among the visible matches.
- */
+// A text may also sit in markup a width hides, so each is found among the visible matches.
 const page = (
   browser: Page,
   path: string,
@@ -124,7 +89,6 @@ const page = (
     );
   });
 
-/** A code page: as `page` checks one, and it never says it is not built. */
 const code = (
   browser: Page,
   path: string,
@@ -139,10 +103,6 @@ const code = (
     );
   });
 
-/**
- * Fetches `path` as Markdown, checks it opens with a title and holds each
- * of `texts`, and saves a screenshot of it, shown as plain text.
- */
 const markdown = (
   browser: Page,
   path: string,
@@ -187,9 +147,7 @@ test.describe("the deployed web", () => {
     "WEB_URL is not set: point it at a deployed web's origin to run this check"
   );
 
-  // The heading renders before the platform answers, so each list page also
-  // waits for a row only the platform's answer holds: until then the page
-  // shows placeholders, and "did not answer" can't have appeared yet.
+  // The heading renders before the platform answers, so each list page also waits for a row only the answer holds.
   test("the front page lists the open asks", ({ page: browser }) =>
     Effect.runPromise(
       page(browser, "/", "front-page", ["Open asks", project])
@@ -200,8 +158,7 @@ test.describe("the deployed web", () => {
       page(browser, `/${project}`, "project-page", [project, ask])
     ));
 
-  // A request, not a page: no browser script runs, so this is the HTML the
-  // server sent, as a crawler or `curl` reads it.
+  // A request, not a page: this is the HTML the server sent, as a crawler reads it.
   test(`${project}'s page arrives with its README rendered by the server`, ({
     page: browser,
   }) =>
@@ -255,8 +212,6 @@ test.describe("the deployed web", () => {
       })
     ));
 
-  // The landings are grouped under one heading per day, each naming its
-  // date in words ("October 7, 2026") over that day's commits.
   test(`${project}'s log groups its commits by day`, ({ page: browser }) =>
     Effect.runPromise(
       Effect.gen(function* () {

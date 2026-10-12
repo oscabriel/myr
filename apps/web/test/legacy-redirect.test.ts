@@ -1,10 +1,3 @@
-/**
- * A project's address on the web (ADR 0032): a key a project kept from
- * before owners, and a name in another case, are a 301 to the name's
- * address with the rest of the path and the query kept, which the edge may
- * keep as any page; everything else goes on to the pages. The router reads
- * a source path as the same project pages, its owner in one param.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Option } from "effect";
 
@@ -13,18 +6,15 @@ import { forTheEdge, KEPT_NOWHERE } from "../src/server/edge-cache.ts";
 
 const WEB_URL = "https://web-test.example.workers.dev";
 
-/** A request for `path` on the web host, by `method`. */
 const request = (path: string, method = "GET") =>
   new Request(`${WEB_URL}${path}`, { method });
 
-/** Where the 301 for `path` leads, if there is one. */
 const movedTo = (path: string) =>
   Option.map(canonicalAddress(request(path)), (response) => [
     response.status,
     response.headers.get("location"),
   ]);
 
-/** An entry that answers every request it is handed with the page. */
 const pages = {
   fetch: (_request: Request) => new Response("the page", { status: 200 }),
 };

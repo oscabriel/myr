@@ -14,11 +14,6 @@ import { docsHead, docsMarkdownPath } from "../../features/docs/head.ts";
 import { markdownLink } from "../../features/front/markdown.ts";
 import { branchPage } from "../../server/cache-headers.ts";
 
-// `/docs/<page>`: one guide or reference page, written for this stage's
-// platform and the web's own origin, with its Markdown at
-// `/docs/<page>.md`. The same for every reader, and it changes only with a
-// deploy.
-
 const root = getRouteApi("__root__");
 
 const DocsPage = () => {
@@ -34,7 +29,6 @@ const DocsPage = () => {
 };
 
 export const Route = createFileRoute("/docs/$page")({
-  // A page the docs don't have is the router's not-found.
   loader: ({ params }) =>
     Effect.runPromise(
       Option.isSome(docEntry(params.page))
