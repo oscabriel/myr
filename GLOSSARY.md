@@ -81,7 +81,7 @@ The cost-ordered chain of stages that narrows a push to a checked tree or a refu
 _Avoid_: CI, pipeline, merge queue
 
 **Landing**:
-The platform's commit of a checked tree to main, written by the platform alone, with credit trailers; when it carries the platform's signature, a clone can prove that without the platform. An ask's opening is a landing too: it opens an ask and answers none. So is a project's adoption, its first `main` from the initializer's first push or an import: it answers no ask, has no parent and credits no one.
+The platform's commit of a checked tree to main, written by the platform alone, with credit trailers. An ask's opening is a landing too: it opens an ask and answers none. So is a project's adoption, its first `main` from the initializer's first push or an import: it answers no ask, has no parent and credits no one.
 _Avoid_: merge, ship
 
 **Landed SHA**:
@@ -191,7 +191,7 @@ The label the platform computes from a project's visibility config as it stands 
 _Avoid_: licence (they are different things)
 
 **Ledger**:
-The public, append-only record of a project's layers, counts, commitments, releases and posture changes; the one record a clone does not yet carry, until the platform writes it as a note on main.
+The public, append-only record of a project's layers, counts, commitments, releases and posture changes; the one record a clone does not yet carry.
 
 **Env shape**:
 The public schema of a project's environment variables: its committed .env.schema file, in the @env-spec format that varlock reads, which the platform parses from the landed SHA and never resolves.
@@ -229,7 +229,7 @@ _Avoid_: settings, config (when meaning the evaluated result), people page
 
 **Tag**:
 A git tag on main naming one commit, as the project's history has it.
-_Avoid_: release (a GitHub Release's notes and assets are not git data)
+_Avoid_: release (a code host's release notes and assets are not git data)
 
 **Run block**:
 The config folder's declaration of the project's own commands: setup, doctor, test, checks.
