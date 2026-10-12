@@ -1,14 +1,5 @@
-/**
- * The visibility cartridge's project state, as the platform provides it:
- * the project service's live `ProjectVisibility` over the private
- * namespace's repos (`LayerRepos` over `ARTIFACTS_PRIVATE`), secret salts
- * from WebCrypto's randomness at the platform's edge, and admissions
- * started as runs of the `Answer` Workflow under their own params.
- *
- * A salt is drawn here and kept only in the project's Durable Object (the
- * layer's row): no ledger entry, trailer, note or event carries it, and
- * nothing reveals it yet (`reveal` stays "on retire or dispute", as config).
- */
+// A salt is kept only in the project's Durable Object: no ledger entry, trailer,
+// note or event carries it.
 import type { Fetch } from "@repo/artifacts/fetch";
 import {
   AdmissionStarts,
@@ -21,7 +12,6 @@ import { AdmissionParams, admissionId } from "../answer-runs.ts";
 import type { PlatformConfig } from "../platform.ts";
 import { layerRepos } from "./layer-repos.ts";
 
-/** 32 bytes from WebCrypto's randomness: each layer commit's commitment gets its own. */
 export const WebCryptoSalts: Layer.Layer<SaltSource> = Layer.succeed(
   SaltSource,
   SaltSource.of({
@@ -29,7 +19,6 @@ export const WebCryptoSalts: Layer.Layer<SaltSource> = Layer.succeed(
   })
 );
 
-/** The part of the `Answer` Workflow binding an admission's start uses. */
 export interface AdmissionWorkflow {
   readonly create: (options: {
     readonly id: string;
@@ -40,12 +29,6 @@ export interface AdmissionWorkflow {
 
 const encodeParams = Schema.encodeEffect(AdmissionParams);
 
-/**
- * Admissions as runs of the `Answer` Workflow, one instance per
- * project, layer and head (`admissionId`): starting one twice finds the
- * instance the first made, so it runs once. Any other failure is a defect,
- * and the outbox row that asked for the start runs it again.
- */
 export const admissionStarts = (
   workflow: AdmissionWorkflow
 ): Layer.Layer<AdmissionStarts> =>
@@ -72,7 +55,6 @@ export const admissionStarts = (
     })
   );
 
-/** The live project state for one stage's config, over the platform's `Fetch`. */
 export const stateLive = (
   config: PlatformConfig
 ): Layer.Layer<never, never, Fetch> =>

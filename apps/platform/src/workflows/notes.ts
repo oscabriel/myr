@@ -1,22 +1,3 @@
-/**
- * Verdict notes on an answer's fork: after the
- * platform judges an answer, its answerer reads the verdict with plain git,
- *
- *     git fetch origin refs/notes/<slug>:refs/notes/<slug>
- *     git notes --ref=<slug> show <head>
- *
- * in a clone of their fork. One JSON note per head, the public `Verdict`
- * encoding and nothing more; a newer verdict on the same head
- * replaces its note, and the notes on the fork's other heads stay.
- *
- * Everything goes through `RepoHost` (principle 6): the notes ref's tip from
- * the ref listing (the binding resolves no custom ref), the earlier
- * notes through reads, and the new note as one compare-and-swap push of the
- * notes ref alone, never beside a branch (no atomic multi-ref push),
- * never forced. Each new notes commit has the earlier one as its parent, so
- * the same fetch, without `+`, brings the newer note to a clone that has the
- * older. The canonical notes on landings are the Lander's.
- */
 import { HostBusy, RefOutcome, RepoHost } from "@repo/artifacts/repo-host";
 import type {
   ObjectId,
@@ -32,7 +13,6 @@ import { DateTime, Effect, Option, Schema } from "effect";
 
 export { notesRef } from "@repo/git/notes";
 
-/** What writing a note came to: the notes ref's tip, and whether the write moved it. */
 export interface NoteWritten {
   readonly notesTip: CommitSha;
   readonly changed: boolean;
@@ -42,13 +22,11 @@ const encoder = new TextEncoder();
 
 const encodeVerdict = Schema.encodeEffect(Schema.fromJsonString(Verdict));
 
-/** The note's bytes as `noteCommit` writes them: the verdict's JSON and a newline. */
 const noteBytes = (verdict: Verdict) =>
   Effect.map(Effect.orDie(encodeVerdict(verdict)), (json) =>
     encoder.encode(`${json}\n`)
   );
 
-/** A blob holding `bytes` as git frames it: its header, then its content. */
 const framed = (bytes: Uint8Array) => {
   const header = encoder.encode(`blob ${bytes.byteLength}\0`);
   const raw = new Uint8Array(header.byteLength + bytes.byteLength);
@@ -59,7 +37,6 @@ const framed = (bytes: Uint8Array) => {
   return raw;
 };
 
-/** The id git gives a blob holding `bytes`. */
 const blobId = (bytes: Uint8Array) =>
   Effect.map(
     Effect.promise(() => crypto.subtle.digest("SHA-1", framed(bytes))),
@@ -69,7 +46,6 @@ const blobId = (bytes: Uint8Array) =>
         .join("")
   );
 
-/** git's zlib stream, as a loose object holds it. */
 const deflate = (bytes: Uint8Array) =>
   Effect.map(
     Effect.promise(() =>
@@ -80,12 +56,9 @@ const deflate = (bytes: Uint8Array) =>
     (buffer) => new Uint8Array(buffer)
   );
 
-/**
- * The earlier note `blob` in the fork, put in `source` as a loose object.
- * A push over git smart HTTP (`/binding`'s) sends every object the new
- * notes tree names that it cannot tell the remote has, and the source
- * holds no earlier notes commit to tell it by, so it must hold their blobs.
- */
+// A push over smart HTTP sends every object the new notes tree names that it cannot
+// tell the remote has, and the source holds no earlier notes commit, so it must hold
+// their blobs.
 const keepEarlierNote = (
   fork: RepoName,
   source: ScratchSource,
@@ -114,7 +87,6 @@ const keepEarlierNote = (
     );
   });
 
-/** The notes tree's entries at `tip`, read through the port; none before the first note. */
 const notesAt = (fork: RepoName, tip: Option.Option<CommitSha>) =>
   Option.match(tip, {
     onNone: () => Effect.succeed<readonly TreeEntry[]>([]),
@@ -143,10 +115,6 @@ interface NoteInput {
   readonly verdict: Verdict;
 }
 
-/**
- * One try: the note on top of the notes ref as listed now, pushed with a
- * compare-and-swap on that ref alone. `None` when the ref moved under it.
- */
 const once = (input: NoteInput) =>
   Effect.gen(function* () {
     const host = yield* RepoHost;
@@ -190,13 +158,6 @@ const once = (input: NoteInput) =>
       : Option.none();
   });
 
-/**
- * `verdict` as the note on `head` in `fork`. The same verdict already there
- * changes nothing (`changed: false`, no push). A notes ref that moved
- * between the listing and the push is listed again and the note written on
- * top of the move, once; one that moved under that too is `HostBusy`, for
- * the caller to retry.
- */
 export const writeVerdictNote = (
   input: NoteInput
 ): Effect.Effect<NoteWritten, RepoNotFound | HostBusy, RepoHost> =>

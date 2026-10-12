@@ -3,10 +3,6 @@ import { Effect, Layer, Option, Ref } from "effect";
 import { Accounts, handleKey, HandleTaken } from "../accounts.ts";
 import type { Account } from "../accounts.ts";
 
-/**
- * Accounts in memory, keyed like D1's table, for tests and local runs: a
- * fresh, empty store each time the layer is built.
- */
 export const AccountsMemory = {
   layer: Layer.effect(
     Accounts,

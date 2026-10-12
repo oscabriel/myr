@@ -1,21 +1,6 @@
-/**
- * The visibility cartridge's landing guards: the
- * no-write-down guards the `Answer` Workflow runs on an answer's merged
- * change set before any check, provided as its `LandingGuards` port.
- *
- * - `PrivatePathInPublicTree`: a path in any layer's path set, as the
- *   project gives it (`layerFacts`). It names exactly which paths collide
- *   only when everyone accountable for the answer reads every layer;
- *   anyone else hears every path they added or modified
- *   (`privatePaths`), so the refusal is no map of the layers.
- * - `LayerContentInPublicTree`: an added blob identical to a blob of a
- *   layer the answerer or a finisher reads (`writeDown`). Only the
- *   blobs of layers they read are compared, read here from the private
- *   namespace (`LayerRepos`) at the layer's `main`; for anyone else the
- *   guard says nothing, never an oracle on a layer's content.
- *
- * Nothing here names a layer's paths or content in a refusal or a log.
- */
+// Refusals and logs here never name a layer's paths or content: exact colliding paths
+// only when everyone accountable reads every layer, and blob comparison only for layers
+// the answerer or a finisher reads.
 import type { Fetch } from "@repo/artifacts/fetch";
 import { ObjectId, RefName } from "@repo/artifacts/repo-host";
 import type { RepoHost, RepoNotFound } from "@repo/artifacts/repo-host";
@@ -36,11 +21,9 @@ import { layerRepos } from "./layer-repos.ts";
 
 const mainRef = RefName.make("refs/heads/main");
 
-/** A layer's repo: as declared, or `<key>--<layer>`, by the project's key. */
 const repoOf = (project: ProjectName, layer: LayerDeclaration) =>
   layer.repo ?? RepoName.make(`${keyOf(project)}--${layer.name}`);
 
-/** Every blob under `tree` in `repo`, at any depth. */
 const blobsUnder = (
   host: RepoHost["Service"],
   repo: RepoName,
@@ -61,7 +44,6 @@ const blobsUnder = (
     )
   );
 
-/** The blobs a layer's repo holds on `main`; none for a layer with no repo yet. */
 const layerBlobs = (host: RepoHost["Service"], repo: RepoName) =>
   Effect.gen(function* () {
     const tip = (yield* host.refs(repo)).get(mainRef);
@@ -77,14 +59,12 @@ const layerBlobs = (host: RepoHost["Service"], repo: RepoName) =>
       : yield* blobsUnder(host, repo, commit.value.tree);
   }).pipe(Effect.catchTag("RepoNotFound", () => Effect.succeed([])));
 
-/** Whether `handle` may read `layer`: its readers and writers. */
 const reads = (api: ProjectApi, handle: Handle, layer: LayerDeclaration) =>
   Effect.map(
     api.layerAccess(Person.make({ handle }), layer.name),
     (access) => Option.isSome(access) && access.value !== "none"
   );
 
-/** The guards on one answer's merged change set, over its project and the private namespace. */
 const guardsOver =
   (repos: RepoHost["Service"], projects: Projects["Service"]) =>
   (input: GuardInput) =>
@@ -136,7 +116,6 @@ const guardsOver =
       ];
     });
 
-/** The landing guards over the project's layers, as `LayerRepos` holds them. */
 export const LandingGuardsLive: Layer.Layer<
   never,
   never,
@@ -151,7 +130,6 @@ export const LandingGuardsLive: Layer.Layer<
   })
 );
 
-/** The landing guards for one stage, over its private namespace (`ARTIFACTS_PRIVATE`). */
 export const heldBackLive = (
   config: PlatformConfig
 ): Layer.Layer<never, never, Fetch | Projects> =>

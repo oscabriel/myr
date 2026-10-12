@@ -1,10 +1,3 @@
-/**
- * What OnPush asks a project's Durable Object before it classifies a push
- * event: whether canonical `main`'s new commit is a landing the platform
- * made (`landing(platform, sha)`), and whether the gateway recorded a claim
- * fork taking the pushed commit. Each read is asked only of the events it
- * can change the verdict of.
- */
 import { platformHandle } from "@repo/project/attention/effects";
 import type { ProjectApi } from "@repo/project/project";
 import { keptEvents } from "@repo/project/project-store";
@@ -20,10 +13,8 @@ import type { PushFacts } from "./classify.ts";
 import { isZero } from "./event.ts";
 import type { OnPushEvent } from "./event.ts";
 
-/** The platform itself, reading a project's public record. */
 const platform = Person.make({ handle: platformHandle });
 
-/** The project a repo belongs to, when its name says. */
 const projectOf = (kind: RepoKind): Option.Option<ProjectName> =>
   RepoKind.$match(kind, {
     Canonical: ({ project }) => Option.some(project),
@@ -32,17 +23,11 @@ const projectOf = (kind: RepoKind): Option.Option<ProjectName> =>
     WorkingFork: ({ project }) => Option.some(project),
   });
 
-/** `sha` as a landing the platform made on the project's `main`, or none. */
 const landedOf = (api: ProjectApi, sha: CommitSha) =>
   Effect.map(Effect.isSuccess(api.landing(platform, sha)), (landed) =>
     landed ? new Set([sha]) : new Set<CommitSha>()
   );
 
-/**
- * Whether the gateway recorded the claim's fork taking `head`: recording a
- * claimant's push keeps the claim alive and emits `Pushed`, which the
- * project keeps among its newest events.
- */
 const seenBy = (
   api: ProjectApi,
   push: { readonly ask: AskId; readonly head: CommitSha }
@@ -62,7 +47,6 @@ const nothing = (repo: RepoKind): PushFacts => ({
   seen: false,
 });
 
-/** The project and the API of the repo `event` is about, when the platform has that project. */
 export const projectFor = (event: OnPushEvent) =>
   Effect.gen(function* () {
     const kind = repoKind(event.source.repoName);
@@ -79,7 +63,6 @@ export const projectFor = (event: OnPushEvent) =>
     return Option.map(api, (found) => ({ api: found, kind }));
   });
 
-/** What the project's Durable Object says about `event`. */
 export const factsOf = (
   event: OnPushEvent
 ): Effect.Effect<PushFacts, never, Projects> =>

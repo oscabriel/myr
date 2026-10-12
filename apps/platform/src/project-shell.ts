@@ -1,16 +1,3 @@
-/**
- * One project's Durable Object, without the host: the project service over
- * its own SQLite, behind the encoded call boundary. Host-free, so Node tests
- * run it over sqlite-node and memory ports; `project-do.ts` gives it the
- * DO's storage and the stage's ports.
- *
- * The shell holds no project logic (ADR 0012): `@repo/project`'s service
- * hydrates, transitions, persists and settles. The shell decodes each call
- * (the DO trusts only what the Worker sends), refuses a contract call
- * before `initProject` with `UnknownProject`, runs the method, and answers
- * its `Exit` encoded, so a refusal stays a refusal and never becomes a
- * defect at the boundary.
- */
 import { EvidenceStore } from "@repo/checks/evidence-store";
 import { projectService } from "@repo/project/project";
 import type { ProjectApi, ProjectPorts } from "@repo/project/project";
@@ -34,21 +21,13 @@ import type { SqlClient } from "effect/sql/SqlClient";
 import { CallRequest, ProjectCalls } from "./project-calls.ts";
 import type { ArgsOf, ExitEncoded, ProjectMethod } from "./project-calls.ts";
 
-/** One project's DO without its host: what `project-do.ts` runs each call and alarm on. */
 export interface ProjectShell {
-  /** One call on the project: its `Exit`, encoded by the method's schemas. */
   readonly call: (
     request: typeof CallRequest.Encoded
   ) => Effect.Effect<ExitEncoded>;
-  /** The DO's alarm fired: the project's deadlines and retries run. */
   readonly alarm: () => Effect.Effect<void>;
 }
 
-/**
- * The service's methods as one table, each over its own arguments: what a
- * call indexed by a method name runs. A method may read lane logs
- * (`evidence`), so each runs with the stage's `EvidenceStore`.
- */
 type Methods = {
   readonly [M in ProjectMethod]: (
     ...args: Readonly<ArgsOf<M>>
@@ -59,20 +38,13 @@ type Methods = {
   >;
 };
 
-/** The DO has no name, and its storage holds no project to take one from. */
 const nameless = Effect.die(
   "the Project DO has no name: the Worker reaches it by `idFromName`"
 );
 
 export const projectShell = (input: {
-  /** The DO's name, when the Worker made its id with `idFromName`. */
   readonly name: ProjectName | undefined;
-  /** SQL over the DO's own storage; sqlite-node in tests. */
   readonly sql: Layer.Layer<SqlClient>;
-  /**
-   * Every port the service runs on but its store, and where lane logs are
-   * kept, which `evidence` reads.
-   */
   readonly ports: Layer.Layer<
     Exclude<ProjectPorts, ProjectStore> | EvidenceStore
   >;
@@ -88,7 +60,6 @@ export const projectShell = (input: {
 
     const store = Context.get(context, ProjectStore);
 
-    /** A method's run, with the stage's lane logs to read. */
     const withEvidence = Effect.provideService(
       EvidenceStore,
       Context.get(context, EvidenceStore)
@@ -97,7 +68,6 @@ export const projectShell = (input: {
     const made = yield* Ref.make(false);
     const built = yield* SynchronizedRef.make(Option.none<Methods>());
 
-    /** Whether `initProject` has made the project; once it has, it stays made. */
     const isMade = Effect.gen(function* () {
       if (yield* Ref.get(made)) {
         return true;
@@ -112,7 +82,6 @@ export const projectShell = (input: {
       return Option.isSome(project);
     });
 
-    /** The project's name: the DO's, or the one its storage holds. */
     const nameOf = Effect.gen(function* () {
       if (input.name !== undefined) {
         return Option.some(input.name);
@@ -123,7 +92,6 @@ export const projectShell = (input: {
       return Option.map(project, (row) => row.project);
     });
 
-    /** The project's one service, built on first use: one lock per project. */
     const service = SynchronizedRef.modifyEffect(built, (current) =>
       Option.match(current, {
         onNone: () =>
@@ -144,7 +112,6 @@ export const projectShell = (input: {
       })
     );
 
-    /** One call on `method`, its request as the Worker encoded it. */
     const serve = <M extends ProjectMethod>(
       method: M,
       request: typeof CallRequest.Encoded & { readonly method: M }
@@ -179,7 +146,6 @@ export const projectShell = (input: {
     return {
       alarm: () =>
         Effect.gen(function* () {
-          // A DO no project was made in has nothing to wake for.
           if (yield* isMade) {
             yield* Effect.flatMap(service, (api) =>
               withEvidence(api.onAlarm())

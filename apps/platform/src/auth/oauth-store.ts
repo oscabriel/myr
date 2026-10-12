@@ -1,14 +1,7 @@
-/**
- * Where the OAuth provider keeps clients, grants and tokens: `OAUTH_KV` on
- * Cloudflare, `/memory` in tests. The shape is only the calls the provider
- * makes (1.2.1: `get` as text or JSON, `put` with a TTL and metadata,
- * `delete`, `list` by prefix), so a `KVNamespace` is one as it is. Tokens,
- * codes and secrets are stored there only as hashes, and props encrypted.
- */
+// Only the calls the provider makes, so a `KVNamespace` is one as it is.
 import { Context } from "effect";
 import type { Schema } from "effect";
 
-/** One page of keys under a prefix, as KV lists them. */
 export interface OAuthStoreList {
   readonly cursor?: string;
   readonly keys: readonly {

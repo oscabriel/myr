@@ -1,10 +1,3 @@
-/**
- * Accounts on D1 (`FRONT_PAGE`'s database, table `accounts` from
- * `migrations/0002_accounts.sql`), through `effect/sql`, so the same code
- * runs on `@effect/sql-d1` in the Worker and on sqlite-node in tests. A
- * `SqlError` is a defect: the sign-in page answers 500, never a wrong
- * "handle or password".
- */
 import { Handle } from "@repo/protocol/ids";
 import { Array, Clock, Effect, Layer, Option, Schema } from "effect";
 import { SqlClient } from "effect/sql/SqlClient";
@@ -12,7 +5,6 @@ import { SqlClient } from "effect/sql/SqlClient";
 import { Accounts, handleKey, HandleTaken } from "../auth/accounts.ts";
 import { PasswordHash } from "../auth/password.ts";
 
-// What D1 hands back is decoded like any other outside input.
 const Rows = Schema.Array(
   Schema.Struct({ handle: Handle, password_hash: PasswordHash })
 );

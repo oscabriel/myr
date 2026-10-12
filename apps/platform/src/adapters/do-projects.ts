@@ -1,16 +1,3 @@
-/**
- * The project service's `Projects` port over the Project Durable Object
- * namespace: each project name is one DO (`idFromName`), and the `ProjectApi` a
- * project gets encodes each call (`encodeCall`), sends it to the DO's `call`,
- * and decodes the reply (`decodeReply`), so a refusal arrives as the same typed
- * refusal it is in the DO.
- *
- * The DO answers `UnknownProject` itself before `initProject`, so `get`
- * asks it once whether the project was made (a `listAsks`) and `create`
- * refuses a name already made with `ProjectExists`; two creates that race
- * meet `ProjectExists` from `initProject` in the DO. A project made stays
- * made, so the layer remembers each one it found.
- */
 import { envSchemaMethod } from "@repo/project/deciders";
 import type { ProjectApi } from "@repo/project/project";
 import { Projects } from "@repo/project/projects";
@@ -30,12 +17,10 @@ import type {
   SuccessOf,
 } from "../project-calls.ts";
 
-/** The part of a Project DO's stub the Worker calls. */
 export interface ProjectStub {
   readonly call: (request: typeof CallRequest.Encoded) => Promise<ExitEncoded>;
 }
 
-/** The part of the `PROJECT` namespace binding the adapter uses. */
 export interface ProjectNamespace {
   readonly idFromName: (name: string) => DurableObjectId;
   readonly get: (id: DurableObjectId) => ProjectStub;
@@ -43,11 +28,7 @@ export interface ProjectNamespace {
 
 const isUnknownProject = Schema.is(UnknownProject);
 
-/**
- * A call that assumes its project is made: `get` found it, or `create`'s
- * caller makes it with `initProject` first. `ProjectApi` has no room for the
- * DO's `UnknownProject`, so one that comes back is a defect.
- */
+// `ProjectApi` has no room for the DO's `UnknownProject`, so one that comes back is a defect.
 const assumingMade = <A, E>(effect: Effect.Effect<A, E>) =>
   effect.pipe(
     Effect.catchIf<E, Extract<E, UnknownProject>, never, never, never>(
@@ -57,7 +38,6 @@ const assumingMade = <A, E>(effect: Effect.Effect<A, E>) =>
     )
   );
 
-/** One call on `project`'s DO, as the method's own types. */
 const remote =
   (namespace: ProjectNamespace, project: ProjectName) =>
   <M extends ProjectMethod>(
@@ -76,7 +56,6 @@ const remote =
       return yield* decodeReply(method, reply);
     });
 
-/** A project's `ProjectApi`, every method a call on its DO. */
 const apiOf = (
   namespace: ProjectNamespace,
   project: ProjectName
@@ -152,7 +131,6 @@ export const DoProjects = (
     Effect.gen(function* () {
       const known = yield* Ref.make<ReadonlySet<ProjectName>>(new Set());
 
-      /** Whether the project's DO holds a project: it answers a read, not `UnknownProject`. */
       const isMade = (project: ProjectName) =>
         Effect.gen(function* () {
           if ((yield* Ref.get(known)).has(project)) {

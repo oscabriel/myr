@@ -1,12 +1,6 @@
-/**
- * A project's raw bytes: `GET /<project>/raw/<rev>/<path…>`, from its
- * canonical repo only, under a sandboxing CSP and `nosniff` so no file runs
- * as script on this origin. The answer is `@repo/project/code/raw`'s, the
- * one the web's dev world serves too. The revision and the path are read
- * from the request's own URL, still encoded, and decoded there once: the
- * router's parameter has `%2F` decoded already, which would cut a tag's
- * name in two.
- */
+// The revision and path are read from the request's own URL, still encoded: the
+// router's parameter has `%2F` decoded already, which would cut a tag's name in two.
+// Served under a sandboxing CSP and `nosniff` so no file runs as script on this origin.
 import type { RepoHost } from "@repo/artifacts/repo-host";
 import { rawFor } from "@repo/project/code/raw";
 import type { Projects } from "@repo/project/projects";

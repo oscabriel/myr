@@ -1,10 +1,3 @@
-/**
- * Identities on D1 (`FRONT_PAGE`'s database, table `identities` from
- * `migrations/0003_identities.sql`), through `effect/sql`, so the same code
- * runs on `@effect/sql-d1` in the Worker and on sqlite-node in tests. A
- * `SqlError` is a defect: the sign-in page answers 500, never a wrong
- * "already linked".
- */
 import { Handle } from "@repo/protocol/ids";
 import { Array, Effect, Layer, Option, Schema } from "effect";
 import { SqlClient } from "effect/sql/SqlClient";
@@ -12,7 +5,6 @@ import { SqlClient } from "effect/sql/SqlClient";
 import { handleKey } from "../auth/accounts.ts";
 import { Identities, IdentityTaken } from "../auth/identities.ts";
 
-// What D1 hands back is decoded like any other outside input.
 const Rows = Schema.Array(Schema.Struct({ handle_key: Handle }));
 
 const decodeRows = Schema.decodeUnknownEffect(Rows);

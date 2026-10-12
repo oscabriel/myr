@@ -7,11 +7,6 @@ interface Window {
   readonly startedAt: number;
 }
 
-/**
- * Attempts in memory, for tests and local runs: a fixed window per key that
- * opens at its first attempt and admits `AttemptPolicy.limit` until
- * `AttemptPolicy.period` has passed. A refused attempt is not counted.
- */
 export const SignInAttemptsMemory = {
   layer: Layer.effect(
     SignInAttempts,

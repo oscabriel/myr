@@ -1,19 +1,3 @@
-/**
- * `CheckRunner` over the sandbox Worker: each run goes to the
- * Checker through the `SANDBOX` service binding, with one read token on the
- * repo it clones from and nothing else. The Checker's container never sees
- * the token; its outcome comes back as the port's own `CheckRun` or
- * `VerifierBlocked`.
- *
- * A job's sealed suite crosses as the platform read it: the
- * layer's files under the sealed areas, base64 on the wire, and one run per
- * sealed check. No layer repo, route or token goes with it, so the only
- * token is still the one on the answer's fork. Its area bits come back
- * decoded and held to the job that asked for them: one per area the job
- * sent, under the job's suite, each counting that area's checks. Bits that
- * answer some other job are the platform's trouble (`VerifierBlocked`),
- * never a result an answer earned.
- */
 import { RepoHost } from "@repo/artifacts/repo-host";
 import { CheckRunner } from "@repo/checks/check-runner";
 import type { CheckJob, CheckRun } from "@repo/checks/check-runner";
@@ -34,13 +18,6 @@ import { Array, Effect, Layer } from "effect";
 
 import { sandboxJob, withRemote } from "./sandbox-credentials.ts";
 
-/**
- * The sandbox Worker's entrypoint, as the platform reaches it through the
- * `SANDBOX` service binding: each method takes a job's wire, encoded, and
- * answers with the job's `Exit` as JSON, which the adapters decode before
- * they trust any of it (principle 2). Structural, so 317 passes the binding
- * itself.
- */
 export interface SandboxBinding {
   readonly check: (
     wire: typeof CheckWire.Encoded
@@ -59,10 +36,7 @@ export interface SandboxBinding {
   ) => Promise<typeof BundleExit.Encoded>;
 }
 
-/**
- * Whether `bits` are the area bits of `job`'s suite: each area it sent,
- * once and in order, as the Checker counts them (`areaBits`).
- */
+// Bits that answer some other job are the platform's trouble, never a result an answer earned.
 const answersJob = (job: CheckJob, bits: readonly HeldBackResult[]) => {
   const suite = job.heldBack;
 
@@ -90,7 +64,6 @@ const answersJob = (job: CheckJob, bits: readonly HeldBackResult[]) => {
   );
 };
 
-/** A run whose area bits answer `job`, or `VerifierBlocked` with one log line naming nothing sealed. */
 const heldTo = (job: CheckJob) => (ran: CheckRun) =>
   answersJob(job, ran.heldBack)
     ? Effect.succeed(ran)

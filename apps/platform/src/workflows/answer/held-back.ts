@@ -1,25 +1,5 @@
-/**
- * The `Answer` Workflow's held-back step: once an
- * answer's public checks pass on the merged tree, the sealed suite its
- * claim was pinned to judges it, one bit per area. The project
- * decides everything through `ProjectApi`: the job (`heldBackJob`, the
- * layer's files read at the pinned commit by the platform, so no layer
- * route or token reaches the sandbox), and the judgement of the area bits
- * (`recordHeldBack`: `HeldBackFailed`, `AttemptsExhausted`, or the
- * `Held-back:` trailer it keeps for the landing). Only answers whose run
- * says `sealed` take this step, so a platform without typed visibility runs
- * the same steps it always did.
- *
- * The suite runs in a job of its own, with no public lane beside it: the
- * public lanes passed in their own jobs, and answer code run again beside
- * the sealed files could carry bits about them that no attempt counts. Only
- * the area bits leave the step: no lane, no log, no duration.
- *
- * A held-back result carries over to a later check of the same request only
- * when the answer's `PatchId` and the pinned suite are unchanged:
- * a main that moved under a passing answer re-runs its public lanes
- * on the new merged tree, never its sealed suite.
- */
+// The layer's files are read by the platform, so no layer route or token reaches the
+// sandbox.
 import { CheckAt, CheckRunner } from "@repo/checks/check-runner";
 import { patchId } from "@repo/git/patch-id";
 import { runBlockOf } from "@repo/project/answer-runs";
@@ -36,34 +16,23 @@ import { Effect, Option, Schema } from "effect";
 
 import { StepRunner } from "../step.ts";
 
-/** What the held-back step came to, kept as its value: area bits and roots only. */
 export const HeldBackRun = Schema.TaggedUnion({
-  /** The Checker could not run the suite: tried again later, never counted. */
   Blocked: { attempt: Schema.Int },
-  /** The suite judged the tree: its area bits, what they earned, and what they judged. */
   Judged: {
     patchId: PatchId,
     refusals: Schema.Array(Refusal),
     results: Schema.Array(HeldBackResult),
     suite: SuiteRoot,
   },
-  /** Nothing sealed judges the answer, or it no longer waits on checks of this tree. */
   Unsealed: {},
 });
 
 export type HeldBackRun = typeof HeldBackRun.Type;
 
-/** A held-back run that judged a tree. */
 export type Judged = Extract<HeldBackRun, { readonly _tag: "Judged" }>;
 
-/** A held-back step with nothing to judge. */
 export const unsealed: HeldBackRun = HeldBackRun.cases.Unsealed.make({});
 
-/**
- * The area bits of the sealed suite on `tree`: the earlier run's when it
- * judged the same patch by the same suite, else a fresh run in a job of
- * the suite alone.
- */
 const areaBits = (input: {
   readonly earlier: Option.Option<Judged>;
   readonly job: HeldBackJob;
@@ -96,13 +65,6 @@ const areaBits = (input: {
     }
   );
 
-/**
- * The sealed suite's run for one checked tree, as a durable step named for
- * the attempt: a replay reads its record back, and the project counts the
- * attempt once per tree whatever runs again (principle 8). `earlier` is
- * the last run this request's Workflow judged, which carries over to an
- * unchanged patch under an unchanged suite.
- */
 export const heldBack = (
   params: { readonly project: ProjectName; readonly requestId: RequestId },
   tree: TreeSha,

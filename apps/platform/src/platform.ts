@@ -24,25 +24,17 @@ import { sessionTable } from "./sessions/table.ts";
 import { HostInfo, Stage } from "./surfaces.ts";
 import type { Services } from "./surfaces.ts";
 
-/**
- * A binding the runtime hands the Worker: present, and an object. The
- * runtime vouches for the rest of it; the Worker never inspects one further.
- */
 const binding = <T>(kind: string) =>
   Schema.declare((input: unknown): input is T => Predicate.isObject(input), {
     expected: kind,
   });
 
-/** A bearer token: long enough that guessing one is hopeless. */
 const Token = Schema.String.check(Schema.isMinLength(32));
 
-/** A 256-bit key, written as 64 hex characters. */
 const HexKey = Schema.String.check(Schema.isPattern(/^[0-9a-f]{64}$/iu));
 
-/**
- * Named sessions: token → handle. A record with a refined key would drop a
- * short token silently, so the whole table is checked instead.
- */
+// A record with a refined key would drop a short token silently, so the whole
+// table is checked instead.
 const SessionTable = Schema.Record(Schema.String, Handle).check(
   Schema.makeFilter((table) =>
     Object.keys(table).every((token) => token.length >= 32)
@@ -51,39 +43,20 @@ const SessionTable = Schema.Record(Schema.String, Handle).check(
   )
 );
 
-/** A stage's name: `local`, never deployed; `dev-<user>`; `demo`. */
 export const StageName = Schema.String.check(
   Schema.isPattern(/^(?:local|demo|dev-[a-z0-9]+(?:-[a-z0-9]+)*)$/u)
 );
 
-/** Which Lander lands answers: the sandbox's container, or isomorphic-git here. */
 export const LanderAdapter = Schema.Literals(["container", "isogit"]);
 
-/**
- * The bindings `wrangler.jsonc` declares, at the top level and in every
- * stage block (`test/bindings.test.ts` holds the two sets equal). Each is
- * typed by the generated `Env`, so a binding removed from `wrangler.jsonc`
- * fails `typecheck` here and wherever it is used.
- */
 export const PlatformBindings = Schema.Struct({
-  /** Workers AI, which drafts asks (`DRAFT_MODEL` names the model). */
   AI: binding<Env["AI"]>("Workers AI"),
   ANSWER: binding<Env["ANSWER"]>("the Answer Workflow"),
   ARTIFACTS: binding<Env["ARTIFACTS"]>("an Artifacts namespace"),
-  /**
-   * The private namespace that holds every project's layer repos. Only
-   * this Worker binds it: the Workers that serve public pages
-   * bind no namespace at all (principle 7).
-   */
   ARTIFACTS_PRIVATE: binding<Env["ARTIFACTS_PRIVATE"]>(
     "the private Artifacts namespace"
   ),
   CLAIM_LIMIT: binding<Env["CLAIM_LIMIT"]>("a rate limit"),
-  /**
-   * Code history (why, a path's log), kept by immutable ids so every
-   * isolate reads what one computed. Only this Worker binds it: the web
-   * reads code through the platform.
-   */
   CODE_CACHE: binding<Env["CODE_CACHE"]>("an R2 bucket"),
   DRAFT_LIMIT: binding<Env["DRAFT_LIMIT"]>("a rate limit"),
   EVIDENCE: binding<Env["EVIDENCE"]>("an R2 bucket"),
@@ -93,71 +66,41 @@ export const PlatformBindings = Schema.Struct({
   ON_PUSH: binding<Env["ON_PUSH"]>("the OnPush Workflow"),
   PROJECT: binding<Env["PROJECT"]>("the Project Durable Object"),
   PROPOSAL_LIMIT: binding<Env["PROPOSAL_LIMIT"]>("a rate limit"),
-  /** The CLI's releases, served at `/install.sh` and `/releases/*`. */
   RELEASES: binding<Env["RELEASES"]>("an R2 bucket"),
-  /**
-   * A service binding to the sandbox Worker's default entrypoint. The
-   * generated `Env` types it as a plain `Fetcher`, since this app's types
-   * may not name another app's entrypoint, so its methods are declared here
-   * by their wire (`SandboxBinding`, the shape a type test holds the
-   * entrypoint to).
-   */
+  // The generated `Env` types this as a plain `Fetcher` (an app's types may not name
+  // another app's entrypoint), so its methods are declared here by their wire.
   SANDBOX: binding<Env["SANDBOX"] & SandboxBinding>("the sandbox Worker"),
   SIGN_IN_LIMIT: binding<Env["SIGN_IN_LIMIT"]>("a rate limit"),
 });
 
-/** The vars `wrangler.jsonc` sets in every block. */
 export const PlatformVars = Schema.Struct({
-  /** The Workers AI model that drafts asks: `@cf/moonshotai/kimi-k2.7-code`. */
   DRAFT_MODEL: Schema.NonEmptyString,
   LANDER_ADAPTER: LanderAdapter.pipe(
     Schema.withDecodingDefaultKey(Effect.succeed("container"))
   ),
   OPERATOR_HANDLE: Handle,
-  /** The web app's own URL, which `/` links to; a stage without one links nowhere. */
   PUBLIC_WEB_URL: Schema.optionalKey(
     Schema.String.check(Schema.isPattern(/^https?:\/\//u))
   ),
   STAGE: StageName,
 });
 
-/**
- * The secrets `.env.schema` declares, each redacted but Google's client id.
- * Every one but `SESSION_TOKENS` and Google's pair is required
- * (`wrangler.jsonc`'s `secrets.required`): sign-in's cookie key and pepper
- * too, since accounts are the platform's own, and the master key.
- */
 export const PlatformSecrets = Schema.Struct({
-  /** Seals a sign-in in progress into its form (`auth/state.ts`). */
   COOKIE_KEY: Schema.RedactedFromValue(Token),
-  /**
-   * Google sign-in's OAuth client (human step H4), set with
-   * `GOOGLE_CLIENT_SECRET` or not at all. Not secret: Google shows it to
-   * everyone who signs in.
-   */
+  // Not secret: Google shows it to everyone who signs in.
   GOOGLE_CLIENT_ID: Schema.optionalKey(Schema.NonEmptyString),
-  /** The secret of Google sign-in's OAuth client, set with its id. */
   GOOGLE_CLIENT_SECRET: Schema.optionalKey(
     Schema.RedactedFromValue(Schema.NonEmptyString)
   ),
-  /**
-   * Wraps the data key of every write-only env value. Losing it
-   * loses every value stored under it.
-   */
+  // Wraps the data key of every write-only env value: losing it loses every value.
   MASTER_KEY: Schema.RedactedFromValue(HexKey),
   OPERATOR_TOKEN: Schema.RedactedFromValue(Token),
-  /** HMAC'd with every password before PBKDF2 (`auth/password.ts`). */
   PASSWORD_PEPPER: Schema.RedactedFromValue(Token),
-  /** Named sessions beside accounts: JSON, token → handle. */
   SESSION_TOKENS: Schema.optionalKey(
     Schema.RedactedFromValue(Schema.fromJsonString(SessionTable))
   ),
 });
 
-/**
- * Google's client id and secret come as a pair: one without the other
- * names the missing key, so Google sign-in is either whole or off.
- */
 const googlePair = Schema.makeFilter(
   (env: {
     readonly GOOGLE_CLIENT_ID?: string;
@@ -178,10 +121,6 @@ const googlePair = Schema.makeFilter(
   }
 );
 
-/**
- * Everything the platform reads from the Worker's env, decoded once
- * (principle 2): its bindings, its vars and its secrets.
- */
 export const PlatformEnv = Schema.Struct({
   ...PlatformBindings.fields,
   ...PlatformVars.fields,
@@ -190,18 +129,12 @@ export const PlatformEnv = Schema.Struct({
 
 export type PlatformConfig = typeof PlatformEnv.Type;
 
-/**
- * The Worker's env cannot run the platform. It names the keys only: a value
- * that failed to decode may be a secret.
- */
+// Names the keys only: a value that failed to decode may be a secret.
 export class InvalidEnv extends Schema.TaggedError<InvalidEnv>()("InvalidEnv", {
   keys: Schema.Array(Schema.String),
 }) {}
 
-/**
- * The top-level key of every issue, once each: a deeper path (a session
- * table's token) may itself be secret.
- */
+// Top-level keys only: a deeper path (a session table's token) may itself be secret.
 const failingKeys = (issue: SchemaIssue.Issue) =>
   Array.sort(
     Array.dedupe(
@@ -212,18 +145,11 @@ const failingKeys = (issue: SchemaIssue.Issue) =>
     Order.String
   );
 
-/** The Worker's env, decoded once: every key that fails is named together. */
 export const decodeEnv = (env: Env) =>
   Schema.decodeUnknownEffect(PlatformEnv, { errors: "all" })(env).pipe(
     Effect.mapError(({ issue }) => new InvalidEnv({ keys: failingKeys(issue) }))
   );
 
-/**
- * Who may call, as one `Sessions`: an access token the
- * platform's OAuth server issued names the person who signed in; otherwise
- * the operator's token names the operator, and each named session in
- * `SESSION_TOKENS` its handle (the operator's wins if both name one).
- */
 const sessionsOf = (config: PlatformConfig) =>
   Layer.sync(Sessions, () =>
     firstOf([
@@ -242,15 +168,6 @@ const sessionsOf = (config: PlatformConfig) =>
     ])
   );
 
-/**
- * The surfaces' services over `ports`: every contract's handler, sessions,
- * the CLI's releases (over `RELEASES`), the stage and what `/` says of the
- * host (the web's URL, the drafter's model) from the decoded env,
- * and the ports beside them (git's routes take the same `Projects` and
- * `Upstream` the handlers do). The Worker runs them over
- * `workerPorts(config)`; the core-loop test runs the same composition over
- * its own adapters of the same ports.
- */
 export const platformOn = (
   config: PlatformConfig,
   ports: Layer.Layer<WorkerPorts>
@@ -269,13 +186,8 @@ export const platformOn = (
     )
   ).pipe(Layer.provideMerge(ports));
 
-/**
- * The surfaces' services from the decoded env: every contract's handler,
- * sessions, the stage, and the ports they run on, each over its binding.
- */
 export const platformOf = (config: PlatformConfig): Layer.Layer<Services> =>
   platformOn(config, workerPorts(config));
 
-/** The surfaces' services from the Worker's env, decoded once. */
 export const platform = (env: Env): Layer.Layer<Services, InvalidEnv> =>
   Layer.unwrap(decodeEnv(env).pipe(Effect.map(platformOf)));

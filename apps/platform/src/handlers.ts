@@ -1,24 +1,3 @@
-/**
- * The contracts' handlers: routing, the rate limit and the fan-out, nothing
- * more. A contract that names a project calls
- * that project's `ProjectApi` (its Durable Object, through `Projects`) as
- * the caller `Authenticated` named; the cross-project reads (`listProjects`,
- * `frontPage`, `credits`) come from the front-page projection, each listed
- * project's posture read from its own ledger (`withStandingPosture`);
- * `status` and `today` without a project ask every project the projection
- * lists and merge what each says. `claim`, `proposeAsk` and `flagAsk` spend the
- * caller's rate limit first, so a call past it reaches no project; a
- * proposal with a draft, and `draftAsk`, spend the draft limit too.
- * `evidence` asks the project who may read a lane's log, which it reads
- * from the stage's `EvidenceStore`. The code reads (`listRefs`, `readTree`,
- * `listPaths`, `readFile`, `log`, `showCommit`, `why`) run here, over the
- * Worker's `RepoHost` and the project's canonical repo (`@repo/project/code`),
- * asking the project only for main's landed commit, its landings and forks. `watch` is served by `watch.ts`: live
- * for a caller on the framed `/rpc`, replayed and ended over JSON.
- *
- * Every `remote` a caller gets back is the platform's git URL for the repo,
- * at the origin the caller reached the platform by: never a storage URL.
- */
 import { RepoHost } from "@repo/artifacts/repo-host";
 import { EvidenceStore, LogRef } from "@repo/checks/evidence-store";
 import {
@@ -55,20 +34,14 @@ import type { Rpc, RpcGroup } from "effect/rpc";
 import { RateLimits } from "./rate-limits.ts";
 import { servedFramed, watchHandler } from "./watch.ts";
 
-/** How many commits a page of `log` holds when the caller names no limit. */
 const LOG_PAGE = 30;
 
-/** How many projects a call without one asks at once. */
 const FAN_OUT = 8;
 
-/** The caller, as the `Authenticated` server side named them. */
 const caller = Effect.service(CurrentPrincipal);
 
-/**
- * The caller of a contract only a person may call. `Authenticated` lets an
- * anonymous call reach only a `public` contract, so anyone else here is a
- * defect in the server side, never a caller to serve.
- */
+// `Authenticated` lets an anonymous call reach only a `public` contract, so anyone
+// else here is a defect in the server side.
 const person = Effect.flatMap(caller, (principal) =>
   Principal.match(principal, {
     Anonymous: () =>
@@ -77,17 +50,11 @@ const person = Effect.flatMap(caller, (principal) =>
   })
 );
 
-/** The incoming request's origin: its URL's when whole, else from its host. */
 const originOf = (request: HttpServerRequest.HttpServerRequest) =>
   URL.canParse(request.originalUrl)
     ? Option.some(new URL(request.originalUrl).origin)
     : Option.map(HttpServerRequest.toURL(request), ({ origin }) => origin);
 
-/**
- * Where the caller reached the platform, which is where its git lives: the
- * incoming request's origin, or the platform's own URL for a call that came
- * from no request.
- */
 const gateway = Effect.gen(function* () {
   const request = yield* Effect.serviceOption(
     HttpServerRequest.HttpServerRequest
@@ -99,10 +66,6 @@ const gateway = Effect.gen(function* () {
   });
 });
 
-/**
- * A repo's git URL at the gateway the caller came through: a project by its
- * name, a fork by its project's name and its own parts (ADR 0032).
- */
 const remoteOf = (repo: RepoName | ProjectName) =>
   Effect.map(
     gateway,
@@ -110,17 +73,12 @@ const remoteOf = (repo: RepoName | ProjectName) =>
       `${origin}/${repo.includes("/") ? repo : Option.getOrElse(addressOfRepo(RepoName.make(repo)), () => repo)}.git`
   );
 
-/** A claim, with its fork's URL at the caller's gateway. */
 const atGateway = (claim: ClaimView) =>
   Effect.map(remoteOf(claim.fork), (remote): ClaimView => ({
     ...claim,
     remote,
   }));
 
-/**
- * The caller's claims and answers, each claim at the caller's gateway, under
- * the caller's own handle (a first login has no claim to read it from).
- */
 const statusAtGateway = (
   who: Person,
   status: {
@@ -134,7 +92,6 @@ const statusAtGateway = (
     handle: who.handle,
   }));
 
-/** Decisions across projects: soonest to expire first, then oldest, then by project and id. */
 const byExpiry: Order.Order<Decision> = Order.combineAll([
   Order.mapInput(DateTime.Order, ({ expiresAt }: Decision) => expiresAt),
   Order.mapInput(DateTime.Order, ({ openedAt }: Decision) => openedAt),
@@ -142,11 +99,6 @@ const byExpiry: Order.Order<Decision> = Order.combineAll([
   Order.mapInput(Order.String, ({ id }: Decision) => id),
 ]);
 
-/**
- * One decider's Today across the projects they decide in: each project's
- * budget added up, its decisions in one order of expiry, and the rest
- * side by side. A person who decides in none has no Today.
- */
 const acrossProjects = (
   decider: Person,
   pages: readonly Today[]
@@ -177,10 +129,6 @@ const acrossProjects = (
     : Effect.fail(new NotDecider({}));
 };
 
-/**
- * Every contract, served by the project it names or by the projection. A
- * missing contract is a type error here (`Contracts.toLayer`).
- */
 export const Handlers: Layer.Layer<
   Rpc.ToHandler<RpcGroup.Rpcs<typeof Contracts>>,
   never,
@@ -193,13 +141,11 @@ export const Handlers: Layer.Layer<
     const evidence = yield* EvidenceStore;
     const host = yield* RepoHost;
 
-    /** `call` on the project named `project`; one never made is `UnknownProject`. */
     const on = <A, E>(
       project: ProjectName,
       call: (api: ProjectApi) => Effect.Effect<A, E>
     ) => Effect.flatMap(projects.get(project), call);
 
-    /** A code read of `project`'s canonical repo, over the Worker's `RepoHost`. */
     const code = <A, E>(
       project: ProjectName,
       read: (of: CodeProject) => Effect.Effect<A, E, RepoHost>
@@ -210,11 +156,6 @@ export const Handlers: Layer.Layer<
         )
       );
 
-    /**
-     * `call` on every project the projection lists, in name order. A
-     * project the platform never made adds nothing, and so does one where
-     * `call` finds nothing for the caller; any other failure is the call's.
-     */
     const everywhere = <A, E>(
       call: (api: ProjectApi) => Effect.Effect<Option.Option<A>, E>
     ) =>
@@ -301,7 +242,7 @@ export const Handlers: Layer.Layer<
         Effect.gen(function* () {
           const who = yield* person;
 
-          // A project an earlier call made but could not start is this
+          // A project an earlier call made but could not start is this call's to start;
           // call's to start; one already started refuses it itself.
           const api = yield* projects
             .create(project)
@@ -356,8 +297,7 @@ export const Handlers: Layer.Layer<
         Effect.gen(function* () {
           const who = yield* person;
 
-          // A draft spends the draft limit (model calls and Checker runs)
-          // first, then the proposal limit, as any proposal does.
+          // A draft spends the draft limit first, then the proposal limit.
           if (input.draft === true) {
             yield* rateLimits.check("draft", who.handle);
           }
@@ -422,7 +362,6 @@ export const Handlers: Layer.Layer<
             return yield* on(project, (api) => api.today(who));
           }
 
-          // A project the caller decides nothing in has no page for them.
           const pages = yield* everywhere((api) =>
             api.today(who).pipe(
               Effect.map(Option.some),
@@ -440,7 +379,6 @@ export const Handlers: Layer.Layer<
         Effect.flatMap(person, (who) =>
           on(project, (api) => api.vouch(who, input))
         ),
-      // Live over a framed `/rpc`; replayed and ended over a buffered one.
       watch: (payload) =>
         Stream.unwrap(
           Effect.map(servedFramed, (live) => watchHandler(payload, { live }))

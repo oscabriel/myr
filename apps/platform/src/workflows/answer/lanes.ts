@@ -1,23 +1,5 @@
-/**
- * The answer's lanes on its merged tree: the
- * cheap stage (the static lanes) and then the checks (the ask's own check
- * and every other project lane), always on the exact tree the merge made.
- * A lane whose checker never got going gets one fresh run; every lane that
- * did not pass keeps its log through `EvidenceStore`, and only the name it
- * is kept under travels on, unless the project's scan finds a stored
- * write-only value in it: that log is never kept, and its lane says
- * `withheld`. The gate classifies each failure against the same
- * lane on main (`gate.classifyFailure`).
- *
- * The merged tree is checked in the answer's fork, where `Lander.merge`
- * keeps it (under `${Brand.refsPrefix}merge/<tree>`), so a merge needs no
- * write token on the canonical repo; main is checked in the canonical repo.
- *
- * The cheap stage also counts the policy's ratchets on the merged tree, one
- * count lane per command (`measure`); the project judges the counts against
- * its baselines when the checks report. A `lintToZero` ask's own lane is a
- * count too: green at zero in its territory, whatever its lint exits with.
- */
+// The merged tree is checked in the answer's fork, where `Lander.merge` keeps it, so a
+// merge needs no write token on the canonical repo.
 import {
   CheckAt,
   CheckLane,
@@ -53,84 +35,55 @@ import { ChecksFailed } from "@repo/protocol/refusal";
 import type { Flake, StaleBase, VerifierBlocked } from "@repo/protocol/refusal";
 import { Array, Effect, Option, Order, Result, Schema } from "effect";
 
-/**
- * The lanes the cheap stage runs before the costlier checks: the static
- * ones, under the names the run block finder gives them (`checks/finder`).
- * The ratchets' counts run beside them (`countRatchets`).
- */
 export const cheapLanes = ["format", "lint", "types"] as const;
 
-/** Which of the answer's lanes a stage runs. */
 export type Stage = "cheap" | "checks";
 
 const isCheap = (lane: LaneName) =>
   cheapLanes.some((name): boolean => name === lane);
 
-/** The lanes of `run` that `stage` runs; the ask's own check is never cheap. */
 export const lanesFor = (run: AnswerRun, stage: Stage): readonly CheckLane[] =>
   run.lanes.filter(
     ({ lane }) =>
       (stage === "cheap") === (isCheap(lane) && lane !== run.askLane)
   );
 
-/** What the lanes are judged against: the answer's request, its merge and its main. */
 export const Checked = Schema.Struct({
-  /** The lane the ask's own check reports as: red on main by design. */
   askLane: Schema.optionalKey(LaneName),
   attempt: Schema.Int,
   base: CommitSha,
-  /** Every path the answer changed against its base. */
   changed: Schema.Array(RepoPath),
-  /** The env every check job of the answer carries: placeholders, never a value. */
   env: Schema.optionalKey(UnlandedRunEnv),
   finish: AskKind.fields.finish,
-  /**
-   * The answer's fork, which holds the merged tree: the Lander keeps it there
-   * under `${Brand.refsPrefix}merge/<tree>` for the Checker to fetch.
-   */
   fork: RepoName,
   main: LandedSha,
   project: ProjectName,
-  /** The canonical repo, which holds main. */
   repo: RepoName,
   requestId: RequestId,
-  /** The project's run block, which every check job carries; absent without a policy. */
   run: Schema.optionalKey(RunBlock),
-  /** Whether a held-back suite judges the answer once its checks pass. */
   sealed: Schema.optionalKey(Schema.Boolean),
   tree: TreeSha,
 });
 
 export type Checked = typeof Checked.Type;
 
-/** One lane on the merged tree, as the gate classifies it. */
 export const LaneRun = Schema.Struct({
-  /** The lane as the project runs it: what runs again on main. */
   check: CheckLane,
-  /** The repo files outside tests its failure points at, when its log names any. */
   failingPaths: Schema.Array(RepoPath),
-  /** How its first run on the merged tree ended. */
   first: LaneOutcome,
-  /** How its fresh run ended, when the first never got going. */
   rerun: Schema.optionalKey(LaneOutcome),
-  /** The result that stands, with where its log is kept when it did not pass at first. */
   result: LaneResult,
 });
 
 export type LaneRun = typeof LaneRun.Type;
 
-/** What one stage's run on the merged tree came to. */
 export const StageRun = Schema.TaggedUnion({
-  /** The checker could not run at all: the project tries again later. */
   Blocked: { attempt: Schema.Int },
-  /** The answer no longer waits on these checks: another run moved it on. */
   Moved: {},
   Ran: {
     checked: Checked,
-    /** The cheap stage's: each ratchet's count on the merged tree, per territory. */
     counts: Schema.optionalKey(Schema.Array(MeasuredCount)),
     lanes: Schema.Array(LaneRun),
-    /** The cheap stage's: a ratchet whose command printed no count the platform can read. */
     uncounted: Schema.optionalKey(RatchetName),
   },
 });
@@ -139,23 +92,13 @@ export type StageRun = typeof StageRun.Type;
 
 type Ran = Extract<StageRun, { readonly _tag: "Ran" }>;
 
-/**
- * A path with a line, as a stack frame or a compiler prints one:
- * `src/lex.ts:3:7`. Its extension starts with a letter, so an address and
- * its port (`127.0.0.1:8080`) is no file.
- */
+// The extension starts with a letter, so an address and port (`127.0.0.1:8080`) is no file.
 const LOCATION =
   /(?<![\w./@+-])(?<path>(?:[\w@+-][\w.@+-]*\/)*[\w@+-][\w.@+-]*\.[A-Za-z][A-Za-z0-9]*):\d+/gu;
 
-/** A file whose failure says nothing about where the code broke: a test itself. */
 const TEST_FILE =
   /(?:^|\/)(?:tests?|__tests__)\/|\.(?:test|spec)\.[A-Za-z0-9]+$/u;
 
-/**
- * The repo files a lane's failure points at: every relative `path:line` its
- * output names, tests left out (a test failing in its own file says
- * nothing about which code broke). Absolute paths are not the repo's.
- */
 export const failingPathsOf = (output: string): readonly RepoPath[] =>
   Array.sort(
     Array.dedupe(
@@ -168,11 +111,6 @@ export const failingPathsOf = (output: string): readonly RepoPath[] =>
     Order.String
   ).map((path) => RepoPath.make(path));
 
-/**
- * A lane's log, as the platform keeps it. The Checker's `CheckRun` carries
- * no raw output yet, so the log is what the run said of the lane: its end,
- * its command, and its failure's signature.
- */
 export const laneLog = (
   result: LaneResult,
   evidence: Option.Option<LaneEvidence>
@@ -192,17 +130,11 @@ export const laneLog = (
     ),
   ].join("\n");
 
-/**
- * Where a lane's log is said to be when it was not kept because it held a
- * stored write-only value: the lane's refusal stands, its
- * log is never put in the evidence store, and nothing names the item.
- */
 export const { withheld } = ChecksFailed;
 
 const isTrouble = (result: LaneOutcome) =>
   result === "flaked" || result === "blocked";
 
-/** Each lane's result and evidence in a run, by lane. */
 interface ByLane {
   readonly evidence: ReadonlyMap<LaneName, LaneEvidence>;
   readonly results: ReadonlyMap<LaneName, LaneResult>;
@@ -215,16 +147,11 @@ const byLane = (run: CheckRun): ByLane => ({
 
 const noRun: ByLane = { evidence: new Map(), results: new Map() };
 
-/** One lane as a stage's runs left it. */
 interface Standing {
   readonly check: CheckLane;
-  /** Its first run on the merged tree; `blocked` when that run left it out. */
   readonly first: LaneResult;
-  /** Its fresh run, when it had one. */
   readonly again: Option.Option<LaneResult>;
-  /** The result that stands: the fresh run's, else the first. */
   readonly stands: LaneResult;
-  /** What the run that stands said of it, when it did not pass. */
   readonly said: Option.Option<LaneEvidence>;
 }
 
@@ -253,7 +180,6 @@ const standingOf = (
   };
 };
 
-/** A lane as the gate classifies it, before its log is kept. */
 const laneRunOf = (checked: Checked, standing: Standing): LaneRun => {
   const signature = Option.getOrElse(
     Option.flatMap(standing.said, ({ signature: said }) =>
@@ -276,7 +202,6 @@ const laneRunOf = (checked: Checked, standing: Standing): LaneRun => {
   });
 };
 
-/** What the answer's state says the lanes are judged against, when it waits on checks of `tree`. */
 const checkedOf = (run: AnswerRun, tree: TreeSha): Option.Option<Checked> => {
   const { state } = run;
 
@@ -312,7 +237,6 @@ const checkedOf = (run: AnswerRun, tree: TreeSha): Option.Option<Checked> => {
   );
 };
 
-/** A job's run with one lane's result, and its evidence, put in place of what it was. */
 const withLane = (
   ran: CheckRun,
   result: LaneResult,
@@ -326,13 +250,7 @@ const withLane = (
   lanes: ran.lanes.map((each) => (each.lane === result.lane ? result : each)),
 });
 
-/**
- * The run with a `lintToZero` ask's lane as its count decides it: passed
- * at zero in its territory, failed above it (its signature says how many,
- * so two runs compare), and a load error when its lint printed no count. A
- * lint the Checker never got going stays as it ran, for its fresh run; its
- * exit code says nothing, since a lint with findings anywhere exits 1.
- */
+// A lint with findings anywhere exits 1, so its exit code says nothing here.
 const countedAskLane = (
   run: AnswerRun,
   ran: CheckRun
@@ -384,17 +302,11 @@ const countedAskLane = (
   );
 };
 
-/** What the cheap stage counted: each ratchet per territory, or the one whose count it could not read. */
 interface Counted {
   readonly counts: readonly MeasuredCount[];
   readonly uncounted: Option.Option<RatchetName>;
 }
 
-/**
- * The policy's ratchets counted on the merged tree: one count lane per
- * command (named for the first ratchet that runs it), each output read for
- * every ratchet it serves and split by the project's modules (`measure`).
- */
 const countRatchets = <E, R>(
   run: AnswerRun,
   job: (lanes: readonly CheckLane[]) => Effect.Effect<CheckRun, E, R>
@@ -435,21 +347,12 @@ const countRatchets = <E, R>(
     });
   });
 
-/** What a stage run says of the counts: them, and the ratchet whose count it could not read. */
 const countFields = (counted: Counted): Pick<Ran, "counts" | "uncounted"> =>
   Option.match(counted.uncounted, {
     onNone: () => ({ counts: counted.counts }),
     onSome: (uncounted) => ({ counts: counted.counts, uncounted }),
   });
 
-/**
- * One stage's lanes on the merged tree `tree`: run, a troubled lane run
- * once more, and each lane that did not pass at first logged, unless its
- * log holds a stored value. The log's name counts the answer's merges
- * (`#1` on its first main), so a replayed step keeps its log under the
- * same name and a re-merge gets a new one. The cheap stage counts the
- * ratchets too.
- */
 export const runStage = (
   run: AnswerRun,
   tree: TreeSha,
@@ -463,8 +366,8 @@ export const runStage = (
         const evidence = yield* EvidenceStore;
         const lanes = lanesFor(run, stage);
 
-        // The project scans each log for its stored values before it leaves
-        // the run, where the values are; never the sandbox.
+        // The project scans each log for its stored values here, where the values are;
+        // never in the sandbox.
         const api = yield* Projects.use((projects) =>
           projects.get(checked.project)
         ).pipe(Effect.orDie);
@@ -579,7 +482,6 @@ export const runStage = (
       ),
   });
 
-/** The lanes of a stage's run whose failure the gate classifies against main. */
 export const toCompareOnMain = (ran: Ran): readonly CheckLane[] =>
   ran.lanes
     .filter(
@@ -588,11 +490,6 @@ export const toCompareOnMain = (ran: Ran): readonly CheckLane[] =>
     )
     .map(({ check }) => check);
 
-/**
- * Each failing lane, classified by the gate: against the same lane on main
- * (`onMain`; the ask's own check counts as green there, since it is red on
- * main by design), the fresh run, and the paths the answer changed.
- */
 export const refusalsOf = (
   ran: Ran,
   onMain: ReadonlyMap<LaneName, LaneOutcome>
@@ -625,7 +522,6 @@ export const refusalsOf = (
   );
 };
 
-/** A lane's end on main: what the gate compares a failure on the merged tree with. */
 export const laneOnMain = (
   checked: Checked,
   lane: CheckLane

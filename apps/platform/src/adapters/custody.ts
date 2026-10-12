@@ -1,43 +1,3 @@
-/**
- * The `Custody` port (`@repo/git/custody`) for one push, by who pushes and
- * which repo the name says it is (ADR 0004).
- *
- * `admit` is stage 0, before anything reaches the upstream: what the pusher
- * may move, from the project's own record through `ProjectApi`. A canonical
- * repo takes no push (`DirectPush`) but its initializer's first
- * (`firstPusher`); a claim's fork takes its claimant's pushes while the claim
- * is live, and a decider's commits on top when they finish its answer; a
- * working fork takes its owner's. A fork takes branches only: a push of its
- * notes, a tag or the platform's own refs is `DirectPush`, whoever makes it,
- * and refuses the whole push. The platform writes its notes and merge refs
- * straight to the store (`RepoHost.push`, the Lander), never through the
- * gateway; no one writes a fork's tags.
- * `ProjectApi` has no read of the push facts the gate's parse stage takes
- * (the policy, the ask, the claim), so `admit` asks the claimant's own
- * `status` and leaves the full parse to `review`, where `recordPush` runs it.
- *
- * `custodyFor` reads what `admit` needs before the gateway starts, and
- * `admit` answers at once. The gateway makes the push's upstream body as
- * soon as it has read the command list, before it asks `admit`, and that
- * body locks the request's the moment the fiber yields: an `admit` that
- * waits on anything and then refuses finds the body locked, and the push
- * fails with a 500 (better: `@repo/git/gateway` reads that body only once
- * the push is admitted).
- *
- * `review` runs after the upstream took the push. A first push becomes the
- * project's landed SHA. A claimant's push to their fork is reported to the
- * project (`recordPush`: liveness, then stages 0–1, every stage-1 refusal at
- * once); a clean one is offered as the answer (`submitAnswer`, the same path
- * as `<cli> submit`) and the pusher reads that it is being checked. The
- * gate's later stages never run inside the push.
- *
- * A harness that pushes names itself in the basic-auth username its
- * credential helper gives (`audit;harness=pi&model=…`, `@repo/protocol/audit`).
- * Custody logs it with the push and reports it with a claimant's push, so
- * the answer's landing discloses it as `Assisted-by:`. It is
- * audit metadata only: who pushes is the token's person, and the username is
- * never identity, credit or a score.
- */
 import type { RepoName } from "@repo/artifacts/repo-host";
 import { Custody } from "@repo/git/custody";
 import type { Command } from "@repo/git/custody";
@@ -56,42 +16,27 @@ import { Array, Effect, Option, Result } from "effect";
 import type { LayerTarget } from "../layer-gate.ts";
 import { RepoKind } from "../repo-names.ts";
 
-/** The branch every repo the platform makes keeps its work on. */
 const mainRef = "refs/heads/main";
 
-/** Says a line to the pusher, as a `remote:` line of git's output. */
 export type Notice = (line: string) => Effect.Effect<void>;
 
-/**
- * The request a push to a claim's fork answers with: it names the head and
- * the pusher, so two people pushing one commit make two requests. A request
- * id holds 64 characters, so the head comes first and is never cut: a long
- * handle is, and each new head is still a new request.
- */
+// A request id holds 64 characters, so the head comes first and is never cut.
 export const pushRequestId = (pusher: Handle, head: CommitSha) =>
   RequestId.make(`push-${head}-${pusher.toLowerCase()}`.slice(0, 64));
 
-/** The push event a push reports: one per (repo, head), so a replay is acted on once. */
 const pushEventId = (repo: RepoName, head: CommitSha) => `push-${repo}-${head}`;
 
-/** Every ref in the push turned away: main moves only by a landing. */
 const directPushes = (commands: readonly Command[]) =>
   commands.map(({ ref }) => new DirectPush({ ref }));
 
-/** Where a person's work goes on a fork: its branches. */
 const branchPrefix = "refs/heads/";
 
-/**
- * A fork takes branches only: every other ref, created, moved or deleted,
- * is the platform's (its verdict notes, the Lander's merge refs) or no one's
- * (a tag), so each is a direct push, whoever pushes it.
- */
+// Every ref but a branch is the platform's (notes, merge refs) or no one's (tags).
 const branchesOnly = (commands: readonly Command[]): readonly Refusal[] =>
   commands.flatMap(({ ref }) =>
     ref.startsWith(branchPrefix) ? [] : [new DirectPush({ ref })]
   );
 
-/** Where a push moves `main`, if it moves it to a commit; a deletion moves it nowhere. */
 const mainTip = (commands: readonly Command[]) =>
   Option.flatMap(
     Array.findFirst(commands, ({ ref }) => ref === mainRef),
@@ -99,7 +44,6 @@ const mainTip = (commands: readonly Command[]) =>
       Option.map(command.to, (head) => ({ from: command.from, head }))
   );
 
-/** Runs `judge` against the project; a project never made refuses the push. */
 const against = (
   projects: Projects["Service"],
   project: ProjectName,
@@ -110,7 +54,6 @@ const against = (
     Effect.catchTag("UnknownProject", (refused) => Effect.succeed([refused]))
   );
 
-/** Custody whose `admit` decides at once, from what was read before the push. */
 const custodyOf = (
   admit: (commands: readonly Command[]) => readonly Refusal[],
   review: Custody["Service"]["review"]
@@ -120,11 +63,7 @@ const custodyOf = (
     review,
   });
 
-/**
- * A project's canonical repo: only its initializer's first push reaches it,
- * as the project says (`firstPusher`). A project never made has no first
- * pusher, so every push there is a direct push: custody fails closed.
- */
+// A project never made has no first pusher: custody fails closed.
 const canonical = (
   projects: Projects["Service"],
   project: ProjectName,
@@ -164,17 +103,11 @@ const canonical = (
     );
   });
 
-/** The claim `person` has on `ask`, as their own `status` shows it. */
 const claimOn = (api: ProjectApi, person: Person, ask: AskId) =>
   Effect.map(api.status(person), ({ claims }) =>
     Array.findFirst(claims, (claim) => claim.ask === ask)
   );
 
-/**
- * Whether the claimant may push to their claim's fork: a live or warned
- * claim lets them; a lapsed one is `ClaimLapsed`; none, or one released or
- * answered, is `NotClaimed`.
- */
 const holds = (api: ProjectApi, person: Person, ask: AskId) =>
   Effect.map(claimOn(api, person, ask), (claim) =>
     Option.match(claim, {
@@ -191,11 +124,6 @@ const holds = (api: ProjectApi, person: Person, ask: AskId) =>
     })
   );
 
-/**
- * The claimant's push, which the fork already took: reported to the
- * project with the harness it came through, then, if stages 0–1 have
- * nothing to say, offered as the answer.
- */
 const offer = (input: {
   readonly api: ProjectApi;
   readonly ask: AskId;
@@ -251,7 +179,6 @@ const offer = (input: {
     });
   });
 
-/** A claim's fork: its claimant while the claim is live, or a decider finishing its answer. */
 const claimFork = (
   projects: Projects["Service"],
   fork: Extract<RepoKind, { readonly _tag: "ClaimFork" }>,
@@ -297,7 +224,6 @@ const claimFork = (
     );
   });
 
-/** What a push's log lines and span carry: who pushes, to which kind of repo, through which harness. */
 type PushAnnotations = HarnessAudit & {
   readonly pusher: string;
   readonly target: RepoKind["_tag"];
@@ -313,11 +239,7 @@ const annotationsOf = (
   target: kind._tag,
 });
 
-/**
- * `custody` with every log line it writes annotated, and its review in a
- * span with the same attributes. `admit` stays synchronous: the gateway's
- * body locks the moment the fiber yields.
- */
+// `admit` stays synchronous: the gateway's body locks the moment the fiber yields.
 const annotated = (custody: Custody["Service"], annotations: PushAnnotations) =>
   Custody.of({
     admit: (repo, commands) =>
@@ -331,22 +253,13 @@ const annotated = (custody: Custody["Service"], annotations: PushAnnotations) =>
         ),
   });
 
-/** Custody of a person's own working fork: every branch push as it comes. */
 const ownBranches = custodyOf(branchesOnly, () => Effect.succeed([]));
 
-/** Custody that takes no push at all: every ref is a direct push. */
 export const refuseAll = custodyOf(directPushes, (_repo, commands) =>
   Effect.succeed(directPushes(commands))
 );
 
-/**
- * Custody of one push by `pusher` to the repo `kind` names. `notice` says a
- * line to the pusher once the push went through: what became of the answer
- * it offered. `audit` is the harness the push came through (`auditOf` in
- * `credential.ts`), if its username named one: logged with the push and
- * reported with a claimant's, never who pushes. Only a signed-in person
- * pushes anywhere.
- */
+// `audit` is metadata only: who pushes is the token's person, never the username.
 export const custodyFor = (
   pusher: Principal,
   kind: RepoKind,
@@ -380,13 +293,7 @@ export const custodyFor = (
     return annotated(custody, annotations);
   });
 
-/**
- * Custody of a push to a layer's repo. The gateway lets only the
- * layer's writers push there (`git.ts`, through `LayerGate`), so every ref
- * goes through; once the upstream took the push, the project hears the
- * head `main` moved to (`recordLayerPush`), which it admits at once or
- * through admission. A project never made takes no layer push.
- */
+// The gateway lets only the layer's writers push here, so every ref goes through.
 export const layerCustodyFor = (
   pusher: Person,
   target: LayerTarget
@@ -408,11 +315,6 @@ export const layerCustodyFor = (
     )
   );
 
-/**
- * A clone or fetch of a layer's repo, for its read log: who
- * read which layer, and the commit they asked for when their request named
- * one. A project never made logs nothing.
- */
 export const layerRead = (
   reader: Person,
   target: LayerTarget,
