@@ -1,10 +1,10 @@
 /**
- * The repo's own docs are the public record: AGENTS.md, GLOSSARY.md, the
- * ADRs and the agent docs point at nothing outside the repo, AGENTS.md says
- * what holds today, every decision has a numbered ADR with a status, and the
+ * The repo's own docs are the public record: AGENTS.md and GLOSSARY.md point
+ * at nothing outside the repo, AGENTS.md says what holds today, and the
  * glossary defines the terms the code is written in. No file the repo would
- * commit cites the build's private plan either, code comments included.
- * File reads and string checks only, beside one `git ls-files`.
+ * commit cites the build's private plan or points into the maintainer's
+ * gitignored working docs either, code comments included. File reads and
+ * string checks only, beside one `git ls-files`.
  */
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
@@ -13,16 +13,31 @@ import { Array, Effect, FileSystem, Option, Order, Path, Schema } from "effect";
 import { committable, readsAtOnce, repoRoot, textOf } from "./root.ts";
 
 /**
+ * A pointer into the maintainer's working docs, which live in a gitignored
+ * `.agents/` folder on the maintainer's machine: the decisions, the demo, the
+ * stage record, the workflow docs, the issue tracker and the folder's README.
+ * A bare `.agents/` is not one: a hosted project's skill lives under it.
+ */
+const PRIVATE_FOLDERS = [
+  ".agents/adr",
+  ".agents/demo",
+  ".agents/ops",
+  ".agents/workflow",
+  ".agents/scratch",
+  ".agents/README",
+] as const;
+
+/**
  * What a pointer to something only the maintainer can open looks like: a
  * home folder, the private research repo or the host that serves it, or the
- * build's own plan folder (gitignored).
+ * maintainer's working docs.
  */
 const PRIVATE = [
   "~/",
   "/home/",
   "wanted-explainer",
   "plans.gneiss.run",
-  ".agents/scratch/build",
+  ...PRIVATE_FOLDERS,
 ] as const;
 
 /**
@@ -53,6 +68,21 @@ const planReferencesIn = (text: string) =>
   PLAN_REFERENCES.flatMap((reference) =>
     reference.test(text) ? [reference.source] : []
   );
+
+/**
+ * Where the private folders may be named: the maintainer's folder itself,
+ * while it is still on disk, and `.gitignore`, which keeps it out.
+ */
+const NAMES_THE_PRIVATE_FOLDERS = (file: string) =>
+  file.startsWith(".agents/") || file === ".gitignore";
+
+/** The private plan references and private folder pointers in `file`'s `text`. */
+const privateIn = (file: string, text: string) => [
+  ...planReferencesIn(text),
+  ...(NAMES_THE_PRIVATE_FOLDERS(file)
+    ? []
+    : PRIVATE_FOLDERS.filter((folder) => text.includes(folder))),
+];
 
 /** Terms the code uses in public names, each of which GLOSSARY.md defines. */
 const TERMS = [
@@ -85,20 +115,6 @@ const read = (relative: string) =>
     return yield* fs.readFileString(path.join(root, relative));
   });
 
-/** The markdown files in a folder, by their paths from the repo root, in name order. */
-const markdownIn = (folder: string) =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
-    const root = yield* repoRoot;
-    const names = yield* fs.readDirectory(path.join(root, folder));
-
-    return Array.sort(
-      names.filter((name) => name.endsWith(".md")),
-      Order.String
-    ).map((name) => `${folder}/${name}`);
-  });
-
 /** Each file with its text. */
 const withText = (paths: readonly string[]) =>
   Effect.forEach(paths, (path) =>
@@ -106,18 +122,7 @@ const withText = (paths: readonly string[]) =>
   );
 
 /** Every public doc this test reads, with its text. */
-const publicDocs = Effect.gen(function* () {
-  return yield* withText([
-    "AGENTS.md",
-    "GLOSSARY.md",
-    ...(yield* markdownIn(".agents/adr")),
-    ...(yield* markdownIn(".agents/workflow")),
-  ]);
-});
-
-/** Frontmatter that opens the file and holds a `status:` line. */
-const STATUS_FRONTMATTER =
-  /^---\n(?:[^\n]*\n)*?status: \S[^\n]*\n(?:[^\n]*\n)*?---\n/u;
+const publicDocs = withText(["AGENTS.md", "GLOSSARY.md"]);
 
 /** The lines of a `## <title>` section, up to the next heading of its level or above. */
 const sectionOf = (text: string, title: string): readonly string[] => {
@@ -155,7 +160,7 @@ describe("the repo's public docs", () => {
   );
 
   it.live(
-    "and no file the repo would commit cites the private plan, comments included",
+    "and no file the repo would commit cites the private plan or points into the private folders, comments included",
     () =>
       Effect.gen(function* () {
         const files = (yield* committable).filter(
@@ -169,7 +174,7 @@ describe("the repo's public docs", () => {
               Option.match(text, {
                 onNone: () => [],
                 onSome: (content) =>
-                  planReferencesIn(content).map(
+                  privateIn(file, content).map(
                     (pattern) => `${file}: ${pattern}`
                   ),
               })
@@ -212,33 +217,6 @@ describe("the repo's public docs", () => {
           )
         ).toStrictEqual(Array.sort(Object.keys(scripts), Order.String));
       }).pipe(Effect.provide(NodeServices.layer))
-  );
-
-  it.live("every ADR opens with a status line", () =>
-    Effect.gen(function* () {
-      const adrs = yield* withText(yield* markdownIn(".agents/adr"));
-
-      expect(
-        adrs.flatMap(({ path, text }) =>
-          STATUS_FRONTMATTER.test(text) ? [] : [path]
-        )
-      ).toStrictEqual([]);
-    }).pipe(Effect.provide(NodeServices.layer))
-  );
-
-  it.live("ADRs are numbered from 0001 with no gap", () =>
-    Effect.gen(function* () {
-      const numbers = (yield* markdownIn(".agents/adr")).map((path) =>
-        path.slice(".agents/adr/".length, ".agents/adr/".length + 5)
-      );
-
-      expect(numbers).toStrictEqual(
-        Array.makeBy(
-          numbers.length,
-          (index) => `${String(index + 1).padStart(4, "0")}-`
-        )
-      );
-    }).pipe(Effect.provide(NodeServices.layer))
   );
 
   it.live("GLOSSARY.md defines each term the code uses", () =>

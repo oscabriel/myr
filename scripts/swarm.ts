@@ -300,7 +300,7 @@ const tokensFor = (handles: readonly Handle[]) =>
     return missing.length === 0
       ? tokens
       : yield* failed(
-          `${SESSIONS_VARIABLE} has no session for ${missing.join(", ")}: add each to the stage's ${SESSIONS_VARIABLE} secret (.agents/ops/stages.md, "Secrets"), and to the env the swarm runs in, then run the swarm again`
+          `${SESSIONS_VARIABLE} has no session for ${missing.join(", ")}: add each to the stage's ${SESSIONS_VARIABLE} secret (in the stage's secrets file, STAGE_SECRETS_FILE), and to the env the swarm runs in, then run the swarm again`
         );
   });
 

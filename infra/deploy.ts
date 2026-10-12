@@ -24,8 +24,7 @@
  *
  * `STAGE_SECRETS_FILE` names a dotenv file outside the repo whose values the
  * platform's deploy carries as its environment, which varlock reads before any
- * `.env` file: a stage's generated secrets, on every stage (`.agents/ops/stages.md`,
- * "Secrets"). Only the items `apps/platform/.env.schema` declares are passed,
+ * `.env` file: a stage's generated secrets, on every stage. Only the items `apps/platform/.env.schema` declares are passed,
  * to that one step, and no value is ever printed.
  *
  * Each step runs with its own folder's `node_modules/.bin` first on `PATH`,

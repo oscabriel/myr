@@ -2,7 +2,7 @@
 
 Myr is a Git platform on Cloudflare. Everything a project ships is public, its contribution process is typed code on main, and a push lands only by passing a typed gate. It is our entry to Cloudflare's "Build the next GitHub" competition, which closes Wed Oct 14, 11:59 PM PDT.
 
-The core loop runs on Cloudflare today: a person claims an ask, pushes an answer through the platform's git gateway, and the platform checks it and lands it, or refuses it: the cheap stages answer in git's own output, and the rest arrive later in `status`, `watch`, MCP and the verdict note. The CLI, MCP and the web all serve the same contracts, and typed visibility (layers, held-back checks, posture, the ledger and write-only env values) plugs in as one cartridge. `README.md` says how to run it, check it and cut it; `.agents/adr/` records each decision and why; `GLOSSARY.md` defines the words.
+The core loop runs on Cloudflare today: a person claims an ask, pushes an answer through the platform's git gateway, and the platform checks it and lands it, or refuses it: the cheap stages answer in git's own output, and the rest arrive later in `status`, `watch`, MCP and the verdict note. The CLI, MCP and the web all serve the same contracts, and typed visibility (layers, held-back checks, posture, the ledger and write-only env values) plugs in as one cartridge. `README.md` says how to run it, check it and cut it; `GLOSSARY.md` defines the words.
 
 `bun run verify` is the gate. The principles table names the check that holds each rule; a rule marked "No fence" is held by review.
 
@@ -66,7 +66,7 @@ Run each as `bun run <name>` from the repo root; `--` passes flags to the script
 - `deploy -- --stage <stage>`: the one way to deploy. It runs `verify`, deploys the three Workers with Wrangler, reads the push trigger back, then runs `smoke`.
 - `smoke -- --stage <stage>`: read-only probes against a live stage. `--loop` then runs the whole core loop on a throwaway project, `smoke-<run>`, through the CLI and git, and refuses `demo`.
 - `seed`: puts the two example projects on a platform (`--world node` on this machine, or `--stage <stage>`); a second run changes nothing. `--only <example> --as <name>` seeds a fresh copy under another name, and refuses a taken one.
-- `import-examples -- --stage <stage>`: imports the open-source repos the code browser is previewed on, one at a time, onto a stage (`demo` included, with its reason in `.agents/ops/stages.md`), each recorded in the ledger as kept; `--tags` backfills the tags Artifacts' import leaves out, `--only <name>` imports one, and `--world node` imports onto this machine.
+- `import-examples -- --stage <stage>`: imports the open-source repos the code browser is previewed on, one at a time, onto a stage (`demo` included, with its reason in the stage's record), each recorded in the ledger as kept; `--tags` backfills the tags Artifacts' import leaves out, `--only <name>` imports one, and `--world node` imports onto this machine.
 - `swarm -- --stage <stage> --project <name>`: plans six fictional contributors, on four harnesses, against one split family on a stage, claims each one's ask, prepares a workspace with a clone of its fork outside the checkout, starts each harness headless on the brief and sends every refusal back into the same session, at most three times, then writes the run's summary; `--view herdr` runs them in herdr panes beside a counter, and `--dry-run` only prints the plan.
 - `release -- --build | --upload --stage <stage> | --publish`: builds the CLI's npm package and two binaries, uploads a release to the stage's own bucket, which the platform serves, and leaves `npm publish` to a person: under an agent it prints the command instead.
 
@@ -123,19 +123,9 @@ Each was weighed and turned down; re-adding one needs sign-off.
 - Any inbound or two-way GitHub sync. It would be a second way onto `main` that skips the gate.
 - A decentralised-identity client (an atproto OAuth client, a DID resolver) behind the handle: a sign-in redesign and a third party's account as identity (ADR 0016). A second identity, if ever, is a key the person holds.
 
-## Agent skills
+## Working docs
 
-### Issue tracker
-
-Issues are local markdown files in `.agents/scratch/`, each written as an ask from `.agents/scratch/TEMPLATE.md`. See `.agents/workflow/issue-tracker.md`.
-
-### Triage labels
-
-The five default roles, each label equal to its name: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human` and `wontfix`. See `.agents/workflow/triage-labels.md`.
-
-### Domain docs
-
-Single-context: one `GLOSSARY.md` and `.agents/adr/` at the repo root. See `.agents/workflow/domain.md`.
+The maintainer's working docs (the decisions and why each was made, the stage record, the issue tracker and the demo notes) live in a gitignored `.agents/` folder on the maintainer's machine, not in this repo. Nothing committed depends on them or links into them; a clone has `README.md`, `GLOSSARY.md` and this file.
 
 <!-- BEGIN:turborepo-agent-rules -->
 

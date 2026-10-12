@@ -20,7 +20,7 @@
  * and the answerer's, from `SESSION_TOKENS` (a JSON object from token to
  * handle, as the platform's own) by the handle `--as` names (`bram` unless
  * given). For example, with the stage's generated secrets file (outside the
- * repo, `.agents/ops/stages.md` says where) loaded into the env:
+ * repo, named by `STAGE_SECRETS_FILE`) loaded into the env:
  *
  *   set -a; . <the stage's secrets file>; set +a
  *   bun scripts/smoke.ts --stage dev-oscabriel --loop

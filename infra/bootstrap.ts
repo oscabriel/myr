@@ -29,7 +29,7 @@
  * exists.
  *
  * It never deletes, never prints a secret, and never reads a `.env` file.
- * Teardown is written down in `.agents/ops/stages.md`, not automated.
+ * Tearing a stage down is a person's job, not automated.
  */
 import { BunRuntime, BunServices } from "@effect/platform-bun";
 import {
@@ -371,7 +371,7 @@ export class MissingSecrets extends Schema.TaggedError<MissingSecrets>()(
   { names: Schema.Array(Schema.String), stage: Schema.String }
 ) {
   override get message() {
-    return `${this.stage}'s platform lacks ${this.names.join(", ")}: set them by name (.agents/ops/stages.md)`;
+    return `${this.stage}'s platform lacks ${this.names.join(", ")}: set them by name, from the stage's secrets file (STAGE_SECRETS_FILE)`;
   }
 }
 
@@ -620,7 +620,7 @@ const secrets = (root: string, credentials: Credentials, stage: Stage) =>
 
     if (!deployed) {
       return yield* Console.log(
-        `bootstrap ${stage}: ${platform} is not deployed yet, so its first deploy must carry ${required.join(", ")} through varlock (.agents/ops/stages.md).`
+        `bootstrap ${stage}: ${platform} is not deployed yet, so its first deploy must carry ${required.join(", ")} through varlock, from the stage's secrets file (STAGE_SECRETS_FILE).`
       );
     }
 

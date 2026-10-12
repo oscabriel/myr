@@ -46,11 +46,11 @@ The core loop, in six lines:
 
 Around the loop:
 
-- **A web built as the gate's control room.** Every page sits in one shell: a rail of where you are (the site's sections, the projects with their posture, the project's sections), the page, and an inspector of the typed facts of the thing in hand (its state, whose move it is, who may take it, the gate, the claim, the family, the provenance), each with its next command numbered to copy. Lists are rows: select one, with a click or `j`/`k`, and its facts and claim command fill the inspector; a split family is one row with its children drawn as a fan that marks each landing as it happens. Below 1120 px the rail opens from a Menu and the facts follow the page's head, and phones get a bottom bar; Today is built to clear on a phone, one tap a choice with its consequence said under it. Pages arrive with their rows in the server's HTML and move without reloading, `?` lists the keys (`j`/`k`, `J`/`K`, `1`-`9` to copy a numbered command, and a switch that turns them off), and colour still means state, always beside its word and mark ([ADR 0022](.agents/adr/0022-the-web-is-a-control-room-shell.md), [ADR 0023](.agents/adr/0023-links-are-the-routers-and-lists-render-on-the-server.md)).
+- **A web built as the gate's control room.** Every page sits in one shell: a rail of where you are (the site's sections, the projects with their posture, the project's sections), the page, and an inspector of the typed facts of the thing in hand (its state, whose move it is, who may take it, the gate, the claim, the family, the provenance), each with its next command numbered to copy. Lists are rows: select one, with a click or `j`/`k`, and its facts and claim command fill the inspector; a split family is one row with its children drawn as a fan that marks each landing as it happens. Below 1120 px the rail opens from a Menu and the facts follow the page's head, and phones get a bottom bar; Today is built to clear on a phone, one tap a choice with its consequence said under it. Pages arrive with their rows in the server's HTML and move without reloading, `?` lists the keys (`j`/`k`, `J`/`K`, `1`-`9` to copy a numbered command, and a switch that turns them off), and colour still means state, always beside its word and mark.
 - **A landing, the asks, a home and the docs.** The web's `/` is a landing for a first-time reader: what the platform is, the way to the open asks before anything else, the install line, the screen `git push` prints when the gate refuses (from the one renderer), the four nouns, the loop, and the projects to read, each with its posture. The front page of open asks across every project is `/asks`. A signed-in person's `/home` is their own: their claims, newest first, each with its ask's want, its latest answer and the command to run next; the decisions waiting on them, if they decide; and the asks they may take. `/docs` holds five guides and a reference (the commands, every refusal, every event, the MCP tools and the imported projects) read from the sources that define them, each page also as Markdown at `/docs/<page>.md`.
 - **A code browser on the web.** A full-viewport app inside the shell: the file tree stays in the rail across files, with a Code | Why toggle on each file, highlighted code with `#L` line links, raw bytes served under a sandboxing CSP, the landings by day, each commit's diff (unified or split, with its stats by territory and tests) and one refs page (main, tags and claim forks; a monorepo's tags grouped by package, each package's newest first). The server sends each file and diff as plain text at the drawing's exact size, so highlighting lands in place. A project's home is its asks, then its README, rendered as GitHub-flavoured Markdown with links and images pointing into the repo at the commit, in the server's HTML so a crawler or `curl` reads it too. Every page names the commit it shows, so any page is a permalink.
-- **Why each line is there.** A file's why page attributes each line to the landing that put it on `main`, naming its ask, answer, people and verdict, or the ask an opening opened. Imported history reads "before adoption". Why and a file's history are kept by commit in an R2 bucket, so every isolate reads them back ([ADR 0020](.agents/adr/0020-code-history-is-kept-by-immutable-ids.md)): on the dev stage's imports (changesets, click; 200 commits of history) a first view took 5.3 to 7.7 s, down from 18.6 to 39.6 s, and a view already kept answers in under a second.
-- **Asks drafted for a want.** A member proposes a want with `--draft` (or the web's propose form). The platform's agent, a Workers AI model, drafts the ask file and its failing test, runs them red first on the Checker, and puts the draft to a decider with its evidence. Nothing lands until a decider accepts, and the landing discloses the agent with `Assisted-by` ([ADR 0018](.agents/adr/0018-asks-are-drafted-in-a-workflow-and-put-to-a-decider.md)).
+- **Why each line is there.** A file's why page attributes each line to the landing that put it on `main`, naming its ask, answer, people and verdict, or the ask an opening opened. Imported history reads "before adoption". Why and a file's history are kept by commit in an R2 bucket, so every isolate reads them back: on the dev stage's imports (changesets, click; 200 commits of history) a first view took 5.3 to 7.7 s, down from 18.6 to 39.6 s, and a view already kept answers in under a second.
+- **Asks drafted for a want.** A member proposes a want with `--draft` (or the web's propose form). The platform's agent, a Workers AI model, drafts the ask file and its failing test, runs them red first on the Checker, and puts the draft to a decider with its evidence. Nothing lands until a decider accepts, and the landing discloses the agent with `Assisted-by`.
 - **A Policy page.** Who decides which paths, who is vouched for or denounced, each layer's readers, writers and disclosure, and the caps, budget and claim timing, all read from the config folder at the landed commit. It has no edit control: these change by landing a change to the config folder. A project whose config has not evaluated says why (no config folder, or one that failed) and what makes it evaluate; `myr policy` prints the same as text.
 - **The platform's own front page.** The platform's `/` says what the host serves (clone URLs, MCP, agent skills, sign-in, the CLI and the web app), in HTML for a browser and as Markdown for an agent.
 - **A For agents page.** The web's `/agents` (and `/agents.md`) is a reference in the voice of a man page: a Synopsis of the CLI's commands, Connect (remote MCP for Claude Code, Cursor and VS Code, MCP over stdio, the CLI, a prompt for any agent, and the skills), the Endpoints an agent reads, the Limits, and every Refusal. Its MCP entries are the same text the plugin bundles carry.
@@ -58,7 +58,7 @@ Around the loop:
 - **`/llms-full.txt`.** Beyond the index at `/llms.txt`: every refusal with its repair, how git meets the platform, how a landing happens, every event a watcher hears, and short guides. The index names it in its first sentence, and a project's `llms.txt` and each ask's Markdown open with a line pointing to both.
 - **The code over MCP.** An agent with no shell, such as a hosted connector, browses a project's code with five capped MCP tools: `readTree`, `readFile`, `log`, `why` and `listRefs`.
 
-The web reads code only through public contracts the platform serves ([ADR 0019](.agents/adr/0019-the-web-reads-repos-through-public-contracts.md)). On the dev stage, 38 open-source repos are imported and kept for previewing it: eight picked for a shape the code browser must render (anyhow, ky, gum, click, awesome, changesets, stb and fuzzel), then thirty well-known projects in TypeScript, JavaScript, Rust, Go, Python, C, Ruby and shell, each a read-only copy under its own licence. `/docs/imported` names each one's source and licence, and `.agents/ops/stages.md` records each import. An import is heard as a landing, its adoption, so a project imported since that change is listed whether or not its policy evaluates; seventeen of the 38, imported before it, are not yet.
+The web reads code only through public contracts the platform serves. On the dev stage, 38 open-source repos are imported and kept for previewing it: eight picked for a shape the code browser must render (anyhow, ky, gum, click, awesome, changesets, stb and fuzzel), then thirty well-known projects in TypeScript, JavaScript, Rust, Go, Python, C, Ruby and shell, each a read-only copy under its own licence. `/docs/imported` names each one's source and licence, and the stage's record keeps each import. An import is heard as a landing, its adoption, so a project imported since that change is listed whether or not its policy evaluates; seventeen of the 38, imported before it, are not yet.
 
 ## Run it
 
@@ -111,7 +111,7 @@ bun run seed -- --world node
 
 ### On your own Cloudflare account
 
-Wrangler deploys the three Workers; cf is our ops CLI. Cloudflare's cf can't deploy this platform yet: its config cannot declare the Artifacts push-event trigger, its deploy refuses the sandbox's container self-binding, and it would be a second deploy tool in the recording week. So Wrangler deploys, and cf runs read-mostly operations as `bun run ops -- <command>` ([ADR 0002](.agents/adr/0002-wrangler-deploys-every-worker.md)).
+Wrangler deploys the three Workers; cf is our ops CLI. Cloudflare's cf can't deploy this platform yet: its config cannot declare the Artifacts push-event trigger, its deploy refuses the sandbox's container self-binding, and it would be a second deploy tool in the recording week. So Wrangler deploys, and cf runs read-mostly operations as `bun run ops -- <command>`.
 
 1. Name your stage `dev-<you>`. Add it to `stages` in `infra/stages.ts`, and give it an `env` block in `apps/platform/wrangler.jsonc`, `apps/sandbox/wrangler.jsonc` and `apps/web/wrangler.jsonc`, copied from `dev-oscabriel`'s with your stage's name in its place and your own handle as `OPERATOR_HANDLE`; `packages/config/test/bootstrap.test.ts` holds the three files to the table.
 2. Log Wrangler in once, and set `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` as `infra/.env.schema` describes (`bun run env:check` shows them, redacted):
@@ -156,7 +156,7 @@ Wrangler deploys the three Workers; cf is our ops CLI. Cloudflare's cf can't dep
    ./node_modules/.bin/varlock run --path apps/platform/ -- bun scripts/smoke.ts --stage dev-<you> --loop
    ```
 
-`.agents/ops/stages.md` lists every resource a stage owns, the secrets, and how a person tears a stage down by hand; no script deletes a stage's own resources. Every throwaway a smoke loop, a swarm run or a `seed --as` copy makes is recorded in `infra/created.jsonl`. `bunx varlock run --path infra/ -- bun infra/teardown.ts` prints which of them still exist, and adding `--apply` deletes exactly those.
+No script deletes a stage's own resources: a person tears a stage down by hand, from the stage's record of what it owns and its secrets. Every throwaway a smoke loop, a swarm run or a `seed --as` copy makes is recorded in `infra/created.jsonl`. `bunx varlock run --path infra/ -- bun infra/teardown.ts` prints which of them still exist, and adding `--apply` deletes exactly those.
 
 ### Install the CLI
 
@@ -256,7 +256,7 @@ Each promise names the check that holds it, and `bun run verify` runs every one.
 What it does not promise:
 
 - **Held-back checks are hidden from people and agents, not from the code under test.** They run in the check job's own container with the network off, nothing they or the lanes beside them print comes back, and a claim, or a person in one area, may fail an area only a few times each week. That raises the cost of reading them; it cannot stop a determined reader whose code runs beside them. The `Held-back:` trailer names each area, how many of its sealed checks passed and the suite's commitment, nothing more.
-- **Verdicts after the push are asynchronous.** Custody and shape refusals arrive in `git push`; the merged-tree checks report through `myr status`, `myr verdict`, MCP, the web, and a git note on the answer's head ([ADR 0015](.agents/adr/0015-submitting-an-answer-is-asynchronous.md)).
+- **Verdicts after the push are asynchronous.** Custody and shape refusals arrive in `git push`; the merged-tree checks report through `myr status`, `myr verdict`, MCP, the web, and a git note on the answer's head.
 - **No numbers but the table's.** The Numbers section holds only what a live run measured, each with its stage and date.
 
 ## Keep or cut
@@ -318,7 +318,6 @@ infra/          bootstrap, deploy, the recording lock, the stage table, smoke's 
 scripts/        brand and byte checks, seed, smoke, swarm, release
 examples/       datekit and burrow, fictional projects for the demo
 tools/oxlint/   the vendored anti-slop lint plugins
-.agents/        decisions (adr/), agent conventions (workflow/), the demo (demo/), the stage record (ops/), the ask template (scratch/)
 ```
 
 Every internal package is `@repo/<name>`, and in code the product's name lives only in `packages/brand/src/index.ts`. Every operation is one contract in `packages/protocol/src/contracts.ts`, and the CLI, MCP and the web are projections of it, built in each app's `surfaces.ts`.
@@ -335,7 +334,7 @@ Bindings are declared per stage in each app's `wrangler.jsonc`, and the platform
 
 ### The core loop, step by step
 
-1. **Init or import.** `myr init` finds the project's own commands (its run block), proposes a config folder, and makes the project, empty or imported once from a public HTTPS repo (from the CLI, or from the web's `/import`). A project is named `<owner>/<name>` (the rule is in the Run a project guide, `packages/agent-kit/src/docs/run-a-project.ts`), and a project made before owners keeps its old address as a redirect ([ADR 0032](.agents/adr/0032-a-project-is-named-by-its-owner-and-the-forty-keep-their-keys.md), [ADR 0033](.agents/adr/0033-a-repo-is-imported-from-the-web-and-its-host-path-offers-the-import.md)). For an empty project, the initializer's first push is the only direct push `main` ever takes; after it, `main` moves only by a landing.
+1. **Init or import.** `myr init` finds the project's own commands (its run block), proposes a config folder, and makes the project, empty or imported once from a public HTTPS repo (from the CLI, or from the web's `/import`). A project is named `<owner>/<name>` (the rule is in the Run a project guide, `packages/agent-kit/src/docs/run-a-project.ts`), and a project made before owners keeps its old address as a redirect. For an empty project, the initializer's first push is the only direct push `main` ever takes; after it, `main` moves only by a landing.
 2. **Rules at the landed SHA.** After every landing the Lander bundles the config folder, and the platform evaluates it once, with frozen time and randomness, into a typed policy. Rules come only from the platform's own last landing.
 3. **Open an ask.** A decider sends the ask and its check; the check runs on `main` twice and must fail the same way by an assertion; the platform lands the ask with `Asked-by`.
 4. **Claim.** `myr claim` makes the claimant's fork (`<owner>/<name>--<ask>--<handle>`). Pushes keep the claim alive; a quiet claim is warned, then lapses.
@@ -348,7 +347,7 @@ Read it back with `myr status`, `myr verdict`, `myr why <path>:<line>`, the verd
 
 ### What the design rests on
 
-Artifacts, the git storage under every repo, has no atomic multi-ref push, so `main` lands by itself, with a non-force push that fails if `main` moved (a compare-and-swap), and the bookkeeping refs (the landed mirror and the notes) follow in pushes of their own. The Project Durable Object's landed SHA is the truth. Any write token can force-push `main`, so a canonical repo's write tokens never leave the platform's own jobs: answers go to forks through the gateway, and only the trusted Lander, which runs no answer code, gets a write token on a canonical repo, for five minutes, inside a landing. Events fire once per pushed ref, the platform's own bookkeeping pushes included, so `OnPush` recognizes those and ignores them. The binding resolves only short branch names and commit SHAs, so the Durable Object keeps the SHAs of custom refs itself ([ADR 0014](.agents/adr/0014-landing-is-a-cas-push-of-main-then-bookkeeping-refs.md)).
+Artifacts, the git storage under every repo, has no atomic multi-ref push, so `main` lands by itself, with a non-force push that fails if `main` moved (a compare-and-swap), and the bookkeeping refs (the landed mirror and the notes) follow in pushes of their own. The Project Durable Object's landed SHA is the truth. Any write token can force-push `main`, so a canonical repo's write tokens never leave the platform's own jobs: answers go to forks through the gateway, and only the trusted Lander, which runs no answer code, gets a write token on a canonical repo, for five minutes, inside a landing. Events fire once per pushed ref, the platform's own bookkeeping pushes included, so `OnPush` recognizes those and ignores them. The binding resolves only short branch names and commit SHAs, so the Durable Object keeps the SHAs of custom refs itself.
 
 ### Plain git, so you can leave
 
@@ -358,7 +357,7 @@ Export is `git clone`. Code, asks (files in the config folder), the rules (TypeS
 git fetch origin 'refs/notes/*:refs/notes/*'
 ```
 
-Inbound or two-way sync with GitHub is declined by design: it would be a second way onto `main` that skips the gate ([ADR 0010](.agents/adr/0010-no-inbound-github-sync.md)). A project can be imported once, to start it.
+Inbound or two-way sync with GitHub is declined by design: it would be a second way onto `main` that skips the gate. A project can be imported once, to start it.
 
 ### What is ours
 
@@ -368,7 +367,7 @@ Every app and package here is ours, except the files ported from other projects.
 - `packages/visibility/src/leak-scan.ts`: the leak scanner's technique, from varlock;
 - `examples/burrow/tools/oxlint/burrow/rules/no-module-level-mutable-state.ts`: the fictional example's own lint rule, from Rat Stack, with `examples/burrow/tools/oxlint/burrow/LICENSE-rat-stack.txt` beside it.
 
-Vendored folders keep their licence file beside them: `tools/oxlint/anti-slop/` (anti-slop's oxlint plugins, with `tools/oxlint/anti-slop/UPSTREAM.md`), `apps/web/src/components/ui/` (shadcn/ui's components) and `apps/web/src/assets/fonts/` (the web's fonts). Ported code is ours to change once copied, and no upstream is synced in ([ADR 0013](.agents/adr/0013-provenance-copy-with-attribution.md)). The decisions behind the design are in `.agents/adr/`.
+Vendored folders keep their licence file beside them: `tools/oxlint/anti-slop/` (anti-slop's oxlint plugins, with `tools/oxlint/anti-slop/UPSTREAM.md`), `apps/web/src/components/ui/` (shadcn/ui's components) and `apps/web/src/assets/fonts/` (the web's fonts). Ported code is ours to change once copied, and no upstream is synced in.
 
 ## Credits
 
@@ -385,7 +384,7 @@ Each credit names what we took and where it lives.
 - **isomorphic-git**. git inside a Worker: the in-memory repo host, the smart-HTTP pushes of the Artifacts binding adapter, and the `/isogit` Lander.
 - **Cloudflare's cf** (ideas, no code). One merged command catalog for every surface (`commandDocs` in `packages/agent-kit/src/command-doc.ts`), and the rule that wire schemas use whole or finite numbers and optional keys, so the JSON Schema an MCP client reads holds no `"Infinity"` and no `null`.
 - **Ghostty's `VOUCHED.td` format**. A project's vouch file: one handle per line, and a leading `-` to denounce.
-- **Matt Pocock's agent-brief shape**. The brief an ask carries (the want, what happens today, the context, the terms, what is out of scope), and the ask-shaped template this repo's own work was written in, `.agents/scratch/TEMPLATE.md`.
+- **Matt Pocock's agent-brief shape**. The brief an ask carries (the want, what happens today, the context, the terms, what is out of scope), and the ask-shaped template this repo's own work was written in.
 
 ## Roadmap
 

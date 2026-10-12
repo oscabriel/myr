@@ -47,7 +47,7 @@ describe(findLeaks, () => {
       findLeaks([
         { content, path: "packages/brand/src/other.ts" },
         { content, path: "AGENTS.md" },
-        { content, path: ".agents/adr/0001-x.md" },
+        { content, path: "examples/datekit/README.md" },
         { content, path: "apps/web/src/components/ui/LICENSE" },
         { content, path: "apps/web/src/assets/fonts/LICENSE-x.txt" },
         { content, path: "LICENSE" },
