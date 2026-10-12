@@ -1,17 +1,5 @@
-/**
- * teardown: `bunx varlock run --path infra/ -- bun infra/teardown.ts
- * [--stage <s>] [--keep <project>]… [--apply]`. Prints which throwaways the
- * ledger (`infra/created.jsonl`) still has on the account, and with `--apply`
- * deletes exactly those; `infra/lib/teardown.ts` decides what may be deleted,
- * and says why.
- *
- * It reaches Artifacts with the infra token (`CLOUDFLARE_ACCOUNT_ID` and
- * `CLOUDFLARE_API_TOKEN`, from `varlock run --path infra/`): repos through
- * `@repo/artifacts`' REST adapter, one per namespace, and a namespace itself
- * over the same REST API bootstrap uses to make one (`RepoHost` has no route
- * for a namespace). It mints no repo token. Nothing it runs is a Wrangler or
- * cf `delete`, and it touches no Worker, D1, KV or R2.
- */
+// Usage: bunx varlock run --path infra/ -- bun infra/teardown.ts
+//   [--stage <s>] [--keep <project>]… [--apply]
 import { BunRuntime, BunServices } from "@effect/platform-bun";
 import { Fetch, FetchFailed } from "@repo/artifacts/fetch";
 import { RepoHost } from "@repo/artifacts/repo-host";
@@ -33,20 +21,18 @@ import { teardown, TeardownAccount } from "./lib/teardown.ts";
 
 const API = "https://api.cloudflare.com/client/v4";
 
-/** The infra credentials `varlock run --path infra/` puts in the environment. */
 const Credentials = Config.all({
   accountId: Config.String("CLOUDFLARE_ACCOUNT_ID"),
   token: Config.Redacted("CLOUDFLARE_API_TOKEN"),
 });
 
-/** Where a request went: the origin and the path, never a query or a header. */
+// Never a query or a header, so no credential reaches the output.
 const placeOf = (request: Request) => {
   const url = new URL(request.url);
 
   return `${url.origin}${url.pathname}`;
 };
 
-/** The `Fetch` port over Bun's own fetch, as effect/http finds it. */
 const BunFetch = Layer.effect(
   Fetch,
   Effect.gen(function* () {
@@ -69,12 +55,6 @@ const BunFetch = Layer.effect(
   })
 );
 
-/**
- * The account over its REST API: a namespace's repos through a REST
- * `RepoHost` made on first use and kept for the run, and a namespace's own
- * route read or deleted directly, where 404 means it isn't there and any
- * other refusal stops the run.
- */
 const LiveAccount = Layer.effect(
   TeardownAccount,
   Effect.gen(function* () {
@@ -105,7 +85,6 @@ const LiveAccount = Layer.effect(
         })
       );
 
-    /** One call to a namespace's own route: true on 200, false on 404. */
     const namespaceCall = (name: string, method: "DELETE" | "GET") =>
       Effect.gen(function* () {
         const response = yield* fetch
