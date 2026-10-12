@@ -12,6 +12,7 @@ import { buildHandler } from "../router-build.ts";
 import { SignInAttemptsBinding } from "./attempts/binding.ts";
 import { GOOGLE_ACCOUNTS, GoogleClient, googleRoutes } from "./google.ts";
 import type { GoogleServices } from "./google.ts";
+import { MailerBinding } from "./mailer/binding.ts";
 import { OAuthStore } from "./oauth-store.ts";
 import { GOOGLE_PATHS } from "./pages.ts";
 import {
@@ -149,6 +150,7 @@ export const signInServices = (
       Layer.orDie
     ),
     SignInAttemptsBinding(config.SIGN_IN_LIMIT),
+    MailerBinding(config.EMAIL),
     Layer.succeed(OAuthStore, config.OAUTH_KV),
     WorkerFetch
   );

@@ -28,8 +28,10 @@ import type { SandboxBinding } from "../src/adapters/check-runner-sandbox.ts";
 import { AccountsMemory } from "../src/auth/accounts/memory.ts";
 import { SignInAttemptsMemory } from "../src/auth/attempts/memory.ts";
 import { IdentitiesMemory } from "../src/auth/identities/memory.ts";
+import { MailerMemory } from "../src/auth/mailer/memory.ts";
 import { OAuthStore } from "../src/auth/oauth-store.ts";
 import { OAuthStoreMemory } from "../src/auth/oauth-store/memory.ts";
+import { ACCOUNT_PATHS } from "../src/auth/pages.ts";
 import { oauthProvider, signInSettings } from "../src/auth/provider.ts";
 import { decodeEnv, PlatformEnv, platformOf } from "../src/platform.ts";
 import { workerPorts } from "../src/ports.ts";
@@ -297,9 +299,12 @@ const signedUp = (handle: string, password: string) =>
       platformOf(config)
     );
 
+    const mailer = yield* MailerMemory.make();
+
     const { dispose, handler } = oauthProvider(
       Layer.mergeAll(
         AccountsMemory.layer,
+        mailer.layer,
         Layer.succeed(OAuthStore, store),
         IdentitiesMemory.layer,
         Layer.succeed(Fetch, untouchable<Fetch["Service"]>("Fetch")),
@@ -348,11 +353,34 @@ const signedUp = (handle: string, password: string) =>
 
     const form = yield* formIn(signUpPage, signIn.cookie);
 
-    const code = yield* fetch(
+    const mailed = yield* fetch(
       post(
         "/signup",
-        { csrf: form.csrf, handle, password, request: form.request },
+        {
+          csrf: form.csrf,
+          displayName: "Alice Example",
+          email: `${handle}@mail.example`,
+          handle,
+          password,
+          request: form.request,
+        },
         form.cookie
+      )
+    ).pipe(Effect.flatMap(pageOf));
+
+    const confirm = yield* formIn(mailed, form.cookie);
+
+    const [mail] = yield* mailer.sent;
+
+    const code = yield* fetch(
+      post(
+        ACCOUNT_PATHS.signUpVerify,
+        {
+          code: mail?.subject.slice(0, 6) ?? "",
+          csrf: confirm.csrf,
+          request: confirm.request,
+        },
+        confirm.cookie
       )
     ).pipe(
       Effect.flatMap((response) => Effect.fromOption(codeOf(response))),

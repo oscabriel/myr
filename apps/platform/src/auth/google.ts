@@ -1,4 +1,6 @@
-// Only Google's stable subject id (`sub`) is kept: no email, no name, and no Google token after the exchange.
+// Google's stable subject id (`sub`) is what links an account. Its email is
+// taken only when Google says it verified it, and its name only to fill in
+// the profile form; no Google token is kept after the exchange.
 import { Fetch } from "@repo/artifacts/fetch";
 import { Handle } from "@repo/protocol/ids";
 import {
@@ -16,18 +18,23 @@ import {
 } from "effect";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 
-import { Accounts } from "./accounts.ts";
+import { Accounts, Email } from "./accounts.ts";
+import type { Account } from "./accounts.ts";
 import { SignInAttempts } from "./attempts.ts";
 import { Identities } from "./identities.ts";
+import { Mailer } from "./mailer.ts";
 import { OAuthStore } from "./oauth-store.ts";
-import { GOOGLE_PATHS, pickHandlePage } from "./pages.ts";
+import { GOOGLE_PATHS, profilePage } from "./pages.ts";
+import type { ProfileValues } from "./pages.ts";
 import { hashPassword } from "./password.ts";
 import {
+  addEmailPageFor,
   addressOf,
   askerOf,
   Authorization,
   authorizeHref,
   byPassword,
+  chosenDisplayName,
   chosenHandle,
   completed,
   CSRF_COOKIE,
@@ -91,7 +98,7 @@ export const googleAuthorizeUrl = (input: {
     nonce: input.nonce,
     redirect_uri: input.redirectUri,
     response_type: "code",
-    scope: "openid",
+    scope: "openid email profile",
     state: input.state,
   }).toString();
 
@@ -128,10 +135,31 @@ const Header = Schema.Struct({
 const Claims = Schema.Struct({
   aud: Schema.Union([Schema.String, Schema.Array(Schema.String)]),
   azp: Schema.optionalKey(Schema.String),
+  email: Schema.optionalKey(Schema.String),
+  email_verified: Schema.optionalKey(Schema.Boolean),
   exp: Schema.Finite,
   iss: Schema.String,
+  name: Schema.optionalKey(Schema.String),
   nonce: Schema.optionalKey(Schema.String),
   sub: GoogleSubject,
+});
+
+export interface GooglePerson {
+  // Only an address Google verified.
+  readonly email: Option.Option<Email>;
+  readonly name: Option.Option<string>;
+  readonly subject: GoogleSubject;
+}
+
+const decodeEmail = Schema.decodeUnknownOption(Email);
+
+const personOf = (claims: typeof Claims.Type): GooglePerson => ({
+  email: Option.fromUndefinedOr(claims.email).pipe(
+    Option.filter(() => claims.email_verified === true),
+    Option.flatMap(decodeEmail)
+  ),
+  name: Option.fromUndefinedOr(claims.name),
+  subject: claims.sub,
 });
 
 const segment = <S extends Schema.Codec<unknown, unknown>>(schema: S) =>
@@ -274,7 +302,7 @@ const issuedTo = (claims: typeof Claims.Type, clientId: string) => {
   );
 };
 
-const verifiedSubject = (
+const verifiedPerson = (
   token: string,
   expected: { readonly clientId: string; readonly nonce: string }
 ) =>
@@ -323,18 +351,18 @@ const verifiedSubject = (
       said.exp * 1000 > now &&
       said.nonce === expected.nonce;
 
-    return holds ? said.sub : yield* unconfirmed;
+    return holds ? personOf(said) : yield* unconfirmed;
   });
 
 // Google's other tokens in the answer are never read, and nothing of it is kept.
-export const googleSubject = (input: {
+export const googlePerson = (input: {
   readonly clientId: string;
   readonly clientSecret: Redacted.Redacted;
   readonly code: string;
   readonly codeVerifier: string;
   readonly nonce: string;
   readonly redirectUri: string;
-}): Effect.Effect<GoogleSubject, SignInFailed, Fetch | GoogleKeys> =>
+}): Effect.Effect<GooglePerson, SignInFailed, Fetch | GoogleKeys> =>
   Effect.gen(function* () {
     const keys = yield* GoogleKeys;
 
@@ -362,7 +390,7 @@ export const googleSubject = (input: {
       })
     );
 
-    return yield* verifiedSubject(id_token, input);
+    return yield* verifiedPerson(id_token, input);
   });
 
 interface Client {
@@ -378,6 +406,8 @@ export class GoogleClient extends Context.Service<
 const GoogleSays = {
   linkedElsewhere:
     "That Google account is linked to another handle. Sign in with that handle, or use another Google account.",
+  noEmail:
+    "Google did not share a verified email for that account. Sign up with an email and password instead.",
 } as const;
 
 // `SameSite=Lax`: Google's redirect back is a cross-site top-level navigation, which a `Strict` cookie misses.
@@ -411,9 +441,13 @@ const legs = sealing("google-leg", GoogleLeg);
 
 const PendingHandle = Schema.Struct({
   csrf: Schema.String,
+  email: Email,
+  name: Schema.optionalKey(Schema.String),
   request: AuthRequest,
   subject: GoogleSubject,
 });
+
+type PendingHandle = typeof PendingHandle.Type;
 
 const pendingHandles = sealing("google-handle", PendingHandle);
 
@@ -501,13 +535,13 @@ const start =
 
 const link =
   (client: Client) => (request: HttpServerRequest.HttpServerRequest) =>
-    byPassword(request, (handle, pending) =>
-      toGoogle(client, pending.request, Option.some(handle))
+    byPassword(request, (account, pending) =>
+      toGoogle(client, pending.request, Option.some(account.handle))
     );
 
 const pickHandle = (
-  subject: GoogleSubject,
-  request: AuthRequest,
+  pending: Omit<PendingHandle, "csrf">,
+  values: ProfileValues,
   status: number,
   message?: string
 ) =>
@@ -516,23 +550,20 @@ const pickHandle = (
 
     const csrf = yield* freshCsrf;
 
-    const sealed = yield* pendingHandles.seal(cookieKey, {
-      csrf,
-      request,
-      subject,
-    });
+    const sealed = yield* pendingHandles.seal(cookieKey, { ...pending, csrf });
 
-    const asker = yield* askerOf(request);
+    const asker = yield* askerOf(pending.request);
 
     return yield* htmlPage(
-      pickHandlePage(
+      profilePage(
         asker,
         { csrf, request: sealed },
-        authorizeHref(request),
+        authorizeHref(pending.request),
+        values,
         message
       ),
       status,
-      request.redirectUri
+      pending.request.redirectUri
     ).pipe(
       HttpServerResponse.setCookie(CSRF_COOKIE, csrf, {
         ...csrfCookie,
@@ -542,42 +573,104 @@ const pickHandle = (
     );
   });
 
-const signedInAs = (subject: GoogleSubject, request: AuthRequest) =>
+// Google just proved who the person is, so an account without an email
+// takes Google's verified one; if it has none, or another account holds it,
+// the person adds one before the grant, as a password sign-in would.
+const completedWithEmail = (
+  account: Account,
+  person: GooglePerson,
+  request: AuthRequest
+) =>
+  Effect.gen(function* () {
+    const accounts = yield* Accounts;
+
+    if (account.email !== undefined) {
+      return yield* completed(account.handle, request);
+    }
+
+    const set = yield* Option.match(person.email, {
+      onNone: () => Effect.succeed(false),
+      onSome: (email) =>
+        accounts.setEmail(account.handle, email).pipe(
+          Effect.as(true),
+          Effect.catchTag("EmailTaken", () => Effect.succeed(false))
+        ),
+    });
+
+    return yield* set
+      ? completed(account.handle, request)
+      : addEmailPageFor(account.handle, request, 200);
+  });
+
+const linkedTo = (person: GooglePerson, handle: Handle, request: AuthRequest) =>
   Effect.gen(function* () {
     const identities = yield* Identities;
 
     const accounts = yield* Accounts;
 
-    const linked = yield* identities.handleOf("google", subject);
+    const linked = yield* identities
+      .link("google", person.subject, handle)
+      .pipe(
+        Effect.as(true),
+        Effect.catchTag("IdentityTaken", () => Effect.succeed(false))
+      );
 
-    if (Option.isNone(linked)) {
-      return yield* pickHandle(subject, request, 200);
+    if (!linked) {
+      return yield* signInPageFor(request, 409, GoogleSays.linkedElsewhere);
     }
 
-    const account = yield* accounts.find(linked.value);
+    const account = yield* accounts.find(handle);
 
     return yield* Option.match(account, {
       onNone: () => signInPageFor(request, 401, unconfirmed.reason),
-      onSome: (found) => completed(found.handle, request),
+      onSome: (found) => completedWithEmail(found, person, request),
     });
   });
 
-const linkedTo = (
-  subject: GoogleSubject,
-  handle: Handle,
-  request: AuthRequest
-) =>
+const signedInAs = (person: GooglePerson, request: AuthRequest) =>
   Effect.gen(function* () {
     const identities = yield* Identities;
 
-    const linked = yield* identities.link("google", subject, handle).pipe(
-      Effect.as(true),
-      Effect.catchTag("IdentityTaken", () => Effect.succeed(false))
-    );
+    const accounts = yield* Accounts;
 
-    return linked
-      ? yield* completed(handle, request)
-      : yield* signInPageFor(request, 409, GoogleSays.linkedElsewhere);
+    const linked = yield* identities.handleOf("google", person.subject);
+
+    if (Option.isSome(linked)) {
+      const account = yield* accounts.find(linked.value);
+
+      return yield* Option.match(account, {
+        onNone: () => signInPageFor(request, 401, unconfirmed.reason),
+        onSome: (found) => completedWithEmail(found, person, request),
+      });
+    }
+
+    if (Option.isNone(person.email)) {
+      return yield* signInPageFor(request, 401, GoogleSays.noEmail);
+    }
+
+    // Both Google and the account proved the address, so they are one person.
+    const holder = yield* accounts.findByEmail(person.email.value);
+
+    if (Option.isSome(holder)) {
+      return yield* linkedTo(person, holder.value.handle, request);
+    }
+
+    return yield* pickHandle(
+      {
+        email: person.email.value,
+        request,
+        subject: person.subject,
+        ...Option.match(person.name, {
+          onNone: () => ({}),
+          onSome: (name) => ({ name }),
+        }),
+      },
+      Option.match(person.name, {
+        onNone: () => ({}),
+        onSome: (displayName) => ({ displayName }),
+      }),
+      200
+    );
   });
 
 const CallbackQuery = Schema.Struct({
@@ -610,7 +703,7 @@ const cameBack =
           // Google sends `error` and no code when the person declines.
           onNone: () => Effect.fail(unconfirmed),
           onSome: (code) =>
-            googleSubject({
+            googlePerson({
               clientId: client.id,
               clientSecret: client.secret,
               code,
@@ -637,13 +730,15 @@ const cameBack =
       return yield* legDone(answered);
     });
 
-const PostedHandle = Schema.Struct({
+const PostedProfile = Schema.Struct({
   csrf: Schema.String,
+  displayName: Schema.String,
   handle: Schema.String,
   request: Schema.String,
 });
 
-// The account's password is one nobody is told: Google signs it in.
+// The account's password is one nobody is told: Google signs it in, and a
+// reset by its email sets a real one.
 const handleChosen = (request: HttpServerRequest.HttpServerRequest) =>
   Effect.gen(function* () {
     const { cookieKey, pepper } = yield* SignInKeys;
@@ -657,7 +752,7 @@ const handleChosen = (request: HttpServerRequest.HttpServerRequest) =>
     const { handles: held } = yield* HeldHandles;
 
     const form = yield* HttpServerRequest.schemaBodyUrlParams(
-      PostedHandle
+      PostedProfile
     ).pipe(Effect.mapError(() => startAgain));
 
     const pending = yield* pendingHandles.open(cookieKey, form.request);
@@ -669,47 +764,56 @@ const handleChosen = (request: HttpServerRequest.HttpServerRequest) =>
       return yield* startAgain;
     }
 
-    if (!(yield* attempts.admit(`sign-up:${addressOf(request)}`))) {
-      return yield* pickHandle(
-        pending.subject,
-        pending.request,
-        429,
-        Says.tooManySignUps
+    const person: GooglePerson = {
+      email: Option.some(pending.email),
+      name: Option.fromUndefinedOr(pending.name),
+      subject: pending.subject,
+    };
+
+    const again = (status: number, message: string) =>
+      pickHandle(
+        pending,
+        { displayName: form.displayName, handle: form.handle },
+        status,
+        message
       );
+
+    if (!(yield* attempts.admit(`sign-up:${addressOf(request)}`))) {
+      return yield* again(429, Says.tooManySignUps);
     }
 
     if (Option.isSome(yield* identities.handleOf("google", pending.subject))) {
-      return yield* signedInAs(pending.subject, pending.request);
+      return yield* signedInAs(person, pending.request);
     }
 
-    const checked = chosenHandle(form.handle, held);
+    const checked = Result.all({
+      displayName: chosenDisplayName(form.displayName),
+      handle: chosenHandle(form.handle, held),
+    });
 
     if (Result.isFailure(checked)) {
-      return yield* pickHandle(
-        pending.subject,
-        pending.request,
-        checked.failure.status,
-        checked.failure.message
-      );
+      return yield* again(checked.failure.status, checked.failure.message);
     }
 
     const hash = yield* hashPassword(pepper, Redacted.make(yield* freshSecret));
 
-    const created = yield* accounts.create(checked.success, hash).pipe(
-      Effect.as(true),
-      Effect.catchTag("HandleTaken", () => Effect.succeed(false))
-    );
-
-    if (!created) {
-      return yield* pickHandle(
-        pending.subject,
-        pending.request,
-        409,
-        Says.handleTaken
+    return yield* accounts
+      .create({
+        displayName: checked.success.displayName,
+        email: pending.email,
+        handle: checked.success.handle,
+        hash,
+      })
+      .pipe(
+        Effect.andThen(
+          linkedTo(person, checked.success.handle, pending.request)
+        ),
+        Effect.catchTags({
+          // Someone proved the same address since: they are one person.
+          EmailTaken: () => signedInAs(person, pending.request),
+          HandleTaken: () => again(409, Says.handleTaken),
+        })
       );
-    }
-
-    return yield* linkedTo(pending.subject, checked.success, pending.request);
   });
 
 export type GoogleServices = Fetch | GoogleClient | Identities | SignInServices;
@@ -727,6 +831,7 @@ export const googleRoutes = HttpRouter.use((router) =>
       Context.add(GoogleKeys, yield* GoogleKeys),
       Context.add(HeldHandles, yield* HeldHandles),
       Context.add(Identities, yield* Identities),
+      Context.add(Mailer, yield* Mailer),
       Context.add(OAuthStore, yield* OAuthStore),
       Context.add(SignInAttempts, yield* SignInAttempts),
       Context.add(SignInKeys, yield* SignInKeys),

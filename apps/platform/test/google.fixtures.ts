@@ -9,6 +9,7 @@ import { SignInAttemptsMemory } from "../src/auth/attempts/memory.ts";
 import { GOOGLE_DISCOVERY } from "../src/auth/google.ts";
 import { Identities } from "../src/auth/identities.ts";
 import { IdentitiesMemory } from "../src/auth/identities/memory.ts";
+import { MailerMemory } from "../src/auth/mailer/memory.ts";
 import { OAuthStore } from "../src/auth/oauth-store.ts";
 import { OAuthStoreMemory } from "../src/auth/oauth-store/memory.ts";
 import { oauthProvider, signInSettings } from "../src/auth/provider.ts";
@@ -90,10 +91,19 @@ export type KeyPair = Effect.Success<ReturnType<typeof keyPair>>;
 export interface Claims {
   readonly aud?: string | readonly string[];
   readonly azp?: string | undefined;
+  readonly email?: string | undefined;
+  readonly email_verified?: boolean | undefined;
   readonly exp?: number;
   readonly iss?: string;
+  readonly name?: string | undefined;
   readonly nonce?: string;
 }
+
+// What Google says of a subject unless a consent says otherwise: a verified
+// address and a name, as `openid email profile` gets for a Gmail account.
+export const googleEmailOf = (sub: string) => `person-${sub}@mail.example`;
+
+export const googleNameOf = (sub: string) => `Person ${sub}`;
 
 export interface Consent {
   readonly claims?: Claims;
@@ -109,7 +119,7 @@ const AuthorizationRequest = Schema.Struct({
   nonce: Schema.String,
   redirect_uri: Schema.String,
   response_type: Schema.Literal("code"),
-  scope: Schema.Literal("openid"),
+  scope: Schema.Literal("openid email profile"),
   state: Schema.String,
 });
 
@@ -171,9 +181,12 @@ export const fakeGoogle = Effect.gen(function* () {
           JSON.stringify({
             aud: clientId,
             azp: clientId,
+            email: googleEmailOf(consent.sub),
+            email_verified: true,
             exp: now + 3600,
             iat: now,
             iss: "https://accounts.google.com",
+            name: googleNameOf(consent.sub),
             nonce: grant.request.nonce,
             sub: consent.sub,
             ...consent.claims,
@@ -232,7 +245,7 @@ export const fakeGoogle = Effect.gen(function* () {
         access_token: "ya29.a-google-access-token",
         expires_in: 3599,
         id_token: yield* idToken(grant.value),
-        scope: "openid",
+        scope: "openid email profile",
         token_type: "Bearer",
       });
     });
@@ -403,10 +416,13 @@ export const googleWorld = (
 
     const store = OAuthStoreMemory.make();
 
+    const mailer = yield* MailerMemory.make();
+
     const { dispose, handler } = oauthProvider(
       Layer.mergeAll(
         Layer.succeed(Accounts, accounts),
         Layer.succeed(Identities, identities),
+        mailer.layer,
         Layer.succeed(OAuthStore, store),
         Layer.succeed(Fetch, google.fetch),
         SignInAttemptsMemory.layer,
@@ -433,7 +449,14 @@ export const googleWorld = (
         )
     );
 
-    return { accounts, browser: browserFor(handle), google, identities, store };
+    return {
+      accounts,
+      browser: browserFor(handle),
+      google,
+      identities,
+      mails: mailer.sent,
+      store,
+    };
   });
 
 export type GoogleWorld = Effect.Success<ReturnType<typeof googleWorld>>;

@@ -7,9 +7,13 @@ import { Effect, Option, Redacted, Schema } from "effect";
 import { TestClock } from "effect/testing";
 
 import { OAuthSessions } from "../src/adapters/sessions-oauth.ts";
+import { Email } from "../src/auth/accounts.ts";
 import { SignInAttempts } from "../src/auth/attempts.ts";
 import { SignInAttemptsMemory } from "../src/auth/attempts/memory.ts";
 import { cliClientMetadata } from "../src/auth/cli-client.ts";
+import { codeMatches, codeTag, deadTag, freshCode } from "../src/auth/codes.ts";
+import type { CodePurpose } from "../src/auth/codes.ts";
+import { ACCOUNT_PATHS } from "../src/auth/pages.ts";
 import {
   hashPassword,
   hashPasswordWith,
@@ -305,7 +309,34 @@ const formIn = (page: Page, cookie?: string) =>
     Effect.orDie
   );
 
-const signUp = (world: World, handle: string, secret: string) =>
+// A valid address for any handle a test tries, valid or not.
+const emailOf = (handle: string) =>
+  `${handle.toLowerCase().replaceAll(/[^a-z0-9]/gu, "-")}@mail.example`;
+
+// The code in the newest mail to `to`; a mail with no code reads as none.
+const codeMailedTo = (world: World, to: string) =>
+  Effect.map(world.mails, (mails) =>
+    Option.fromNullishOr(
+      mails
+        .findLast((mail) => mail.to === to)
+        ?.subject.match(/^(?<code>\d{6}) /u)?.groups?.code
+    )
+  );
+
+interface Started {
+  readonly cookie: string;
+  readonly page: Page;
+}
+
+const startSignUp = (
+  world: World,
+  fields: {
+    readonly displayName?: string;
+    readonly email: string;
+    readonly handle: string;
+    readonly password: string;
+  }
+) =>
   Effect.gen(function* () {
     const signInForm = yield* formIn(yield* openSignIn(world));
 
@@ -322,18 +353,75 @@ const signUp = (world: World, handle: string, secret: string) =>
 
     const form = yield* formIn(page, signInForm.cookie);
 
+    const started = yield* world
+      .fetch(
+        post(
+          "/signup",
+          {
+            csrf: form.csrf,
+            displayName: fields.displayName ?? "Alice Example",
+            email: fields.email,
+            handle: fields.handle,
+            password: fields.password,
+            request: form.request,
+          },
+          form.cookie
+        )
+      )
+      .pipe(Effect.flatMap(read));
+
+    return { cookie: form.cookie, page: started } satisfies Started;
+  });
+
+const enterCode = (
+  world: World,
+  started: Started,
+  path: string,
+  code: string,
+  extra: Readonly<Record<string, string>> = {}
+) =>
+  Effect.gen(function* () {
+    const form = yield* formIn(started.page, started.cookie);
+
     return yield* world.fetch(
       post(
-        "/signup",
-        { csrf: form.csrf, handle, password: secret, request: form.request },
+        path,
+        { code, csrf: form.csrf, request: form.request, ...extra },
         form.cookie
       )
     );
   });
 
-const signIn = (
+// The whole sign-up: the form, then the code mailed to the address. A form
+// the platform refuses comes back as it is.
+const signUp = (
   world: World,
   handle: string,
+  secret: string,
+  email = emailOf(handle)
+) =>
+  Effect.gen(function* () {
+    const started = yield* startSignUp(world, {
+      email,
+      handle,
+      password: secret,
+    });
+
+    // Read already, so handed back afresh.
+    if (started.page.response.status !== 200) {
+      return new Response(started.page.html, started.page.response);
+    }
+
+    const code = yield* Effect.fromOption(
+      yield* codeMailedTo(world, email)
+    ).pipe(Effect.orDie);
+
+    return yield* enterCode(world, started, ACCOUNT_PATHS.signUpVerify, code);
+  });
+
+const signIn = (
+  world: World,
+  login: string,
   secret: string,
   address?: string
 ) =>
@@ -343,7 +431,7 @@ const signIn = (
     return yield* world.fetch(
       post(
         "/authorize",
-        { csrf: form.csrf, handle, password: secret, request: form.request },
+        { csrf: form.csrf, login, password: secret, request: form.request },
         form.cookie,
         address
       )
@@ -379,7 +467,7 @@ const CSP = "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'";
 describe("the platform as its own OAuth authorization server", () => {
   it.live("publishes where to authorize and where to get a token", () =>
     Effect.gen(function* () {
-      const world = yield* signInWorld;
+      const world = yield* signInWorld();
 
       const response = yield* world.fetch(
         new Request(new URL("/.well-known/oauth-authorization-server", origin))
@@ -398,7 +486,7 @@ describe("the platform as its own OAuth authorization server", () => {
 
   it.live("serves the CLI's client metadata document at its client id", () =>
     Effect.gen(function* () {
-      const world = yield* signInWorld;
+      const world = yield* signInWorld();
 
       const response = yield* world.fetch(new Request(cliClient));
 
@@ -411,7 +499,7 @@ describe("the platform as its own OAuth authorization server", () => {
 
   it.live("hands every other path to the rest of the platform", () =>
     Effect.gen(function* () {
-      const world = yield* signInWorld;
+      const world = yield* signInWorld();
 
       const page = yield* world
         .fetch(new Request(new URL("/rpc", origin)))
@@ -428,7 +516,7 @@ describe("the platform as its own OAuth authorization server", () => {
     "shows the CLI a small sign-in page that loads nothing and cannot be framed",
     () =>
       Effect.gen(function* () {
-        const world = yield* signInWorld;
+        const world = yield* signInWorld();
 
         const page = yield* openSignIn(world);
 
@@ -453,7 +541,7 @@ describe("the platform as its own OAuth authorization server", () => {
     "lets the code go back to an IPv6 loopback, which no CSP host can name",
     () =>
       Effect.gen(function* () {
-        const world = yield* signInWorld;
+        const world = yield* signInWorld();
 
         const page = yield* world
           .fetch(
@@ -510,7 +598,7 @@ describe("signing up", () => {
     "creates the account and signs it in, back to the CLI with a code",
     () =>
       Effect.gen(function* () {
-        const world = yield* signInWorld;
+        const world = yield* signInWorld();
 
         const response = yield* signUp(world, "alice", alicePassword);
 
@@ -521,15 +609,19 @@ describe("signing up", () => {
             "state"
           )
         ).toBe("state-1");
-        expect(
-          Option.isSome(yield* world.accounts.find(Handle.make("alice")))
-        ).toBeTruthy();
+        expect(yield* world.accounts.find(Handle.make("alice"))).toMatchObject(
+          Option.some({
+            displayName: "Alice Example",
+            email: emailOf("alice"),
+            handle: "alice",
+          })
+        );
       })
   );
 
   it.live("says a handle is taken, in any case", () =>
     Effect.gen(function* () {
-      const world = yield* signInWorld;
+      const world = yield* signInWorld();
 
       yield* signUp(world, "alice", alicePassword);
 
@@ -547,7 +639,7 @@ describe("signing up", () => {
     "says the operator's handle and a named session's are taken, in any case",
     () =>
       Effect.gen(function* () {
-        const world = yield* signInWorld;
+        const world = yield* signInWorld();
 
         const pages = yield* Effect.forEach(
           [fakeEnv().OPERATOR_HANDLE.toUpperCase(), namedPerson],
@@ -582,7 +674,7 @@ describe("signing up", () => {
     "refuses the handle %s with a plain reason",
     ([handle = "", reason = ""]) =>
       Effect.gen(function* () {
-        const world = yield* signInWorld;
+        const world = yield* signInWorld();
 
         const page = yield* signUp(world, handle, alicePassword).pipe(
           Effect.flatMap(read)
@@ -596,7 +688,7 @@ describe("signing up", () => {
 
   it.live("refuses a password under 12 or over 256 characters", () =>
     Effect.gen(function* () {
-      const world = yield* signInWorld;
+      const world = yield* signInWorld();
 
       const short = yield* signUp(world, "alice", "elevenchars").pipe(
         Effect.flatMap(read)
@@ -623,7 +715,7 @@ describe("signing in from the CLI", () => {
     "trades a code and its verifier for an access token that names only the person",
     () =>
       Effect.gen(function* () {
-        const world = yield* signInWorld;
+        const world = yield* signInWorld();
 
         yield* signUp(world, "Alice", alicePassword);
 
@@ -647,7 +739,7 @@ describe("signing in from the CLI", () => {
     "says only that the handle or password is wrong, and issues no code",
     () =>
       Effect.gen(function* () {
-        const world = yield* signInWorld;
+        const world = yield* signInWorld();
 
         yield* signUp(world, "alice", alicePassword);
 
@@ -661,7 +753,9 @@ describe("signing in from the CLI", () => {
 
         for (const page of [wrong, nobody]) {
           expect(page.response.status).toBe(401);
-          expect(page.html).toContain("The handle or password is wrong.");
+          expect(page.html).toContain(
+            "The email, handle or password is wrong."
+          );
           expect(Option.isNone(codeOf(page.response))).toBeTruthy();
           expect(
             Option.isSome(formOf(page.response, page.html, "cookie"))
@@ -672,7 +766,7 @@ describe("signing in from the CLI", () => {
 
   it.live("refuses a code traded with the wrong verifier", () =>
     Effect.gen(function* () {
-      const world = yield* signInWorld;
+      const world = yield* signInWorld();
 
       const code = yield* signUp(world, "alice", alicePassword).pipe(
         Effect.flatMap(codeIn)
@@ -696,7 +790,7 @@ describe("signing in from the CLI", () => {
     "refuses a form it did not seal, or whose CSRF token does not match, and issues no code",
     () =>
       Effect.gen(function* () {
-        const world = yield* signInWorld;
+        const world = yield* signInWorld();
 
         yield* signUp(world, "alice", alicePassword);
 
@@ -720,7 +814,7 @@ describe("signing in from the CLI", () => {
                 "/authorize",
                 {
                   csrf: attempt.csrf,
-                  handle: "alice",
+                  login: "alice",
                   password: alicePassword,
                   request: attempt.request,
                 },
@@ -740,7 +834,7 @@ describe("signing in from the CLI", () => {
     "refuses the sixth attempt in a minute for one handle before checking the password",
     () =>
       Effect.gen(function* () {
-        const world = yield* signInWorld;
+        const world = yield* signInWorld();
 
         yield* signUp(world, "alice", alicePassword);
 
@@ -766,7 +860,7 @@ describe("signing in from the CLI", () => {
 
   it.live("refuses the sixth attempt in a minute from one address", () =>
     Effect.gen(function* () {
-      const world = yield* signInWorld;
+      const world = yield* signInWorld();
 
       const statuses = yield* Effect.forEach(
         ["bob", "carol", "dave", "erin", "frank", "grace"],
@@ -784,14 +878,18 @@ describe("signing in from the CLI", () => {
     "replaces a password hash made with fewer iterations than today's",
     () =>
       Effect.gen(function* () {
-        const world = yield* signInWorld;
+        const world = yield* signInWorld();
 
         const alice = Handle.make("alice");
 
-        yield* world.accounts.create(
-          alice,
-          yield* hashPasswordWith(1000)(pepper, Redacted.make(alicePassword))
-        );
+        yield* world.accounts.create({
+          email: Email.make(emailOf("alice")),
+          handle: alice,
+          hash: yield* hashPasswordWith(1000)(
+            pepper,
+            Redacted.make(alicePassword)
+          ),
+        });
 
         yield* signIn(world, "alice", alicePassword).pipe(
           Effect.flatMap(codeIn)
@@ -811,7 +909,7 @@ describe("OAuth sessions over the provider's tokens", () => {
     "know the person an access token was issued to, and nobody by a changed or expired one",
     () =>
       Effect.gen(function* () {
-        const world = yield* signInWorld;
+        const world = yield* signInWorld();
 
         yield* signUp(world, "alice", alicePassword);
 
@@ -836,5 +934,551 @@ describe("OAuth sessions over the provider's tokens", () => {
           Option.none()
         );
       })
+  );
+});
+
+describe("confirming a sign-up's email", () => {
+  it.live(
+    "mails the address a code and makes no account until the code comes back",
+    () =>
+      Effect.gen(function* () {
+        const world = yield* signInWorld();
+
+        const started = yield* startSignUp(world, {
+          email: "Alice@Mail.Example",
+          handle: "alice",
+          password: alicePassword,
+        });
+
+        const [mail] = yield* world.mails;
+
+        expect(started.page.response.status).toBe(200);
+        expect(started.page.html).toContain(
+          "We mailed a code to Alice@Mail.Example."
+        );
+        expect(mail?.to).toBe("Alice@Mail.Example");
+        expect(mail?.text).toContain(
+          /^(?<code>\d{6}) is your /u.exec(mail?.subject ?? "")?.groups?.code
+        );
+        expect(yield* world.accounts.find(Handle.make("alice"))).toStrictEqual(
+          Option.none()
+        );
+      })
+  );
+
+  it.live("refuses a wrong code, and makes no account", () =>
+    Effect.gen(function* () {
+      const world = yield* signInWorld();
+
+      const started = yield* startSignUp(world, {
+        email: emailOf("alice"),
+        handle: "alice",
+        password: alicePassword,
+      });
+
+      const code = yield* Effect.fromOption(
+        yield* codeMailedTo(world, emailOf("alice"))
+      ).pipe(Effect.orDie);
+
+      const wrong = code === "000000" ? "000001" : "000000";
+
+      const page = yield* enterCode(
+        world,
+        started,
+        ACCOUNT_PATHS.signUpVerify,
+        wrong
+      ).pipe(Effect.flatMap(read));
+
+      expect(page.response.status).toBe(401);
+      expect(page.html).toContain("That code is wrong or has expired.");
+      expect(Option.isNone(codeOf(page.response))).toBeTruthy();
+      expect(yield* world.accounts.find(Handle.make("alice"))).toStrictEqual(
+        Option.none()
+      );
+    })
+  );
+
+  it.live("takes a code with spaces in it", () =>
+    Effect.gen(function* () {
+      const world = yield* signInWorld();
+
+      const started = yield* startSignUp(world, {
+        email: emailOf("alice"),
+        handle: "alice",
+        password: alicePassword,
+      });
+
+      const code = yield* Effect.fromOption(
+        yield* codeMailedTo(world, emailOf("alice"))
+      ).pipe(Effect.orDie);
+
+      const response = yield* enterCode(
+        world,
+        started,
+        ACCOUNT_PATHS.signUpVerify,
+        `${code.slice(0, 3)} ${code.slice(3)}`
+      );
+
+      expect(Option.isSome(codeOf(response))).toBeTruthy();
+    })
+  );
+
+  it.live("refuses the sixth code tried for one address in a minute", () =>
+    Effect.gen(function* () {
+      const world = yield* signInWorld();
+
+      const started = yield* startSignUp(world, {
+        email: emailOf("alice"),
+        handle: "alice",
+        password: alicePassword,
+      });
+
+      const code = yield* Effect.fromOption(
+        yield* codeMailedTo(world, emailOf("alice"))
+      ).pipe(Effect.orDie);
+
+      const wrong = code === "000000" ? "000001" : "000000";
+
+      const statuses = yield* Effect.forEach([1, 2, 3, 4, 5], () =>
+        enterCode(world, started, ACCOUNT_PATHS.signUpVerify, wrong).pipe(
+          Effect.map(({ status }) => status)
+        )
+      );
+
+      const sixth = yield* enterCode(
+        world,
+        started,
+        ACCOUNT_PATHS.signUpVerify,
+        code
+      );
+
+      expect([...statuses, sixth.status]).toStrictEqual([
+        401, 401, 401, 401, 401, 429,
+      ]);
+    })
+  );
+
+  it.live(
+    "mails the holder of a taken address a notice in place of a code, and reads the same to the one signing up",
+    () =>
+      Effect.gen(function* () {
+        const world = yield* signInWorld();
+
+        yield* signUp(world, "alice", alicePassword);
+
+        const started = yield* startSignUp(world, {
+          email: emailOf("alice").toUpperCase(),
+          handle: "mallory",
+          password: "another long password",
+        });
+
+        const mails = yield* world.mails;
+
+        expect(started.page.response.status).toBe(200);
+        expect(started.page.html).toContain("We mailed a code to");
+        expect(mails.at(-1)?.subject).toContain("You already have");
+        expect(mails.at(-1)?.text).not.toMatch(/\d{6}/u);
+
+        const page = yield* enterCode(
+          world,
+          started,
+          ACCOUNT_PATHS.signUpVerify,
+          "123456"
+        );
+
+        expect([
+          page.status,
+          Option.isNone(yield* world.accounts.find(Handle.make("mallory"))),
+        ]).toStrictEqual([401, true]);
+      })
+  );
+
+  it.live(
+    "says so when someone took the handle while the code was in the mail",
+    () =>
+      Effect.gen(function* () {
+        const world = yield* signInWorld();
+
+        const started = yield* startSignUp(world, {
+          email: emailOf("first"),
+          handle: "alice",
+          password: alicePassword,
+        });
+
+        yield* signUp(world, "alice", alicePassword, emailOf("second"));
+
+        const code = yield* Effect.fromOption(
+          yield* codeMailedTo(world, emailOf("first"))
+        ).pipe(Effect.orDie);
+
+        const page = yield* enterCode(
+          world,
+          started,
+          ACCOUNT_PATHS.signUpVerify,
+          code
+        ).pipe(Effect.flatMap(read));
+
+        expect(page.response.status).toBe(409);
+        expect(page.html).toContain("Someone took that handle");
+        expect(page.html).toContain(`value="${emailOf("first")}"`);
+      })
+  );
+
+  it.live("says the mail could not go, and makes no account", () =>
+    Effect.gen(function* () {
+      const world = yield* signInWorld({ mailFails: true });
+
+      const started = yield* startSignUp(world, {
+        email: emailOf("alice"),
+        handle: "alice",
+        password: alicePassword,
+      });
+
+      expect(started.page.response.status).toBe(503);
+      expect(started.page.html).toContain("We could not send the mail");
+      expect(started.page.html).toContain(`value="${emailOf("alice")}"`);
+    })
+  );
+
+  it.live.each([
+    ["not an address", { email: "alice" }, "does not look like an email"],
+    ["an empty display name", { displayName: " " }, "display name"],
+    ["a display name of 65", { displayName: "x".repeat(65) }, "display name"],
+  ] as const)("refuses %s", ([, fields, said]) =>
+    Effect.gen(function* () {
+      const world = yield* signInWorld();
+
+      const started = yield* startSignUp(world, {
+        email: emailOf("alice"),
+        handle: "alice",
+        password: alicePassword,
+        ...fields,
+      });
+
+      expect(started.page.response.status).toBe(400);
+      expect(started.page.html).toContain(said);
+      expect(yield* world.mails).toStrictEqual([]);
+    })
+  );
+});
+
+describe("signing in by email", () => {
+  it.live("signs in by the account's email, in any case", () =>
+    Effect.gen(function* () {
+      const world = yield* signInWorld();
+
+      yield* signUp(world, "Alice", alicePassword);
+
+      const { access_token } = yield* accessTokenFor(
+        world,
+        emailOf("alice").toUpperCase(),
+        alicePassword
+      );
+
+      const summary = yield* Effect.promise(() =>
+        tokenReader(world.store).unwrapToken(access_token)
+      );
+
+      expect(summary?.grant.props).toStrictEqual({ handle: "Alice" });
+    })
+  );
+});
+
+const legacyAccount = (world: World) =>
+  Effect.gen(function* () {
+    yield* world.accounts.create({
+      handle: Handle.make("alice"),
+      hash: yield* hashPassword(pepper, Redacted.make(alicePassword)),
+    });
+  });
+
+describe("an account made before sign-up asked for an email", () => {
+  it.live(
+    "adds and confirms one after its password, before any code goes back",
+    () =>
+      Effect.gen(function* () {
+        const world = yield* signInWorld();
+
+        yield* legacyAccount(world);
+
+        const asked = yield* signIn(world, "alice", alicePassword).pipe(
+          Effect.flatMap(read)
+        );
+
+        expect(asked.response.status).toBe(200);
+        expect(asked.html).toContain("Add your email");
+        expect(Option.isNone(codeOf(asked.response))).toBeTruthy();
+
+        const form = yield* formIn(asked);
+
+        const sent = yield* world
+          .fetch(
+            post(
+              ACCOUNT_PATHS.addEmail,
+              {
+                csrf: form.csrf,
+                email: emailOf("alice"),
+                request: form.request,
+              },
+              form.cookie
+            )
+          )
+          .pipe(Effect.flatMap(read));
+
+        const code = yield* Effect.fromOption(
+          yield* codeMailedTo(world, emailOf("alice"))
+        ).pipe(Effect.orDie);
+
+        const done = yield* enterCode(
+          world,
+          { cookie: form.cookie, page: sent },
+          ACCOUNT_PATHS.addEmailVerify,
+          code
+        );
+
+        expect(Option.isSome(codeOf(done))).toBeTruthy();
+        expect(yield* world.accounts.find(Handle.make("alice"))).toMatchObject(
+          Option.some({ email: emailOf("alice") })
+        );
+      })
+  );
+
+  it.live(
+    "refuses an address another account holds, once the code proves it",
+    () =>
+      Effect.gen(function* () {
+        const world = yield* signInWorld();
+
+        yield* signUp(world, "bob", alicePassword);
+        yield* legacyAccount(world);
+
+        const asked = yield* signIn(world, "alice", alicePassword).pipe(
+          Effect.flatMap(read)
+        );
+
+        const form = yield* formIn(asked);
+
+        const sent = yield* world
+          .fetch(
+            post(
+              ACCOUNT_PATHS.addEmail,
+              { csrf: form.csrf, email: emailOf("bob"), request: form.request },
+              form.cookie
+            )
+          )
+          .pipe(Effect.flatMap(read));
+
+        const code = yield* Effect.fromOption(
+          yield* codeMailedTo(world, emailOf("bob"))
+        ).pipe(Effect.orDie);
+
+        const page = yield* enterCode(
+          world,
+          { cookie: form.cookie, page: sent },
+          ACCOUNT_PATHS.addEmailVerify,
+          code
+        ).pipe(Effect.flatMap(read));
+
+        expect(page.response.status).toBe(409);
+        expect(page.html).toContain("Another account already uses that email");
+        expect(Option.isNone(codeOf(page.response))).toBeTruthy();
+      })
+  );
+});
+
+const startReset = (world: World, email: string) =>
+  Effect.gen(function* () {
+    const signInForm = yield* formIn(yield* openSignIn(world));
+
+    const page = yield* world
+      .fetch(
+        new Request(
+          new URL(
+            `${ACCOUNT_PATHS.reset}?request=${encodeURIComponent(signInForm.request)}`,
+            origin
+          )
+        )
+      )
+      .pipe(Effect.flatMap(read));
+
+    const form = yield* formIn(page, signInForm.cookie);
+
+    const sent = yield* world
+      .fetch(
+        post(
+          ACCOUNT_PATHS.reset,
+          { csrf: form.csrf, email, request: form.request },
+          form.cookie
+        )
+      )
+      .pipe(Effect.flatMap(read));
+
+    return { cookie: form.cookie, page: sent } satisfies Started;
+  });
+
+describe("resetting a password", () => {
+  it.live(
+    "sets a new password by the code mailed to the account, and signs in",
+    () =>
+      Effect.gen(function* () {
+        const world = yield* signInWorld();
+
+        yield* signUp(world, "alice", alicePassword);
+
+        const started = yield* startReset(world, emailOf("alice"));
+
+        const code = yield* Effect.fromOption(
+          yield* codeMailedTo(world, emailOf("alice"))
+        ).pipe(Effect.orDie);
+
+        const done = yield* enterCode(
+          world,
+          started,
+          ACCOUNT_PATHS.resetVerify,
+          code,
+          { password: "a brand new password" }
+        );
+
+        const old = yield* signIn(world, "alice", alicePassword);
+
+        const fresh = yield* signIn(world, "alice", "a brand new password");
+
+        expect(Option.isSome(codeOf(done))).toBeTruthy();
+        expect(old.status).toBe(401);
+        expect(Option.isSome(codeOf(fresh))).toBeTruthy();
+      })
+  );
+
+  it.live(
+    "reads the same for an address no account has, and mails it nothing",
+    () =>
+      Effect.gen(function* () {
+        const world = yield* signInWorld();
+
+        yield* signUp(world, "alice", alicePassword);
+
+        const before = (yield* world.mails).length;
+
+        const known = yield* startReset(world, emailOf("alice"));
+
+        const unknown = yield* startReset(world, emailOf("nobody"));
+
+        const mails = yield* world.mails;
+
+        expect([
+          known.page.response.status,
+          unknown.page.response.status,
+        ]).toStrictEqual([200, 200]);
+        expect(unknown.page.html).toContain(
+          `If an account uses ${emailOf("nobody")}, we mailed it a code.`
+        );
+        expect(mails.slice(before).map(({ to }) => to)).toStrictEqual([
+          emailOf("alice"),
+        ]);
+
+        const page = yield* enterCode(
+          world,
+          unknown,
+          ACCOUNT_PATHS.resetVerify,
+          "123456",
+          { password: "a brand new password" }
+        );
+
+        expect(page.status).toBe(401);
+      })
+  );
+
+  it.live("keeps the old password when the code is wrong", () =>
+    Effect.gen(function* () {
+      const world = yield* signInWorld();
+
+      yield* signUp(world, "alice", alicePassword);
+
+      const started = yield* startReset(world, emailOf("alice"));
+
+      const code = yield* Effect.fromOption(
+        yield* codeMailedTo(world, emailOf("alice"))
+      ).pipe(Effect.orDie);
+
+      const page = yield* enterCode(
+        world,
+        started,
+        ACCOUNT_PATHS.resetVerify,
+        code === "000000" ? "000001" : "000000",
+        { password: "a brand new password" }
+      );
+
+      const old = yield* signIn(world, "alice", alicePassword);
+
+      expect(page.status).toBe(401);
+      expect(Option.isSome(codeOf(old))).toBeTruthy();
+    })
+  );
+});
+
+describe("a mailed code", () => {
+  const email = Email.make("alice@mail.example");
+
+  it.effect("is six digits", () =>
+    Effect.gen(function* () {
+      const codes = yield* Effect.forEach(
+        [1, 2, 3, 4, 5, 6, 7, 8],
+        () => freshCode
+      );
+
+      for (const code of codes) {
+        expect(code).toMatch(/^\d{6}$/u);
+      }
+    })
+  );
+
+  it.effect(
+    "opens only for the purpose and address it was mailed for, in any case",
+    () =>
+      Effect.gen(function* () {
+        const tag = yield* codeTag(cookieKey, "sign-up", email, "123456");
+
+        const opens = (
+          purpose: CodePurpose,
+          to: string,
+          entered: string,
+          key = cookieKey
+        ) => codeMatches(key, purpose, Email.make(to), tag, entered);
+
+        expect([
+          yield* opens("sign-up", "alice@mail.example", "123456"),
+          yield* opens("sign-up", "ALICE@mail.example", "123 456"),
+          yield* opens("reset", "alice@mail.example", "123456"),
+          yield* opens("add-email", "alice@mail.example", "123456"),
+          yield* opens("sign-up", "bob@mail.example", "123456"),
+          yield* opens("sign-up", "alice@mail.example", "123457"),
+          yield* opens("sign-up", "alice@mail.example", "12345"),
+          yield* opens(
+            "sign-up",
+            "alice@mail.example",
+            "123456",
+            Redacted.make("not-the-cookie-key-0123456789abcdef")
+          ),
+        ]).toStrictEqual([
+          true,
+          true,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+        ]);
+      })
+  );
+
+  it.effect("never opens a dead tag", () =>
+    Effect.gen(function* () {
+      const tag = yield* deadTag;
+
+      expect(
+        yield* codeMatches(cookieKey, "reset", email, tag, "123456")
+      ).toBeFalsy();
+    })
   );
 });

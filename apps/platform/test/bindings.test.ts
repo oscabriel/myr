@@ -23,6 +23,7 @@ import type { DoProjects } from "../src/adapters/do-projects.ts";
 import type { LanderSandbox } from "../src/adapters/lander-sandbox.ts";
 import type { WorkerRateLimits } from "../src/adapters/rate-limits.ts";
 import type { SignInAttemptsBinding } from "../src/auth/attempts/binding.ts";
+import type { MailerBinding } from "../src/auth/mailer/binding.ts";
 import type { tokenReader } from "../src/auth/provider.ts";
 import {
   PlatformBindings,
@@ -104,6 +105,7 @@ const BindingKinds = Schema.Struct({
   kv_namespaces: Schema.optionalKey(Bound),
   r2_buckets: Schema.optionalKey(Bound),
   ratelimits: Schema.optionalKey(Named),
+  send_email: Schema.optionalKey(Named),
   services: Schema.optionalKey(Bound),
   worker_loaders: Schema.optionalKey(Bound),
   workflows: Schema.optionalKey(Bound),
@@ -160,6 +162,7 @@ const declaredIn = (raw: typeof Raw.Type) =>
       ...(block.kv_namespaces ?? []).map(({ binding }) => binding),
       ...(block.r2_buckets ?? []).map(({ binding }) => binding),
       ...(block.ratelimits ?? []).map(({ name }) => name),
+      ...(block.send_email ?? []).map(({ name }) => name),
       ...(block.services ?? []).map(({ binding }) => binding),
       ...(block.worker_loaders ?? []).map(({ binding }) => binding),
       ...(block.workflows ?? []).map(({ binding }) => binding),
@@ -434,6 +437,9 @@ describe("the platform Worker's bindings", () => {
     >();
     expectTypeOf<Env["SIGN_IN_LIMIT"]>().toExtend<
       Parameters<typeof SignInAttemptsBinding>[0]
+    >();
+    expectTypeOf<Env["EMAIL"]>().toExtend<
+      Parameters<typeof MailerBinding>[0]
     >();
     expectTypeOf<Env["CODE_CACHE"]>().toExtend<
       Parameters<typeof CodeStoreR2>[0]

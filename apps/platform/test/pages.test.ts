@@ -6,8 +6,12 @@ import { UnknownProject } from "@repo/protocol/refusal";
 import { Effect, Layer, Option } from "effect";
 
 import {
-  pickHandlePage,
+  ACCOUNT_PATHS,
+  addEmailPage,
+  codePage,
   problemPage,
+  profilePage,
+  resetPage,
   signInPage,
   signUpPage,
 } from "../src/auth/pages.ts";
@@ -71,22 +75,54 @@ const home = Effect.gen(function* () {
 );
 
 const PAGES = {
-  "Google's handle page": pickHandlePage(
+  "Google's profile page": profilePage(
     local,
     form,
     "/authorize?x=1",
+    { displayName: "Carol Example", handle: "carol" },
     "That handle is taken. Choose another, or sign in."
   ),
+  "adding an email": addEmailPage(
+    claude,
+    form,
+    "/authorize?x=1",
+    "alice@mail.example",
+    "Another account already uses that email. Add a different one."
+  ),
+  "entering a code": codePage(
+    claude,
+    form,
+    {
+      action: ACCOUNT_PATHS.signUpVerify,
+      intro: "We mailed a code to alice@mail.example.",
+      newPassword: false,
+      startOverHref: "/authorize?x=1",
+    },
+    "That code is wrong or has expired."
+  ),
+  "resetting a password": resetPage(
+    local,
+    form,
+    "/authorize?x=1",
+    "alice@mail.example"
+  ),
+  "setting a new password by code": codePage(local, form, {
+    action: ACCOUNT_PATHS.resetVerify,
+    intro: "If an account uses alice@mail.example, we mailed it a code.",
+    newPassword: true,
+    startOverHref: "/authorize?x=1",
+  }),
   "sign-in": signInPage(
     claude,
     form,
     { google: true },
-    "The handle or password is wrong."
+    "The email, handle or password is wrong."
   ),
   "sign-up": signUpPage(
     local,
     form,
     "/authorize?x=1",
+    { displayName: "Alice", email: "alice@mail.example", handle: "alice" },
     "A password is 12 to 256 characters."
   ),
   "the problem page": problemPage(
@@ -94,7 +130,9 @@ const PAGES = {
   ),
 } as const;
 
-const FORMS = new Set(["Google's handle page", "sign-in", "sign-up"]);
+const FORMS = new Set(
+  Object.keys(PAGES).filter((name) => name !== "the problem page")
+);
 
 interface Rule {
   readonly selectors: readonly string[];
@@ -401,9 +439,54 @@ describe("the sign-in page, as an MCP client's consent", () => {
 
   it("draws an error in the refusal's colour, and the problem page's in ink", () => {
     expect(PAGES["sign-in"]).toMatch(
-      /<p class="error" role="alert">The handle or password is wrong\.<\/p>/u
+      /<p class="error" role="alert">The email, handle or password is wrong\.<\/p>/u
     );
     expect(PAGES["the problem page"]).not.toContain('class="error"');
     expect(PAGES["the problem page"]).toMatch(/<a href="\/">/u);
+  });
+});
+
+describe("a sign-in form shown again", () => {
+  it("escapes every value the person typed", () => {
+    const typed = `"><script>alert(1)</script>`;
+
+    const pages = [
+      signUpPage(local, form, "/authorize", {
+        displayName: typed,
+        email: typed,
+        handle: typed,
+      }),
+      profilePage(local, form, "/authorize", {
+        displayName: typed,
+        handle: typed,
+      }),
+      addEmailPage(local, form, "/authorize", typed),
+      resetPage(local, form, "/authorize", typed),
+    ];
+
+    for (const html of pages) {
+      expect(html).not.toContain("<script>");
+      expect(html).toContain(
+        `value="&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;"`
+      );
+    }
+  });
+
+  it("never fills in a password", () => {
+    expect(
+      signUpPage(local, form, "/authorize", { email: "alice@mail.example" })
+    ).toMatch(/<input type="password" name="password" [^>]*required>/u);
+  });
+});
+
+describe("the sign-in page's ways out", () => {
+  it("links to resetting a password and to signing up, carrying the sealed request", () => {
+    const html = signInPage(claude, form, { google: false });
+
+    expect(html).toContain(
+      `href="${ACCOUNT_PATHS.reset}?request=sealed-request"`
+    );
+    expect(html).toContain('href="/signup?request=sealed-request"');
+    expect(html).toContain("Email or handle");
   });
 });

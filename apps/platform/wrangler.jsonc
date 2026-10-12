@@ -88,6 +88,9 @@
     { "binding": "RELEASES", "bucket_name": "releases-local" },
     { "binding": "CODE_CACHE", "bucket_name": "code-cache-local" },
   ],
+  // Sign-in's mail (Cloudflare Email Service). `wrangler dev` only logs
+  // each mail, code included, so no real mail leaves a local run.
+  "send_email": [{ "name": "EMAIL" }],
   "worker_loaders": [{ "binding": "LOADER" }],
   // Workers AI, for the drafter (no key: the account's own).
   "ai": { "binding": "AI" },
@@ -181,6 +184,7 @@
         { "binding": "RELEASES", "bucket_name": "releases-dev-oscabriel" },
         { "binding": "CODE_CACHE", "bucket_name": "code-cache-dev-oscabriel" },
       ],
+      "send_email": [{ "name": "EMAIL" }],
       "worker_loaders": [{ "binding": "LOADER" }],
       "ai": { "binding": "AI" },
       "services": [
@@ -268,6 +272,7 @@
         { "binding": "RELEASES", "bucket_name": "releases-demo" },
         { "binding": "CODE_CACHE", "bucket_name": "code-cache-demo" },
       ],
+      "send_email": [{ "name": "EMAIL" }],
       "worker_loaders": [{ "binding": "LOADER" }],
       "ai": { "binding": "AI" },
       "services": [{ "binding": "SANDBOX", "service": "sandbox-demo" }],
@@ -358,6 +363,7 @@
         { "binding": "RELEASES", "bucket_name": "releases-prod" },
         { "binding": "CODE_CACHE", "bucket_name": "code-cache-prod" },
       ],
+      "send_email": [{ "name": "EMAIL" }],
       "worker_loaders": [{ "binding": "LOADER" }],
       "ai": { "binding": "AI" },
       "services": [{ "binding": "SANDBOX", "service": "sandbox-prod" }],

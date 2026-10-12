@@ -59,6 +59,7 @@ export const PlatformBindings = Schema.Struct({
   CLAIM_LIMIT: binding<Env["CLAIM_LIMIT"]>("a rate limit"),
   CODE_CACHE: binding<Env["CODE_CACHE"]>("an R2 bucket"),
   DRAFT_LIMIT: binding<Env["DRAFT_LIMIT"]>("a rate limit"),
+  EMAIL: binding<Env["EMAIL"]>("Email Service's send_email"),
   EVIDENCE: binding<Env["EVIDENCE"]>("an R2 bucket"),
   FRONT_PAGE: binding<Env["FRONT_PAGE"]>("a D1 database"),
   LOADER: binding<Env["LOADER"]>("a Worker Loader"),

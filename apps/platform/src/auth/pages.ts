@@ -17,6 +17,15 @@ export interface Offers {
   readonly google: boolean;
 }
 
+// Under `/oauth/`, which the platform already keeps for sign-in.
+export const ACCOUNT_PATHS = {
+  addEmail: "/oauth/email",
+  addEmailVerify: "/oauth/email/verify",
+  reset: "/oauth/reset",
+  resetVerify: "/oauth/reset/verify",
+  signUpVerify: "/oauth/signup/verify",
+} as const;
+
 export const GOOGLE_PATHS = {
   callback: "/oauth/google/callback",
   handle: "/oauth/google/handle",
@@ -128,9 +137,15 @@ const googleChoices = (offers: Offers, form: PendingForm) =>
     ? {
         link: `<button type="submit" class="secondary" formaction="${GOOGLE_PATHS.link}">Sign in and link Google</button>`,
         start: `<p><a href="${GOOGLE_PATHS.start}?request=${encodeURIComponent(form.request)}" class="button">Continue with Google</a></p>
-<p class="muted">Or sign in with your handle and password.</p>`,
+<p class="muted">Or sign in with your email or handle and password.</p>`,
       }
     : { link: "", start: "" };
+
+const valueOf = (value?: string) =>
+  value === undefined ? "" : ` value="${escapeHtml(value)}"`;
+
+const withRequest = (path: string, form: PendingForm) =>
+  `${path}?request=${encodeURIComponent(form.request)}`;
 
 export const signInPage = (
   asker: Asker,
@@ -148,41 +163,60 @@ ${google.start}
 ${messageParagraph(message)}
 <form method="post" action="/authorize">
 ${hiddenFields(form)}
-<label>Handle <input name="handle" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>
+<label>Email or handle <input name="login" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>
 <label>Password <input type="password" name="password" autocomplete="current-password" required></label>
 <div class="actions">
 <button type="submit">Sign in</button>
 ${google.link}
 </div>
 </form>
-<p>New here? <a href="/signup?request=${encodeURIComponent(form.request)}">Choose a handle and sign up</a>.</p>`
+<p><a href="${withRequest(ACCOUNT_PATHS.reset, form)}">Forgot your password?</a></p>
+<p>New here? <a href="${withRequest("/signup", form)}">Sign up</a>.</p>`
   );
 };
 
-export const pickHandlePage = (
+export interface ProfileValues {
+  readonly displayName?: string;
+  readonly handle?: string;
+}
+
+const HANDLE_FIELD = (value?: string) =>
+  `<label>Handle, the name in your projects' addresses <input name="handle" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="39" required${valueOf(value)}></label>`;
+
+const DISPLAY_NAME_FIELD = (value?: string) =>
+  `<label>Display name <input name="displayName" autocomplete="name" maxlength="64" required${valueOf(value)}></label>`;
+
+export const profilePage = (
   asker: Asker,
   form: PendingForm,
   signInHref: string,
+  values: ProfileValues,
   message?: string
 ) =>
   page(
-    "Choose a handle",
-    `<h1>Choose your handle on ${escapeHtml(Brand.name)}</h1>
+    "Set up your profile",
+    `<h1>Set up your profile on ${escapeHtml(Brand.name)}</h1>
 ${askerParagraphs(asker)}
-<p>Google confirmed who you are. This Google account has not signed in here before: choose the handle people will know you by.</p>
+<p>Google confirmed who you are. This Google account has not signed in here before: choose the handle and name people will know you by.</p>
 ${messageParagraph(message)}
 <form method="post" action="${GOOGLE_PATHS.handle}">
 ${hiddenFields(form)}
-<label>Handle <input name="handle" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="39" required></label>
+${DISPLAY_NAME_FIELD(values.displayName)}
+${HANDLE_FIELD(values.handle)}
 <div class="actions"><button type="submit">Sign up</button></div>
 </form>
 <p>Have an account with a password? <a href="${escapeHtml(signInHref)}">Sign in with it</a> and choose "Sign in and link Google".</p>`
   );
 
+export interface SignUpValues extends ProfileValues {
+  readonly email?: string;
+}
+
 export const signUpPage = (
   asker: Asker,
   form: PendingForm,
   signInHref: string,
+  values: SignUpValues,
   message?: string
 ) =>
   page(
@@ -192,11 +226,86 @@ ${askerParagraphs(asker)}
 ${messageParagraph(message)}
 <form method="post" action="/signup">
 ${hiddenFields(form)}
-<label>Handle <input name="handle" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="39" required></label>
+<label>Email <input type="email" name="email" autocomplete="email" autocapitalize="none" spellcheck="false" maxlength="254" required${valueOf(values.email)}></label>
+${DISPLAY_NAME_FIELD(values.displayName)}
+${HANDLE_FIELD(values.handle)}
 <label>Password, 12 to 256 characters <input type="password" name="password" autocomplete="new-password" minlength="12" maxlength="256" required></label>
 <div class="actions"><button type="submit">Sign up</button></div>
 </form>
+<p>We mail a code to the address, to check it is yours.</p>
 <p>Have an account? <a href="${escapeHtml(signInHref)}">Sign in</a>.</p>`
+  );
+
+export interface CodeForm {
+  readonly action: string;
+  // Said above the form: where the code went, and what it is for.
+  readonly intro: string;
+  // A reset sets the new password in the same form.
+  readonly newPassword: boolean;
+  readonly startOverHref: string;
+}
+
+export const codePage = (
+  asker: Asker,
+  form: PendingForm,
+  code: CodeForm,
+  message?: string
+) =>
+  page(
+    "Enter the code",
+    `<h1>Enter the code we mailed you</h1>
+${askerParagraphs(asker)}
+<p>${escapeHtml(code.intro)} It works for 10 minutes.</p>
+${messageParagraph(message)}
+<form method="post" action="${code.action}">
+${hiddenFields(form)}
+<label>Code <input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9 -]*" maxlength="12" required></label>
+${code.newPassword ? `<label>New password, 12 to 256 characters <input type="password" name="password" autocomplete="new-password" minlength="12" maxlength="256" required></label>` : ""}
+<div class="actions"><button type="submit">Continue</button></div>
+</form>
+<p>No mail? Check your spam folder, or <a href="${escapeHtml(code.startOverHref)}">start again</a>.</p>`
+  );
+
+export const addEmailPage = (
+  asker: Asker,
+  form: PendingForm,
+  startOverHref: string,
+  value?: string,
+  message?: string
+) =>
+  page(
+    "Add your email",
+    `<h1>Add your email</h1>
+${askerParagraphs(asker)}
+<p>Your account has no email yet. Add one to finish signing in: we mail it a code, and it is how you reset your password.</p>
+${messageParagraph(message)}
+<form method="post" action="${ACCOUNT_PATHS.addEmail}">
+${hiddenFields(form)}
+<label>Email <input type="email" name="email" autocomplete="email" autocapitalize="none" spellcheck="false" maxlength="254" required${valueOf(value)}></label>
+<div class="actions"><button type="submit">Send the code</button></div>
+</form>
+<p><a href="${escapeHtml(startOverHref)}">Sign in as someone else</a></p>`
+  );
+
+export const resetPage = (
+  asker: Asker,
+  form: PendingForm,
+  signInHref: string,
+  value?: string,
+  message?: string
+) =>
+  page(
+    "Reset your password",
+    `<h1>Reset your password</h1>
+${askerParagraphs(asker)}
+<p>Enter your account's email. We mail it a code to set a new password with.</p>
+${messageParagraph(message)}
+<form method="post" action="${ACCOUNT_PATHS.reset}">
+${hiddenFields(form)}
+<label>Email <input type="email" name="email" autocomplete="email" autocapitalize="none" spellcheck="false" maxlength="254" required${valueOf(value)}></label>
+<div class="actions"><button type="submit">Send the code</button></div>
+</form>
+<p>Remembered it? <a href="${escapeHtml(signInHref)}">Sign in</a>.</p>`
   );
 
 export const problemPage = (message: string) =>

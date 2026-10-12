@@ -46,7 +46,7 @@ The web's `/docs` holds the guides and the full reference; `/llms.txt` and `myr 
 
 ## Deploy your own
 
-You need a Cloudflare account on Workers Paid, with Artifacts, and Docker with buildx. Add a `dev-<you>` stage to `infra/stages.ts` and each app's `wrangler.jsonc`, set the credentials `infra/.env.schema` names, then:
+You need a Cloudflare account on Workers Paid, with Artifacts, and Docker with buildx. Sign-in mails codes from `no-reply@myr.technology` through Cloudflare Email Service, so onboard the brand's domain for Email Sending on the account (Compute › Email Service). Add a `dev-<you>` stage to `infra/stages.ts` and each app's `wrangler.jsonc`, set the credentials `infra/.env.schema` names, then:
 
 ```sh
 bun run bootstrap -- --stage dev-<you>   # makes the stage's resources; deletes nothing

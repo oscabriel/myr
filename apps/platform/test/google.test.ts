@@ -16,11 +16,12 @@ import {
 import { SqlClient } from "effect/sql/SqlClient";
 
 import { IdentitiesD1 } from "../src/adapters/identities-d1.ts";
+import { Email } from "../src/auth/accounts.ts";
 import {
   GOOGLE_DISCOVERY,
   googleAuthorizeUrl,
   GoogleKeysPerIsolate,
-  googleSubject,
+  googlePerson,
 } from "../src/auth/google.ts";
 import type { GoogleKeys } from "../src/auth/google.ts";
 import { Identities, IdentityTaken } from "../src/auth/identities.ts";
@@ -35,7 +36,9 @@ import {
   clientId,
   clientSecret,
   fakeGoogle,
+  googleEmailOf,
   googleEnv,
+  googleNameOf,
   googleWorld,
   jwksUri,
 } from "./google.fixtures.ts";
@@ -232,7 +235,7 @@ const callbackUri = "https://platform.test/oauth/google/callback";
 const nonce = "nonce-0123456789abcdef";
 
 describe("Google's authorization request", () => {
-  it("asks for a code with openid only, PKCE by S256, the state and the nonce", () => {
+  it("asks for a code with openid, email and profile, PKCE by S256, the state and the nonce", () => {
     const url = new URL(
       googleAuthorizeUrl({
         clientId,
@@ -255,7 +258,7 @@ describe("Google's authorization request", () => {
         nonce: "nonce-0123456789abcdef",
         redirect_uri: "https://platform.test/oauth/google/callback",
         response_type: "code",
-        scope: "openid",
+        scope: "openid email profile",
         state: "sealed-state",
       },
     ]);
@@ -270,12 +273,12 @@ const authorizationRequest = new URL(
     nonce,
     redirect_uri: callbackUri,
     response_type: "code",
-    scope: "openid",
+    scope: "openid email profile",
     state: "sealed-state",
   }).toString()}`
 ).toString();
 
-const subjectOf = (
+const personOf = (
   google: FakeGoogle,
   consent: Consent,
   kept: { readonly codeVerifier?: string; readonly nonce?: string } = {}
@@ -283,7 +286,7 @@ const subjectOf = (
   Effect.gen(function* () {
     const back = yield* google.consent(authorizationRequest, consent);
 
-    return yield* googleSubject({
+    return yield* googlePerson({
       clientId,
       clientSecret: Redacted.make(clientSecret),
       code: back.searchParams.get("code") ?? "",
@@ -292,6 +295,12 @@ const subjectOf = (
       redirectUri: callbackUri,
     });
   });
+
+const subjectOf = (
+  google: FakeGoogle,
+  consent: Consent,
+  kept: { readonly codeVerifier?: string; readonly nonce?: string } = {}
+) => Effect.map(personOf(google, consent, kept), ({ subject }) => subject);
 
 const withGoogle = <A, E>(
   body: (google: FakeGoogle) => Effect.Effect<A, E, Fetch | GoogleKeys>
@@ -309,6 +318,47 @@ const withGoogle = <A, E>(
   });
 
 describe("the person Google confirms", () => {
+  it.live(
+    "carries the ID token's email only when Google verified it, and its name",
+    () =>
+      withGoogle((google) =>
+        Effect.gen(function* () {
+          const verified = yield* personOf(google, { sub: "1042" });
+
+          const unverified = yield* personOf(google, {
+            claims: { email_verified: false },
+            sub: "1042",
+          });
+
+          const malformed = yield* personOf(google, {
+            claims: { email: "not an address" },
+            sub: "1042",
+          });
+
+          const bare = yield* personOf(google, {
+            claims: { email: undefined, name: undefined },
+            sub: "1042",
+          });
+
+          expect([
+            verified,
+            unverified.email,
+            malformed.email,
+            bare,
+          ]).toStrictEqual([
+            {
+              email: Option.some(googleEmailOf("1042")),
+              name: Option.some(googleNameOf("1042")),
+              subject: "1042",
+            },
+            Option.none(),
+            Option.none(),
+            { email: Option.none(), name: Option.none(), subject: "1042" },
+          ]);
+        })
+      )
+  );
+
   it.live("is the ID token's subject, once its signature and claims hold", () =>
     withGoogle((google) =>
       Effect.gen(function* () {
@@ -569,7 +619,7 @@ describe("Google sign-in, with a Google OAuth client", () => {
   );
 
   it.live(
-    "sends the person to Google for a code, with openid only, PKCE by S256, a sealed state and a nonce",
+    "sends the person to Google for a code, with openid, email and profile, PKCE by S256, a sealed state and a nonce",
     () =>
       Effect.gen(function* () {
         const world = yield* googleWorld();
@@ -598,7 +648,7 @@ describe("Google sign-in, with a Google OAuth client", () => {
           "https://accounts.google.com/o/oauth2/v2/auth",
           clientId,
           "code",
-          "openid",
+          "openid email profile",
           "S256",
           43,
           `${origin}/oauth/google/callback`,
@@ -664,7 +714,12 @@ const backFromGoogle = (
     );
   });
 
-const chooseHandle = (world: GoogleWorld, page: Page, handle: string) =>
+const chooseHandle = (
+  world: GoogleWorld,
+  page: Page,
+  handle: string,
+  displayName = "Carol Example"
+) =>
   Effect.gen(function* () {
     const form = yield* formIn(page);
 
@@ -672,6 +727,7 @@ const chooseHandle = (world: GoogleWorld, page: Page, handle: string) =>
       world,
       formPost("/oauth/google/handle", {
         csrf: form.csrf,
+        displayName,
         handle,
         request: form.request,
       })
@@ -700,11 +756,11 @@ const propsFor = (world: GoogleWorld, response: Response) =>
     return summary?.grant.props;
   });
 
-const isPickHandle = (page: Page) => page.html.includes("Choose your handle");
+const isPickHandle = (page: Page) => page.html.includes("Set up your profile");
 
 describe("coming back from Google", () => {
   it.live(
-    "asks a first-time Google account for a handle, then signs it in as that handle",
+    "asks a first-time Google account for a handle and a name, Google's filled in, then signs it in as that handle with Google's email",
     () =>
       Effect.gen(function* () {
         const world = yield* googleWorld();
@@ -715,10 +771,11 @@ describe("coming back from Google", () => {
           { sub: "1042" }
         );
 
-        expect([page.response.status, isPickHandle(page)]).toStrictEqual([
-          200,
-          true,
-        ]);
+        expect([
+          page.response.status,
+          isPickHandle(page),
+          page.html.includes(`value="${googleNameOf("1042")}"`),
+        ]).toStrictEqual([200, true, true]);
 
         const signedIn = yield* chooseHandle(world, page, "carol");
 
@@ -726,9 +783,12 @@ describe("coming back from Google", () => {
         expect(yield* propsFor(world, signedIn)).toStrictEqual({
           handle: "carol",
         });
-        expect(
-          Option.isSome(yield* world.accounts.find(Handle.make("carol")))
-        ).toBeTruthy();
+        expect(yield* world.accounts.find(Handle.make("carol"))).toMatchObject(
+          Option.some({
+            displayName: "Carol Example",
+            email: googleEmailOf("1042"),
+          })
+        );
         expect(
           yield* world.identities.handleOf("google", "1042")
         ).toStrictEqual(Option.some(Handle.make("carol")));
@@ -782,6 +842,7 @@ describe("coming back from Google", () => {
         const second = new Request(
           formPost("/oauth/google/handle", {
             csrf: form.csrf,
+            displayName: "Carol Example",
             handle: "carol",
             request: form.request,
           }),
@@ -841,13 +902,13 @@ describe("coming back from Google", () => {
       Effect.gen(function* () {
         const world = yield* googleWorld();
 
-        yield* world.accounts.create(
-          Handle.make("carol"),
-          yield* hashPassword(
+        yield* world.accounts.create({
+          handle: Handle.make("carol"),
+          hash: yield* hashPassword(
             Redacted.make(passwordPepper),
             Redacted.make(alicePassword)
-          )
-        );
+          ),
+        });
 
         const page = yield* backFromGoogle(
           world,
@@ -867,6 +928,127 @@ describe("coming back from Google", () => {
           yield* world.identities.handleOf("google", "1042")
         ).toStrictEqual(Option.none());
       })
+  );
+});
+
+const withAlice = (world: GoogleWorld) =>
+  Effect.gen(function* () {
+    yield* world.accounts.create({
+      handle: Handle.make("alice"),
+      hash: yield* hashPassword(
+        Redacted.make(passwordPepper),
+        Redacted.make(alicePassword)
+      ),
+    });
+  });
+
+describe("Google's email", () => {
+  it.live(
+    "signs straight into the account that proved the same address, and links Google to it",
+    () =>
+      Effect.gen(function* () {
+        const world = yield* googleWorld();
+
+        yield* world.accounts.create({
+          email: Email.make(googleEmailOf("1042").toUpperCase()),
+          handle: Handle.make("alice"),
+          hash: yield* hashPassword(
+            Redacted.make(passwordPepper),
+            Redacted.make(alicePassword)
+          ),
+        });
+
+        const page = yield* backFromGoogle(
+          world,
+          yield* continueWithGoogle(world),
+          { sub: "1042" }
+        );
+
+        expect(page.response.status).toBe(302);
+        expect(yield* propsFor(world, page.response)).toStrictEqual({
+          handle: "alice",
+        });
+        expect(
+          yield* world.identities.handleOf("google", "1042")
+        ).toStrictEqual(Option.some(Handle.make("alice")));
+      })
+  );
+
+  it.live(
+    "makes no account for a Google account whose email Google did not verify",
+    () =>
+      Effect.gen(function* () {
+        const world = yield* googleWorld();
+
+        const page = yield* backFromGoogle(
+          world,
+          yield* continueWithGoogle(world),
+          { claims: { email_verified: false }, sub: "1042" }
+        );
+
+        expect([
+          page.response.status,
+          page.html.includes("did not share a verified email"),
+          isPickHandle(page),
+          Option.isNone(codeOf(page.response)),
+        ]).toStrictEqual([401, true, false, true]);
+        expect(
+          yield* world.identities.handleOf("google", "1042")
+        ).toStrictEqual(Option.none());
+      })
+  );
+
+  it.live(
+    "asks an account linked before emails for one, when another account holds Google's",
+    () =>
+      Effect.gen(function* () {
+        const world = yield* googleWorld();
+
+        yield* withAlice(world);
+        yield* world.identities.link("google", "5150", Handle.make("alice"));
+        yield* world.accounts.create({
+          email: Email.make(googleEmailOf("5150")),
+          handle: Handle.make("bob"),
+          hash: yield* hashPassword(
+            Redacted.make(passwordPepper),
+            Redacted.make(alicePassword)
+          ),
+        });
+
+        const page = yield* backFromGoogle(
+          world,
+          yield* continueWithGoogle(world),
+          { sub: "5150" }
+        );
+
+        expect([
+          page.response.status,
+          page.html.includes("Add your email"),
+          Option.isNone(codeOf(page.response)),
+        ]).toStrictEqual([200, true, true]);
+      })
+  );
+
+  it.live("refuses a display name by sign-up's rule, and asks again", () =>
+    Effect.gen(function* () {
+      const world = yield* googleWorld();
+
+      const page = yield* backFromGoogle(
+        world,
+        yield* continueWithGoogle(world),
+        { sub: "1042" }
+      );
+
+      const refused = yield* chooseHandle(world, page, "carol", " ").pipe(
+        Effect.flatMap(read)
+      );
+
+      expect([
+        refused.response.status,
+        isPickHandle(refused),
+        refused.html.includes("display name"),
+      ]).toStrictEqual([400, true, true]);
+    })
   );
 });
 
@@ -992,17 +1174,6 @@ describe("Google not confirming anyone", () => {
   );
 });
 
-const withAlice = (world: GoogleWorld) =>
-  Effect.gen(function* () {
-    yield* world.accounts.create(
-      Handle.make("alice"),
-      yield* hashPassword(
-        Redacted.make(passwordPepper),
-        Redacted.make(alicePassword)
-      )
-    );
-  });
-
 const signInAndLink = (world: GoogleWorld, handle: string, password: string) =>
   Effect.gen(function* () {
     const form = yield* formIn(yield* openSignIn(world));
@@ -1011,7 +1182,7 @@ const signInAndLink = (world: GoogleWorld, handle: string, password: string) =>
       world,
       formPost("/oauth/google/link", {
         csrf: form.csrf,
-        handle,
+        login: handle,
         password,
         request: form.request,
       })
@@ -1039,9 +1210,16 @@ describe("linking Google to an account signed in by password", () => {
         expect(yield* propsFor(world, linked.response)).toStrictEqual({
           handle: "alice",
         });
-        expect(
-          yield* world.identities.handleOf("google", "5150")
-        ).toStrictEqual(Option.some(Handle.make("alice")));
+        expect([
+          yield* world.identities.handleOf("google", "5150"),
+          Option.flatMap(
+            yield* world.accounts.find(Handle.make("alice")),
+            ({ email }) => Option.fromUndefinedOr(email)
+          ),
+        ]).toStrictEqual([
+          Option.some(Handle.make("alice")),
+          Option.some(googleEmailOf("5150")),
+        ]);
 
         const later = yield* backFromGoogle(
           world,
@@ -1069,7 +1247,7 @@ describe("linking Google to an account signed in by password", () => {
 
       expect([
         page.response.status,
-        page.html.includes("The handle or password is wrong."),
+        page.html.includes("The email, handle or password is wrong."),
         Option.isNone(locationOf(page.response)),
       ]).toStrictEqual([401, true, true]);
     })
@@ -1122,7 +1300,7 @@ describe("a sealed form, opened only where it was made", () => {
             `/oauth/google/start?request=${encodeURIComponent(form.request)}`,
             formPost("/authorize", {
               csrf: form.csrf,
-              handle: "alice",
+              login: "alice",
               password: alicePassword,
               request: form.request,
             }),

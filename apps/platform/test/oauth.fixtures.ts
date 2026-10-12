@@ -8,6 +8,7 @@ import { AccountsMemory } from "../src/auth/accounts/memory.ts";
 import { SignInAttemptsMemory } from "../src/auth/attempts/memory.ts";
 import { cliClientId } from "../src/auth/cli-client.ts";
 import { IdentitiesMemory } from "../src/auth/identities/memory.ts";
+import { MailerMemory } from "../src/auth/mailer/memory.ts";
 import { OAuthStore } from "../src/auth/oauth-store.ts";
 import { OAuthStoreMemory } from "../src/auth/oauth-store/memory.ts";
 import { oauthProvider, signInSettings } from "../src/auth/provider.ts";
@@ -46,72 +47,79 @@ const decodeTokenRecord = Schema.decodeUnknownEffect(
   Schema.Record(Schema.String, Schema.Unknown)
 );
 
-export const signInWorld = Effect.gen(function* () {
-  const config = yield* decodeEnv(worldEnv()).pipe(Effect.orDie);
+export const signInWorld = (options: { readonly mailFails?: boolean } = {}) =>
+  Effect.gen(function* () {
+    const config = yield* decodeEnv(worldEnv()).pipe(Effect.orDie);
 
-  const accounts = yield* Effect.provide(
-    Effect.service(Accounts),
-    AccountsMemory.layer
-  );
-
-  const store = OAuthStoreMemory.make();
-
-  const services = Layer.mergeAll(
-    Layer.succeed(Accounts, accounts),
-    Layer.succeed(OAuthStore, store),
-    IdentitiesMemory.layer,
-    Layer.succeed(Fetch, untouchable<Fetch["Service"]>("Fetch")),
-    SignInAttemptsMemory.layer,
-    signInSettings(config)
-  );
-
-  const { dispose, handler } = oauthProvider(services, platformFetch);
-
-  const send = (request: Request) => handler.fetch(request, fakeEnv(), context);
-
-  yield* Effect.acquireRelease(
-    Effect.sync(() => {
-      vi.stubGlobal("Cloudflare", {
-        compatibilityFlags: { global_fetch_strictly_public: true },
-      });
-      vi.stubGlobal("fetch", (input: RequestInfo | URL) =>
-        send(new Request(input))
-      );
-    }),
-    () =>
-      Effect.promise(dispose).pipe(
-        Effect.andThen(Effect.sync(() => vi.unstubAllGlobals()))
-      )
-  );
-
-  const fetch = (request: Request) => Effect.promise(() => send(request));
-
-  const expireTokens = Effect.gen(function* () {
-    const { keys } = yield* Effect.promise(() =>
-      store.list({ prefix: "token:" })
+    const accounts = yield* Effect.provide(
+      Effect.service(Accounts),
+      AccountsMemory.layer
     );
 
-    const now = yield* Clock.currentTimeMillis;
+    const store = OAuthStoreMemory.make();
 
-    for (const { metadata, name } of keys) {
-      const token = yield* Effect.promise(() =>
-        store.get(name, { type: "json" })
-      ).pipe(Effect.flatMap(decodeTokenRecord), Effect.orDie);
+    const mailer = yield* MailerMemory.make({
+      failing: options.mailFails === true,
+    });
 
-      yield* Effect.promise(() =>
-        store.put(
-          name,
-          JSON.stringify({ ...token, expiresAt: Math.floor(now / 1000) - 1 }),
-          { metadata }
+    const services = Layer.mergeAll(
+      Layer.succeed(Accounts, accounts),
+      mailer.layer,
+      Layer.succeed(OAuthStore, store),
+      IdentitiesMemory.layer,
+      Layer.succeed(Fetch, untouchable<Fetch["Service"]>("Fetch")),
+      SignInAttemptsMemory.layer,
+      signInSettings(config)
+    );
+
+    const { dispose, handler } = oauthProvider(services, platformFetch);
+
+    const send = (request: Request) =>
+      handler.fetch(request, fakeEnv(), context);
+
+    yield* Effect.acquireRelease(
+      Effect.sync(() => {
+        vi.stubGlobal("Cloudflare", {
+          compatibilityFlags: { global_fetch_strictly_public: true },
+        });
+        vi.stubGlobal("fetch", (input: RequestInfo | URL) =>
+          send(new Request(input))
+        );
+      }),
+      () =>
+        Effect.promise(dispose).pipe(
+          Effect.andThen(Effect.sync(() => vi.unstubAllGlobals()))
         )
+    );
+
+    const fetch = (request: Request) => Effect.promise(() => send(request));
+
+    const expireTokens = Effect.gen(function* () {
+      const { keys } = yield* Effect.promise(() =>
+        store.list({ prefix: "token:" })
       );
-    }
+
+      const now = yield* Clock.currentTimeMillis;
+
+      for (const { metadata, name } of keys) {
+        const token = yield* Effect.promise(() =>
+          store.get(name, { type: "json" })
+        ).pipe(Effect.flatMap(decodeTokenRecord), Effect.orDie);
+
+        yield* Effect.promise(() =>
+          store.put(
+            name,
+            JSON.stringify({ ...token, expiresAt: Math.floor(now / 1000) - 1 }),
+            { metadata }
+          )
+        );
+      }
+    });
+
+    return { accounts, expireTokens, fetch, mails: mailer.sent, store };
   });
 
-  return { accounts, expireTokens, fetch, store };
-});
-
-export type World = Effect.Success<typeof signInWorld>;
+export type World = Effect.Success<ReturnType<typeof signInWorld>>;
 
 export interface SignInForm {
   readonly cookie: string;

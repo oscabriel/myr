@@ -128,6 +128,7 @@ export const fakeEnv = (): Env => ({
   COOKIE_KEY: cookieKey,
   DRAFT_LIMIT: untouchable("DRAFT_LIMIT"),
   DRAFT_MODEL: "@cf/moonshotai/kimi-k2.7-code",
+  EMAIL: untouchable("EMAIL"),
   EVIDENCE: untouchable("EVIDENCE"),
   FRONT_PAGE: untouchable("FRONT_PAGE"),
   LANDER_ADAPTER: "container",
