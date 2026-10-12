@@ -1,10 +1,3 @@
-/**
- * `bun scripts/import-examples.ts`: the open-source repos the code browser
- * is previewed on, imported one at a time as the operator, skipped once a
- * platform lists them, recorded in the ledger as kept imports, on `demo`
- * as on a dev stage; and `--tags`' backfill, which pushes tags only and
- * never shows its token.
- */
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { ProjectExists } from "@repo/protocol/refusal";
@@ -276,7 +269,6 @@ describe("the tag backfill's commands", () => {
   });
 });
 
-/** A platform in memory: the projects it lists, and every call made to it. */
 const fakePlatform = (listed: readonly string[]) =>
   Effect.gen(function* () {
     const calls = yield* Ref.make<readonly string[]>([]);
@@ -325,7 +317,6 @@ const fakePlatform = (listed: readonly string[]) =>
     };
   });
 
-/** `importExamples(argv)` over `layer`, with the ledger in a temp folder: how it ended, and what it printed. */
 const ran = (
   argv: readonly string[],
   layer: Layer.Layer<ImportTarget | TagBackfill | Warmer>
@@ -557,7 +548,6 @@ describe("bun scripts/import-examples.ts", () => {
         const ledgerFile = path.join(dir, "created.jsonl");
         const platform = yield* fakePlatform(["anyhow", "ky"]);
 
-        // An earlier run imported anyhow; ky is someone else's project.
         yield* fs.writeFileString(
           ledgerFile,
           `${JSON.stringify({ at: "2026-10-08T20:00:00.000Z", by: "import", kind: "project", name: "anyhow", stage: "dev-oscabriel" })}\n`
@@ -588,8 +578,6 @@ describe("bun scripts/import-examples.ts", () => {
 
         const ledgerFile = path.join(dir, "created.jsonl");
 
-        // An earlier run imported anyhow and gum; the platform lists anyhow
-        // and ky (someone else's project), and gum not yet.
         const platform = yield* fakePlatform(["anyhow", "ky"]);
 
         yield* fs.writeFileString(
@@ -685,15 +673,10 @@ describe("bun scripts/import-examples.ts", () => {
   );
 });
 
-/** A call the platform never answered, as an edge timeout leaves it. */
 class NoAnswer extends Data.TaggedError("NoAnswer")<{
   readonly after: string;
 }> {}
 
-/**
- * `initUntilAnswered` over calls that answer `answers` in turn, the clock
- * moved past its waits: how it ended, and how many calls it made.
- */
 const askedAgain = (
   answers: readonly Effect.Effect<
     { readonly landed?: string },

@@ -1,23 +1,3 @@
-/**
- * How an agent reaches the platform, set as a reference: a synopsis of the
- * CLI's commands; the channels it connects through (remote MCP for a client
- * that signs in over OAuth, MCP over stdio through the CLI, the CLI itself,
- * a sentence any agent can be handed, and the skills), each saying when to
- * use it and giving the snippets to copy; the endpoints an agent reads; the
- * limits a project's policy sets by default; and the refusals. The web draws
- * it as `/agents` and serves `agentSetupMarkdown` as `/agents.md`.
- *
- * Pure: the hosts hand in the CLI's commands as this package's one list
- * holds them and the two hosts' URLs. Each client's MCP JSON comes from
- * `mcpServersFor`, the builder the plugin bundles use, and every name from
- * `Brand`, the MCP server's name being `Brand.slug`.
- *
- * Client facts, as each client's docs give them: Claude Code adds a remote
- * server with `claude mcp add --transport http <name> <url>` and signs in
- * from `/mcp`; Cursor reads `.cursor/mcp.json`'s `mcpServers`, a remote
- * entry being its `url`; VS Code reads `.vscode/mcp.json`'s `servers`, a
- * remote entry being `{type: "http", url}`.
- */
 import { Brand } from "@repo/brand";
 import { PolicyInput } from "@repo/protocol/domain/policy";
 import { groups } from "@repo/protocol/refusal";
@@ -30,34 +10,26 @@ import { span } from "./sections.ts";
 import { code, listed, page, printJson, table } from "./text.ts";
 
 export interface SetupSnippet {
-  /** What the snippet is, or where it goes: a client, a file. */
   readonly label: string;
   readonly language: "sh" | "json" | "text";
-  /** The text to copy, whole, with no trailing newline. */
   readonly text: string;
 }
 
 export interface SetupChannel {
   readonly title: string;
-  /** One plain sentence, no Markdown: the agent this channel is for. */
   readonly useWhen: string;
   readonly snippets: readonly SetupSnippet[];
 }
 
 export interface SetupInput {
-  /** Every CLI command, as `commandDocs` lists them. */
   readonly commands: readonly CommandDoc[];
-  /** The platform's origin: its MCP endpoint and the CLI's sign-in. */
   readonly platformUrl: string;
-  /** The web's origin: its Markdown, the CLI's downloads and the skills. */
   readonly webUrl: string;
 }
 
-/** Whether the CLI has the command whose words are `words`. */
 const has = (commands: readonly CommandDoc[], words: string) =>
   Arr.some(commands, ({ path }) => path.join(" ") === words);
 
-/** JSON as a snippet holds it: the generators' printing, without its final newline. */
 const json = (value: Parameters<typeof printJson>[0]) =>
   printJson(value).trimEnd();
 
@@ -145,7 +117,6 @@ const skills = ({ webUrl }: SetupInput): SetupChannel => ({
   useWhen: `Your agent loads skills: each project's contribute skill is listed, with its digest, at ${webUrl}/.well-known/agent-skills/index.json.`,
 });
 
-/** Every channel, in the order the page shows them; stdio only when the CLI has `mcp`. */
 export const agentSetup = (input: SetupInput): readonly SetupChannel[] => [
   remoteMcp(input),
   ...(has(input.commands, "mcp") ? [stdioMcp()] : []),
@@ -154,16 +125,11 @@ export const agentSetup = (input: SetupInput): readonly SetupChannel[] => [
   skills(input),
 ];
 
-// --- Synopsis -------------------------------------------------------------------
-
-/** One command as a synopsis gives it: how it is typed, and what it does. */
 export interface SynopsisLine {
-  /** The CLI's name, its words, its arguments, then each flag it takes in brackets. */
   readonly usage: string;
   readonly summary: string;
 }
 
-/** Every command, one line each, in the catalog's order. */
 export const synopsis = (
   commands: readonly CommandDoc[]
 ): readonly SynopsisLine[] =>
@@ -179,18 +145,12 @@ export const synopsis = (
     ].join(" "),
   }));
 
-// --- Endpoints ------------------------------------------------------------------
-
-/** One address an agent reads or calls. */
 export interface Endpoint {
-  /** The address whole; `<…>` marks a part the reader fills in. */
   readonly url: string;
   readonly what: string;
-  /** A plain GET in a browser shows it. */
   readonly readable: boolean;
 }
 
-/** Every address an agent reads, the web's first, then the platform's. */
 export const agentEndpoints = ({
   platformUrl,
   webUrl,
@@ -242,15 +202,11 @@ export const agentEndpoints = ({
   },
 ];
 
-// --- Limits ---------------------------------------------------------------------
-
-/** One limit and its value, as a person says them. */
 export interface Limit {
   readonly limit: string;
   readonly value: string;
 }
 
-/** What a policy that sets nothing takes: the defaults its schema fills in. */
 const policyDefaults = () =>
   Schema.decodeSync(
     Schema.Struct({
@@ -260,10 +216,6 @@ const policyDefaults = () =>
     })
   )({});
 
-/**
- * The limits an agent meets: each project's policy may set its own, so the
- * values are the defaults; the platform's own rate limits stand in front.
- */
 export const agentLimits = (): readonly Limit[] => {
   const { budget, caps, claims } = policyDefaults();
 
@@ -295,8 +247,6 @@ export const agentLimits = (): readonly Limit[] => {
     },
   ];
 };
-
-// --- Markdown -------------------------------------------------------------------
 
 const snippetLines = ({ label, language, text }: SetupSnippet) => [
   `${label}:`,
@@ -356,7 +306,6 @@ const refusalLines = ({ webUrl }: SetupInput) => [
   "",
 ];
 
-/** The whole reference as one Markdown document: `/agents.md`. */
 export const agentSetupMarkdown = (input: SetupInput) =>
   page([
     "# For agents",

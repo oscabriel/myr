@@ -1,7 +1,3 @@
-/**
- * The first guide: what the platform is, the four words a contributor
- * meets, the loop a change takes to `main`, and what a refusal looks like.
- */
 import { Brand } from "@repo/brand";
 
 import type { DocSource } from "./page.ts";

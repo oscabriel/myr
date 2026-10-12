@@ -1,14 +1,3 @@
-/**
- * `/llms-full.txt`: what an agent needs beyond the index, in one file.
- * `frontLlms`' text, then every refusal of the closed union (every group,
- * from `refusalCatalog`), the CLI's exit codes, how git meets the platform, how a landing
- * happens (ADR 0014), one line per event a watcher hears (those four from
- * `llms-sections.ts`, which the docs show too), and the guides for the
- * moments an answer goes sideways.
- *
- * Pure, and every name comes from `Brand`; a guide names a command only
- * when the catalog has it.
- */
 import type { ProjectListing } from "@repo/protocol/domain/front-page";
 import { Option } from "effect";
 
@@ -25,8 +14,6 @@ import { exitCodeSection } from "./refusals.ts";
 import { code, page } from "./text.ts";
 
 type Commands = readonly CommandDoc[];
-
-// --- Guides ---------------------------------------------------------------------
 
 const guides = (commands: Commands, platformUrl: string) => [
   "## Guides",
@@ -72,10 +59,6 @@ const guides = (commands: Commands, platformUrl: string) => [
   ).join("")}`,
 ];
 
-/**
- * `/llms-full.txt`: the index, then the refusals, exit codes, git,
- * landings, events and guides. The web serves it; the platform's `/` stays the index alone.
- */
 export const fullLlms = (input: {
   readonly commands: Commands;
   readonly projects: readonly ProjectListing[];

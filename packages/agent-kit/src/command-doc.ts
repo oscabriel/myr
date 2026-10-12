@@ -1,10 +1,3 @@
-/**
- * One row per CLI command, the list the platform's skill, the CLI's MCP
- * prompt and the web's `llms.txt` all render from. Contract rows
- * come from each contract's annotations; the hand-written commands are
- * listed here, and `apps/cli/test/commands-doc.test.ts` holds the list to
- * the CLI.
- */
 import {
   Cli,
   Description,
@@ -16,15 +9,10 @@ import type { Contracts } from "@repo/protocol/contracts";
 import { Array as Arr, Context, Order, Schema, SchemaAST } from "effect";
 
 export const CommandDoc = Schema.Struct({
-  /** The contract it calls: always for a contract's row, sometimes for a local one. */
   contract: Schema.optionalKey(Schema.NonEmptyString),
-  /** Every flag it takes, as typed: `--project`. */
   flags: Schema.Array(Schema.NonEmptyString),
-  /** It runs only with `--yes`; `--dry-run` prints what it would send. */
   needsApproval: Schema.Boolean,
-  /** The words after the CLI's name: `["env", "set"]`. */
   path: Schema.NonEmptyArray(Schema.NonEmptyString),
-  /** The arguments it takes in order, by name. */
   positional: Schema.Array(Schema.NonEmptyString),
   readOnly: Schema.Boolean,
   source: Schema.Literals(["contract", "local"]),
@@ -33,11 +21,6 @@ export const CommandDoc = Schema.Struct({
 
 export type CommandDoc = typeof CommandDoc.Type;
 
-/**
- * The CLI's hand-written commands. `init` and `env set` stand in for the
- * contracts they call (`initProject`, `setEnv`), so those contracts get no
- * row of their own.
- */
 export const localCommandDocs: readonly CommandDoc[] = [
   {
     flags: [
@@ -175,30 +158,17 @@ export const localCommandDocs: readonly CommandDoc[] = [
   },
 ];
 
-/**
- * The names of the local commands that call a contract: a contract whose
- * CLI name is one of them is that command, so it gets no row of its own.
- */
 const standIns = new Set(
   localCommandDocs.flatMap(({ contract, path }) =>
     contract === undefined ? [] : [path.join(" ")]
   )
 );
 
-/** A payload's field names, in the schema's order; none for a payload of no fields. */
 const fieldsOf = (ast: SchemaAST.AST) =>
   SchemaAST.isObjects(ast)
     ? ast.propertySignatures.map(({ name }) => String(name))
     : [];
 
-/**
- * One row per contract the CLI serves (its `Surfaces` include `cli`), in the
- * group's order, from its annotations: the `Cli` name split into words, its
- * positional fields, then every other payload field as a flag, `--json`,
- * `--yes` when it needs approval, and `--dry-run` unless it only reads. A
- * contract a local command calls under the same name is left to that
- * command's row.
- */
 export const contractCommandDocs = (
   group: typeof Contracts
 ): readonly CommandDoc[] =>
@@ -247,12 +217,5 @@ const byWords = Order.mapInput(Order.String, (doc: CommandDoc) =>
   doc.path.join(" ")
 );
 
-/**
- * Every command the CLI has, one row each, sorted by its words (so `ask`
- * and its subcommands come before `asks`): the contracts it projects and the
- * commands written by hand in it. The platform's skill, the CLI's MCP
- * prompt and the web's `llms.txt` all read this list;
- * `apps/cli/test/commands-doc.test.ts` holds it to the CLI's real tree.
- */
 export const commandDocs = (group: typeof Contracts): readonly CommandDoc[] =>
   Arr.sort([...contractCommandDocs(group), ...localCommandDocs], byWords);

@@ -1,10 +1,3 @@
-/**
- * Teardown: `bun infra/teardown.ts` prints a plan, and only
- * `--apply` deletes it. The plan is the ledger's throwaways that the account
- * still lists, never a stage's own namespaces, never `witness`, never the
- * seeded examples, and never a name the ledger doesn't hold, whatever it is
- * called.
- */
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import {
@@ -46,7 +39,6 @@ const projects = "projects-dev-oscabriel";
 
 const layers = "layers-dev-oscabriel";
 
-/** One ledger line, made by `by` on the dev stage; a repo's names its namespace. */
 const made = (
   by: Created["by"],
   kind: Created["kind"],
@@ -72,7 +64,6 @@ const repo = (name: string, namespace = projects): Listed => ({
 
 const namespace = (name: string): Listed => ({ kind: "namespace", name });
 
-/** A smoke run's project and repos, and a `seed --as` swarm copy's. */
 const ledger: readonly Created[] = [
   made("smoke", "project", "smoke-r1"),
   made("smoke", "repo", "smoke-r1", projects),
@@ -88,7 +79,6 @@ const ledger: readonly Created[] = [
   made("seed", "repo", "datekit-805--maintainers", layers),
 ];
 
-/** What the account lists: every ledger repo, and much that isn't the ledger's. */
 const listed: readonly Listed[] = [
   repo("datekit"),
   repo("burrow"),
@@ -107,7 +97,6 @@ const listed: readonly Listed[] = [
   namespace("witness"),
 ];
 
-/** Two imports of the preview repos, kept: each one's project and repo line. */
 const imports: readonly Created[] = [
   made("import", "project", "anyhow"),
   made("import", "repo", "anyhow", projects),
@@ -275,7 +264,6 @@ describe("the teardown plan", () => {
   });
 });
 
-/** A fresh ledger file in a temp dir, for the scope of one test. */
 const tempLedger = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -394,10 +382,7 @@ describe("the protected names", () => {
   });
 });
 
-/**
- * The account in memory: each namespace a memory `RepoHost` holding `repos`.
- * A namespace it doesn't hold, `witness` among them, dies when read.
- */
+/** A namespace it doesn't hold, `witness` among them, dies when read. */
 const memoryAccount = (repos: Readonly<Record<string, readonly string[]>>) =>
   Effect.gen(function* () {
     const read = yield* Ref.make<readonly string[]>([]);
@@ -428,7 +413,6 @@ const memoryAccount = (repos: Readonly<Record<string, readonly string[]>>) =>
         )
       );
 
-    /** Of `names`, those the namespace still holds. */
     const standing = (space: string, names: readonly string[]) =>
       Effect.gen(function* () {
         const host = yield* Effect.fromNullishOr(hosts.get(space)).pipe(
@@ -454,7 +438,6 @@ const memoryAccount = (repos: Readonly<Record<string, readonly string[]>>) =>
     };
   });
 
-/** A temp root with a ledger written from `entries` and no recording lock. */
 const tempRoot = (entries: readonly Created[]) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -469,7 +452,6 @@ const tempRoot = (entries: readonly Created[]) =>
     return { ledgerFile, lock: path.join(dir, ".recording") };
   });
 
-/** `teardown(argv)` over `account`: how it ended, and what it printed. */
 const tornDown = (
   argv: readonly string[],
   account: TeardownAccount["Service"],
@@ -496,7 +478,6 @@ const tornDown = (
     return { printed, result };
   });
 
-/** The dev stage's two namespaces as a smoke run, a swarm copy and the seed left them. */
 const devRepos = {
   [layers]: ["datekit--maintainers", "datekit-805--maintainers"],
   [projects]: [
@@ -511,7 +492,6 @@ const devRepos = {
   ],
 };
 
-/** The ledger: `ledger` above, one repo already gone, and one in `witness`. */
 const devLedger: readonly Created[] = [
   ...ledger,
   made("smoke", "repo", "smoke-r0", projects),
@@ -652,7 +632,6 @@ describe("bun infra/teardown.ts", () => {
     "lists the kept imports apart, each once, never in the plan, and deletes none of them with --apply",
     () =>
       Effect.gen(function* () {
-        // A `--tags` backfill records anyhow's repo a second time.
         const files = yield* tempRoot([
           ...devLedger,
           ...imports,

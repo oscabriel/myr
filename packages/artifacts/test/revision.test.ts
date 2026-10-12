@@ -4,7 +4,6 @@ import { Schema } from "effect";
 
 import { BranchName, RepoName } from "../src/repo-host.ts";
 
-// One `RepoName` across the product: the port names repos with the domain's.
 describe("a repo name", () => {
   it("is the domain's RepoName", () => {
     expect(RepoName).toBe(Ids.RepoName);

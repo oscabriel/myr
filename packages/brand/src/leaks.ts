@@ -7,7 +7,6 @@ export interface SourceFile {
 
 export interface BrandLeak {
   readonly path: string;
-  /** 1-based; 0 when the path itself carries the name. */
   readonly line: number;
   readonly text: string;
 }
@@ -62,6 +61,5 @@ const leaksIn = (file: SourceFile): readonly BrandLeak[] => {
   return [...inPath, ...inContent];
 };
 
-/** Every place outside the brand package and prose that spells the name. */
 export const findLeaks = (files: Iterable<SourceFile>): readonly BrandLeak[] =>
   [...files].flatMap(leaksIn);

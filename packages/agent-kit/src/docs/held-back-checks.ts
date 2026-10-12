@@ -1,8 +1,3 @@
-/**
- * The visibility guide: layers and their audiences, held-back checks and
- * what an answerer learns of them, the posture and the ledger anyone can
- * read, and the env shape with its write-only values.
- */
 import { Brand } from "@repo/brand";
 
 import { code } from "../text.ts";

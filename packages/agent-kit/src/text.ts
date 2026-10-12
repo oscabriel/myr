@@ -1,19 +1,9 @@
-/**
- * The few ways generated text is written: Markdown pages, code spans and
- * table cells that survive any command a project writes, and JSON with
- * sorted keys, so no byte depends on the order a value was built in.
- */
 import { Array as Arr, Order, Predicate } from "effect";
 import type { Schema } from "effect";
 
-/** A Markdown page: its lines joined, ending in exactly one newline. */
 export const page = (lines: readonly string[]) =>
   `${lines.join("\n").replace(/\n+$/u, "")}\n`;
 
-/**
- * A code span around any text: a command with a backtick in it gets a
- * longer fence, padded with spaces as Markdown asks.
- */
 export const code = (text: string) => {
   const runs = text.match(/`+/gu) ?? [];
   const longest = Math.max(0, ...runs.map((run) => run.length));
@@ -24,10 +14,8 @@ export const code = (text: string) => {
     : `${fence} ${text} ${fence}`;
 };
 
-/** A table cell: a pipe in it would end the cell. */
 export const cell = (text: string) => text.replaceAll("|", String.raw`\|`);
 
-/** A Markdown table: a header row, its rule, then one row per entry. */
 export const table = (
   header: readonly string[],
   rows: readonly (readonly string[])[]
@@ -37,7 +25,6 @@ export const table = (
   ...rows.map((row) => `| ${row.map(cell).join(" | ")} |`),
 ];
 
-/** Words joined as a sentence lists them: `a`, `a and b`, `a, b and c`. */
 export const listed = (words: readonly string[]) =>
   words.length < 2
     ? words.join("")
@@ -71,6 +58,5 @@ const sortKeys = (value: Schema.Json): Schema.Json => {
   return value;
 };
 
-/** JSON as the generators write it: sorted keys, two-space indents, a final newline. */
 export const printJson = (value: Schema.Json) =>
   `${JSON.stringify(sortKeys(value), null, 2)}\n`;

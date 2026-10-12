@@ -55,8 +55,6 @@ describe(findLeaks, () => {
     ).toStrictEqual([]);
   });
 
-  // Nothing in the repo is written from the brand any more, so no folder
-  // outside the brand package and prose may spell it.
   it("flags the name in a plugin's or a skill's JSON like any other file", () => {
     const content = `${Brand.cli} asks`;
 

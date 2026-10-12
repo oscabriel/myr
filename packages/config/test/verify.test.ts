@@ -19,8 +19,6 @@ const rootScripts = Effect.gen(function* () {
 });
 
 describe("verify", () => {
-  // The gate guards the product's own behaviour: the lockfile, lint and
-  // format, types, tests, the brand and the Workers' byte budgets.
   it.live("runs the product's checks, in order", () =>
     Effect.gen(function* () {
       const scripts = yield* rootScripts;

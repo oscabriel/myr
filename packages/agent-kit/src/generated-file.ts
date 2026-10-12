@@ -1,25 +1,14 @@
-/**
- * A generated file, and how it says it was generated. A Markdown file opens
- * with Agent Skills frontmatter whose `metadata` names who manages it, the
- * landing it came from and the SHA-256 of its body, so a stale copy (its
- * body differs from the one the current policy gives) and a hand-edited copy
- * (its body no longer hashes to what it records) are both detectable.
- */
 import { Brand } from "@repo/brand";
 import { LandedSha } from "@repo/protocol/ids";
 import { Array as Arr, Effect, Option, Schema } from "effect";
 
-/** One file a generator makes: where it goes, and every byte of it. */
 export interface GeneratedFile {
   readonly path: string;
   readonly content: string;
 }
 
-/** What a managed file says about itself, and the body it says it of. */
 export interface Managed {
-  /** The landing it was generated from; none for the platform's own files. */
   readonly landed: Option.Option<LandedSha>;
-  /** `sha256:<64 hex>`, as its frontmatter records it. */
   readonly hash: string;
   readonly body: string;
 }
@@ -29,11 +18,6 @@ const hex = (bytes: ArrayBuffer) =>
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
 
-/**
- * `sha256:<64 hex>` of the text's UTF-8 bytes, through WebCrypto, which the
- * platform Worker and Node both have. SHA-256 of bytes in memory cannot fail
- * for a reason a caller could handle, so a failure is a defect.
- */
 export const contentHash = (text: string): Effect.Effect<string> =>
   Effect.tryPromise(() =>
     crypto.subtle.digest("SHA-256", new TextEncoder().encode(text))
@@ -42,16 +26,10 @@ export const contentHash = (text: string): Effect.Effect<string> =>
     Effect.map((digest) => `sha256:${hex(digest)}`)
   );
 
-// Every value but the name is a YAML double-quoted string, written as JSON
-// writes one: a description has colons, and YAML would read a SHA made only
-// of digits as a number.
+// Values are JSON-quoted: a description has colons, and YAML would read a
+// SHA made only of digits as a number.
 const quoted = (value: string) => JSON.stringify(value);
 
-/**
- * A Markdown file with Agent Skills frontmatter: only the spec's `name`,
- * `description` and `metadata`, with `managed-by`, `landed` (when it came
- * from one) and `content-hash` (of `body`) under `metadata`.
- */
 export const frontmatter = (input: {
   readonly name: string;
   readonly description: string;
@@ -84,11 +62,9 @@ const decodeQuoted = Schema.decodeUnknownOption(
   Schema.fromJsonString(Schema.String)
 );
 
-/** A frontmatter value: a quoted one decoded, a plain one as it stands. */
 const valueOf = (raw: string) =>
   raw.startsWith('"') ? decodeQuoted(raw) : Option.some(raw);
 
-/** The `key: value` lines indented under `metadata:`, by key. */
 const metadataOf = (head: string) => {
   const lines = head.split("\n");
   const start = lines.indexOf("metadata:");
@@ -112,7 +88,6 @@ const metadataOf = (head: string) => {
 
 const decodeLanded = Schema.decodeUnknownOption(LandedSha);
 
-/** A Markdown file's frontmatter and the body after it; none without one. */
 const sections = (file: string) => {
   if (!file.startsWith(OPEN)) {
     return Option.none();
@@ -130,12 +105,6 @@ const sections = (file: string) => {
 
 const DESCRIPTION = "description: ";
 
-/**
- * The `description` a skill's frontmatter gives, quoted as `frontmatter`
- * writes it or plain as a hand-written skill may: none without the
- * frontmatter, or without a description in it. The skills index lists a
- * landed skill by it.
- */
 export const describedIn = (file: string): Option.Option<string> =>
   Option.flatMap(sections(file), ({ head }) =>
     Arr.findFirst(head.split("\n"), (line) =>
@@ -147,10 +116,6 @@ export const describedIn = (file: string): Option.Option<string> =>
     )
   );
 
-/**
- * What a file this platform manages says about itself: none for a file
- * without the frontmatter, or one someone else manages.
- */
 export const readManaged = (file: string): Option.Option<Managed> => {
   const split = sections(file);
 
@@ -175,17 +140,6 @@ export const readManaged = (file: string): Option.Option<Managed> => {
   });
 };
 
-/**
- * Whether the copy on disk differs from the file the current policy gives:
- * its body hashes to something other than what it records (edited by hand),
- * or what it records is not the current body's hash (generated from other
- * text). The landing alone never makes a copy stale: a landing that left
- * the text alone leaves the copy current. Some names the copy's own landing
- * and recorded hash. A copy without the frontmatter has no landing, and its
- * hash is the whole file's: it is current only when the current file has no
- * frontmatter either and the two are the same text, so a copy whose
- * frontmatter was taken off is stale.
- */
 export const isStale = (
   onDisk: string,
   current: GeneratedFile

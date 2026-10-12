@@ -1,7 +1,5 @@
 /**
- * `RepoHost` over the Workers `Artifacts` binding: how the deployed platform
- * keeps its repos. The binding's surprises, found by probing it live, come back
- * typed:
+ * The binding's surprises, found by probing it live:
  *
  * - errors are read by `code`, and by message when there is none, as under
  *   `wrangler dev` remote bindings;
@@ -10,21 +8,10 @@
  *   `main`;
  * - reads name a branch by its short name and a commit by its id, never
  *   `refs/…`, so `refs` and `push` go over git smart HTTP instead;
- * - a busy receive-pack is `HostBusy`;
- * - a call refused for Artifacts' rate limit (2,000 requests per 10 s per
- *   repo) is asked again from 250 ms apart, doubling, at most four more
- *   times; past that it fails as the call's own failure would.
+ * - a rate-limited call (2,000 requests per 10 s per repo) is retried.
  *
- * Refs and pushes use a token the adapter mints for the one call and revokes
- * after it; the token goes nowhere but the `Authorization` header of the
- * adapter's own requests. The day-long write token a create, a fork or an
- * import hands back is revoked at once: any write token can force-push
- * `main`, and no caller needs it. A repo still being
- * created is asked for again, from 250 ms apart, up to seven more times
- * (about 32 s); one still being imported up to sixteen (about 3 minutes),
- * each sleep at most 16 s. Every repo handle is disposed after use: after
- * each read, or, for reads in one `RepoSession`, once when the session
- * ends, so a view's many reads ask `get` for one handle.
+ * The write token a create, fork or import hands back is revoked at once:
+ * any write token can force-push `main`, and no caller needs it.
  */
 import {
   Data,
@@ -68,10 +55,6 @@ import {
 import type { Code } from "./artifacts-api.ts";
 import { listRefs, listTags, pushRefs } from "./smart-http.ts";
 
-/**
- * The codes a message names when the error carries none: Artifacts'
- * words, the fake's, and the code itself.
- */
 const MESSAGES = [
   [/not found/iu, "NOT_FOUND"],
   [/already exists/iu, "ALREADY_EXISTS"],
@@ -79,26 +62,19 @@ const MESSAGES = [
   [/internal error/iu, "INTERNAL_ERROR"],
 ] as const satisfies readonly (readonly [RegExp, Code])[];
 
-/**
- * What a call to the binding threw, read once: its `code`, or the one its
- * message names when it has none, and the error itself as the cause.
- */
 class Thrown extends Data.TaggedError("Thrown")<{
   readonly code: Option.Option<Code>;
   readonly message: string;
   readonly error: unknown;
 }> {}
 
-/** A fork that answered `INTERNAL_ERROR`, which may still have made the repo. */
 class MaybeForked extends Data.TaggedError("MaybeForked")<{
   readonly thrown: Thrown;
 }> {}
 
 /**
- * How Artifacts words a refusal for its rate limit. ASSUMPTION: none has
- * been seen live and its error codes list none, so it is read from a code
- * or a message that names the limit, as an HTTP 429's "Too Many Requests"
- * does.
+ * ASSUMPTION: no rate-limit refusal has been seen live and its error codes
+ * list none, so it is read from a code or a message that names the limit.
  */
 const RATE_LIMITED = /rate[ _-]?limit|too[ _-]many[ _-]requests/iu;
 
@@ -108,7 +84,6 @@ const isRateLimited = ({ error, message }: Thrown) =>
     Predicate.isString(error.code) &&
     RATE_LIMITED.test(error.code));
 
-/** From 250 ms apart, doubling, four more asks while the limit refuses. */
 const whileLimited = Schedule.exponential(Duration.millis(250)).pipe(
   Schedule.setInputType<Thrown>(),
   Schedule.while(
@@ -116,10 +91,6 @@ const whileLimited = Schedule.exponential(Duration.millis(250)).pipe(
   )
 );
 
-/**
- * A promise of the binding's, failing with what it threw, read; asked
- * again while Artifacts' rate limit refuses it.
- */
 const attempt = <A>(run: () => Promise<A>) =>
   Effect.tryPromise({
     catch: (error) => {
@@ -142,10 +113,6 @@ const threw =
   (thrown: Thrown): boolean =>
     Option.contains(thrown.code, code);
 
-/**
- * An error the binding threw, as the port's: by `code` first, by message
- * when there is none. Anything else is a defect, with the error as its cause.
- */
 const fromArtifactsError = (
   name: RepoName,
   thrown: Thrown
@@ -163,7 +130,6 @@ const fromArtifactsError = (
     Match.orElse(({ error }) => Effect.die(error))
   );
 
-/** A call about the repo `name`, its errors read as the port's. */
 const call = <A>(name: RepoName, run: () => Promise<A>) =>
   attempt(run).pipe(
     Effect.catchTag("Thrown", (thrown) => fromArtifactsError(name, thrown))
@@ -171,7 +137,6 @@ const call = <A>(name: RepoName, run: () => Promise<A>) =>
 
 const asDefect = ({ error }: Thrown) => Effect.die(error);
 
-/** The port's reads and token calls fail only with `RepoNotFound`. */
 const onlyNotFound = <A, R>(
   effect: Effect.Effect<A, RepoNotFound | RepoExists | ForkInProgress, R>
 ) =>
@@ -181,10 +146,8 @@ const onlyNotFound = <A, R>(
 
 const main = RefName.make("refs/heads/main");
 
-/** How long a token minted for one call lives; it is revoked after the call. */
 const CALL_TOKEN_TTL = Duration.minutes(5);
 
-/** The codes `import` refuses a source with. */
 const IMPORT_REFUSALS: ReadonlySet<Code> = new Set(NO_SOURCE);
 
 const bytesOf = (blob: Blob) =>
@@ -229,12 +192,7 @@ const entriesOf = (entries: readonly ArtifactsTreeEntry[]) =>
     })
   ).pipe(Effect.orDie);
 
-/**
- * How many times `get` is asked again while the repo is still being made:
- * a create about 32 s in all, and an import, which copies a whole history
- * and may outlast `import()` itself, about 3 minutes. Anything else is
- * never asked again.
- */
+/** An import copies a whole history and may outlast `import()` itself. */
 const asksWhileMaking = (thrown: Thrown) =>
   Match.value(thrown).pipe(
     Match.when(threw("CREATE_IN_PROGRESS"), () => 7),
@@ -242,11 +200,6 @@ const asksWhileMaking = (thrown: Thrown) =>
     Match.orElse(() => 0)
   );
 
-/**
- * From 250 ms apart, doubling, each sleep at most 16 s: 250 ms … 16 s for a
- * create's seven asks (31.75 s), then 16 s apart for an import's nine more
- * (175.75 s in all).
- */
 const whileMaking = Schedule.min([
   Schedule.exponential(Duration.millis(250)),
   Schedule.spaced(Duration.seconds(16)),
@@ -255,20 +208,18 @@ const whileMaking = Schedule.min([
   Schedule.while(({ attempt: asked, input }) => asked <= asksWhileMaking(input))
 );
 
-/** A handle to `name`, asked for again while the repo is still being made. */
 const handleOf = (binding: Artifacts, name: RepoName) =>
   attempt(() => binding.get(name)).pipe(
     Effect.retry(whileMaking),
     Effect.catchTag("Thrown", (thrown) => fromArtifactsError(name, thrown))
   );
 
-/** Gives a handle back: the binding's handles are RPC stubs. */
+/** The binding's handles are RPC stubs, so each is disposed. */
 const disposeOf = (repo: ArtifactsRepo) =>
   Effect.sync(() => {
     repo[Symbol.dispose]();
   });
 
-/** `use` over a handle to `name`, disposed after, whatever `use` came to. */
 const withRepo = <A, E, R>(
   binding: Artifacts,
   name: RepoName,
@@ -281,9 +232,8 @@ const withRepo = <A, E, R>(
   );
 
 /**
- * The repo `made` names, its initial write token revoked: nothing the
- * adapter's callers do needs it. A revoke that fails is logged, never the
- * call's failure: the repo was made, and the token went nowhere.
+ * The initial write token is revoked: no caller needs it. A failed revoke is
+ * logged, never the call's failure: the repo was made.
  */
 const withoutToken = (
   binding: Artifacts,
@@ -302,10 +252,6 @@ const withoutToken = (
     Effect.as({ name, remote: made.remote })
   );
 
-/**
- * A token for one call, revoked when the scope closes, and the repo's
- * remote: what a smart-HTTP call to the repo needs.
- */
 const access = (name: RepoName, repo: ArtifactsRepo, scope: TokenScope) =>
   Effect.gen(function* () {
     const { remote } = yield* call(name, () => repo.info());
@@ -327,7 +273,7 @@ const refsOf = (name: RepoName, repo: ArtifactsRepo) =>
     })
   );
 
-/** The repo's tags over smart HTTP, peeled: the binding lists no refs. */
+/** Over smart HTTP: the binding lists no refs. */
 const tagsOf = (name: RepoName, repo: ArtifactsRepo) =>
   Effect.scoped(
     Effect.gen(function* () {
@@ -339,8 +285,7 @@ const tagsOf = (name: RepoName, repo: ArtifactsRepo) =>
 
 /**
  * After a 500 and then an already-exists or a second 500, the fork may be
- * made: it is, if it lists `main`. Otherwise it is still being made, or
- * was undone; either way the caller tries again later.
+ * made: it is, if it lists `main`.
  */
 const confirmed = (binding: Artifacts, name: RepoName) =>
   withRepo(binding, name, (repo) =>
@@ -362,10 +307,6 @@ const confirmed = (binding: Artifacts, name: RepoName) =>
     })
   );
 
-/**
- * One fork call. The base's absence names the base; any other refusal names
- * the target, and a 500 is `MaybeForked`, since it may have made the target.
- */
 const forkOnce = (binding: Artifacts, base: RepoName, name: RepoName) =>
   withRepo(binding, base, (repo) =>
     attempt(() => repo.fork(name)).pipe(
@@ -383,10 +324,7 @@ const forkOnce = (binding: Artifacts, base: RepoName, name: RepoName) =>
     )
   ).pipe(Effect.flatMap((made) => withoutToken(binding, made, name)));
 
-/**
- * Whether the repo holds `id` as a blob or a commit: `readBlob` answers
- * `null` for any other kind, and `readCommit` throws for a non-commit.
- */
+/** `readBlob` answers `null` for any other kind, and `readCommit` throws for a non-commit. */
 const blobOrCommit = (name: RepoName, repo: ArtifactsRepo, id: string) =>
   call(name, () => repo.readBlob(id)).pipe(
     Effect.flatMap((blob) =>
@@ -410,8 +348,6 @@ const treeAt = (name: RepoName, repo: ArtifactsRepo, tree: string) =>
     Effect.flatMap((found) =>
       found === null ? Effect.succeedNone : Effect.asSome(entriesOf(found))
     ),
-    // A blob's or a commit's id names no tree, as on the other stores;
-    // any other failure stays one.
     Effect.catchIf(threw("INTERNAL_ERROR"), ({ error }) =>
       blobOrCommit(name, repo, tree).pipe(
         Effect.flatMap((other) =>
@@ -516,11 +452,6 @@ const make = (binding: Artifacts) =>
     // every call's finalizers would wait for the layer's end.
     const fetch = yield* Fetch;
 
-    /**
-     * A read of `name`'s, failing only with `RepoNotFound`: over the
-     * session's handle to `name` when the read runs in a `RepoSession`,
-     * else over a handle of its own.
-     */
     const read = <A>(
       name: RepoName,
       use: (
@@ -633,10 +564,6 @@ const make = (binding: Artifacts) =>
     });
   });
 
-/**
- * Artifacts through the Workers binding, the platform's `RepoHost` in
- * production. Refs and pushes go over git smart HTTP through `Fetch`.
- */
 export const RepoHostBinding = {
   layer: (binding: Artifacts): Layer.Layer<RepoHost, never, Fetch> =>
     Layer.effect(RepoHost, make(binding)),

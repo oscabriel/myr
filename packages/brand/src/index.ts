@@ -1,8 +1,3 @@
-/**
- * The product's name and every identifier made from it. Nothing outside this
- * package spells the name; `brand:check` holds that, and the acceptance script
- * renames the slug at random to prove it.
- */
 const slug = "myr";
 
 export const Brand = {

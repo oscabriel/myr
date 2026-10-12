@@ -48,12 +48,10 @@ const namespace = "projects-test";
 
 const api = `https://api.cloudflare.com/client/v4/accounts/${accountId}/artifacts/namespaces/${namespace}`;
 
-/** Where the store's repos are served, in Artifacts' shape: `<base>/<name>.git`. */
 const remoteBase = `https://${accountId}.artifacts.test/git/${namespace}`;
 
 const apiToken = "cf-api-token-for-the-rest-tests";
 
-/** One request as the test's `Fetch` saw it, with its reply. */
 interface Seen {
   readonly method: string;
   readonly url: string;
@@ -70,7 +68,6 @@ const textOf = (message: Request | Response) =>
 
 const decodeJson = Schema.decodeEffect(Schema.fromJsonString(Schema.Unknown));
 
-/** What a token's mint answered, as far as these tests read it. */
 const decodeMinted = Schema.decodeEffect(
   Schema.fromJsonString(
     Schema.Struct({
@@ -79,12 +76,6 @@ const decodeMinted = Schema.decodeEffect(
   )
 );
 
-/**
- * The REST adapter over a fake API on local disk: a `RepoHostLocal` in a
- * temporary directory, behind `fakeRest`, with its remotes served by real
- * `git http-backend` over the same directory. Every request and reply the
- * adapter's `Fetch` carries is recorded.
- */
 const world = (
   options: Omit<FakeRestOptions, "accountId" | "namespace" | "token"> = {}
 ) =>
@@ -165,7 +156,6 @@ const world = (
 
 type World = Effect.Success<ReturnType<typeof world>>;
 
-/** The REST adapter over a `Fetch` that gives every request the same reply. */
 const answering = (reply: () => Response) =>
   RepoHostRest.layer({
     accountId,
@@ -177,14 +167,12 @@ const answering = (reply: () => Response) =>
     )
   );
 
-/** A refusal in Cloudflare's v4 envelope. */
 const refused = (status: number, code: number, message: string) => () =>
   Response.json(
     { errors: [{ code, message }], messages: [], result: null, success: false },
     { status }
   );
 
-/** A test body over a fresh world, with the REST adapter's `RepoHost` in scope. */
 const within = <A, E>(
   body: (
     world: World
@@ -212,7 +200,6 @@ describeRepoHost(
   }
 );
 
-/** A repo `name` with one commit on `main`, and the client that made it. */
 const seeded = (name: RepoName) =>
   Effect.gen(function* () {
     const repos = yield* RepoHost;
@@ -229,7 +216,6 @@ const seeded = (name: RepoName) =>
     return { client, first };
   });
 
-/** The requests to one REST route, by method and path under the namespace. */
 const requestsTo = (
   seen: Ref.Ref<readonly Seen[]>,
   method: string,
@@ -244,7 +230,6 @@ const requestsTo = (
     )
   );
 
-/** A commit's tree, read from the client that wrote it. */
 const treeOf = (source: PushSource, oid: CommitSha) =>
   Effect.promise(() => readCommit({ ...source, oid })).pipe(
     Effect.map(({ commit }) => ObjectId.make(commit.tree))
@@ -674,9 +659,6 @@ describe("reads whose replies the REST docs do not show", () => {
       )
   );
 
-  // The binding throws `INTERNAL_ERROR` for a read of the wrong kind; the
-  // fake's REST API answers 500 there (an ASSUMPTION), and the other stores
-  // read no tree.
   it.live("reads no tree at a blob's id or a commit's id", () =>
     within(() =>
       Effect.gen(function* () {

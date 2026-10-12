@@ -29,21 +29,15 @@ const path = RepoPath.make("src/a.ts");
 
 const text = (bytes: Uint8Array) => new TextDecoder().decode(bytes);
 
-/** No object in any repo here has this id. */
 const absent = ObjectId.make("0".repeat(40));
 
-/** When a commit was written, and when committed: two different instants. */
 const authored = 1_700_000_000;
 
 const committed = 1_700_000_500;
 
-/** The test client's repo, which a push takes objects from. */
 type Source = Parameters<RepoHost["Service"]["push"]>[1];
 
-/**
- * A commit on `parent`'s tree written by hand, so its author and committer
- * times differ (the test client stamps both alike).
- */
+/** Written by hand, so its author and committer times differ (the test client stamps both alike). */
 const timedCommit = (source: Source, parent: CommitSha) =>
   Effect.gen(function* () {
     const { commit } = yield* Effect.promise(() =>
@@ -76,13 +70,11 @@ const timedCommit = (source: Source, parent: CommitSha) =>
     return CommitSha.make(oid);
   });
 
-/** When a commit was written and committed, as a store read it. */
 const times = (commit: Commit) => ({
   authoredAt: commit.authoredAt,
   committedAt: commit.committedAt,
 });
 
-/** An annotated tag object naming `commit`; its id, as a push sends it. */
 const annotatedTag = (source: Source, name: string, commit: CommitSha) =>
   Effect.map(
     Effect.promise(() =>
@@ -106,12 +98,7 @@ const annotatedTag = (source: Source, name: string, commit: CommitSha) =>
     (oid) => CommitSha.make(oid)
   );
 
-/** What an adapter's run of the suite adds to the shared cases. */
 export interface RepoHostSuite {
-  /**
-   * The URL `importFrom` reads the repo `name` from, as this adapter's
-   * stand-in for a public remote. Without one, the import cases don't run.
-   */
   readonly importUrl?: (
     name: RepoName
   ) => Effect.Effect<string, never, RepoHost>;
@@ -124,12 +111,6 @@ export interface RepoHostSuite {
   readonly danglingHead?: boolean;
 }
 
-/**
- * What every RepoHost adapter must do, written against the port. `/memory`,
- * `/local`, `/binding` (over testkit's fake Artifacts on `/local`) and
- * `/rest` (over a fake REST API on `/local`) run it on every `verify`;
- * `binding-live.test.ts` runs it against live Artifacts when asked.
- */
 export const describeRepoHost = (
   adapter: string,
   host: Layer.Layer<RepoHost>,
@@ -573,8 +554,6 @@ export const describeRepoHost = (
       }).pipe(Effect.provide(host))
     );
 
-    // A fork shares what it inherited and nothing a sibling
-    // adds later.
     it.effect("keeps each fork's own commits to itself", () =>
       Effect.gen(function* () {
         const repos = yield* RepoHost;

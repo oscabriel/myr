@@ -1,9 +1,3 @@
-/**
- * datekit's maintainers layer and the seed's layer step: the
- * held-back checks datekit keeps in `layers/maintainers/`, each citing the
- * clause it enforces, and the seed pushing them to the private namespace
- * after the public project, never into the public tree.
- */
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import {
@@ -37,10 +31,8 @@ import {
 import { Handle, keyOf, RepoName } from "../../protocol/src/ids.ts";
 import { repoRoot } from "./root.ts";
 
-/** The config folder's name, from the brand. */
 const config = Brand.configDir;
 
-/** Every file of datekit's maintainers layer, as the layer repo holds it. */
 const layerFiles = [
   `${config}/layer.json`,
   `${config}/layer.ts`,
@@ -105,14 +97,11 @@ describe("planSeed, for a project with a layer", () => {
   );
 });
 
-// ------------------------------------------------------------- the layer
-
 const example = "examples/datekit";
 
 const text = <E>(bytes: Stream.Stream<Uint8Array, E>) =>
   bytes.pipe(Stream.decodeText(), Stream.mkString);
 
-/** `command` run in `cwd`: how it ended, and both streams. */
 const run = (cwd: string, command: string, args: readonly string[]) =>
   Effect.scoped(
     Effect.gen(function* () {
@@ -131,7 +120,6 @@ const run = (cwd: string, command: string, args: readonly string[]) =>
     })
   );
 
-/** A file of the example, as text. */
 const exampleFile = (file: string) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -140,14 +128,8 @@ const exampleFile = (file: string) =>
     return yield* fs.readFileString(path.join(yield* repoRoot, example, file));
   });
 
-// Every import of the sdk by the name config files use.
 const SDK = new RegExp(`(["'])${Brand.cliPackage}/rules\\1`, "gu");
 
-/**
- * What a config module's default export is, as data: the module run by
- * bun with its sdk import pointed at the sdk's source, as the rules
- * evaluator's `/bun` adapter runs config code, then printed as JSON.
- */
 const defaultExportOf = (source: string) =>
   Effect.scoped(
     Effect.gen(function* () {
@@ -168,7 +150,6 @@ const defaultExportOf = (source: string) =>
 
       const ran = yield* run(dir, "bun", ["main.ts"]);
 
-      // What bun said shows only when it failed.
       expect({
         code: ran.code,
         said: ran.code === 0 ? "" : ran.output,
@@ -180,13 +161,11 @@ const defaultExportOf = (source: string) =>
     })
   );
 
-/** The layer's file at `file`, as text. */
 const inLayer = (plan: SeedPlan, file: string) =>
   new TextDecoder().decode(
     plan.layers[0]?.files.find(({ path }) => path === file)?.content
   );
 
-/** datekit's plan, its maintainers layer, the manifest and the policy. */
 const datekit = Effect.gen(function* () {
   const plan = yield* planSeed(example);
   const layer = yield* Effect.fromNullishOr(plan.layers[0]);
@@ -202,7 +181,6 @@ const datekit = Effect.gen(function* () {
   return { layer, manifest, plan, policy };
 });
 
-/** The lanes datekit's `project.ts` runs on every answer: the public checks, by name. */
 const publicLanes = Effect.gen(function* () {
   const { run: block } = yield* Schema.decodeUnknownEffect(
     Schema.Struct({
@@ -215,7 +193,6 @@ const publicLanes = Effect.gen(function* () {
   return Object.entries(block.checks);
 });
 
-/** A heading's anchor, as a README link names it: `## Format patterns` is `format-patterns`. */
 const anchorOf = (heading: string) =>
   heading
     .toLowerCase()
@@ -223,7 +200,6 @@ const anchorOf = (heading: string) =>
     .trim()
     .replaceAll(/\s+/gu, "-");
 
-/** Each README section's text by its anchor: from its heading to the next. */
 const sectionsOf = (readme: string) => {
   const sections = new Map<string, string>();
   let current = "";
@@ -345,7 +321,6 @@ describe("datekit's maintainers layer", () => {
 
         expect(unquoted).toStrictEqual([]);
 
-        // Both kinds of source are cited.
         expect(
           Array.dedupe(
             manifest.checks.map(({ clause }) => clause.source)
@@ -383,7 +358,6 @@ describe("datekit's maintainers layer", () => {
   );
 });
 
-/** A folder holding `trees` one over another, each file at its path. */
 const treeOf = (...trees: readonly (readonly SeedFile[])[]) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -441,7 +415,6 @@ describe("datekit's held-back checks, run", () => {
                 `./checks/held-back/${area}`,
               ]);
 
-              // Each lane as the Checker runs it: its command under `sh -c`.
               const failedLanes = yield* Effect.filter(lanes, ([, command]) =>
                 Effect.map(
                   run(bad, "sh", ["-c", command]),
@@ -468,12 +441,8 @@ describe("datekit's held-back checks, run", () => {
   );
 });
 
-// ------------------------------------------------------------- the world
-
-/** A vouched contributor to datekit, who reads no layer. */
 const bram = Handle.make("bram");
 
-/** Paths a public tree must never hold: the layer's, or the example's folder of layers. */
 const isLayerPath = (path: string) =>
   ["layers/", "checks/held-back/", ".agents/maintainers/"].some((prefix) =>
     path.startsWith(prefix)
@@ -501,8 +470,6 @@ describe("runSeed, for a project with a layer", () => {
             "Layer datekit--maintainers: done",
           ]);
 
-          // A maintainer's clone: the layer's files on main, and a branch
-          // for each known-bad commit its manifest names.
           const refs = yield* Effect.flatMap(
             target.refsAt(layer.repo, plan.decider),
             Effect.fromOption
@@ -538,8 +505,6 @@ describe("runSeed, for a project with a layer", () => {
             ].toSorted(),
           });
 
-          // A contributor's clone of the layer is turned away, and the
-          // public tree holds visibility.ts and nothing of the layer.
           const refused = yield* Effect.flip(target.refsAt(layer.repo, bram));
 
           const published = yield* target.pathsAt(
@@ -560,9 +525,6 @@ describe("runSeed, for a project with a layer", () => {
             visibility: true,
           });
 
-          // The public ledger declares the layer and the posture its
-          // config states. (Each area's counts are published when its
-          // checks are admitted: 615.)
           const ledger = yield* Client.use((client) =>
             client.ledger({ project: plan.project })
           ).pipe(Effect.provide(target.clientFor(bram)));
@@ -590,7 +552,6 @@ describe("runSeed, for a project with a layer", () => {
               "Open with sealed evidence · sealed checks in export, parser",
           });
 
-          // A second run finds every step done and moves no ref.
           const again = yield* runSeed(plan);
           const after = yield* target.refsAt(layer.repo, plan.decider);
 

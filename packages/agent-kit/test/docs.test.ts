@@ -1,10 +1,3 @@
-/**
- * The docs: guides written for people, then a reference read from the
- * sources that define it (the CLI's commands, the refusal union, the
- * events, the MCP tools and the import plan's copy). Every command a page
- * names is one the CLI has, with flags it takes, and every link between
- * pages names a page that exists.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { Contracts, Surfaces } from "@repo/protocol/contracts";
@@ -32,7 +25,6 @@ const markdownOf = (slug: string) =>
     onSome: ({ markdown }) => markdown,
   });
 
-/** Every code span and shell line in `markdown` that runs the CLI, as its words. */
 const cliSpans = (markdown: string) =>
   [
     ...[...markdown.matchAll(/`(?<span>[^`\n]+)`/gu)].map(
@@ -45,7 +37,6 @@ const cliSpans = (markdown: string) =>
       : []
   );
 
-/** The catalog's command these words run: the longest path they start with. */
 const commandOf = (words: readonly string[]) =>
   commands
     .filter(({ path }) => path.every((word, at) => words[at] === word))

@@ -1,12 +1,3 @@
-/**
- * smoke's core loop: `bun scripts/smoke.ts --stage <s> --loop`
- * makes a throwaway project, opens an ask red first, claims it, pushes an
- * answer that reaches outside the ask's territory and hears `OutOfScope`
- * in git's own output, pushes the fix, and reads back its landing and its
- * verdict note, all through the CLI and git as a person would. Here it runs
- * against the Node world (`apps/platform/test/serve-world.ts`), reached
- * over HTTP and git as a stage is.
- */
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import {
@@ -37,21 +28,17 @@ const decider = Handle.make("ines-v");
 
 const answerer = Handle.make("bram");
 
-/** Each person's token in the world: no secret, it never leaves this machine. */
 const tokens = {
   answerer: Redacted.make("bram-smoke-loop-world-token-0123456789abcdef"),
   decider: Redacted.make("ines-v-smoke-loop-world-token-0123456789abcd"),
 };
 
-/** A person in a trailer: their handle and the address the platform gives them. */
 const credited = (handle: string) =>
   `${handle} <${handle}@users.${Brand.domain}>`;
 
-/** All a byte stream says, as text. */
 const textOf = <E>(bytes: Stream.Stream<Uint8Array, E>) =>
   bytes.pipe(Stream.decodeText(), Stream.mkString);
 
-/** `git ls-remote <remote> <ref>` as anyone, with no credential at all. */
 const anonymousTip = (remote: string, ref: string) =>
   Effect.scoped(
     Effect.gen(function* () {
@@ -179,10 +166,7 @@ describe("smokeLoop, against the Node world", () => {
   );
 });
 
-/**
- * A spawner that runs nothing: each command it was asked for, by name. Any
- * command fails, so a run that reached one could not pass by accident.
- */
+/** Any command fails, so a run that reached one could not pass by accident. */
 const refusing = Effect.gen(function* () {
   const asked = yield* Ref.make<readonly string[]>([]);
 
@@ -215,18 +199,11 @@ const refusing = Effect.gen(function* () {
   };
 });
 
-/**
- * A platform scripted at the process boundary: `status` names the decider,
- * `projects` lists `listed`, git does what it is asked, and `init` makes
- * the project on the platform and then fails (as a push that answered 500
- * after the project was made did on a dev stage). What was spawned is kept, git by
- * its subcommand and the CLI by its command.
- */
+/** `init` makes the project and then fails, as a push that answered 500 after making it did. */
 const scripted = (listed: readonly string[]) =>
   Effect.gen(function* () {
     const asked = yield* Ref.make<readonly string[]>([]);
 
-    // Each CLI command's `--json` envelope, as the CLI prints it.
     const replies = new Map([
       [
         "status",
@@ -267,7 +244,6 @@ const scripted = (listed: readonly string[]) =>
           ? [command.command, command.args]
           : ["a pipe", []];
 
-        // The CLI runs as `bun <entry> <command> … --json`.
         const said =
           program === "bun" ? (args[1] ?? "") : `${program} ${args[0] ?? ""}`;
 
@@ -297,10 +273,6 @@ const scripted = (listed: readonly string[]) =>
     };
   });
 
-/**
- * The loop for run `r1` on the scripted platform, with the ledger in a file
- * of its own: how it ended, the CLI commands it ran, and the ledger's lines.
- */
 const loopOnScripted = (listed: readonly string[]) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;

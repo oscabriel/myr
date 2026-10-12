@@ -1,8 +1,7 @@
 /**
- * The binding against live Artifacts. Opt-in, never in `verify`: it runs only
- * with `LIVE_ARTIFACTS=1` and `LIVE_ARTIFACTS_HARNESS` naming, by absolute
- * path, a harness module outside this repo (live-harness code lives
- * outside it). The harness exports `live()`, which resolves to
+ * Opt-in, never in `verify`: runs only with `LIVE_ARTIFACTS=1` and
+ * `LIVE_ARTIFACTS_HARNESS` naming, by absolute path, a harness module outside
+ * this repo. The harness exports `live()`, which resolves to
  *
  * ```ts
  * {
@@ -12,10 +11,6 @@
  *   dispose: () => Promise<void>;             // the proxy's
  * }
  * ```
- *
- * Every repo name gets a fresh prefix per test, since the contract suite uses
- * fixed names, and every repo a test made is deleted when it ends. It never
- * runs against the `witness` namespace.
  */
 import { describe } from "@effect/vitest";
 import { Data, Effect, FiberSet, Layer, Predicate, Schema } from "effect";
@@ -24,7 +19,6 @@ import { Fetch, FetchFailed } from "../src/fetch.ts";
 import { RepoHostBinding } from "../src/repo-host/binding.ts";
 import { describeRepoHost } from "./repo-host-contract.ts";
 
-/** The namespace another project owns. */
 const FORBIDDEN = "witness";
 
 const harnessPath = process.env.LIVE_ARTIFACTS_HARNESS;
@@ -47,10 +41,8 @@ const Send = Schema.declare(
     Predicate.isFunction(input)
 );
 
-/** What the harness's module exports. */
 const HarnessModule = Schema.Struct({ live: Start });
 
-/** What `live()` resolves to. */
 const Harness = Schema.Struct({
   binding: Schema.declare(
     (input): input is Artifacts =>
@@ -75,7 +67,6 @@ class HarnessFailed extends Data.TaggedError("HarnessFailed")<{
   readonly reason: string;
 }> {}
 
-/** The harness's `live()`, run once per test and disposed after it. */
 const harness = (path: string) =>
   Effect.acquireRelease(
     Effect.gen(function* () {
@@ -92,17 +83,12 @@ const harness = (path: string) =>
     ({ dispose }) => Effect.tryPromise(() => dispose()).pipe(Effect.ignore)
   );
 
-/** A fresh prefix: the suite's fixed names, unique to this test. */
 const freshPrefix = () =>
   `live-${crypto
     .getRandomValues(new Uint32Array(2))
     .reduce((text, word) => text + word.toString(36), "")}-`;
 
-/**
- * The live binding with every name prefixed, and every repo made through it
- * deleted when the scope closes. Each method is forwarded by name: a binding
- * and its handles are RPC stubs, whose methods a spread would not copy.
- */
+/** Each method is forwarded by name: RPC stubs' methods are not copied by a spread. */
 const prefixed = (binding: Artifacts) =>
   Effect.gen(function* () {
     const prefix = freshPrefix();
@@ -155,7 +141,6 @@ const prefixed = (binding: Artifacts) =>
     } satisfies Artifacts;
   });
 
-/** The live store's `Fetch`: the harness's fetch, failing as no response. */
 const fetchOver = (send: Harness["fetch"]) =>
   Fetch.of({
     fetch: (request) =>

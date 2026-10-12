@@ -1,9 +1,3 @@
-/**
- * The sections the contribute skill, the AGENTS.md block and the platform's
- * own skill are made of, each from the policy or the brand alone. None
- * names the landing, so a landing that leaves the policy's text alone
- * leaves every generated body, and its hash, as it was.
- */
 import { Brand } from "@repo/brand";
 import { RatchetMeasure } from "@repo/protocol/domain/check";
 import type { AskKind, CheckKind, ClaimRule } from "@repo/protocol/domain/kind";
@@ -20,13 +14,6 @@ const remote = Brand.slug;
 
 const notesRef = `refs/notes/${Brand.slug}`;
 
-// --- The loop ----------------------------------------------------------------
-
-/**
- * The five steps every answer takes: read and claim, work, check, push,
- * read the verdict. The same in every generated file, so an agent that read
- * one knows them all.
- */
 export const loopSteps = () => [
   `1. Read the ask, then claim it: ${cli("ask", "<ask>")}, then ${cli("claim", "<ask>")}. The claim prints your fork's remote; add it with ${code(`git remote add ${remote} <remote>`)}.`,
   "2. Work inside the ask's territory until its check passes.",
@@ -43,7 +30,6 @@ const unitsOfTime = [
   { ms: 1000, one: "second" },
 ] as const;
 
-/** A span as a person says it: `2 hours`, `1 day`, `90 minutes`. */
 export const span = (ms: number) => {
   const unit = unitsOfTime.find((each) => ms % each.ms === 0) ?? unitsOfTime[4];
 
@@ -52,11 +38,8 @@ export const span = (ms: number) => {
   return `${count} ${unit.one}${count === 1 ? "" : "s"}`;
 };
 
-/** What the project's policy says about holding a claim. */
 export const claimTerms = (policy: Policy) =>
   `A claim stays alive only while you push to it: after ${span(policy.claims.warnAfterMs)} without a push it is warned, and after ${span(policy.claims.lapseAfterMs)} it lapses. You may hold ${policy.caps.claimsPerPerson} ${policy.caps.claimsPerPerson === 1 ? "claim" : "claims"} at once in this project.`;
-
-// --- What an answer may change -------------------------------------------------
 
 const byName = <A>(name: (item: A) => string) =>
   Order.mapInput(Order.String, name);
@@ -86,11 +69,6 @@ const ratchetLines = (ratchets: Policy["ratchets"]) =>
       `- ${code(ratchet.name)}${ratchet.territory === undefined ? "" : ` in ${code(ratchet.territory)}`}: ${measureOf(ratchet.measure)}`
   );
 
-/**
- * The territory rule, the public files rule, the judge closure, the
- * weakening markers and the ratchets: each held by a refusal the gate
- * gives, which the section names.
- */
 export const changeSection = (policy: Policy) => {
   const { judge, modules, ratchets, weakening } = policy;
 
@@ -154,9 +132,6 @@ export const changeSection = (policy: Policy) => {
   ];
 };
 
-// --- The run block -------------------------------------------------------------
-
-/** The run block's lanes, by name. */
 export const lanesOf = (run: RunBlock) =>
   Arr.sort(
     Object.entries(run.checks),
@@ -182,8 +157,6 @@ export const runSection = (run: RunBlock) => [
   ),
   "",
 ];
-
-// --- Ask kinds -----------------------------------------------------------------
 
 const checkKindText = (kind: CheckKind, run: RunBlock) =>
   ({
@@ -247,12 +220,6 @@ export const kindsSection = (policy: Policy) =>
         ).flatMap((kind) => kindLines(kind, policy)),
       ];
 
-// --- No fence yet ----------------------------------------------------------------
-
-/**
- * Norms the generated files state that nothing checks yet, listed as such
- * rather than as rules. Without a project, the default `agents` policy.
- */
 export const unfencedNorms = (agents: Policy["agents"] = "trailer") => [
   "- Keep an answer to its ask's want. The gate holds the files you change to the territory, but nothing measures how much you change inside it.",
   ...(agents === "none"

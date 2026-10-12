@@ -1,23 +1,9 @@
-/**
- * The repo's own docs are the public record: AGENTS.md and GLOSSARY.md point
- * at nothing outside the repo, AGENTS.md says what holds today, and the
- * glossary defines the terms the code is written in. No file the repo would
- * commit cites the build's private plan or points into the maintainer's
- * gitignored working docs either, code comments included. File reads and
- * string checks only, beside one `git ls-files`.
- */
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { Array, Effect, FileSystem, Option, Order, Path, Schema } from "effect";
 
 import { committable, readsAtOnce, repoRoot, textOf } from "./root.ts";
 
-/**
- * A pointer into the maintainer's working docs, which live in a gitignored
- * `.agents/` folder on the maintainer's machine: the decisions, the demo, the
- * stage record, the workflow docs, the issue tracker and the folder's README.
- * A bare `.agents/` is not one: a hosted project's skill lives under it.
- */
 const PRIVATE_FOLDERS = [
   ".agents/adr",
   ".agents/demo",
@@ -27,11 +13,6 @@ const PRIVATE_FOLDERS = [
   ".agents/README",
 ] as const;
 
-/**
- * What a pointer to something only the maintainer can open looks like: a
- * home folder, the private research repo or the host that serves it, or the
- * maintainer's working docs.
- */
 const PRIVATE = [
   "~/",
   "/home/",
@@ -41,11 +22,9 @@ const PRIVATE = [
 ] as const;
 
 /**
- * What a reference into the build's private plan looks like, which a reader
- * with only the repo cannot follow: a section of its spec (`spec §8`, or a
- * wave's `W9 §14`), one of its decisions (`spec D6`, or a wave's `W9-D14`),
- * one of its issues by wave (`W3 313`), or the research synthesis it was
- * drawn from (`SYN`).
+ * A reference into the build's private plan: a section of its spec
+ * (`spec §8`, `W9 §14`), a decision (`spec D6`, `W9-D14`), an issue by wave
+ * (`W3 313`), or the research synthesis (`SYN`).
  */
 const PLAN_REFERENCES = [
   /\bspec §/u,
@@ -56,14 +35,12 @@ const PLAN_REFERENCES = [
   /\bSYN\b/u,
 ] as const;
 
-/** The files a reader opens as text: source, config, docs and scripts. */
 const TEXT_FILE =
   /(?:\.(?:css|html|json|jsonc|md|mjs|sh|sql|toml|ts|tsx|ya?ml)|(?:^|\/)(?:\.gitignore|\.env\.schema|[^/]*Dockerfile))$/u;
 
 /** This file, which spells the references out to find them. */
 const QUOTES_THE_REFERENCES = "packages/config/test/docs-public.test.ts";
 
-/** The plan references `text` makes, by their patterns. */
 const planReferencesIn = (text: string) =>
   PLAN_REFERENCES.flatMap((reference) =>
     reference.test(text) ? [reference.source] : []
@@ -76,7 +53,6 @@ const planReferencesIn = (text: string) =>
 const NAMES_THE_PRIVATE_FOLDERS = (file: string) =>
   file.startsWith(".agents/") || file === ".gitignore";
 
-/** The private plan references and private folder pointers in `file`'s `text`. */
 const privateIn = (file: string, text: string) => [
   ...planReferencesIn(text),
   ...(NAMES_THE_PRIVATE_FOLDERS(file)
@@ -84,7 +60,6 @@ const privateIn = (file: string, text: string) => [
     : PRIVATE_FOLDERS.filter((folder) => text.includes(folder))),
 ];
 
-/** Terms the code uses in public names, each of which GLOSSARY.md defines. */
 const TERMS = [
   "Claim fork",
   "Decision",
@@ -105,7 +80,6 @@ const RootPackage = Schema.Struct({
   scripts: Schema.Record(Schema.String, Schema.String),
 });
 
-/** A file's text, by its path from the repo root. */
 const read = (relative: string) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -115,16 +89,13 @@ const read = (relative: string) =>
     return yield* fs.readFileString(path.join(root, relative));
   });
 
-/** Each file with its text. */
 const withText = (paths: readonly string[]) =>
   Effect.forEach(paths, (path) =>
     Effect.map(read(path), (text) => ({ path, text }))
   );
 
-/** Every public doc this test reads, with its text. */
 const publicDocs = withText(["AGENTS.md", "GLOSSARY.md"]);
 
-/** The lines of a `## <title>` section, up to the next heading of its level or above. */
 const sectionOf = (text: string, title: string): readonly string[] => {
   const lines = text.split("\n");
   const start = lines.indexOf(`## ${title}`);
@@ -139,7 +110,6 @@ const sectionOf = (text: string, title: string): readonly string[] => {
   return end === -1 ? rest : rest.slice(0, end);
 };
 
-/** The command a list item opens with: `ops` in "- `ops -- <command>`: …". */
 const commandOf = (line: string) =>
   /^- `(?<name>[^`\s]+)/u.exec(line)?.groups?.name;
 

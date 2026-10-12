@@ -1,18 +1,6 @@
-/**
- * The open-source projects imported onto the platform for reading, each a
- * copy of a public repo under its own licence, read-only here and not run
- * by its maintainers. A copy of the import script's plan, which a test in
- * `packages/config` holds equal to it, so the docs can name each one's
- * source and licence.
- */
 import { ProjectKey, ProjectName, sourceNamespaceOf } from "@repo/protocol/ids";
 import { Option } from "effect";
 
-/**
- * One imported project: its name here, after its source namespace
- * (`github.com/pallets/click`), the key it was imported under (`click`),
- * its source, its licence, and what it is.
- */
 export interface ImportedProject {
   readonly name: ProjectName;
   readonly key: ProjectKey;
@@ -34,7 +22,6 @@ const imported = (
   url,
 });
 
-/** Every imported project, in the order they were imported. */
 export const importedProjects: readonly ImportedProject[] = [
   imported(
     "anyhow",

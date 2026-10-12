@@ -1,10 +1,3 @@
-/**
- * `seed --as`: a fresh copy of an example under another project
- * name, so a live run (the swarm's rehearsal) can take a family nobody has
- * touched while the original stays fresh for the recording. A name some
- * project already has is refused, and a copy on a stage is written to the
- * throwaway ledger for teardown.
- */
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { Console, DateTime, Effect, FileSystem, Layer, Path } from "effect";
@@ -79,7 +72,6 @@ describe(renameSeedPlan, () => {
           }))
         );
 
-        // A copy of a copy is still a copy of the example.
         expect(copy.copyOf).toBe("oscabriel/datekit");
       }).pipe(Effect.provide(NodeServices.layer))
   );
@@ -126,7 +118,6 @@ describe("runSeed, for a copy", () => {
   );
 });
 
-/** What `main` prints, line by line. */
 const printedBy = (argv: readonly string[]) =>
   Effect.gen(function* () {
     const printed: string[] = [];

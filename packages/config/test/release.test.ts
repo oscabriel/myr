@@ -1,9 +1,3 @@
-/**
- * The release: the CLI's npm package says what it is from
- * `Brand` alone, a release builds for exactly two machines, only a person
- * publishes, and what goes to the platform's own release storage is what
- * the platform decodes and serves.
- */
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import {
@@ -49,7 +43,6 @@ import { layoutOf, runStep } from "../../../scripts/lib/release/steps.ts";
 import { Brand } from "../../brand/src/index.ts";
 import { repoRoot } from "./root.ts";
 
-/** What the test reads of a package manifest. */
 const PackageJson = Schema.fromJsonString(
   Schema.Struct({
     dependencies: Schema.optionalKey(
@@ -408,7 +401,6 @@ describe("a release's plan", () => {
   });
 });
 
-/** A digest, as `sha256sum` prints one. */
 const digest = (fill: string) => fill.repeat(64);
 
 const first = {
@@ -432,10 +424,6 @@ const second = {
   [`${Brand.slug}-linux-x64`]: { bytes: 81_900_000, sha256: digest("e") },
 };
 
-/**
- * A spawner that runs nothing and exits 0: each command it was asked for,
- * as `<folder>$ <command> <args>`, its folder relative to the repo root.
- */
 const recordingSpawner = Effect.gen(function* () {
   const path = yield* Path.Path;
   const root = yield* repoRoot;
@@ -545,7 +533,6 @@ describe("the release manifest", () => {
   });
 });
 
-/** A file's digest as `sha256sum` prints it. */
 const sha256 = (content: string) =>
   Effect.flatMap(Crypto.Crypto, (crypto) =>
     crypto.digest("SHA-256", new TextEncoder().encode(content))
@@ -581,10 +568,6 @@ describe("the install script", () => {
     });
   });
 
-  /**
-   * A machine to install on: a `curl` that serves `files` for the release's
-   * URLs and fails any other, a home folder, and `sh` to run the script.
-   */
   const install = (files: Readonly<Record<string, string>>) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
@@ -655,7 +638,6 @@ describe("the install script", () => {
       };
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer));
 
-  /** A binary for each machine a release builds for, as a tiny script. */
   const binaries = Object.fromEntries(
     ["linux-x64", "darwin-arm64"].map((target) => [
       `${Brand.slug}-${target}`,
@@ -663,7 +645,6 @@ describe("the install script", () => {
     ])
   );
 
-  /** `SHA256SUMS` for the binaries, each digest as `digestOf` gives it. */
   const sums = <E, R>(
     digestOf: (content: string) => Effect.Effect<string, E, R>
   ) =>

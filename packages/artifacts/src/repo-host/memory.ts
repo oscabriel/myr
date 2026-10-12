@@ -29,15 +29,10 @@ const createdOf = (name: RepoName): RepoCreated => ({
 });
 
 interface Repo extends StoredRepo {
-  /** Token ids still live; the memory store authenticates nothing. */
+  /** The memory store authenticates nothing. */
   readonly tokens: Set<string>;
 }
 
-/**
- * Artifacts in memory, as probes found it: each repo a bare git directory, a push
- * a compare-and-swap per ref with no atomicity across refs, and reads that
- * resolve short branch names and commit ids only.
- */
 const make = () => {
   const fs = memoryFs();
   const repos = new Map<RepoName, Repo>();
@@ -69,7 +64,6 @@ const make = () => {
       return repo;
     });
 
-  /** A new repo `name` holding `from`'s `ref` at `tip`, copied as it stands. */
   const seed = (
     from: Repo,
     name: RepoName,
@@ -115,8 +109,6 @@ const make = () => {
           });
         }
 
-        // Without a branch, the remote's default: what its HEAD names, or
-        // its one branch, as `master` is on a remote that has only that.
         const named =
           source.branch === undefined
             ? yield* defaultRefOf(from.dir)
@@ -177,5 +169,4 @@ const make = () => {
   });
 };
 
-/** A fresh, empty store each time the layer is built. */
 export const RepoHostMemory = Layer.sync(RepoHost, make);

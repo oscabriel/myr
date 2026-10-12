@@ -1,16 +1,6 @@
-/**
- * The platform's own skill and plugin: the platform's skill,
- * which the platform and the CLI serve as the MCP prompt `contribute`, the
- * Claude Code plugin with its three hooks, and the Agent Plugins bundle,
- * each as files at `skills/<slug>/` and `plugins/<slug>/`. The plugin is what
- * a person installs, so it is the only place executable hooks ship; a
- * project's own generated files are data.
- *
- * Both plugin manifests share one directory: Claude Code reads
- * `.claude-plugin/plugin.json`, `.mcp.json` and `hooks/hooks.json`, Agent
- * Plugins 1.0 reads `plugin.json` and `mcp.json`, and both read `skills/`.
- * No path is read by both, so neither manifest overrides the other.
- */
+// Claude Code reads `.claude-plugin/plugin.json`, `.mcp.json` and
+// `hooks/hooks.json`; Agent Plugins 1.0 reads `plugin.json` and `mcp.json`.
+// No path is read by both, so the two manifests share one directory.
 import { Brand } from "@repo/brand";
 import { Array as Arr, Effect, Option, Order } from "effect";
 
@@ -23,17 +13,13 @@ import { loopSteps, unfencedSection } from "./sections.ts";
 import { code, page, printJson, table } from "./text.ts";
 
 export interface PlatformInput {
-  /** Every CLI command, as `commandDocs` lists them. */
   readonly commands: readonly CommandDoc[];
-  /** The platform's origin, for its MCP endpoint; without it, MCP runs through the CLI. */
   readonly platformUrl?: string;
 }
 
 const SKILL = `skills/${Brand.slug}/SKILL.md`;
 
 const PLUGIN = `plugins/${Brand.slug}`;
-
-// --- The platform's skill ------------------------------------------------------
 
 const description = `Contribute to projects on ${Brand.name} with the \`${Brand.cli}\` CLI: find an ask, claim it, check your answer locally, push it to your fork, and read the verdict. Use when a repo's remote is on ${Brand.name}, or when a push was refused with a refusal such as OutOfScope or StaleBase.`;
 
@@ -99,12 +85,8 @@ const platformBody = (input: PlatformInput) =>
     ...unfencedSection(),
   ]);
 
-/**
- * The platform's skill as the prompt `contribute` serves it: its name, its
- * description and its Markdown, made at once. The platform builds the
- * prompt where nothing may be awaited (its router, at module load), and
- * `SKILL.md`'s frontmatter hashes the body through WebCrypto, a promise.
- */
+// Synchronous: the platform builds the prompt at module load, where nothing
+// may be awaited, and `SKILL.md`'s hash is a WebCrypto promise.
 export const platformSkillParts = (input: PlatformInput) => ({
   body: platformBody(input),
   description,
@@ -114,20 +96,12 @@ export const platformSkillParts = (input: PlatformInput) => ({
 const skillFile = (input: PlatformInput) =>
   frontmatter({ ...platformSkillParts(input), landed: Option.none() });
 
-/** `skills/<slug>/SKILL.md`: the platform's skill, which comes from no landing. */
 export const platformSkill = (
   input: PlatformInput
 ): Effect.Effect<readonly GeneratedFile[]> =>
   skillFile(input).pipe(Effect.map((content) => [{ content, path: SKILL }]));
 
-// --- The MCP server, as each client's config names it ----------------------------
-
-/**
- * How each config spells the platform's MCP server: Claude Code's `.mcp.json`
- * (and VS Code's `servers`, the same entry), Agent Plugins 1.0's `mcp.json`,
- * and Cursor's `mcp.json`, whose remote entry is a bare `url` (its docs give
- * a `type` only for stdio).
- */
+// Cursor's remote entry is a bare `url`: its docs give a `type` only for stdio.
 const servers = {
   "agent-plugins": {
     remote: (url: string) => ({ type: "streamable-http", url }),
@@ -145,12 +119,6 @@ const servers = {
 
 export type McpFlavour = keyof typeof servers;
 
-/**
- * The `mcpServers` object a client's config holds: the platform's `/mcp`
- * over HTTP, or `<cli> mcp` over stdio without a URL, under the brand's
- * slug. The plugin bundles and the Agents page (`agent-setup.ts`) both
- * build theirs here, so no client's snippet can drift from a bundle's.
- */
 export const mcpServersFor = (
   platformUrl: string | undefined,
   flavour: McpFlavour
@@ -161,18 +129,11 @@ export const mcpServersFor = (
       : servers[flavour].remote(`${platformUrl}/mcp`),
 });
 
-// --- The Claude Code plugin ------------------------------------------------------
-
 const hookCommand = (event: HookEvent) => ({
   hooks: [{ command: `${Brand.cli} hook ${event} --json`, type: "command" }],
 });
 
-/**
- * `hooks/hooks.json`: before an edit, the scope guard; at the session's
- * start, the claimed ask's brief; at Stop, the verdict gate. Each runs
- * `<cli> hook <event> --json`, which fails open: hooks are early feedback,
- * and the gateway decides.
- */
+// Each hook fails open: hooks are early feedback, and the gateway decides.
 const hooksJson = () =>
   printJson({
     hooks: Object.fromEntries(
@@ -192,11 +153,6 @@ const pluginDescription = `The ${Brand.name} CLI's skill, MCP server and hooks: 
 const homepage = (platformUrl: string | undefined) =>
   platformUrl === undefined ? {} : { homepage: platformUrl };
 
-/**
- * `plugins/<slug>/`: `.claude-plugin/plugin.json`, the platform's skill,
- * `.mcp.json` (the platform's `/mcp` over HTTP, or `<cli> mcp` without a
- * URL) and `hooks/hooks.json`.
- */
 export const claudePlugin = (
   input: PlatformInput
 ): Effect.Effect<readonly GeneratedFile[]> =>
@@ -221,16 +177,8 @@ export const claudePlugin = (
     ])
   );
 
-// --- The Agent Plugins bundle ----------------------------------------------------
-
 const SCHEMAS = "https://agent-plugins.org/schemas/1.0.0";
 
-/**
- * `plugins/<slug>/plugin.json`, the same skill and `mcp.json`: the Agent
- * Plugins 1.0 package, whose manifests are closed (only `$schema` and the
- * listed fields) and carry no hooks, which that standard leaves to each
- * client.
- */
 export const agentPluginsBundle = (
   input: PlatformInput
 ): Effect.Effect<readonly GeneratedFile[]> =>

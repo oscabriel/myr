@@ -1,18 +1,9 @@
 /**
- * The visibility cartridge, read as data (README's cut line 5): its
- * paths exist, one marked line plugs it in, and nothing outside it reaches
- * into it, so removing it is a deletion. The cartridge is its manifest's
- * folders, the marked composition line (the line under the marker
- * comment, which goes with it), the two `@repo/visibility` dependency lines
- * and the `ARTIFACTS_PRIVATE` binding; everything else
- * depends only on the neutral ports (`@repo/project`'s `visibility-port.ts`
- * and `env-port.ts`, the platform's `layer-gate.ts`), whose defaults are
- * the platform without it.
- *
- * Imports are read from the source with comments and the insides of
- * strings, regexes and templates blanked, so an import spelled in a comment
- * or a string never counts, and every form does: static, `import type`,
- * re-exports and `import()`.
+ * The visibility cartridge is its manifest's folders, the marked composition
+ * line, the two `@repo/visibility` dependency lines and the
+ * `ARTIFACTS_PRIVATE` binding; everything else depends only on the neutral
+ * ports, whose defaults are the platform without it. Imports are read with
+ * comments and the insides of strings, regexes and templates blanked.
  */
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
@@ -21,7 +12,6 @@ import type { ChildProcessSpawner } from "effect/process";
 
 import { committable, readsAtOnce, repoRoot, textOf } from "./root.ts";
 
-/** The cartridge's folders, from the repo root; each ends with `/`, and each exists. */
 const MANIFEST = [
   "packages/visibility/",
   "packages/project/src/visibility/",
@@ -29,42 +19,24 @@ const MANIFEST = [
   "apps/platform/test/visibility/",
 ] as const;
 
-/**
- * Where tests of the cartridge's project side live: they go with it, so
- * they are its too, though none may be written yet.
- */
 const TEST_HOMES = ["packages/project/test/visibility/"] as const;
 
-/**
- * Tests outside its folders that run the cartridge's world as a process,
- * by its path rather than an import (the CLI's end-to-end `env set`:
- * apps never import apps), so no import reader sees them: they go
- * with it too.
- */
 const RUNS_ITS_WORLD = [
   "apps/cli/test/local/env-set-live.test.ts",
-  // The seed's layer step, over the world the cartridge plugs into.
   "packages/config/test/seed-layer.test.ts",
 ] as const;
 
-/**
- * The examples' content that only a platform with the cartridge can seed:
- * datekit's maintainers layer. Without it the seed plans no layer.
- */
 const ITS_CONTENT = ["examples/datekit/layers/"] as const;
 
 /**
- * Every folder, and every file, that goes when the cartridge goes. Deleting
- * it also takes the lines that name it (deleting it in a scratch worktree
- * left verify green): the marked line in `cartridges.ts`; the two
+ * Every folder and file that goes when the cartridge goes. Deleting it also
+ * takes the lines that name it: the marked line in `cartridges.ts`; the two
  * `@repo/visibility` dependency lines; `ARTIFACTS_PRIVATE` and `MASTER_KEY`
  * in the platform's `wrangler.jsonc`, `.env.schema` and `platform.ts`, its
- * tests' fake env (`withPrivateNamespace` and its imports, and its use in
- * `serve-world.ts`), `bindings.test.ts`, `platform.test.ts` and
- * `env.test-d.ts`, then `bun run types`; the private namespace and
- * `MASTER_KEY` rows in `bootstrap.test.ts`; and datekit's three `Layer`
- * lines in `seed.test.ts`. Bootstrap still plans the stage's `layers-<s>`
- * namespace (`infra/stages.ts`), which nothing binds then.
+ * tests' fake env (`withPrivateNamespace` and its uses), `bindings.test.ts`,
+ * `platform.test.ts` and `env.test-d.ts`, then `bun run types`; the private
+ * namespace and `MASTER_KEY` rows in `bootstrap.test.ts`; and datekit's three
+ * `Layer` lines in `seed.test.ts`.
  */
 const CARTRIDGE = [
   ...MANIFEST,
@@ -73,11 +45,6 @@ const CARTRIDGE = [
   ...ITS_CONTENT,
 ];
 
-/**
- * Where the line that plugs the cartridge in lives (`ports.ts` merges every
- * cartridge `cartridges.ts` names over the platform's ports), and the one
- * module it names.
- */
 const COMPOSITION = {
   file: "apps/platform/src/cartridges.ts",
   module: "./visibility/live.ts",
@@ -88,20 +55,14 @@ const MARKER = ["//", "cartridge:", "visibility"].join(" ");
 
 const PACKAGE = "@repo/visibility";
 
-/** The workspaces that depend on the package: the cartridge's implementations live in them. */
 const DEPENDENTS = [
   "apps/platform/package.json",
   "packages/project/package.json",
 ];
 
-/** The private namespace's binding, by its name, spelled so a search for it finds the allowed files below. */
+/** Spelled so a search for the binding's name finds only the allowed files below. */
 const BINDING = ["ARTIFACTS", "PRIVATE"].join("_");
 
-/**
- * The files outside the cartridge that may name the binding: the platform's
- * config, generated types and env decode, its tests' fake env and type
- * fences, principle 7's web fence, and these tests.
- */
 const NAMES_BINDING = new Set([
   "apps/platform/wrangler.jsonc",
   "apps/platform/worker-configuration.d.ts",
@@ -115,7 +76,6 @@ const NAMES_BINDING = new Set([
   "packages/config/test/cartridge.test.ts",
 ]);
 
-/** Prose and binary files: they wire nothing. */
 const NOT_WIRING = /\.(?:md|png|ico|svg|woff2?|ttf|otf|jpg|webp|gif|lockb)$/u;
 
 const isCartridge = (file: string) =>
@@ -123,9 +83,6 @@ const isCartridge = (file: string) =>
 
 const isSource = (file: string) => /\.tsx?$/u.test(file);
 
-// ------------------------------------------------------------ the repo
-
-/** Every committable file with its text, `filter` deciding which. */
 const filesWhere = (filter: (file: string) => boolean) =>
   Effect.flatMap(committable, (files) =>
     Effect.forEach(
@@ -138,9 +95,6 @@ const filesWhere = (filter: (file: string) => boolean) =>
     )
   ).pipe(Effect.map(Array.getSomes));
 
-// --------------------------------------------------------- reading code
-
-/** Punctuation after which a `/` starts a regex rather than a division. */
 const BEFORE_REGEX = new Set("(,=:[!&|?{};+-*%<>~^");
 
 const KEYWORDS_BEFORE_REGEX = new Set([
@@ -164,25 +118,17 @@ const WORD = /[\w$]/u;
 
 const SPACE = /\s/u;
 
-/**
- * One pass over a file's source: `chars` ends with comments and the insides
- * of strings, regexes and templates blanked, keeping every offset.
- */
 interface Lexer {
   readonly chars: string[];
   readonly content: string;
-  /** The brace depth outside each enclosing template's `${`, innermost last. */
   readonly outer: number[];
-  /** Each string literal's contents, by the offset of its opening quote. */
   readonly strings: Map<number, string>;
   at: number;
   depth: number;
   inTemplate: boolean;
-  /** The last code token read: a punctuation character or a word. */
   previous: string;
 }
 
-/** Blanks `[from, to)`, keeping line breaks. */
 const blank = (lexer: Lexer, from: number, to: number) => {
   for (let at = from; at < Math.min(to, lexer.chars.length); at += 1) {
     if (lexer.chars[at] !== "\n") {
@@ -191,7 +137,6 @@ const blank = (lexer: Lexer, from: number, to: number) => {
   }
 };
 
-/** The offset of the `/` that closes the regex opening at `start`, or -1 when its line ends first. */
 const regexEnd = (content: string, start: number) => {
   let inClass = false;
   let at = start + 1;
@@ -213,7 +158,6 @@ const regexEnd = (content: string, start: number) => {
   return -1;
 };
 
-/** A template's text, up to its closing backtick or its next `${`. */
 const templateText = (lexer: Lexer) => {
   const { content } = lexer;
   const start = lexer.at;
@@ -240,7 +184,6 @@ const templateText = (lexer: Lexer) => {
   }
 };
 
-/** Each step reads one token of code if it starts at `at`, and says whether it did. */
 type Step = (lexer: Lexer) => boolean;
 
 const comment: Step = (lexer) => {
@@ -321,7 +264,6 @@ const regex: Step = (lexer) => {
   return true;
 };
 
-/** The `}` that closes a template's `${`. */
 const templateResume: Step = (lexer) => {
   if (
     lexer.content[lexer.at] !== "}" ||
@@ -375,11 +317,6 @@ const STEPS: readonly Step[] = [
   punctuation,
 ];
 
-/**
- * The source with comments, and the insides of strings, regexes and
- * templates, blanked, keeping every offset and line break, so import
- * syntax inside them is never read.
- */
 const mask = (content: string) => {
   const lexer: Lexer = {
     at: 0,
@@ -409,13 +346,11 @@ const mask = (content: string) => {
 const IMPORT =
   /(?<![.\w$])(?:import|export)[\s{*][^;]*?\bfrom\s*["']|(?<![.\w$])import\s*["']|(?<![.\w$])import\s*\(\s*["']/gu;
 
-/** One import of a file: what it names, and the line it is on (1-based). */
 interface Import {
   readonly line: number;
   readonly specifier: string;
 }
 
-/** Every import, re-export and dynamic import in a file, in source order. */
 const importsOf = (content: string): readonly Import[] => {
   const { code, strings } = mask(content);
 
@@ -429,9 +364,6 @@ const importsOf = (content: string): readonly Import[] => {
   });
 };
 
-// ------------------------------------------------------------ resolving
-
-/** `a/b/../c/./d` as `a/c/d`; none when it climbs out of the repo. */
 const normalize = (path: string): Option.Option<string> => {
   const parts: string[] = [];
 
@@ -468,13 +400,11 @@ const decodeManifest = Schema.decodeUnknownEffect(
   Schema.fromJsonString(Manifest)
 );
 
-/** A workspace: its folder (with `/`) and its manifest. */
 interface Workspace {
   readonly dir: string;
   readonly manifest: Manifest;
 }
 
-/** Every workspace package in the repo: the `package.json` files under `apps/` and `packages/`. */
 const workspaces = Effect.flatMap(
   filesWhere((file) => /^(?:apps|packages)\/[^/]+\/package\.json$/u.test(file)),
   (files) =>
@@ -486,7 +416,6 @@ const workspaces = Effect.flatMap(
     )
 );
 
-/** The file an `exports` subpath names, through a key or one `*` wildcard. */
 const exported = (
   workspace: Workspace,
   subpath: string
@@ -520,7 +449,6 @@ const exported = (
   );
 };
 
-/** The repo path an import reaches: a relative path, or a workspace package's export; none for anything else. */
 const resolved = (
   from: string,
   specifier: string,
@@ -540,7 +468,6 @@ const resolved = (
     : exported(owner, specifier.slice(owner.manifest.name.length + 1));
 };
 
-/** Whether an import reaches into the cartridge: its package by name, or a path inside it. */
 const reachesCartridge = (
   from: string,
   specifier: string,
@@ -560,8 +487,6 @@ const dependencyNames = (manifest: Manifest) =>
     ...manifest.devDependencies,
     ...manifest.peerDependencies,
   });
-
-// ---------------------------------------------------------------- tests
 
 const provided = <A, E>(
   effect: Effect.Effect<
@@ -692,7 +617,6 @@ describe("the visibility cartridge", () => {
           const reaching = outside.flatMap(({ content, file }) => {
             const lines = content.split("\n");
 
-            // `line` is 1-based, so the line above it is `lines[line - 2]`.
             return importsOf(content)
               .filter(
                 ({ line, specifier }) =>

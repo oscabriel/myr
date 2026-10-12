@@ -1,17 +1,5 @@
-/**
- * The fence-shaped example: `examples/burrow` is a Bun
- * project of its own, and these cases run its own commands in its folder, as
- * its maintainers would. Its lint, run as its ratchet runs it, reports
- * exactly the six module-level `let`s the ratchet starts from, one in each
- * package's `src/`, as warnings; its caller count finds `legacyFetch` in all
- * six packages, in the JSON a migrate ask's count command prints; its other
- * lanes pass on main; and its lint rule's own fixture test passes.
- *
- * Each case installs first (`--frozen-lockfile`: burrow's devDependencies are
- * pinned to the root's, so Bun's cache serves them). The manifest's presence
- * is asserted before anything runs, so a missing project is a failed
- * assertion, not a spawn error.
- */
+// Each case installs first (`--frozen-lockfile`: burrow's devDependencies are
+// pinned to the root's, so Bun's cache serves them).
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, FileSystem, Path, Schema, Stream } from "effect";
@@ -21,7 +9,6 @@ import { repoRoot } from "./root.ts";
 
 const example = "examples/burrow";
 
-/** The six workspace packages, each holding one module-level `let`. */
 const PACKAGES = [
   "auth",
   "billing",
@@ -31,17 +18,12 @@ const PACKAGES = [
   "search",
 ] as const;
 
-/**
- * What a migrate ask's count command prints (`CallerCount` in
- * `@repo/project/migrate`; `@repo/config` imports no workspace package, so
- * the shape is restated here).
- */
+/** `@repo/config` imports no workspace package, so `CallerCount`'s shape is restated here. */
 const CallerCount = Schema.Struct({
   byModule: Schema.Record(Schema.String, Schema.Int),
   total: Schema.Int,
 });
 
-/** The part of `oxlint --format json` these cases read. */
 const OxlintReport = Schema.Struct({
   diagnostics: Schema.Array(
     Schema.Struct({
@@ -52,14 +34,12 @@ const OxlintReport = Schema.Struct({
   ),
 });
 
-/** A command's exit code and what it printed. */
 interface Ran {
   readonly code: number;
   readonly stderr: string;
   readonly stdout: string;
 }
 
-/** Runs a command in burrow's folder and keeps its exit code and output. */
 const run = (command: string, args: readonly string[]) =>
   Effect.gen(function* () {
     const path = yield* Path.Path;
@@ -82,7 +62,6 @@ const run = (command: string, args: readonly string[]) =>
     return { code, stderr, stdout } satisfies Ran;
   }).pipe(Effect.scoped);
 
-/** Asserts burrow exists, then installs its pinned devDependencies. */
 const install = () =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -94,17 +73,14 @@ const install = () =>
       `${example}/package.json exists`
     ).toBeTruthy();
 
-    // The whole run on a failure, so its stderr shows in the diff.
     expect(yield* run("bun", ["install", "--frozen-lockfile"])).toMatchObject({
       code: 0,
     });
   });
 
-/** The package a reported file sits in, from its `packages/<name>/src/` path. */
 const packageOf = (filename: string) =>
   /(?:^|\/)packages\/(?<name>[^/]+)\/src\//u.exec(filename)?.groups?.name;
 
-/** Long enough for a cold install; a warm one takes about a second. */
 const TIMEOUT = 180_000;
 
 describe("examples/burrow", () => {
@@ -114,7 +90,6 @@ describe("examples/burrow", () => {
       Effect.gen(function* () {
         yield* install();
 
-        // The command burrow's ratchet runs (its config folder's `project.ts`).
         const lint = yield* run("bun", ["run", "lint", "--format", "json"]);
 
         const report = yield* Schema.decodeEffect(
@@ -162,8 +137,6 @@ describe("examples/burrow", () => {
           Schema.fromJsonString(CallerCount)
         )(count.stdout);
 
-        // Every package has a caller, so the family has six children; the
-        // calls in each package's src/, counted by hand.
         expect(counts).toStrictEqual({
           byModule: {
             "@burrow/auth": 2,

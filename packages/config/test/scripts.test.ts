@@ -1,10 +1,3 @@
-/**
- * The demo-readiness scripts: a maintainer types `bun run swarm`,
- * `bun run seed`, `bun run release` or `bun run import-examples`, and each
- * runs one entry file that
- * exists, so the work that builds them fills an entry without touching a
- * root file.
- */
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, FileSystem, Path, Schema } from "effect";
@@ -15,7 +8,6 @@ const RootPackage = Schema.Struct({
   scripts: Schema.Record(Schema.String, Schema.String),
 });
 
-/** What `bun run <name>` runs, and whether its entry file is on disk. */
 const entryOf = (name: string) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;

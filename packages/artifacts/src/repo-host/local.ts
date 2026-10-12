@@ -54,7 +54,6 @@ import {
 } from "./isogit-store.ts";
 import type { GitDir } from "./isogit-store.ts";
 
-/** A promise from isomorphic-git or the file system that rejected. */
 class IoFailure extends Data.TaggedError("IoFailure")<{
   readonly cause: unknown;
 }> {}
@@ -62,13 +61,11 @@ class IoFailure extends Data.TaggedError("IoFailure")<{
 const io = <A>(run: () => Promise<A>) =>
   Effect.tryPromise({ catch: (cause) => new IoFailure({ cause }), try: run });
 
-/** Whether a file-system call failed with node's error `code`. */
 const failedWith = (code: "EEXIST" | "ENOENT") => (failure: IoFailure) =>
   failure.cause instanceof Error &&
   "code" in failure.cause &&
   failure.cause.code === code;
 
-/** Whether anything is at `path`. */
 const exists = (path: string) =>
   io(() => fs.promises.stat(path)).pipe(
     Effect.as(true),
@@ -76,7 +73,6 @@ const exists = (path: string) =>
     Effect.orDie
   );
 
-/** Deletes `path` and everything under it; whether there was anything. */
 const removeAll = (path: string) =>
   Effect.gen(function* () {
     const found = yield* exists(path);
@@ -88,16 +84,10 @@ const removeAll = (path: string) =>
     return found;
   });
 
-/** The remote an HTTP import fetches through, removed once it has. */
 const importRemote = "import";
 
 const branchOf = (ref: string) => ref.replace(/^refs\/heads\//u, "");
 
-/**
- * The tokens a repo has minted, kept beside its objects so that every layer
- * over the same root sees them. `minted` counts every token ever minted, so
- * no two get the same id.
- */
 const Tokens = Schema.fromJsonString(
   Schema.Struct({ live: Schema.Array(Schema.String), minted: Schema.Int })
 );
@@ -128,7 +118,6 @@ const bytesOf = (body: AsyncIterable<Uint8Array> | Iterable<Uint8Array>) =>
     : Stream.fromIterable(body)
   ).pipe(Stream.runCollect, Effect.map(concat));
 
-/** One chunk as the async iterator isomorphic-git reads a response body from. */
 const once = (bytes: Uint8Array): AsyncIterableIterator<Uint8Array> => {
   const chunks = [bytes];
 
@@ -148,10 +137,6 @@ const once = (bytes: Uint8Array): AsyncIterableIterator<Uint8Array> => {
   return iterator;
 };
 
-/**
- * isomorphic-git's HTTP client over a `Fetch`. isomorphic-git awaits a
- * promise, so each exchange runs as one; a `Fetch` failure rejects it as is.
- */
 const httpOver = (
   fetch: Fetch["Service"]["fetch"],
   context: Context.Context<never>
@@ -186,7 +171,6 @@ const httpOver = (
     ),
 });
 
-/** Why a fetch from `url` brought nothing to import. */
 const fetchRefusal = (url: string, cause: unknown) =>
   Match.value(cause).pipe(
     Match.when(Schema.is(FetchFailed), (failed) => failed.reason),
@@ -234,7 +218,6 @@ const make = (options: {
         return lock;
       });
 
-    /** The repo's directory and lock, if the repo exists. */
     const known = (name: RepoName) =>
       Effect.gen(function* () {
         const dir = dirOf(name);
@@ -246,7 +229,7 @@ const make = (options: {
         return { dir, lock: yield* lockOf(name) };
       });
 
-    /** A new, empty bare repo; making its directory is what claims the name. */
+    /** Making its directory is what claims the name. */
     const open = (name: RepoName) =>
       Effect.gen(function* () {
         const dir = dirOf(name);
@@ -266,7 +249,6 @@ const make = (options: {
         return dir;
       });
 
-    /** A new repo `name` holding `source`'s `ref` at `tip`, copied as it stands. */
     const seed = (
       name: RepoName,
       source: PushSource,
@@ -279,9 +261,7 @@ const make = (options: {
         return createdOf(name);
       });
 
-    // Local disk's test-only meaning of a public remote: a bare repo on this
-    // machine, copied object by object. Without a branch, it takes the one
-    // the repo's HEAD names.
+    // Test-only meaning of a public remote: a bare repo on this machine.
     const importFile = (
       name: RepoName,
       url: string,
@@ -290,7 +270,6 @@ const make = (options: {
       Effect.gen(function* () {
         const noRepo = new ImportRefused({ name, reason: `no repo at ${url}` });
 
-        // A file URL that names another host is no path on this machine.
         const gitdir = yield* Effect.try({
           catch: () => noRepo,
           try: () => fileURLToPath(url),
@@ -304,9 +283,6 @@ const make = (options: {
           return yield* noRepo;
         }
 
-        // Without a branch, what HEAD names, or the one branch when HEAD
-        // names none it has (`main` on a repo whose only branch is
-        // `master`). A detached HEAD with several branches names none.
         const named =
           branch === undefined
             ? yield* defaultRefOf({ fs, gitdir })
@@ -333,7 +309,6 @@ const make = (options: {
         return yield* seed(name, { fs, gitdir }, ref, tip);
       });
 
-    /** One branch of a smart-HTTP remote, fetched into the empty repo `gitdir`. */
     const fetchInto = (
       name: RepoName,
       gitdir: string,
@@ -385,7 +360,6 @@ const make = (options: {
         yield* io(() => writeRef({ fs, gitdir, ref, value: tip })).pipe(
           Effect.orDie
         );
-        // No repo here has remotes or remote-tracking refs.
         yield* io(() =>
           deleteRemote({ fs, gitdir, remote: importRemote })
         ).pipe(Effect.orDie);
@@ -394,8 +368,7 @@ const make = (options: {
         return createdOf(name);
       });
 
-    // A public remote over smart HTTP, through the `Fetch` this layer was
-    // given. A failed import leaves no repo behind.
+    // A failed import leaves no repo behind.
     const importHttp = (
       name: RepoName,
       url: string,
@@ -407,7 +380,6 @@ const make = (options: {
         )
       );
 
-    /** The repo's tokens file, read and rewritten under the repo's lock. */
     const updateTokens = <A>(
       name: RepoName,
       change: (tokens: Tokens) => Effect.Effect<readonly [A, Tokens]>
@@ -531,12 +503,8 @@ const make = (options: {
 
 /**
  * Artifacts on local disk, for tests that need real git over HTTP and for the
- * CLI's dev mode: each repo a bare git repo `<root>/<name>.git` with default
- * branch `main`, kept across layers over the same root. A push is a
- * compare-and-swap per ref with no atomicity across refs, as probes found
- * Artifacts. `remote(name)` is `<remoteBase>/<name>.git`, so a test can serve
- * `root` with `git http-backend` under that base and drive real git at it.
- * Tokens are recorded, never checked.
+ * CLI's dev mode. Pushes are a compare-and-swap per ref with no atomicity
+ * across refs, as probes found Artifacts. Tokens are recorded, never checked.
  */
 export const RepoHostLocal = {
   layer: (options: {

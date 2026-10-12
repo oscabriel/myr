@@ -1,9 +1,3 @@
-/**
- * Generated agent files from a project's policy: the contribute skill, the
- * AGENTS.md block, the harness plugins and their hooks, and the well-known
- * skills index. Each module is its own subpath too
- * (`@repo/agent-kit/hook-events`).
- */
 export { agentsBlock, upsertAgentsBlock } from "./agents-block.ts";
 
 export type { AgentsBlock } from "./agents-block.ts";

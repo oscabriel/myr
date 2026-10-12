@@ -1,15 +1,7 @@
-/**
- * What names each page of the docs: its title, its one-line summary and
- * whether it is a guide or the reference, in the order the index lists
- * them. Apart from the pages' text, so a route's head and its not-found
- * read it without carrying every page into the first load.
- */
 import { Option } from "effect";
 
-/** A guide, written for a person doing one job, or a page of the reference. */
 export type DocPart = "guide" | "reference";
 
-/** What names a page, before it is written: enough for a list or a head. */
 export interface DocEntry {
   readonly slug: string;
   readonly title: string;
@@ -17,7 +9,6 @@ export interface DocEntry {
   readonly part: DocPart;
 }
 
-/** Every page as the index lists it, guides first. */
 export const docEntries = [
   {
     part: "guide",
@@ -103,9 +94,7 @@ export const docEntries = [
   },
 ] as const satisfies readonly DocEntry[];
 
-/** A page's slug: the last segment of its address. */
 export type DocSlug = (typeof docEntries)[number]["slug"];
 
-/** The page at `slug` as a list or a head names it; none for a slug no page has. */
 export const docEntry = (slug: string): Option.Option<DocEntry> =>
   Option.fromUndefinedOr(docEntries.find((entry) => entry.slug === slug));

@@ -25,7 +25,6 @@ import { blankJsonc } from "../../../infra/jsonc.ts";
 import { resources, stages } from "../../../infra/stages.ts";
 import { repoRoot } from "./root.ts";
 
-/** A file under the repo root, as text. */
 const rootText = (file: string) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -34,7 +33,6 @@ const rootText = (file: string) =>
     return yield* fs.readFileString(path.join(yield* repoRoot, file));
   }).pipe(Effect.provide(NodeServices.layer));
 
-/** What this test reads of a stage's block in the platform's `wrangler.jsonc`. */
 const PlatformStage = Schema.Struct({
   artifacts: Schema.Array(
     Schema.Struct({ binding: Schema.String, namespace: Schema.String })
@@ -70,7 +68,6 @@ const Wrangler = <S extends Schema.Top>(stage: S) =>
     })
   );
 
-/** `apps/<app>/wrangler.jsonc`, comments and trailing commas aside, decoded. */
 const wrangler = <S extends Schema.Top & { readonly DecodingServices: never }>(
   app: string,
   stage: S
@@ -82,7 +79,6 @@ const wrangler = <S extends Schema.Top & { readonly DecodingServices: never }>(
 
 const nothing: Existing = { d1: [], kv: [], namespaces: [], r2: [] };
 
-/** Every resource of `dev-oscabriel` and `demo` present, with ids. */
 const everything: Existing = {
   d1: [
     {
@@ -121,13 +117,11 @@ describe("the stage table", () => {
         expect(platform.name).toBe("platform");
         expect(Object.keys(platform.env)).toStrictEqual([...stages]);
 
-        // Each block as the table names it, and as wrangler.jsonc does.
         const named = stages.map((stage) => {
           const names = resources(stage);
 
           return {
             frontPage: names.frontPage,
-            // The public namespace, then the private one the layers live in.
             namespaces: [names.projects, names.layers],
             onPush: [names.onPush, names.onPush],
             platform: names.platform,
@@ -251,7 +245,6 @@ describe("a dry run", () => {
   });
 });
 
-/** The lines of `after` that differ from `before`'s, by line. */
 const changed = (before: string, after: string) => {
   const old = before.split("\n");
 

@@ -1,9 +1,3 @@
-/**
- * A datekit-shaped project at one landed commit: two ask kinds, three asks,
- * two modules and the run block `{test: "bun test {path}", checks: {lint,
- * types, unit}}`. Decoded with the domain's own schema, so a fixture the
- * domain would refuse throws here.
- */
 import { Brand } from "@repo/brand";
 import { CheckSpec } from "@repo/protocol/domain/check";
 import { Command } from "@repo/protocol/domain/common";
@@ -18,7 +12,6 @@ export const project = ProjectName.make("oscabriel/datekit");
 
 export const landed = LandedSha.make("a".repeat(40));
 
-/** A later landing, for a copy generated before it. */
 export const later = LandedSha.make("b".repeat(40));
 
 const encodeCheck = Schema.encodeSync(CheckSpec);
@@ -148,7 +141,6 @@ const encoded: typeof Policy.Encoded = {
 
 export const policy = Schema.decodeSync(Policy)(encoded);
 
-/** The same project after a landing that changed one lane of its run block. */
 export const policyWithNewLint = Schema.decodeSync(Policy)({
   ...encoded,
   run: {
@@ -157,10 +149,7 @@ export const policyWithNewLint = Schema.decodeSync(Policy)({
   },
 });
 
-/**
- * A few CLI commands as the generators take them: hand-written here, so a
- * contract's wording changing elsewhere leaves these golden files alone.
- */
+// Hand-written, so a contract's wording changing elsewhere leaves the golden files alone.
 export const commands: readonly CommandDoc[] = [
   {
     contract: "listAsks",
@@ -213,5 +202,4 @@ export const commands: readonly CommandDoc[] = [
   },
 ];
 
-/** Where the platform serves its routes in these tests. */
 export const platformUrl = `https://${Brand.domain}`;

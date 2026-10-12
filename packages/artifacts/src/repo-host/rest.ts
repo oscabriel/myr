@@ -1,69 +1,18 @@
 /**
- * `RepoHost` over the Artifacts REST API, with a Cloudflare API token: for
- * code that runs outside a Worker, such as infra scripts and the seed
- * script. It passes the contract the binding passes, and types the same
- * surprises:
+ * Over the REST API, as probes and the docs found it:
  *
  * - a fork names its target (`{name, default_branch_only: true}`), which
- *   cf's `artifacts namespaces repos fork` cannot do (cf #180);
- * - a fork that answers 500 (code 10400) is tried once more, and an
- *   already-exists or a second 500 after that may be the fork the first
- *   made: it is, if it lists `main`, as on the binding;
- * - `refs` and `push` have no REST route, so they go over git smart HTTP to
- *   the repo's `remote` (`smart-http.ts`), with a repo token this layer mints.
+ *   cf's `artifacts namespaces repos fork` cannot do;
+ * - a fork that answers 500 (code 10400) may still have made the repo, as on
+ *   the binding;
+ * - `refs` and `push` have no REST route, so they go over git smart HTTP;
+ * - a token id resolves through an eventually consistent index, so revoking
+ *   it within about a second of its mint can be 404.
  *
- * Every route is under `<base>/accounts/<accountId>/artifacts/namespaces/
- * <namespace>` and carries the API token as `Authorization: Bearer`, and
- * nowhere else. Each was confirmed with `bun run ops -- schema artifacts
- * namespaces <command>` (cf 1.0.0-beta.12, read-only), and against
- * Artifacts' REST docs (developers.cloudflare.com/artifacts/api/rest-api),
- * which spell bodies in snake case where cf's flags use kebab case:
- *
- * | Port | Route | `<command>` | Body or query |
- * | --- | --- | --- | --- |
- * | `create` | `POST /repos` | `repos create` | `{name}` |
- * | `remote`, and whether a repo exists | `GET /repos/{name}` | `repos get` | |
- * | `remove` | `DELETE /repos/{name}` | `repos delete` | |
- * | `fork` | `POST /repos/{base}/fork` | `repos fork` | `{name, default_branch_only: true}`: the docs and the probes send `name`; cf's schema lacks it (cf #180) |
- * | `importFrom` | `POST /repos/{name}/import` | `repos import` | `{url, branch?}` |
- * | `mintToken`, and the git calls' tokens | `POST /tokens` | `tokens create` | `{repo, scope, ttl}` |
- * | `revokeToken` | `DELETE /tokens/{id}` | `tokens revoke` | |
- * | `readCommit` | `GET /repos/{name}/commit/{hash}` | `repos commits get` | |
- * | `readTree` | `GET /repos/{name}/tree/{hash}` | `repos trees get` | |
- * | `readBlob` | `GET /repos/{name}/blob/{hash}` | `repos blobs get` | raw bytes back |
- * | `readFile` | `GET /repos/{name}/file` | `repos files get` | `?ref&path`; raw bytes back |
- * | `log` | `GET /repos/{name}/log` | `repos logs get` | `?ref&limit&offset` |
- *
- * cf's schema gives no reply shapes. From the docs: every JSON reply, and
- * every refusal, is Cloudflare's v4 envelope, `{success, errors: [{code,
- * message}], messages, result}`; blob and file replies are raw bytes; create,
- * fork, import and a repo's info carry `remote`; a minted token is `{id,
- * plaintext, scope, expires_at}`; a repo still being imported or forked
- * answers 409 (cf's generated client declares 409 for a repo's info and a
- * token's mint too); errors carry Artifacts' numeric codes (its errors
- * page), which the binding's `numericCode` matches (workers-types), and probes
- * saw 10201 and 10400 live. A refusal that names no code at all, such as a
- * proxy's, is read by its status: 404 is not found, 5xx internal. One that
- * names only Cloudflare's own codes (7000, an unknown route) is a defect.
- * ASSUMPTIONs, for a live run to settle:
- *
- * - a commit is the binding's metadata, spelled in snake case
- *   (`tree_hash`) as the API's other fields are, or in camel case as the
- *   binding's; a tree's `result` is the binding's entries, and a log's is a
- *   list of commit metadata;
- * - a 404 from a read is the object's absence once the repo is found to
- *   exist, and a tree read at another kind of object fails as the binding's
- *   does (500), so the adapter asks whether it is a blob or a commit;
- * - a log page may hold fewer commits than asked before the history ends
- *   (a server cap), so only an empty page ends it.
- *
- * A token id resolves through an eventually consistent index, so revoking it
- * within about a second of its mint can be 404 (cf's help for `tokens
- * revoke`): a 404 for a token this layer minted less than two seconds ago is
- * tried once more when they have passed. Git calls share one token per repo
- * and scope, minted on first use, minted again near its expiry, and revoked
- * when the layer closes. The day-long write token create, fork and import
- * return is dropped, as the binding drops it.
+ * ASSUMPTIONs, for a live run to settle: a commit's fields are snake case or
+ * camel case; a 404 from a read is the object's absence once the repo exists;
+ * a tree read at another kind of object is 500; and a log page may hold fewer
+ * commits than asked, so only an empty page ends it.
  */
 import { CommitSha } from "@repo/protocol/ids";
 import {
@@ -107,7 +56,6 @@ import {
 import type { Code } from "./artifacts-api.ts";
 import { listRefs, listTags, pushRefs } from "./smart-http.ts";
 
-/** A refusal that names no code at all, such as a proxy's, read by status. */
 const byStatus = (status: number): Option.Option<Code> =>
   Match.value(status).pipe(
     Match.when(404, () => Option.some<Code>("NOT_FOUND")),
@@ -118,14 +66,12 @@ const byStatus = (status: number): Option.Option<Code> =>
     Match.orElse(() => Option.none())
   );
 
-/** A reply that was no success: its status, the code it names, its messages. */
 class Refused extends Data.TaggedError("Refused")<{
   readonly status: number;
   readonly code: Option.Option<Code>;
   readonly message: string;
 }> {}
 
-/** A fork that answered 500, which may still have made the repo. */
 class MaybeForked extends Data.TaggedError("MaybeForked")<{
   readonly refused: Refused;
 }> {}
@@ -139,11 +85,9 @@ const Failure = Schema.fromJsonString(
 const decodeFailure = Schema.decodeOption(Failure);
 
 /**
- * A refused reply read: by the first code Artifacts names, or by its status
- * when it names no code at all. One that names only codes Artifacts does not
- * own, such as Cloudflare's 7000 for a route it does not know, reads as no
- * code, so a wrong route, account or namespace is a defect and never passes
- * for a missing repo or object.
+ * A reply naming only codes Artifacts does not own (Cloudflare's 7000 for an
+ * unknown route) reads as no code, so a wrong route, account or namespace is
+ * a defect and never passes for a missing repo or object.
  */
 const refusedBy = (status: number, text: string) => {
   const problems = Option.match(decodeFailure(text), {
@@ -169,7 +113,6 @@ const is =
   (refused: Refused): boolean =>
     Option.exists(refused.code, (code) => codes.includes(code));
 
-/** Cloudflare's v4 envelope around a success's `result`. */
 const Envelope = <S extends Schema.Top>(result: S) =>
   Schema.fromJsonString(
     Schema.Struct({ result, success: Schema.Literal(true) })
@@ -274,7 +217,6 @@ const refusal = (response: Response) =>
     Effect.flatMap((text) => Effect.fail(refusedBy(response.status, text)))
   );
 
-/** A success's envelope, decoded at the boundary, or what refused it. */
 const decoded =
   <A>(codec: Schema.Codec<A, string>) =>
   (response: Response) =>
@@ -285,7 +227,6 @@ const decoded =
         )
       : refusal(response);
 
-/** A success's raw bytes, or what refused it. */
 const bytesOf = (response: Response) =>
   response.ok
     ? Effect.promise(() => response.arrayBuffer()).pipe(
@@ -298,23 +239,18 @@ const accepted = (response: Response) =>
 
 const main = RefName.make("refs/heads/main");
 
-/** How long a token for git calls lives, and how near its expiry it is replaced. */
 const CALL_TOKEN_TTL = Duration.minutes(30);
 
 const CALL_TOKEN_MARGIN = Duration.minutes(5);
 
-/** How long a token id may be unknown to the index after its mint. */
 const REVOKE_LAG = Duration.seconds(2);
 
-/** A token this layer minted and has not revoked. */
 interface Token {
   readonly name: RepoName;
   readonly at: DateTime.Utc;
-  /** Minted for the layer's own git calls, and revoked when it closes. */
   readonly forCalls: boolean;
 }
 
-/** What a git call to a repo needs: its remote, and a token. */
 interface Access {
   readonly name: RepoName;
   readonly remote: string;
@@ -335,7 +271,6 @@ const BEING_MADE = [
   "IMPORT_IN_PROGRESS",
 ] as const satisfies readonly Code[];
 
-/** What a create or an import refuses a name with: one taken, or being made. */
 const TAKEN = [
   "ALREADY_EXISTS",
   ...BEING_MADE,
@@ -368,7 +303,6 @@ const make = (options: {
 
     const authorization = () => `Bearer ${Redacted.value(options.token)}`;
 
-    /** One request to the API; one that got no response is a defect. */
     const send = (request: Request) => fetch.fetch(request).pipe(Effect.orDie);
 
     const httpGet = (path: string) =>
@@ -414,7 +348,6 @@ const make = (options: {
         })
       );
 
-    /** A repo's remote; a 409 there is a repo still being made. */
     const infoOf = (name: RepoName) =>
       httpGet(repoPath(name)).pipe(
         Effect.flatMap(decoded(Remote)),
@@ -435,10 +368,6 @@ const make = (options: {
     const remoteOf = (name: RepoName) =>
       infoOf(name).pipe(Effect.catchTag("ForkInProgress", Effect.die));
 
-    /**
-     * A read whose 404 is the object's absence once the repo is found to
-     * exist; any other refusal is a defect.
-     */
     const optional = <A>(name: RepoName, read: Effect.Effect<A, Refused>) =>
       read.pipe(
         Effect.asSome,
@@ -507,10 +436,6 @@ const make = (options: {
         )
       );
 
-    /**
-     * Revokes the token `id`, once more when the index may not know it yet;
-     * whether it was revoked. The layer forgets the token either way.
-     */
     const revoke = (id: string) =>
       Effect.gen(function* () {
         const token = (yield* Ref.get(minted)).get(id);
@@ -538,7 +463,6 @@ const make = (options: {
         return again;
       });
 
-    /** The remote and token a git call to `name` uses, minted on first use. */
     const accessOf = (name: RepoName, scope: TokenScope) =>
       Effect.gen(function* () {
         const key = `${scope}:${name}`;
@@ -593,8 +517,7 @@ const make = (options: {
 
     /**
      * After a 500 and then an already-exists or a second 500, the fork may be
-     * made: it is, if it lists `main`. Otherwise it is still being made,
-     * or was undone; either way the caller tries again later.
+     * made: it is, if it lists `main`.
      */
     const confirmed = (name: RepoName) =>
       Effect.gen(function* () {
@@ -613,10 +536,6 @@ const make = (options: {
         Effect.provideService(Fetch, fetch)
       );
 
-    /**
-     * One fork request. The base's absence names the base; any other refusal
-     * names the target, and a 500 is `MaybeForked`, since it may have made it.
-     */
     const forkOnce = (from: RepoName, name: RepoName) =>
       httpPost(`${repoPath(from)}/fork`, {
         default_branch_only: true,
@@ -643,7 +562,6 @@ const make = (options: {
         )
       );
 
-    /** Whether the repo holds `id` as a blob or a commit, as a tree read refused it. */
     const blobOrCommit = (name: RepoName, id: ObjectId) =>
       optional(
         name,
@@ -674,8 +592,6 @@ const make = (options: {
             Match.when(is("NOT_FOUND"), () =>
               remoteOf(name).pipe(Effect.as(Option.none()))
             ),
-            // A blob's or a commit's id names no tree, as on the other stores;
-            // any other failure stays one.
             Match.when(is("INTERNAL_ERROR"), () =>
               blobOrCommit(name, tree).pipe(
                 Effect.flatMap((other) =>
@@ -688,7 +604,6 @@ const make = (options: {
         )
       );
 
-    /** One page of a log; a ref that names nothing logs nothing, as the binding's. */
     const page = (name: RepoName, ref: string, offset: number, limit: number) =>
       httpGet(
         `${repoPath(name)}/log?${new URLSearchParams({
@@ -844,19 +759,11 @@ const make = (options: {
     });
   });
 
-/**
- * Artifacts over its REST API, for scripts: the same `RepoHost`
- * the platform reaches through the binding. The API token is the caller's
- * (scripts get it from `varlock run`), and goes only into the
- * `Authorization` header of requests to the API. Delete only repos the
- * caller made with it.
- */
 export const RepoHostRest = {
   layer: (options: {
     readonly accountId: string;
     readonly namespace: string;
     readonly token: Redacted.Redacted;
-    /** Defaults to `https://api.cloudflare.com/client/v4`. */
     readonly base?: string;
   }): Layer.Layer<RepoHost, never, Fetch> =>
     Layer.effect(RepoHost, make(options)),

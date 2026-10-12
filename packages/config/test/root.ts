@@ -1,16 +1,11 @@
 import { Effect, FileSystem, Option, Path, Stream } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
-/** The repo root. Vitest runs in the package's folder, two below it. */
 export const repoRoot = Effect.map(Path.Path, (path) =>
   path.resolve("..", "..")
 );
 
-/**
- * Every file git tracks or would track (ignored files left out), from the
- * repo root. A tracked file deleted but not yet staged is still listed:
- * `textOf` reads it as none.
- */
+/** A tracked file deleted but not yet staged is still listed: `textOf` reads it as none. */
 export const committable = Effect.gen(function* () {
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
   const cwd = yield* repoRoot;
@@ -35,14 +30,9 @@ export const committable = Effect.gen(function* () {
   return listed.split("\n").filter((line) => line.length > 0);
 }).pipe(Effect.scoped);
 
-/**
- * How many of the repo's files a whole-repo scan reads at once. One at a
- * time, a scan of every source file waits on a thousand queued reads, which
- * under verify's parallel test run takes longer than a test's timeout.
- */
+/** One read at a time, a whole-repo scan outlasts a test's timeout under verify's parallel run. */
 export const readsAtOnce = { concurrency: 32 } as const;
 
-/** A file under the repo root, as text, if it is on disk. */
 export const textOf = (file: string) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
