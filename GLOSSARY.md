@@ -55,8 +55,12 @@ _Avoid_: scope (when meaning paths), lane, footprint
 One or more members of the closed, typed union the platform returns instead of landing, all from the cheapest failing stage, each with a reason, a reproducing command, a next step, and whether retrying can help.
 _Avoid_: rejection, error, failure, CI failure
 
+**Discussion**:
+A public, freeform thread in a project, open to anyone not denounced, that lands nothing itself; a decider may turn it into a proposal.
+_Avoid_: issue, forum topic, comments
+
 **Proposal**:
-A request to open an ask, or to flag an existing one, from anyone not denounced; it expires unless a decider accepts it.
+A request to open an ask, or to flag an existing one, from anyone not denounced, or made by a decider from a discussion; it expires unless a decider accepts it.
 _Avoid_: feature request, suggestion
 
 **Draft**:
@@ -144,7 +148,7 @@ A line in the project's vouch file by which a member admits a person to claim an
 _Avoid_: approval, whitelist, endorsement, trust score
 
 **Denouncement**:
-A line in the project's vouch file that bars a person from making proposals; it is shown as the line it is, never as a warning beside the person's name.
+A line in the project's vouch file that bars a person from making proposals and posting in discussions; it is shown as the line it is, never as a warning beside the person's name.
 _Avoid_: ban, block, flag
 
 **Record**:
