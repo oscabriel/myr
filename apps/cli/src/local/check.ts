@@ -761,7 +761,7 @@ export const check = Command.make(
 
       for (const move of ratcheted.decisions) {
         yield* output.note(
-          `The ratchet ${moveText(move)}: a reasoned escape you add there asks a decider to raise it, so the answer will wait on that decision.`
+          `The ratchet ${moveText(move)}: a reasoned escape you add there asks a maintainer to raise it, so the answer will wait on that decision.`
         );
       }
 

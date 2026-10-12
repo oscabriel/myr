@@ -95,7 +95,7 @@ describe(explain, () => {
         }),
       ])
     ).toStrictEqual([
-      'Weakened: adds it.skip without a reason; remove it, or give a reason after " -- " for a decider to weigh',
+      'Weakened: adds it.skip without a reason; remove it, or give a reason after " -- " for a maintainer to weigh',
       "  at: src/a.ts:3",
       `  next: ${Brand.cli} check`,
       "  retryable: no",
@@ -130,7 +130,7 @@ describe(explain, () => {
         "TouchedJudge: changes files that decide what the checks do: src/a.ts",
     },
     {
-      ends: '; remove it, or give a reason after " -- " for a decider to weigh',
+      ends: '; remove it, or give a reason after " -- " for a maintainer to weigh',
       refusal: new Weakened({
         at: { line: 3, path },
         weakening: { marker: ".skip(" },
@@ -138,7 +138,7 @@ describe(explain, () => {
       starts: "Weakened: adds .skip( without a reason",
     },
     {
-      ends: "; a decider declined it, so take the marker out",
+      ends: "; a maintainer declined it, so take the marker out",
       refusal: new Weakened({
         at: { line: 3, path },
         weakening: { marker: "oxlint-disable", reason: "generated code" },
@@ -197,11 +197,11 @@ describe(explain, () => {
       "TouchedJudge: changes files that decide what the checks do: oxlint.config.ts; the checks are fixed for this ask, so put them back, or flag the ask if a check is wrong",
       `  next: ${Brand.cli} check`,
       "  retryable: no",
-      'Weakened: adds .skip( without a reason; remove it, or give a reason after " -- " for a decider to weigh',
+      'Weakened: adds .skip( without a reason; remove it, or give a reason after " -- " for a maintainer to weigh',
       "  at: packages/a/test/x.test.ts:3",
       `  next: ${Brand.cli} check`,
       "  retryable: no",
-      'Weakened: adds .only( without a reason; remove it, or give a reason after " -- " for a decider to weigh',
+      'Weakened: adds .only( without a reason; remove it, or give a reason after " -- " for a maintainer to weigh',
       "  at: packages/a/test/x.test.ts:9",
       `  next: ${Brand.cli} check`,
       "  retryable: no",
@@ -212,7 +212,7 @@ describe(explain, () => {
     ]);
   });
 
-  it("says a decider declined a reasoned marker, and to take it out", () => {
+  it("says a maintainer declined a reasoned marker, and to take it out", () => {
     const lines = explain([
       new Weakened({
         at: { line: 3, path },
@@ -221,12 +221,12 @@ describe(explain, () => {
     ]);
 
     expect(lines).toStrictEqual([
-      'Weakened: adds .skip( with the reason "flaky"; a decider declined it, so take the marker out',
+      'Weakened: adds .skip( with the reason "flaky"; a maintainer declined it, so take the marker out',
       "  at: src/a.ts:3",
       `  next: ${Brand.cli} check`,
       "  retryable: no",
     ]);
-    expect(lines.join("\n")).not.toContain("waits for a decider");
+    expect(lines.join("\n")).not.toContain("waits for a maintainer");
   });
 
   it("leaves a raised ratchet's reason as it was", () => {
@@ -418,7 +418,7 @@ describe(explain, () => {
     expect(
       explain([new ChecksFailed({ lane: "unit", logRef, next: "bun test" })])
     ).toStrictEqual([
-      `ChecksFailed: the unit checks failed on the answer; run bun test in a clone of the fork to see the failure; the log is kept as ${logRef}, which the answerer and the project's deciders read with ${Brand.cli} evidence`,
+      `ChecksFailed: the unit checks failed on the answer; run bun test in a clone of the fork to see the failure; the log is kept as ${logRef}, which the answerer and the project's maintainers read with ${Brand.cli} evidence`,
       "  next: bun test",
       "  retryable: no",
     ]);
@@ -441,11 +441,11 @@ describe(explain, () => {
     expect(lines.join("\n")).not.toContain("evidence");
   });
 
-  it("tells a caller they are not a decider without naming a project", () => {
+  it("tells a caller they are not a maintainer without naming a project", () => {
     const [line] = explain([new NotDecider({})]);
 
     expect(line).toBe(
-      "NotDecider: you are not a decider here: only the deciders a project's config names may do this"
+      "NotDecider: you are not a maintainer here: only the maintainers a project's config names may do this"
     );
     expect(line).not.toContain("this project's");
   });
@@ -490,7 +490,7 @@ describe(receiptLine, () => {
         `fix-parser at 2222222 waits on decision dec-000001; ${follow}`
       ),
       Result.succeed(
-        `fix-parser at 2222222 passed and waits for a decider's finish; ${follow}`
+        `fix-parser at 2222222 passed and waits for a maintainer's finish; ${follow}`
       ),
       Result.succeed(
         `fix-parser at 2222222 passed and waits for parse-iso to land; ${follow}`

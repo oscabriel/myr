@@ -127,7 +127,7 @@ export const openDecision = (input: {
   subject: input.subject,
 });
 
-// A non-decider is refused before the decision's state is read, so they learn
+// A non-maintainer is refused before the decision's state is read, so they learn
 // nothing of it.
 export const decide = (
   decisions: readonly Decision[],

@@ -735,7 +735,7 @@ layer(ScenarioOnce, { excludeTestServices: true, timeout: "240 seconds" })(
     );
 
     it.effect(
-      "refuses bram, no decider, with NotDecider printed once and exit 77",
+      "refuses bram, no maintainer, with NotDecider printed once and exit 77",
       () =>
         Effect.gen(function* () {
           const { byBram } = yield* Scenario;

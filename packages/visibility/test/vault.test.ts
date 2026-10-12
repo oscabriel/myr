@@ -201,7 +201,7 @@ describe("write-only values over WebCrypto", () => {
   );
 
   it.effect(
-    "refuses an 11-character value unless the decider acknowledges it",
+    "refuses an 11-character value unless the maintainer acknowledges it",
     () =>
       Effect.gen(function* () {
         const short = "abcdefghijk";

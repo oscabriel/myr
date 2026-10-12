@@ -75,11 +75,11 @@ const reason = Match.typeTags<Refusal, string>()({
       return `the ${lane} checks failed; their log was withheld`;
     }
 
-    // `evidence` lets in the answerer and the project's deciders alone; the
+    // `evidence` lets in the answerer and the project's maintainers alone; the
     // local check keeps no log for it to read.
     return ChecksFailed.isLocal(logRef)
       ? `the ${lane} checks failed on this commit; run ${next} to see the failure`
-      : `the ${lane} checks failed on the answer; run ${next} in a clone of the fork to see the failure; the log is kept as ${logRef}, which the answerer and the project's deciders read with ${Brand.cli} evidence`;
+      : `the ${lane} checks failed on the answer; run ${next} in a clone of the fork to see the failure; the log is kept as ${logRef}, which the answerer and the project's maintainers read with ${Brand.cli} evidence`;
   },
   ClaimLapsed: ({ ask }) => `your claim on ${ask} lapsed`,
   DecisionClosed: ({ decision }) =>
@@ -104,7 +104,7 @@ const reason = Match.typeTags<Refusal, string>()({
   NotClaimed: ({ ask }) => `you hold no claim on ${ask}`,
   // `today` across every project raises it too, so it names no project.
   NotDecider: () =>
-    "you are not a decider here: only the deciders a project's config names may do this",
+    "you are not a maintainer here: only the maintainers a project's config names may do this",
   NotRedFirst: () =>
     "the ask's check must fail on main twice in the same way, by an assertion",
   NotSensitive: ({ key }) =>
@@ -115,7 +115,7 @@ const reason = Match.typeTags<Refusal, string>()({
   OutOfScope: ({ paths }) =>
     `changes paths outside the ask's territory: ${list(paths)}; put those files back, or flag the ask if the want needs them`,
   PostureChange: ({ from, to }) =>
-    `landing would change the posture from ${from} to ${to}, which takes a decider`,
+    `landing would change the posture from ${from} to ${to}, which takes a maintainer`,
   PrivatePathInPublicTree: ({ paths }) =>
     `would put held-back paths in a public tree: ${list(paths)}; those paths belong to a layer, so remove them from the answer`,
   ProjectExists: ({ project }) => `a project named ${project} already exists`,
@@ -157,10 +157,10 @@ const reason = Match.typeTags<Refusal, string>()({
     }
 
     // A reasoned marker opens a decision, not a refusal: a refusal that
-    // carries a reason is a waiver a decider declined.
+    // carries a reason is a waiver a maintainer declined.
     return weakening.reason === undefined
-      ? `adds ${weakening.marker} without a reason; remove it, or give a reason after " -- " for a decider to weigh`
-      : `adds ${weakening.marker} with the reason "${weakening.reason}"; a decider declined it, so take the marker out`;
+      ? `adds ${weakening.marker} without a reason; remove it, or give a reason after " -- " for a maintainer to weigh`
+      : `adds ${weakening.marker} with the reason "${weakening.reason}"; a maintainer declined it, so take the marker out`;
   },
 });
 
@@ -197,7 +197,7 @@ export const receiptLine = (
         Result.succeed(`${at} waits on decision ${decision}; ${follow}`),
       AwaitingFinish: () =>
         Result.succeed(
-          `${at} passed and waits for a decider's finish; ${follow}`
+          `${at} passed and waits for a maintainer's finish; ${follow}`
         ),
       Checking: () => Result.succeed(`checking ${at}; ${follow}`),
       Landed: ({ sha }) => Result.succeed(`${at} landed as ${short(sha)}`),

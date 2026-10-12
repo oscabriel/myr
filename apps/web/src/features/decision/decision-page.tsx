@@ -60,7 +60,7 @@ const DecisionFacts = ({
 }) => (
   <FactBlock label="Decision">
     <dl className="text-ui grid grid-cols-[6rem_1fr] gap-x-3 gap-y-1.5">
-      <dt className="text-label text-muted-foreground pt-0.5">Deciders</dt>
+      <dt className="text-label text-muted-foreground pt-0.5">Maintainers</dt>
       <dd className="flex flex-wrap gap-x-2">
         {decision.deciders.map((handle) => (
           <HandleLink handle={handle} key={handle} />
@@ -171,9 +171,9 @@ const ForAnyone = ({
   <div className="flex max-w-[70ch] flex-col items-start gap-3">
     <p className="text-body">
       Decision <code className="text-mono font-mono">{id}</code> is a choice put
-      to {project}&apos;s deciders: the people its policy names for what it is
-      about. A decider takes it on their Today, with its evidence and a safe
-      default if nobody does.
+      to {project}&apos;s maintainers: the people its policy names for what it
+      is about. A maintainer takes it on their Today, with its evidence and a
+      safe default if nobody does.
     </p>
     <p className="text-ui">
       <AppLink className={LINK} to={`/${project}/people`}>

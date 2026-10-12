@@ -79,7 +79,7 @@ const todayFor = (
     ...input,
   });
 
-describe("a decider's Today", () => {
+describe("a maintainer's Today", () => {
   it("holds the decisions that expire first to the budget, and counts the overflow", () => {
     const page = todayFor({ decisions: eight });
 
@@ -89,7 +89,7 @@ describe("a decider's Today", () => {
     expect(page.decider).toBe(alice);
   });
 
-  it("shows a decider their decisions however sign-in cases the handle", () => {
+  it("shows a maintainer their decisions however sign-in cases the handle", () => {
     const page = todayFor({ decider: handle("ALICE"), decisions: eight });
 
     expect(page.decisions).toStrictEqual([p1, p2, p3, p4, p5]);
@@ -106,7 +106,7 @@ describe("a decider's Today", () => {
   });
 
   it("shows none when more was used than the day's budget now allows", () => {
-    // The policy lowered decisionsPerDay after the decider had spent more.
+    // The policy lowered decisionsPerDay after the maintainer had spent more.
     const page = todayFor({
       budget: { finishes: 0, total: 3, used: 5 },
       decisions: eight,
@@ -150,7 +150,7 @@ describe("a decider's Today", () => {
     expect(page.overflow).toBe(1);
   });
 
-  it("leaves out decisions for paths the decider does not own", () => {
+  it("leaves out decisions for paths the maintainer does not own", () => {
     const policy = {
       ...scenario.policy,
       deciders: [
@@ -278,7 +278,7 @@ describe("the budget", () => {
   const thursday = now;
   const wednesday = at("2026-10-07T18:00:00Z");
 
-  it("counts the decisions a decider already took today against used", () => {
+  it("counts the decisions a maintainer already took today against used", () => {
     const days = spendAll([
       { decider: alice, now: wednesday, on: "decision" },
       { decider: alice, now: thursday, on: "decision" },
@@ -297,7 +297,7 @@ describe("the budget", () => {
     });
   });
 
-  it("counts what a decider spent under any casing of their handle", () => {
+  it("counts what a maintainer spent under any casing of their handle", () => {
     const days = spendAll([{ decider: alice, now: thursday, on: "decision" }]);
 
     expect(

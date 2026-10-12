@@ -720,7 +720,7 @@ describe.each(["memory", "sqlite"] as const)(
     );
 
     it.effect(
-      "2. an ask green on main is not red first, and only a decider opens one",
+      "2. an ask green on main is not red first, and only a maintainer opens one",
       () =>
         Effect.map(seen, ({ opened }) => {
           expect(opened.greenRefused).toStrictEqual(new NotRedFirst({}));
@@ -1162,7 +1162,7 @@ describe("opening an ask", () => {
       )
   );
 
-  it.effect("is for a decider whose paths hold the ask's territory", () =>
+  it.effect("is for a maintainer whose paths hold the ask's territory", () =>
     Effect.map(
       decidingNarrowly.pipe(Effect.provide(worldOf(narrowDecider, "memory"))),
       ({ inside, outside }) => {

@@ -100,8 +100,8 @@ const NOUNS: readonly Noun[] = [
 
 const LOOP: readonly ReactNode[] = [
   <>
-    A decider opens an ask; <Code>{`${Brand.cli} ask open`}</Code> lands it only
-    once its check fails on <Code>main</Code> twice the same way, by an
+    A maintainer opens an ask; <Code>{`${Brand.cli} ask open`}</Code> lands it
+    only once its check fails on <Code>main</Code> twice the same way, by an
     assertion.
   </>,
   <>

@@ -250,7 +250,7 @@ const NoAsks = ({
   ) : (
     <EmptyState
       command={`${Brand.cli} ask open <ask> --files <files>`}
-      title="No open asks on any project. A decider opens one from an ask file."
+      title="No open asks on any project. A maintainer opens one from an ask file."
     />
   );
 

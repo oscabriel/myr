@@ -252,7 +252,7 @@ const Read = ({
 const SetValueFacts = ({ project }: { readonly project: ProjectName }) => (
   <FactBlock label="Set a value">
     <p className="text-ui text-muted-foreground">
-      A decider sets one from a terminal; nobody reads it back.
+      A maintainer sets one from a terminal; nobody reads it back.
     </p>
     <CommandLine
       command={`${Brand.cli} env set <KEY> --project ${project} --yes`}

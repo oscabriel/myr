@@ -152,11 +152,11 @@ describe(StatusLine, () => {
           decision: DecisionId.make("dec-000001"),
         }),
         "Waiting on decision dec-000001",
-        "a decider's move",
+        "a maintainer's move",
       ],
       [
         Outcome.cases.AwaitingFinish.make({ decider: okonkwo }),
-        "Passed, waiting for a decider's finish from okonkwo",
+        "Passed, waiting for a maintainer's finish from okonkwo",
         "okonkwo's move",
       ],
       [
@@ -246,7 +246,7 @@ describe(StatusLine, () => {
     expect(yours.text).toContain("default: decline");
     expect(yours.text).toContain("your move");
     expect(yours.tone).toBe("waiting");
-    expect(theirs.text).toContain("a decider's move");
+    expect(theirs.text).toContain("a maintainer's move");
   });
 
   it("says a decided decision's choice, in the landed role only when it took effect", () => {
@@ -300,7 +300,7 @@ describe(StatusLine, () => {
 
     expect(drafting.text).toContain("Drafting");
     expect(drafting.tone).toBe("checking");
-    expect(ready.text).toContain("Ready, waits for a decider");
+    expect(ready.text).toContain("Ready, waits for a maintainer");
     expect(ready.tone).toBe("waiting");
   });
 

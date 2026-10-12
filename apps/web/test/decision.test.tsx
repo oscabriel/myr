@@ -243,7 +243,7 @@ describe("the decide atom", () => {
       })
   );
 
-  it.live("sends no note when the decider wrote none", () =>
+  it.live("sends no note when the maintainer wrote none", () =>
     Effect.gen(function* () {
       const { asked } = yield* decideOnce(taken, { choice: "adopt" });
 
@@ -664,7 +664,7 @@ describe(DecisionView, () => {
 
     expect(markup).not.toContain("data-choice=");
     expect(markup).not.toContain(".skip(");
-    expect(text).toContain("A decider takes it on their Today");
+    expect(text).toContain("A maintainer takes it on their Today");
     expect(markup).toContain('href="/oscabriel/vellum/people"');
     expect(text).toContain(`${Brand.cli} today --project oscabriel/vellum`);
   });

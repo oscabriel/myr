@@ -155,7 +155,7 @@ const rows: readonly {
       ref: RefNameText.make("refs/heads/release"),
       target: PushTarget.Canonical({ project: ask.project }),
     }),
-    name: "a decider's push to another canonical branch",
+    name: "a maintainer's push to another canonical branch",
     refusals: [new DirectPush({ ref: "refs/heads/release" })],
   },
   {
@@ -196,7 +196,7 @@ const rows: readonly {
       pusher: Person.make({ handle: alice }),
       target: PushTarget.WorkingFork({ owner: alice, project: ask.project }),
     }),
-    name: "a decider's push to their own working fork (deciders vouch, so need none)",
+    name: "a maintainer's push to their own working fork (maintainers vouch, so need none)",
     refusals: [],
   },
   {

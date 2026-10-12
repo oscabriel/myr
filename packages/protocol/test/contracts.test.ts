@@ -503,7 +503,7 @@ describe("the contracts group", () => {
     ).toStrictEqual(table.map(({ cli, tag }) => ({ cli, tag })));
   });
 
-  it("sets each contract's visibility explicitly, keeping only a decider's Today and decisions, and a lane's log, to maintainers", () => {
+  it("sets each contract's visibility explicitly, keeping only a maintainer's Today and decisions, and a lane's log, to maintainers", () => {
     expect(
       contracts.flatMap((rpc) => {
         const visibility = Context.getOrUndefined(rpc.annotations, Visibility);

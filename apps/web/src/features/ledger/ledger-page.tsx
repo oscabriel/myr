@@ -93,7 +93,7 @@ const Handles = ({ handles }: { readonly handles: readonly Handle[] }) =>
   ));
 
 const MembersOf = ({ members }: { readonly members: Members }) =>
-  members === "deciders" ? "the deciders" : <Handles handles={members} />;
+  members === "deciders" ? "the maintainers" : <Handles handles={members} />;
 
 const LayerBlock = ({ layer }: { readonly layer: Layer }) => (
   <li className="flex min-w-0 flex-col gap-2" data-layer={layer.name}>

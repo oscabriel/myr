@@ -253,9 +253,9 @@ describe("a project's ledger", () => {
         "Reason",
         "Held-back checks judge an answer by the ask's words, not by tests it could read.",
         "Readers",
-        "the deciders",
+        "the maintainers",
         "Writers",
-        "the deciders",
+        "the maintainers",
       ])
     ).toBeTruthy();
   });

@@ -135,7 +135,7 @@ describe("git through the platform", () => {
   );
 
   it.live(
-    "2. a decider's push to canonical main is DirectPush, and main stays where it was",
+    "2. a maintainer's push to canonical main is DirectPush, and main stays where it was",
     () =>
       Effect.gen(function* () {
         const { landed, repos, root, urlOf } = yield* withDatekit;
@@ -703,7 +703,7 @@ describe("custody of one push", () => {
   );
 
   it.live(
-    "a decider pushes onto someone's claim fork to finish its answer, which the push itself does not offer",
+    "a maintainer pushes onto someone's claim fork to finish its answer, which the push itself does not offer",
     () =>
       Effect.gen(function* () {
         const { api, landed, projects, seen } = yield* withDatekit;
@@ -742,7 +742,7 @@ describe("custody of one push", () => {
   );
 
   it.live(
-    "a fork takes branches only, whoever pushes: a working fork's owner and a finishing decider hear DirectPush for a tag",
+    "a fork takes branches only, whoever pushes: a working fork's owner and a finishing maintainer hear DirectPush for a tag",
     () =>
       Effect.gen(function* () {
         const { api, landed, projects } = yield* withDatekit;

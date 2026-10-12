@@ -214,7 +214,7 @@ const runs = Match.type<StageName>().pipe(
   ),
   Match.when(
     "human",
-    () => "A decider's finish, when the ask's kind asks for one."
+    () => "A maintainer's finish, when the ask's kind asks for one."
   ),
   Match.exhaustive
 );

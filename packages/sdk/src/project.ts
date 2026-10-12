@@ -56,7 +56,7 @@ export interface ProjectConfig {
   readonly admit?: Admit;
   /** Whether landings carry `Assisted-by:` trailers for the agents people worked through. Default `"trailer"`. */
   readonly agents?: PolicyInputEncoded["agents"];
-  /** How many decisions a decider takes a day, and how long one waits before its default. Default 5 a day, `"14 days"`. */
+  /** How many decisions a maintainer takes a day, and how long one waits before its default. Default 5 a day, `"14 days"`. */
   readonly budget?: {
     readonly decisionsPerDay: number;
     readonly expire: Days;
@@ -71,7 +71,7 @@ export interface ProjectConfig {
     readonly lapseAfter: Span;
     readonly warnAfter: Span;
   };
-  /** Who decides for which paths: a glob, and its deciders' handles or `"owners"`. Default `{ "**": "owners" }`. */
+  /** Who decides for which paths: a glob, and its maintainers' handles or `"owners"`. Default `{ "**": "owners" }`. */
   readonly deciders?: Readonly<
     Record<string, readonly [string, ...string[]] | "owners">
   >;

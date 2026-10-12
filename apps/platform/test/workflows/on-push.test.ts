@@ -281,7 +281,7 @@ const table: readonly {
     facts: facts(
       RepoKind.WorkingFork({ handle: Handle.make("alice"), project: datekit })
     ),
-    title: "a decider's working fork took a push",
+    title: "a maintainer's working fork took a push",
     verdict: ignored("not main"),
   },
   {

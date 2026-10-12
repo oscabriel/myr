@@ -153,7 +153,7 @@ const world = Layer.merge(worldOf(scenario, "memory"), EvidenceStoreMemory);
 
 describe("reading a failing lane's log", () => {
   it.effect(
-    "gives the answer's claimant and the project's deciders the log, whole",
+    "gives the answer's claimant and the project's maintainers the log, whole",
     () =>
       Effect.gen(function* () {
         const api = yield* answered();

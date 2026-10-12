@@ -180,7 +180,7 @@ const filesOf = (project: Filler, stated: readonly StatedAsk[]): Files =>
     ],
     [
       `${configDir}/vouched.td`,
-      `# The people ${project.project}'s deciders vouch for.\n`,
+      `# The people ${project.project}'s maintainers vouch for.\n`,
     ],
   ]);
 

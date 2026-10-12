@@ -89,7 +89,7 @@ const SignInFirst = ({
     <p className="text-body">
       A proposal asks {project} to open an ask nobody wrote yet: a want in your
       words, which the platform&apos;s agent can draft into an ask file and a
-      failing check for a decider to accept.
+      failing check for a maintainer to accept.
     </p>
     <p className="text-ui flex items-start gap-2">
       <LogIn
@@ -222,8 +222,8 @@ const Form = ({
         </div>
         <p className="text-label text-muted-foreground pl-6 font-normal">
           It writes the ask file and a check that fails on main, runs it red
-          first, and puts the draft to a decider. Clear the box to propose the
-          want alone.
+          first, and puts the draft to a maintainer. Clear the box to propose
+          the want alone.
         </p>
       </div>
 
@@ -312,7 +312,7 @@ export const ProposeView = ({
       ]}
       facts={<GoodWant />}
       factsHeading="Proposing"
-      meta="A decider decides whether the ask opens; nothing lands from here."
+      meta="A maintainer decides whether the ask opens; nothing lands from here."
       title="Propose an ask"
     >
       <ProposeBody

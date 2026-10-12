@@ -583,7 +583,7 @@ export interface Patience {
 const outcomeLine = (outcome: Outcome) =>
   Outcome.match(outcome, {
     AwaitingDecision: ({ decision }) => `waits on the decision ${decision}`,
-    AwaitingFinish: () => "waits for a decider's finish",
+    AwaitingFinish: () => "waits for a maintainer's finish",
     Checking: ({ stage }) => `is still being checked at ${stage}`,
     Landed: ({ sha }) => `landed as ${sha}`,
     Refused: ({ refusals }) =>

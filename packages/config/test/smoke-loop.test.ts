@@ -423,7 +423,7 @@ describe("smoke --loop on demo", () => {
 
 describe("smokeLoop --draft, against the Node world", () => {
   it.live(
-    "after the loop, the answerer's want is drafted red first by the memory drafter, the decider accepts it, and the ask opens disclosing the drafter beside the asker",
+    "after the loop, the answerer's want is drafted red first by the memory drafter, the maintainer accepts it, and the ask opens disclosing the drafter beside the asker",
     () =>
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;

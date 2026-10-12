@@ -94,7 +94,7 @@ const repairs = {
     todo: "Nothing: the platform could not run the checks, and runs them again.",
   },
   Weakened: {
-    todo: "Take the marker out; a marker without a reason may get one after ` -- ` for a decider to weigh, but one a decider declined stays out; never raise a ratchet.",
+    todo: "Take the marker out; a marker without a reason may get one after ` -- ` for a maintainer to weigh, but one a maintainer declined stays out; never raise a ratchet.",
   },
 } as const satisfies Record<AnswerTag, Repair>;
 
@@ -114,7 +114,7 @@ const elsewhere = {
     todo: "Take the paths it names out: their files stay private and never enter a public tree.",
   },
   NotDecider: {
-    todo: "Only one of the project's deciders may do this: ask one of them.",
+    todo: "Only one of the project's maintainers may do this: ask one of them.",
   },
   NotRedFirst: {
     todo: "Make the ask's check fail on main by an assertion, the same way twice, then open the ask again.",
@@ -126,7 +126,7 @@ const elsewhere = {
     todo: "Make the project in your own namespace: `next` names it with your handle.",
   },
   PostureChange: {
-    todo: "A decider declined the posture change it names (`from`, `to`): take out what changes the posture; `next` lists the decisions.",
+    todo: "A maintainer declined the posture change it names (`from`, `to`): take out what changes the posture; `next` lists the decisions.",
   },
   ProjectExists: { todo: "Pick another name: that one is taken." },
   ProposalClosed: {

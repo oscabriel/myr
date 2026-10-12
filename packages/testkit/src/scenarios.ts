@@ -164,7 +164,7 @@ export const aProject = (
   } = {}
 ): Scenario => {
   const [first = "alice", ...more] = options.deciders ?? [];
-  // A bare word is the first decider's (`alice/<word>`), who makes the
+  // A bare word is the first maintainer's (`alice/<word>`), who makes the
   // project in every scenario; a full name is kept as given.
   const given = options.name ?? "datekit";
   const name = given.includes("/") ? given : `${first.toLowerCase()}/${given}`;

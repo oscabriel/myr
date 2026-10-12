@@ -35,7 +35,7 @@ export const stageNames = Match.type<StageName>().pipe(
     label: "Held-back",
     words: "held-back checks",
   })),
-  Match.when("human", () => ({ label: "Decider", words: "decider" })),
+  Match.when("human", () => ({ label: "Maintainer", words: "maintainer" })),
   Match.exhaustive
 );
 
@@ -128,7 +128,7 @@ const moveWords = (
       claimant === undefined ? "the answerer's move" : `${claimant}'s move`,
     ]),
     Match.when("decider", () => [
-      decider === undefined ? "a decider's move" : `${decider}'s move`,
+      decider === undefined ? "a maintainer's move" : `${decider}'s move`,
     ]),
     Match.when("platform", () => ["the platform's move"]),
     Match.when("parent", () => ["that ask's move"]),
@@ -178,7 +178,7 @@ const answerReading = ({
       mark: "waiting",
       rest: (
         <>
-          , waiting for a decider&apos;s finish
+          , waiting for a maintainer&apos;s finish
           {decider === undefined ? null : (
             <>
               {" "}
@@ -386,7 +386,7 @@ const deciderMove = (decision: Decision, viewerDecides: boolean) => {
 
   const [only, ...others] = decision.deciders;
 
-  return others.length === 0 ? `${only}'s move` : "a decider's move";
+  return others.length === 0 ? `${only}'s move` : "a maintainer's move";
 };
 
 const decisionReading = ({
@@ -447,10 +447,10 @@ const proposalReading = (proposal: Proposal): Reading => {
   }
 
   const waiting: Reading = {
-    after: ["a decider's move"],
+    after: ["a maintainer's move"],
     lead: "Waiting",
     mark: "waiting",
-    rest: " for a decider to open it or decline it",
+    rest: " for a maintainer to open it or decline it",
     tone: "waiting",
   };
 
@@ -478,10 +478,10 @@ const proposalReading = (proposal: Proposal): Reading => {
           tone: "ink",
         }),
         Ready: (): Reading => ({
-          after: ["a decider's move"],
+          after: ["a maintainer's move"],
           lead: "Ready",
           mark: "waiting",
-          rest: ", waits for a decider",
+          rest: ", waits for a maintainer",
           tone: "waiting",
         }),
       });

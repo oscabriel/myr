@@ -115,7 +115,7 @@ const prose = (text: string): View => ({ markdown: text });
 const outcomeText = (outcome: Outcome) =>
   Outcome.match(outcome, {
     AwaitingDecision: ({ decision }) => `waits on decision ${decision}`,
-    AwaitingFinish: () => "passed; waits for a decider's finish",
+    AwaitingFinish: () => "passed; waits for a maintainer's finish",
     Checking: ({ stage }) => `checking (${stage})`,
     Landed: ({ sha }) => `landed as ${short(sha)}`,
     Refused: ({ refusals }) =>
@@ -353,9 +353,9 @@ const evaluated = (policy: PublicPolicy) => {
         ? `As of ${short(policy.at)}, the landed commit, from ${PROJECT_FILE}.`
         : `As of ${short(policy.at)}, the landed commit. This project has no ${PROJECT_FILE}: the person who set it up decides everything, under the platform's defaults.`
     ),
-    prose("Deciders by path:"),
+    prose("Maintainers by path:"),
     table(
-      ["paths", "deciders"],
+      ["paths", "maintainers"],
       policy.deciders.map(({ handles, paths }) => [paths, handles.join(", ")]),
       "Nobody decides.",
       [0]
@@ -377,7 +377,7 @@ const evaluated = (policy: PublicPolicy) => {
       ],
       [
         "Budget",
-        `${plural(budget.decisionsPerDay, "decision", "decisions")} a day per decider; an undecided one takes its default after ${plural(budget.expireDays, "day", "days")}`,
+        `${plural(budget.decisionsPerDay, "decision", "decisions")} a day per maintainer; an undecided one takes its default after ${plural(budget.expireDays, "day", "days")}`,
       ],
       [
         "Claim timing",
@@ -407,7 +407,7 @@ const pendingText = ({ at, reason }: PolicyPending) => {
   return reason === "noConfig"
     ? [
         `${notEvaluated}: there is no ${Brand.configDir}/ folder, and no test command in the project's CI or package files.`,
-        `Run \`${Brand.cli} init --project <owner>/<name> --dry-run\` in the project's repo to see the ${PROJECT_FILE} it proposes, then have a decider land it.`,
+        `Run \`${Brand.cli} init --project <owner>/<name> --dry-run\` in the project's repo to see the ${PROJECT_FILE} it proposes, then have a maintainer land it.`,
       ]
     : [
         `${notEvaluated}: ${Brand.configDir}/ at ${short(at)} did not evaluate.`,

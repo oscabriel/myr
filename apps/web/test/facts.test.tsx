@@ -176,7 +176,7 @@ describe(GateFacts, () => {
         "Cheap",
         "Checks",
         "Held-back",
-        "Decider",
+        "Maintainer",
       ])
     ).toBeTruthy();
   });

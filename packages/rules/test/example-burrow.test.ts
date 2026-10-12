@@ -242,7 +242,7 @@ describe("examples/burrow's config folder", () => {
   );
 
   it.live(
-    "names its deciders, the people who may claim, and the run block its hooks run",
+    "names its maintainers, the people who may claim, and the run block its hooks run",
     () =>
       Effect.gen(function* () {
         const policy = yield* evaluated();

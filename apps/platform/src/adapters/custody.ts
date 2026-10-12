@@ -189,7 +189,7 @@ const claimFork = (
   Effect.gen(function* () {
     const isClaimant = sameHandle(pusher.handle, fork.handle);
 
-    // A decider finishes an answer by pushing onto its fork.
+    // A maintainer finishes an answer by pushing onto its fork.
     const refused = yield* against(projects, fork.project, (api) =>
       isClaimant
         ? holds(api, pusher, fork.ask)
@@ -200,7 +200,7 @@ const claimFork = (
 
     return custodyOf(
       (commands) => [...branchesOnly(commands), ...refused],
-      // A decider's commits are judged by `<cli> finish`, not by the push.
+      // A maintainer's commits are judged by `<cli> finish`, not by the push.
       (repo, commands) =>
         Option.match(
           Option.filter(mainTip(commands), () => isClaimant),

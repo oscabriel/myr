@@ -1,5 +1,5 @@
 // The policy digest reads only a `PublicPolicy`'s kinds, modules, run block
-// and deciders, so no layer, held-back check or reason can reach a prompt.
+// and maintainers, so no layer, held-back check or reason can reach a prompt.
 import { Brand } from "@repo/brand";
 import type { PublicPolicy } from "@repo/protocol/domain/policy";
 import type { Refusal } from "@repo/protocol/refusal";
@@ -30,7 +30,7 @@ export const policyDigest = (
       ({ module, paths }) => `Module ${module}: ${paths.join(", ")}`
     ),
     ...policy.deciders.map(
-      ({ handles, paths }) => `Deciders for ${paths}: ${handles.join(", ")}`
+      ({ handles, paths }) => `Maintainers for ${paths}: ${handles.join(", ")}`
     ),
     Option.match(askTests, {
       onNone: () =>
@@ -52,7 +52,7 @@ export const systemPrompt = (digest: string): string =>
     "- context: facts an answerer needs that the code does not say, when they help.",
     "- territory: the smallest set of existing files an answer must change.",
     "- test.path and test.source: the ask's test file.",
-    "- rationale: why this draft reads the want this way, for the decider.",
+    "- rationale: why this draft reads the want this way, for the maintainer.",
     "",
     "Rules for the test:",
     "- It must fail on the current code by an assertion (an expect that fails), never by a missing import, export or file.",

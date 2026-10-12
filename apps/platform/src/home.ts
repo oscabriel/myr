@@ -123,7 +123,7 @@ const homeHtml = (input: {
       ),
       section(
         "Drafting",
-        `<p>A member can ask the platform's agent to draft a proposed ask (Workers AI, ${code(draftModel)}); a decider accepts it, and only people are credited.</p>`
+        `<p>A member can ask the platform's agent to draft a proposed ask (Workers AI, ${code(draftModel)}); a maintainer accepts it, and only people are credited.</p>`
       ),
       section("Health", `<p>${link(`${origin}/health`)}</p>`),
     ].join("\n"),

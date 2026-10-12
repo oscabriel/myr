@@ -29,7 +29,7 @@ The fork a claim is made of, at `<owner>/<name>--<ask>--<handle>`, to which the 
 _Avoid_: branch, feature branch
 
 **Working fork**:
-A person's own fork of a project, at `<owner>/<name>--me--<handle>`, that holds a decider's own changes before they land and a proposer's sealed answers.
+A person's own fork of a project, at `<owner>/<name>--me--<handle>`, that holds a maintainer's own changes before they land and a proposer's sealed answers.
 _Avoid_: personal fork, scratch repo
 
 **Check**:
@@ -56,22 +56,22 @@ One or more members of the closed, typed union the platform returns instead of l
 _Avoid_: rejection, error, failure, CI failure
 
 **Discussion**:
-A public, freeform thread in a project, open to anyone not denounced, that lands nothing itself; a decider may turn it into a proposal.
+A public, freeform thread in a project, open to anyone not denounced, that lands nothing itself; a maintainer may turn it into a proposal.
 _Avoid_: issue, forum topic, comments
 
 **Proposal**:
-A request to open an ask, or to flag an existing one, from anyone not denounced, or made by a decider from a discussion; it expires unless a decider accepts it.
+A request to open an ask, or to flag an existing one, from anyone not denounced, or made by a maintainer from a discussion; it expires unless a maintainer accepts it.
 _Avoid_: feature request, suggestion
 
 **Draft**:
-An ask file and its check that the platform's agent wrote for a proposal, run red first before it is put to a decider. It lands only when a decider accepts it.
+An ask file and its check that the platform's agent wrote for a proposal, run red first before it is put to a maintainer. It lands only when a maintainer accepts it.
 _Avoid_: AI suggestion, auto-ask
 
 **Sealed answer**:
-An answer recorded with a proposal and judged after the ask opens, without the decider reading its diff.
+An answer recorded with a proposal and judged after the ask opens, without the maintainer reading its diff.
 
 **Finish**:
-A decider's own commits on a passing answer before it lands, re-checked and credited with Finished-by.
+A maintainer's own commits on a passing answer before it lands, re-checked and credited with Finished-by.
 _Avoid_: review, nit, suggested change
 
 ## Landing
@@ -89,7 +89,7 @@ The commit the platform itself last landed on main; the only commit a project's 
 _Avoid_: HEAD, tip of main
 
 **Import**:
-A project adopted from a public repo: a read-only copy, not run by its maintainers, whose first `main` is the source branch's tip. The source, its address and branch, stays on the project's record and is shown as where it was imported from; by default the project is named after its source namespace (the Run a project guide has the whole rule). It is made from the CLI's `init --import` or the web's `/import`.
+A project adopted from a public repo: a read-only copy, not run by its upstream maintainers, whose first `main` is the source branch's tip. The source, its address and branch, stays on the project's record and is shown as where it was imported from; by default the project is named after its source namespace (the Run a project guide has the whole rule). It is made from the CLI's `init --import` or the web's `/import`.
 _Avoid_: mirror, fork (of the source), sync
 
 **Outcome**:
@@ -104,7 +104,7 @@ _Avoid_: protected paths
 An answer's added marker that disables a check (.skip, @ts-ignore, a lint or @effect-diagnostics disable) or raises a ratchet baseline; a marker without a reason is refused, and one with a reason counts against the ratchet.
 
 **Ratchet**:
-A counted budget per territory, recorded at landing and lowered automatically, that answers may lower but never raise; only a decider raises it.
+A counted budget per territory, recorded at landing and lowered automatically, that answers may lower but never raise; only a maintainer raises it.
 _Avoid_: baseline (alone), suppression file
 
 **Verdict**:
@@ -128,20 +128,20 @@ The person credited with deciding a change was worth making.
 The accountable human who signs an answer; any agent works through their token.
 _Avoid_: contributor (when meaning this role), agent identity
 
-**Decider**:
+**Maintainer**:
 A person whose decisions open asks, accept proposals and finish answers for an area; a path may name several, and may ask that more than one of them agree.
-_Avoid_: reviewer, approver, owner, delegate
+_Avoid_: decider, reviewer, approver, owner, delegate
 
 **Decision**:
-One choice put to a project's deciders, with its evidence and a safe default that is taken if nobody decides before it expires. Where a path asks for more than one decider, the choice takes effect once that many have chosen alike, and waits until then.
+One choice put to a project's maintainers, with its evidence and a safe default that is taken if nobody decides before it expires. Where a path asks for more than one maintainer, the choice takes effect once that many have chosen alike, and waits until then.
 _Avoid_: approval, vote, review request, quorum
 
 **Today**:
-A decider's daily page of open decisions, ordered by expiry and held to their budget; the overflow waits for a later day.
+A maintainer's daily page of open decisions, ordered by expiry and held to their budget; the overflow waits for a later day.
 _Avoid_: inbox, queue, dashboard
 
 **Budget**:
-The number of decisions a decider takes per day; a decision past it waits, and one that expires undecided takes its default.
+The number of decisions a maintainer takes per day; a decision past it waits, and one that expires undecided takes its default.
 
 **Vouch**:
 A line in the project's vouch file by which a member admits a person to claim and to submit sealed answers; it may carry the member's reason and the landing it followed, and it is read as a line, never counted.
@@ -187,7 +187,7 @@ _Avoid_: hidden test, private test, holdout, sealed test
 The salted SHA-256 root of a held-back suite, printed on every landing it judged.
 
 **Posture**:
-The label the platform computes from a project's visibility config as it stands now: Open, Open with sealed evidence, Open on schedule, Open core, or Source available. A narrowing stands only once a decider accepts it and its notice runs out. Every page and list shows the posture the ledger shows, said once per page.
+The label the platform computes from a project's visibility config as it stands now: Open, Open with sealed evidence, Open on schedule, Open core, or Source available. A narrowing stands only once a maintainer accepts it and its notice runs out. Every page and list shows the posture the ledger shows, said once per page.
 _Avoid_: licence (they are different things)
 
 **Ledger**:
@@ -198,7 +198,7 @@ The public schema of a project's environment variables: its committed .env.schem
 _Avoid_: env.ts, .env.example, secrets file
 
 **Write-only value**:
-A value for one @sensitive env item, set by a decider and stored encrypted by the platform; nobody can read it back, and it reaches only runs of landed code or is swapped in at the network boundary.
+A value for one @sensitive env item, set by a maintainer and stored encrypted by the platform; nobody can read it back, and it reaches only runs of landed code or is swapped in at the network boundary.
 _Avoid_: secret (alone), vault entry
 
 **Placeholder**:
@@ -213,7 +213,7 @@ _Avoid_: slug, repo name, full name, path
 
 **Owner**:
 The namespace a project is named in: a person's handle, or a source namespace. Owning a namespace is the right to make projects in it and nothing more; deciding stays with the config folder.
-_Avoid_: org, account, maintainer, admin
+_Avoid_: org, account, maintainer (owning a namespace is not maintaining a project), admin
 
 **Source namespace**:
 An owner that is the host and the account on that host a repo was imported from, such as `github.com/pallets`, so an import's address, `<host>/<account>/<name>`, says where it came from. Here, and only here, account means the host's account, never one on this platform.

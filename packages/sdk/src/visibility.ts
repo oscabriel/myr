@@ -31,7 +31,7 @@ export type LayerDefinition = Omit<typeof Layer.Encoded, "name" | "repo">;
 export type LayerHolds = readonly [LayerKind, ...LayerKind[]];
 
 export interface LayerConfig<Holds extends LayerHolds = LayerHolds> {
-  /** Who may read it. Default `"maintainers"`, the deciders' audience. */
+  /** Who may read it. Default `"maintainers"`, the maintainers' audience. */
   readonly audience?: Audience;
   /** What people outside its audience learn about what it holds. */
   readonly disclose: Disclosure;
@@ -161,7 +161,7 @@ const flowsOf = checked(VisibilityPolicy.fields.flows);
 export const flows = {
   /**
    * Nothing moves from a layer into a wider audience but a credited
-   * release, by the people named. Default release: the deciders.
+   * release, by the people named. Default release: the maintainers.
    */
   noWriteDown: (options?: {
     readonly release?: MembersInput;
@@ -171,7 +171,7 @@ export const flows = {
 
 export interface VisibilityConfig<Area extends string = string> {
   readonly checks?: SealedChecksDefinition<Area>;
-  /** Who may set a write-only env value. Default the deciders. */
+  /** Who may set a write-only env value. Default the maintainers. */
   readonly env?: { readonly setters: MembersInput };
   /** Default `flows.noWriteDown()`. */
   readonly flows?: FlowsDefinition;

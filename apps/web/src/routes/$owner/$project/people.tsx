@@ -118,7 +118,7 @@ export const Route = createFileRoute("/$owner/$project/people")({
   head: ({ params: { project } }) =>
     pageHead({
       title: `Policy · ${project}`,
-      description: `${project}'s deciders and limits.`,
+      description: `${project}'s maintainers and limits.`,
     }),
   component: PeoplePage,
   notFoundComponent: Unknown,

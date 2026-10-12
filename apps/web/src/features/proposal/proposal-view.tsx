@@ -313,7 +313,7 @@ const ProposalFacts = ({
           <When at={proposal.expiresAt} now={now} />
           <span className="text-muted-foreground">
             {" "}
-            unless a decider opens it
+            unless a maintainer opens it
           </span>
         </dd>
         <dt className="text-label text-muted-foreground pt-0.5">State</dt>
@@ -387,8 +387,8 @@ const DraftGuide = ({
   if (files.length === 0) {
     return proposal.draft === undefined ? (
       <p className="text-body max-w-[70ch]">
-        A want alone: no ask file or check yet. A decider who accepts it writes
-        the change it asks for.
+        A want alone: no ask file or check yet. A maintainer who accepts it
+        writes the change it asks for.
       </p>
     ) : null;
   }
@@ -397,8 +397,8 @@ const DraftGuide = ({
     <>
       {kept ? (
         <p className="text-ui text-muted-foreground" data-kept="">
-          An earlier round&apos;s ready draft, which a decider can still accept:
-          it runs red first again on main before the ask opens.
+          An earlier round&apos;s ready draft, which a maintainer can still
+          accept: it runs red first again on main before the ask opens.
         </p>
       ) : null}
       <AskFileStep file={askFile} proposal={proposal} />

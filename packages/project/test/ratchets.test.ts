@@ -82,7 +82,7 @@ describe(afterLanding, () => {
 
 describe(decideRaise, () => {
   it.each<Choice>(["accept", "adopt"])(
-    "sets the raised baseline when a decider chooses %s",
+    "sets the raised baseline when a maintainer chooses %s",
     (choice) => {
       expect(
         decideRaise([baseline(14)], raiseTo(15), choice, shaAt(2))
@@ -91,7 +91,7 @@ describe(decideRaise, () => {
   );
 
   it.each<Choice>(["decline", "revert"])(
-    "leaves the baseline when a decider chooses %s",
+    "leaves the baseline when a maintainer chooses %s",
     (choice) => {
       expect(
         decideRaise([baseline(14)], raiseTo(15), choice, shaAt(2))
@@ -253,7 +253,7 @@ const step = (model: Model, move: Move, at: number): Stepped => {
         judged.decisions.length === asked.length
           ? Option.none()
           : Option.some(
-              "an answer's raises were not each refused or put to a decider"
+              "an answer's raises were not each refused or put to a maintainer"
             ),
       decided: Option.none(),
       model: { ...model, waiting: [...model.waiting, ...judged.decisions] },

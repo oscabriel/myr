@@ -70,8 +70,8 @@ export interface StageHolds {
 }
 
 /**
- * A passing verdict reaches the decider stage whether or not a decider took
- * part, so with `holds` a held-back or decider stage it never needed reads not
+ * A passing verdict reaches the maintainer stage whether or not a maintainer took
+ * part, so with `holds` a held-back or maintainer stage it never needed reads not
  * needed.
  */
 export const stageStates = (

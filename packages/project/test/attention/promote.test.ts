@@ -131,7 +131,7 @@ const heldFiles = ({ decision, proposal }: Promotion) =>
   );
 
 describe("promoting a repeated finish", () => {
-  it("puts two finishes in one area for the same rule to their decider as one decision, declined by default", () => {
+  it("puts two finishes in one area for the same rule to their maintainer as one decision, declined by default", () => {
     const made = promote(pair);
 
     expect(

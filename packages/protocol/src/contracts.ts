@@ -589,7 +589,7 @@ export class InitProject extends Rpc.make("initProject", {
 })
   .annotate(
     Description,
-    "Make a project, empty or imported from a public git repo, with the caller as its decider."
+    "Make a project, empty or imported from a public git repo, with the caller as its maintainer."
   )
   .annotate(Audience, "signedIn")
   .annotate(Visibility, "public")
@@ -657,7 +657,7 @@ export class ProposeAsk extends Rpc.make("proposeAsk", {
 })
   .annotate(
     Description,
-    "Propose an ask, optionally with a sealed answer; the proposal expires unless a decider accepts it."
+    "Propose an ask, optionally with a sealed answer; the proposal expires unless a maintainer accepts it."
   )
   .annotate(Audience, "signedIn")
   .annotate(Visibility, "public")
@@ -686,7 +686,7 @@ export class DraftAsk extends Rpc.make("draftAsk", {
 })
   .annotate(
     Description,
-    "Have the platform's agent draft, or draft again, an open proposal's ask and its failing check; the proposer or a decider may ask."
+    "Have the platform's agent draft, or draft again, an open proposal's ask and its failing check; the proposer or a maintainer may ask."
   )
   .annotate(Audience, "signedIn")
   .annotate(Visibility, "public")
@@ -708,7 +708,7 @@ export class FlagAsk extends Rpc.make("flagAsk", {
 })
   .annotate(
     Description,
-    "Flag an open ask to its deciders with a reason, as a proposal that expires unless a decider accepts it."
+    "Flag an open ask to its maintainers with a reason, as a proposal that expires unless a maintainer accepts it."
   )
   .annotate(Audience, "signedIn")
   .annotate(Visibility, "public")
@@ -847,7 +847,7 @@ export class Finish extends Rpc.make("finish", {
 })
   .annotate(
     Description,
-    "Finish a passing answer with a decider's own commits on top; they are checked again, and credited with Finished-by when it lands."
+    "Finish a passing answer with a maintainer's own commits on top; they are checked again, and credited with Finished-by when it lands."
   )
   .annotate(Audience, "decider")
   .annotate(Visibility, "public")
@@ -871,7 +871,7 @@ export class Land extends Rpc.make("land", {
 })
   .annotate(
     Description,
-    "Land a decider's own change from their working fork, after the same checks an answer passes."
+    "Land a maintainer's own change from their working fork, after the same checks an answer passes."
   )
   .annotate(Audience, "decider")
   .annotate(Visibility, "public")
@@ -941,9 +941,9 @@ export class EvidenceOf extends Rpc.make("evidence", {
 })
   .annotate(
     Description,
-    "Show the log a failing lane left, by the logRef its verdict names, to the answer's own claimant and the project's deciders only; the last 256 KiB."
+    "Show the log a failing lane left, by the logRef its verdict names, to the answer's own claimant and the project's maintainers only; the last 256 KiB."
   )
-  // The handler lets in the answer's claimant and the project's deciders.
+  // The handler lets in the answer's claimant and the project's maintainers.
   .annotate(Audience, "signedIn")
   .annotate(Visibility, "maintainers")
   .annotate(ReadOnly, true)

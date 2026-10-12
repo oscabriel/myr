@@ -434,7 +434,7 @@ describe("the dev world's fixtures", seededWorlds, () => {
   );
 
   it.live(
-    "put every kind of decision on a decider's Today, one due within the day and two of five taken",
+    "put every kind of decision on a maintainer's Today, one due within the day and two of five taken",
     () =>
       inWorld(withFixtures, (as) =>
         Effect.gen(function* () {
@@ -594,23 +594,25 @@ describe("the dev world's fixtures", seededWorlds, () => {
       )
   );
 
-  it.live("state a policy with deciders by path and a denounced person", () =>
-    inWorld(withFixtures, (as) =>
-      Effect.gen(function* () {
-        const { policy } = yield* (yield* as()).projectPolicy({
-          project: vellum,
-        });
+  it.live(
+    "state a policy with maintainers by path and a denounced person",
+    () =>
+      inWorld(withFixtures, (as) =>
+        Effect.gen(function* () {
+          const { policy } = yield* (yield* as()).projectPolicy({
+            project: vellum,
+          });
 
-        expect(
-          new Set(policy?.deciders.map(({ paths }) => paths)).size
-        ).toBeGreaterThan(2);
-        expect(
-          policy?.vouches
-            .filter(({ denounced }) => denounced)
-            .map(({ handle }) => handle)
-        ).toStrictEqual(["wren"]);
-      })
-    )
+          expect(
+            new Set(policy?.deciders.map(({ paths }) => paths)).size
+          ).toBeGreaterThan(2);
+          expect(
+            policy?.vouches
+              .filter(({ denounced }) => denounced)
+              .map(({ handle }) => handle)
+          ).toStrictEqual(["wren"]);
+        })
+      )
   );
 
   it.live("draft proposals into every state a draft settles in", () =>

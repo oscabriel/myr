@@ -19,7 +19,7 @@ const swarmCopy = ProjectName.make("oscabriel/burrow-swarm-2");
 
 describe(renameSeedPlan, () => {
   it.effect(
-    "renames burrow's project and keeps everything else: its decider, main's first files, its ratchet and every ask",
+    "renames burrow's project and keeps everything else: its maintainer, main's first files, its ratchet and every ask",
     () =>
       Effect.gen(function* () {
         const plan = yield* planSeed("examples/burrow");

@@ -111,7 +111,7 @@ describe("the datekit example's config folder", () => {
   );
 
   it.live(
-    "evaluates under /bun to a policy with its run block, its deciders and its kinds",
+    "evaluates under /bun to a policy with its run block, its maintainers and its kinds",
     () =>
       Effect.gen(function* () {
         const { folder, policy } = yield* evaluated;

@@ -82,7 +82,7 @@ describe("a project scenario", () => {
     ]);
   });
 
-  it("names its people by the names it was given, deciders first", () => {
+  it("names its people by the names it was given, maintainers first", () => {
     const scenario = aProject({
       deciders: ["dana", "eve"],
       name: "burrow",

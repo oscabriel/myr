@@ -191,7 +191,7 @@ const rows: readonly {
   },
   {
     facts: push([ask.file, checkPath], [], { opensAsk: true }),
-    name: "a decider opening the ask writes its file and its check",
+    name: "a maintainer opening the ask writes its file and its check",
     refusals: [],
   },
   {

@@ -345,7 +345,7 @@ const promotionOf = (
 
   const touched = fresh.flatMap(({ paths }) => paths);
 
-  // Only finishers who still decide: accepting needs a decider.
+  // Only finishers who still decide: accepting needs a maintainer.
   const deciders = decidersFor(policy, touched).filter((decider) =>
     fresh.some((finish) => sameHandle(finish.decider, decider))
   );

@@ -763,7 +763,7 @@ describe("the Lander's git", () => {
   });
   describe(compose, () => {
     it.live(
-      "commits a decider's files onto main on a compose ref named by the tree, leaves main alone, and gives the same commit when asked again",
+      "commits a maintainer's files onto main on a compose ref named by the tree, leaves main alone, and gives the same commit when asked again",
       () =>
         Effect.gen(function* () {
           const repos = yield* world;

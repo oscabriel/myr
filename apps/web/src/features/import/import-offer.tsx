@@ -31,7 +31,7 @@ export const ImportOffer = ({
   return (
     <Workspace
       crumbs={[{ label: project }]}
-      meta={`Nobody has imported ${project} yet. Import it, and you become its decider.`}
+      meta={`Nobody has imported ${project} yet. Import it, and you become its maintainer.`}
       title="Not imported yet"
     >
       <ImportForm

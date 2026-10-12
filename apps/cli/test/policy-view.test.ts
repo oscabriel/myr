@@ -62,7 +62,7 @@ const linesOf = (text: string) =>
     .filter((line) => line !== "");
 
 describe("policy's text view", () => {
-  it("lists each decider glob with its handles, in the policy's order", () => {
+  it("lists each maintainer glob with its handles, in the policy's order", () => {
     const lines = linesOf(textOf(datekit));
 
     expect(lines).toContain("** ines-v");
@@ -72,7 +72,7 @@ describe("policy's text view", () => {
     );
   });
 
-  it("writes each decider glob as code in Markdown, so `**` reads as a glob, not emphasis", () => {
+  it("writes each maintainer glob as code in Markdown, so `**` reads as a glob, not emphasis", () => {
     const markdown = Option.match(views.projectPolicy(datekit), {
       onNone: () => "",
       onSome: (view) => view.markdown,
@@ -116,7 +116,7 @@ describe("policy's text view", () => {
     for (const line of [
       "Claims 3 claims per person at once",
       "Proposals 2 proposals per person at once",
-      "Budget 5 decisions a day per decider; an undecided one takes its default after 14 days",
+      "Budget 5 decisions a day per maintainer; an undecided one takes its default after 14 days",
       "Claim timing warned after 2 hours without a push; lapses after 24 hours",
       "Record a landing counts once it has stood 30 days, for 365 days",
     ]) {
@@ -131,7 +131,7 @@ describe("policy's text view", () => {
 
     expect(lines).toStrictEqual([
       `The config at the landed commit ${sha.slice(0, 7)} has not been evaluated: there is no ${Brand.configDir}/ folder, and no test command in the project's CI or package files.`,
-      `Run \`${Brand.cli} init --project <owner>/<name> --dry-run\` in the project's repo to see the ${Brand.configDir}/project.ts it proposes, then have a decider land it.`,
+      `Run \`${Brand.cli} init --project <owner>/<name> --dry-run\` in the project's repo to see the ${Brand.configDir}/project.ts it proposes, then have a maintainer land it.`,
     ]);
   });
 

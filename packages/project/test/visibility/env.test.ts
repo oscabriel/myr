@@ -267,7 +267,7 @@ describe("the env shape at the landed SHA", () => {
   );
 
   it.effect(
-    "is empty where no schema can be read, so a decider's value is for an unknown item",
+    "is empty where no schema can be read, so a maintainer's value is for an unknown item",
     () =>
       Effect.gen(function* () {
         const api = yield* begun();
@@ -393,7 +393,7 @@ describe("the env shape at the landed SHA", () => {
 
 describe("a write-only value", () => {
   it.effect(
-    "is set by a decider, shown as who and when, stored sealed, and recorded in the ledger",
+    "is set by a maintainer, shown as who and when, stored sealed, and recorded in the ledger",
     () =>
       Effect.gen(function* () {
         const api = yield* begun();
@@ -466,7 +466,7 @@ describe("a write-only value", () => {
   );
 
   it.effect(
-    "is refused to a non-decider, for an item not sensitive or unknown, and when too short",
+    "is refused to a non-maintainer, for an item not sensitive or unknown, and when too short",
     () =>
       Effect.gen(function* () {
         const api = yield* begun();

@@ -53,7 +53,7 @@ const press = (state: TodayViewState, keys: readonly string[]) => {
   return { calls, state: now };
 };
 
-describe("the keys a decider presses on Today", () => {
+describe("the keys a maintainer presses on Today", () => {
   it("declines the second decision with d, its default, at once", () => {
     const { calls } = press(start(today), ["down", "d"]);
 
@@ -75,7 +75,7 @@ describe("the keys a decider presses on Today", () => {
     ]);
   });
 
-  it("keeps the decision open when the decider says n, or moves on", () => {
+  it("keeps the decision open when the maintainer says n, or moves on", () => {
     const asked = press(start(today), ["down", "a"]).state;
 
     expect(press(asked, ["n", "y"]).calls).toStrictEqual([]);
@@ -418,7 +418,7 @@ const atTerminal =
 const ids = (state: TodayViewState | undefined) =>
   state?.today.decisions.map(({ id }) => id);
 
-describe("Today full-screen, worked by a decider", () => {
+describe("Today full-screen, worked by a maintainer", () => {
   it.effect(
     "sends d on the second decision as a decline, then shows Today without it",
     () =>

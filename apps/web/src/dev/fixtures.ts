@@ -257,7 +257,7 @@ const overlay: Layer.Layer<
               .map((event) => ({ event, seq: event.seq }))
           )
         ),
-      // Anyone but a decider or the log's claimant hears `NotDecider` whether or not a log is kept,
+      // Anyone but a maintainer or the log's claimant hears `NotDecider` whether or not a log is kept,
       // so the reply tells no one which logs exist.
       evidence: (caller, ref) =>
         Effect.gen(function* () {

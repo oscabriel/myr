@@ -200,7 +200,7 @@ describe("reading without signing in", () => {
   );
 
   it.effect(
-    "refuses a signed-in or decider contract to anyone as Unauthenticated",
+    "refuses a signed-in or maintainer contract to anyone as Unauthenticated",
     () =>
       Effect.gen(function* () {
         const seen = yield* Ref.make<readonly Principal[]>([]);

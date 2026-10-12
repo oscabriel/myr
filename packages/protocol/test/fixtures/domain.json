@@ -121,7 +121,7 @@
         }
       }
     },
-    "a policy whose deciders are still the owners marker": {
+    "a policy whose maintainers are still the owners marker": {
       "schema": "Policy",
       "value": {
         "agents": "trailer",

@@ -271,7 +271,7 @@ describe("deciding", () => {
 
   // One rule for handles everywhere (`sameHandle`): the policy's `alice` is
   // the person GitHub signs in as `Alice`.
-  it("takes a decision from its decider however sign-in cases the handle", () => {
+  it("takes a decision from its maintainer however sign-in cases the handle", () => {
     expect(
       Result.isSuccess(choose(proposalDecision, "accept", Handle.make("Alice")))
     ).toBeTruthy();
@@ -440,7 +440,7 @@ describe("who decides", () => {
     ).toStrictEqual([alice]);
   });
 
-  it("names each decider once, however many of the paths they hold", () => {
+  it("names each maintainer once, however many of the paths they hold", () => {
     expect(
       decidersFor(policy, [
         RepoPath.make("docs/iso.md"),
