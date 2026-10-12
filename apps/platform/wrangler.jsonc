@@ -350,13 +350,13 @@
         {
           "binding": "FRONT_PAGE",
           "database_name": "front-page-prod",
-          "database_id": "00000000-0000-0000-0000-000000000000",
+          "database_id": "ebcdcb90-acd6-4fa5-ad04-eb2fc5484978",
           "migrations_dir": "migrations",
         },
       ],
       // KV namespace `oauth-prod`.
       "kv_namespaces": [
-        { "binding": "OAUTH_KV", "id": "00000000000000000000000000000000" },
+        { "binding": "OAUTH_KV", "id": "bcdfcea12a6e4986a0a760e7cc9c7981" },
       ],
       "r2_buckets": [
         { "binding": "EVIDENCE", "bucket_name": "evidence-prod" },
