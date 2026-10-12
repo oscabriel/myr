@@ -1,18 +1,3 @@
-/**
- * The shell every page sits in: the rail (where you are), main (what is
- * waiting) and, when a page has typed facts, the inspector (the thing in
- * hand), on one paper ground parted by hairlines. From 1120 px the three
- * are columns, each scrolling on its own; below it a top bar holds the way
- * around, and on a phone a bottom bar holds the sections. The page's own
- * panes come from its `Workspace`.
- *
- * The shell owns the overlays (the rail as a sheet, More, Projects, the
- * keys dialog), loaded once the page is up and closed whenever the reader
- * moves, and the keyboard's one listener.
- *
- * One page is drawn outside it: the landing, whose route names
- * `staticData: { shell: "bare" }`. There the shell gives the page alone.
- */
 import { useHydrated, useLocation, useMatches } from "@tanstack/react-router";
 import { Suspense, useCallback, useMemo, useState } from "react";
 import type { ReactNode } from "react";
@@ -28,12 +13,10 @@ import { TopBar } from "./top-bar.tsx";
 
 declare module "@tanstack/react-router" {
   interface StaticDataRouteOption {
-    /** `"bare"`: the page is drawn alone, with no rail, bars or overlays. */
     readonly shell?: "bare";
   }
 }
 
-/** Whether the address's page is drawn outside the shell. */
 const useBare = () =>
   useMatches({
     select: (matches) =>
@@ -49,8 +32,8 @@ export const AppShell = ({
   const hydrated = useHydrated();
   const bare = useBare();
 
-  // An overlay belongs to the address it opened on: a link inside it moves
-  // the reader on, and it is gone from the next page.
+  // An overlay belongs to the address it opened on: it is gone from the next
+  // page.
   const [opened, setOpened] = useState<{
     readonly at: string;
     readonly overlay: Overlay;

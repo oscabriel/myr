@@ -1,8 +1,3 @@
-/**
- * What people outside a layer's audience learn about what it holds, in
- * one set of words for every page that shows a layer (the ledger, the
- * people page).
- */
 import type { Disclosure } from "@repo/protocol/domain/visibility";
 
 export const disclosureWords = {

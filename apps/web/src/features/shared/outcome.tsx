@@ -1,16 +1,3 @@
-/**
- * Where an answer stands, read the same on every page that shows one.
- *
- * `OutcomeView` gives the outcome as the status line (`StatusLine`):
- * checking, waiting (on a decision, a finish or a parent ask) or landed,
- * each with its state as `data-state` ("waiting" or "final"); a refusal's
- * line is followed by the refusal itself, drawn whole by `RefusalView`.
- * Waiting is never shown as refusing.
- *
- * `StageStrip` is the gate's results row: one cell per stage, in the order
- * of cost, each marked passed, current, refused, pending or not needed by
- * a mark and a word, colour only third.
- */
 import { Outcome, StageName } from "@repo/protocol/domain/outcome";
 import type { Handle, ProjectName } from "@repo/protocol/ids";
 
@@ -29,15 +16,10 @@ export const OutcomeView = ({
   stamp = false,
 }: {
   readonly outcome: Outcome;
-  /** Who holds the ask, to name whose move a refusal leaves. */
   readonly claimant?: Handle;
-  /** The stage the verdict reached, to say where a refusal came from. */
   readonly stage?: StageName;
-  /** The project, to link the landing or what the answer waits on. */
   readonly project?: ProjectName;
-  /** The answer page's hero is a step up. */
   readonly size?: "body" | "title";
-  /** Settle a landing's mark once: it landed while the page was open. */
   readonly stamp?: boolean;
 }) => {
   const subject: StatusSubject = {
@@ -75,7 +57,6 @@ export const OutcomeView = ({
   );
 };
 
-/** A stage's place in the strip. */
 export type StageState =
   | "passed"
   | "current"
@@ -83,23 +64,15 @@ export type StageState =
   | "pending"
   | "skipped";
 
-/** What a verdict holds beyond its stage: a decider's decision, and held-back results. */
 export interface StageHolds {
   readonly decided: boolean;
   readonly heldBack: boolean;
 }
 
 /**
- * Each stage's state, given the furthest stage the answer reached and its
- * outcome: stages before it passed; at it, current (checking or waiting),
- * refused, or passed (landed or waiting on its parent); after it, pending,
- * or skipped once the answer landed without them.
- *
- * A passing verdict reaches the decider stage whether or not a decider
- * took part, so with `holds` (what the verdict holds) a held-back or
- * decider stage that would read passed reads not needed when the verdict
- * holds no held-back results or no decision. Without it, every stage
- * before the reached one reads passed.
+ * A passing verdict reaches the decider stage whether or not a decider took
+ * part, so with `holds` a held-back or decider stage it never needed reads not
+ * needed.
  */
 export const stageStates = (
   reached: StageName,
@@ -145,7 +118,6 @@ export const stageStates = (
   });
 };
 
-/** Each state's mark and word in a cell; the current one's mark follows the outcome. */
 const cellMarks = (outcome: Outcome) =>
   ({
     current: {
@@ -161,7 +133,6 @@ const cellMarks = (outcome: Outcome) =>
     { readonly mark: StateMark; readonly word: string }
   >;
 
-/** A cell's word in its state's role; not yet and not needed stay muted. */
 const wordTones = {
   current: "",
   passed: "text-landed",
@@ -175,7 +146,6 @@ export const StageStrip = ({
   outcome,
   stage,
 }: {
-  /** What the verdict holds, so a stage it never needed reads not needed. */
   readonly holds?: StageHolds;
   readonly outcome: Outcome;
   readonly stage: StageName;

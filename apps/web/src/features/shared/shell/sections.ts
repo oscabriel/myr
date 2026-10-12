@@ -1,15 +1,8 @@
-/**
- * Where a reader can be: the site's sections, a project's, and the trail of
- * crumbs from the site to the page at an address. The rail, the top bar,
- * the bottom bar, the section row and the context bar all read them here,
- * so one address names one place everywhere.
- */
 import { projectAddressOf } from "@repo/protocol/ids";
 import { Option } from "effect";
 
 import { segmentsOf } from "../paths.ts";
 
-/** Which of a project's pages is being read. */
 export type ProjectTab =
   | "code"
   | "env"
@@ -19,19 +12,12 @@ export type ProjectTab =
   | "people"
   | "refs";
 
-/** One of a project's sections: its word, its page, and the tab it is. */
 export interface Section {
   readonly label: string;
   readonly tab: ProjectTab;
   readonly to: string;
 }
 
-/**
- * A project's sections (`project` as the address names it), in the order
- * every list of them shows. The project's
- * home is its asks; its `people` page is its policy (who decides, vouches,
- * budgets), and reads so, at the address it has always had.
- */
 export const projectSections = (project: string): readonly Section[] => [
   { label: "Asks", tab: "overview", to: `/${project}` },
   { label: "Code", tab: "code", to: `/${project}/tree/main` },
@@ -42,7 +28,6 @@ export const projectSections = (project: string): readonly Section[] => [
   { label: "Env shape", tab: "env", to: `/${project}/env` },
 ];
 
-/** The first segment of each of a project's pages, by the section it sits in. */
 const SECTION_OF = {
   answers: "overview",
   asks: "overview",
@@ -57,7 +42,6 @@ const SECTION_OF = {
   why: "code",
 } as const satisfies Record<string, ProjectTab>;
 
-/** The site's own first segments: every other one starts a project's address. */
 const SITE = new Set([
   "agents",
   "asks",
@@ -68,13 +52,6 @@ const SITE = new Set([
   "today",
 ]);
 
-/**
- * The project an address is in, as the address spells it, and the
- * segments of its page after the name; none on the site's own pages. The
- * name is read by the protocol's one reader of addresses, so
- * `/oscabriel/datekit/ledger` and `/github.com/pallets/click/tree/main` (or
- * the router's own `/github.com%2Fpallets/click/…`) each find theirs.
- */
 const addressOf = (pathname: string) => {
   const segments = segmentsOf(pathname);
   const [first] = segments;
@@ -84,11 +61,9 @@ const addressOf = (pathname: string) => {
     : Option.getOrUndefined(projectAddressOf(segments));
 };
 
-/** The project an address is in; none on the site's own pages. */
 export const projectOf = (pathname: string): string | undefined =>
   addressOf(pathname)?.spelled;
 
-/** The project section an address sits in; none for a page under none (a decision, a proposal). */
 export const sectionOf = (pathname: string): ProjectTab | undefined => {
   const address = addressOf(pathname);
 
@@ -103,7 +78,6 @@ export const sectionOf = (pathname: string): ProjectTab | undefined => {
     : Object.entries(SECTION_OF).find(([segment]) => segment === page)?.[1];
 };
 
-/** One step of the trail to a page: its word, its page (none for the page itself), and whether it is an id. */
 export interface Crumb {
   readonly label: string;
   readonly mono?: boolean;
@@ -120,7 +94,6 @@ const SECTION_LABEL = {
   refs: "Refs",
 } as const satisfies Record<ProjectTab, string>;
 
-/** A section's crumb, linked to its page when a page sits below it. */
 const sectionCrumb = (
   project: string,
   tab: ProjectTab,
@@ -132,7 +105,6 @@ const sectionCrumb = (
   return below && section !== undefined ? { label, to: section.to } : { label };
 };
 
-/** A project's crumb, then its section's. */
 const projectCrumbs = (
   project: string,
   tab: ProjectTab,
@@ -142,13 +114,11 @@ const projectCrumbs = (
   sectionCrumb(project, tab, below),
 ];
 
-/** A code page's trail: Code, then the path in hand (none at the root). */
 const pathCrumbs = (project: string, path: string): readonly Crumb[] =>
   path === ""
     ? projectCrumbs(project, "code", false)
     : [...projectCrumbs(project, "code", true), { label: path, mono: true }];
 
-/** The site's own pages' trails, by first segment. */
 const SITE_CRUMBS = {
   agents: () => [{ label: "For agents" }],
   asks: () => [{ label: "Asks" }],
@@ -164,7 +134,6 @@ const SITE_CRUMBS = {
   (second: string | undefined) => readonly Crumb[]
 >;
 
-/** A project's subject pages' trails (an ask, an answer, a commit, a path…), by second segment. */
 const SUBJECT_CRUMBS = {
   answers: (project: string, ask: string) => [
     ...projectCrumbs(project, "overview", true),
@@ -199,11 +168,6 @@ const SUBJECT_CRUMBS = {
   (project: string, third: string, rest: string) => readonly Crumb[]
 >;
 
-/**
- * The trail from the site to the page at `pathname`: the project first, then
- * its section, then the thing in hand (an ask, a commit, a path), each a
- * link but the last. A page that knows better gives `Workspace` its own.
- */
 export const crumbsFor = (pathname: string): readonly Crumb[] => {
   const [first, second] = segmentsOf(pathname);
 

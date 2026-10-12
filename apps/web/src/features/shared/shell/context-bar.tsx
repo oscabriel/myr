@@ -1,10 +1,3 @@
-/**
- * Main's context bar, 44 px, on the same line as the rail's wordmark: the
- * trail to the page on the left (the project first, ids in mono, each a
- * link but the last), and on the right what the page is in a word (its
- * state, or a list's count) and its one command to copy. From the shell's
- * width it stays at the top of main while main scrolls.
- */
 import { Check, Copy } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -14,7 +7,6 @@ import { useNumberedCommand } from "../keys.tsx";
 import { AppLink } from "../link.tsx";
 import type { Crumb } from "./sections.ts";
 
-/** The trail to the page, as a breadcrumb: each step a link but the page itself. */
 export const Breadcrumb = ({
   crumbs,
 }: {
@@ -27,8 +19,6 @@ export const Breadcrumb = ({
         const face = mono ? "text-mono font-mono" : "";
 
         return (
-          // On a phone the top bar's Back link names the page above, so
-          // the trail keeps only the page itself, whole rather than cut.
           <li
             className={`${last ? "flex" : "tablet:flex hidden"} min-w-0 items-center gap-1.5`}
             key={`${index}:${label}`}
@@ -66,11 +56,6 @@ export const Breadcrumb = ({
   </nav>
 );
 
-/**
- * The page's one command, as a copy button: the command itself is the
- * button's text for a screen reader and a crawler, and its number (when the
- * single keys are on) is in its title.
- */
 export const CopyCommand = ({ command }: { readonly command: string }) => {
   const { copied, copy } = useCopy(command);
   const number = useNumberedCommand(command);
@@ -108,7 +93,6 @@ export const ContextBar = ({
 }: {
   readonly count?: string | undefined;
   readonly crumbs: readonly Crumb[];
-  /** Anything else the page's bar holds at its end (the code pages' Facts button). */
   readonly end?: ReactNode;
   readonly primaryCommand?: string | undefined;
   readonly state?: ReactNode;

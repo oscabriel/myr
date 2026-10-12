@@ -1,19 +1,6 @@
 /**
- * Where a subject stands, in one sentence, the same on every page: under a
- * title, in the inspector's State block, and (compact: the mark and the
- * lead word) in the context bar.
- *
- *   [mark] [Lead, in its role] [the rest, in ink] · [whose move] · [next command]
- *
- * A subject is an answer (its outcome), an ask (its state, who holds it and
- * its latest outcome), a decision or a proposal. Whose move it is comes
- * from the outcome alone (`whoseMove`): a refusal leaves it to the
- * answerer, a wait on a decision or a finish to a decider, a check under
- * way to the platform, a wait on a parent ask to the family.
- *
- * Two rules hold everywhere: waiting is never drawn in the refused role,
- * and a refusal is named by its tag (`headline`, the renderer git and the
- * CLI use) and never paraphrased; the refusal itself is `RefusalView`'s.
+ * Waiting is never drawn in the refused role, and a refusal is named by its
+ * tag, never paraphrased.
  */
 import type { Ask } from "@repo/protocol/domain/ask";
 import type { Choice, Decision } from "@repo/protocol/domain/decision";
@@ -38,7 +25,6 @@ import type { StateMark } from "./marks.tsx";
 import { askPath, decisionPath } from "./paths.ts";
 import { distanceInWords } from "./time.tsx";
 
-/** Each stage as a cell heads it (`label`) and as a sentence names it (`words`). */
 export const stageNames = Match.type<StageName>().pipe(
   Match.when("parse", () => ({ label: "Parse", words: "parse" })),
   Match.when("shape", () => ({ label: "Shape", words: "shape" })),
@@ -53,39 +39,30 @@ export const stageNames = Match.type<StageName>().pipe(
   Match.exhaustive
 );
 
-/** What a status line is about. */
 export type StatusSubject =
   | {
       readonly kind: "answer";
       readonly outcome: Outcome;
-      /** Who holds the ask, to name whose move a refusal leaves. */
       readonly claimant?: Handle | undefined;
-      /** The stage the verdict reached, to say where a refusal came from. */
       readonly stage?: StageName | undefined;
-      /** The project, to link the landing, the decision or the parent named. */
       readonly project?: ProjectName | undefined;
     }
   | {
       readonly kind: "ask";
       readonly ask: Ask;
-      /** Whether the viewer may take it now. */
       readonly takeable: boolean;
       readonly claimant?: Handle | undefined;
-      /** The current attempt's latest outcome, from the event fold. */
       readonly latest?: Outcome | undefined;
-      /** The asks it waits on, as a family counts them (`familyMarks(ask, states)`). */
       readonly blockers?: Family | undefined;
     }
   | {
       readonly kind: "decision";
       readonly decision: Decision;
       readonly now: DateTime.Utc;
-      /** Whether the viewer is one of its deciders. */
       readonly viewerDecides: boolean;
     }
   | { readonly kind: "proposal"; readonly proposal: Proposal };
 
-/** The role a line is drawn in; `ink` and `muted` are no state's colour. */
 export type StatusTone =
   | "checking"
   | "ink"
@@ -103,15 +80,12 @@ const leadTone = {
   waiting: "text-waiting",
 } as const satisfies Record<StatusTone, string>;
 
-/** A status line, read from its subject. */
 interface Reading {
   readonly mark: StateMark;
   readonly tone: StatusTone;
   readonly lead: string;
   readonly rest?: ReactNode;
-  /** Muted parts after the sentence: who it is held for, a default, whose move. */
   readonly after: readonly string[];
-  /** The command that runs next, when the subject itself names one (a refusal's `next`). */
   readonly next?: string;
 }
 
@@ -121,7 +95,6 @@ const Code = ({ children }: { readonly children: ReactNode }) => (
   </code>
 );
 
-/** `children` as a link to `to` when the project is known, as plain code when not. */
 const CodeLink = ({
   children,
   to,
@@ -140,7 +113,6 @@ const CodeLink = ({
     </AppLink>
   );
 
-/** Whose move, in words; nothing when it is no one's. */
 const moveWords = (
   move: Move,
   {
@@ -159,13 +131,11 @@ const moveWords = (
       decider === undefined ? "a decider's move" : `${decider}'s move`,
     ]),
     Match.when("platform", () => ["the platform's move"]),
-    // The ask it waits on may be a family's or a lone one: its move.
     Match.when("parent", () => ["that ask's move"]),
     Match.when("none", () => []),
     Match.exhaustive
   );
 
-/** An answer's outcome as a line. */
 const answerReading = ({
   claimant,
   outcome,
@@ -290,7 +260,6 @@ const answerReading = ({
   });
 };
 
-/** Who an ask is held for, when it is held for someone. */
 const heldFor = (ask: Ask): readonly string[] => {
   if (ask.reserve === "newcomers") {
     return [
@@ -303,7 +272,6 @@ const heldFor = (ask: Ask): readonly string[] => {
   return ask.reserve === "people" ? ["held for people, not agents"] : [];
 };
 
-/** What an ask that waits on others waits for, in its family's terms when the caller counted them. */
 const waitingReading = (ask: Ask, blockers: Family | undefined): Reading => {
   if (blockers !== undefined && blockers.total > 0) {
     const remaining = blockers.total - blockers.landed;
@@ -391,7 +359,6 @@ const askReading = ({
     };
   }
 
-  // Not takeable while it waits on others: waiting, as its row says.
   return !takeable && ask.blockedBy.length > 0
     ? { after: [], lead: "Waiting", mark: "waiting", tone: "waiting" }
     : {
@@ -402,7 +369,6 @@ const askReading = ({
       };
 };
 
-/** A decider's choice in the past tense, and whether it took effect. */
 const chosen = {
   accept: { effect: true, word: "Accepted" },
   adopt: { effect: true, word: "Adopted" },
@@ -413,7 +379,6 @@ const chosen = {
   { readonly effect: boolean; readonly word: string }
 >;
 
-/** Whose move an open decision is: the viewer's, its one decider's, or any of its deciders'. */
 const deciderMove = (decision: Decision, viewerDecides: boolean) => {
   if (viewerDecides) {
     return "your move";
@@ -522,7 +487,6 @@ const proposalReading = (proposal: Proposal): Reading => {
       });
 };
 
-/** The line its subject reads as. */
 export const readStatus: (subject: StatusSubject) => Reading =
   Match.type<StatusSubject>().pipe(
     Match.discriminator("kind")("answer", answerReading),
@@ -541,17 +505,9 @@ const SIZE = {
 
 export interface StatusLineProps {
   readonly subject: StatusSubject;
-  /**
-   * The command that runs next; a refusal's own `next` when left out, and
-   * none at all with `false` (a refusal drawn whole below the line shows
-   * its own).
-   */
   readonly command?: string | false;
-  /** Only the mark and the lead word (the context bar's). */
   readonly compact?: boolean;
-  /** The outcome hero of an answer is a step up. */
   readonly size?: keyof typeof SIZE;
-  /** Settle the mark once: a landing that happened while the page was open. */
   readonly stamp?: boolean;
 }
 

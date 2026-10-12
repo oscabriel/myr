@@ -1,26 +1,3 @@
-/**
- * One row for every list: asks, decisions, landings, commits, refs, forks,
- * credits, rounds, history. Two lines, the thing first and its state at
- * the right:
- *
- *   [mark] the want or subject, the link          [state word]  [copy]
- *          kind · territory · id (metadata)       [time]
- *
- * - Line 1 is the thing in its own words, one line, ellipsised, the whole
- *   text its `title`; it is the link, never the id.
- * - Line 2 is metadata, parted by ` · `; a value that means nothing (the
- *   whole repo's territory, ".") is left out (`MetaLine`).
- * - The state's mark sits in its own column, in its role's colour, and its
- *   word at the right in ink (Refused and Landed keep theirs: DESIGN.md's
- *   Mark Carries Rule); the mark is hidden from screen readers, the word
- *   is not.
- * - A row with a command has one copy action, the command as text inside it.
- *
- * From the shell's width a click anywhere off the link selects the row
- * (its facts fill the inspector); below it the whole row is the link's to
- * press. `j` and `k` reach each row's link (`data-list-key`). Every
- * `data-*` a list carries sits on the row's `<li>`.
- */
 import type { AskListing } from "@repo/protocol/domain/ask";
 import type { ClaimState } from "@repo/protocol/domain/claim";
 import { Outcome } from "@repo/protocol/domain/outcome";
@@ -40,56 +17,36 @@ import { useSelection } from "./shell/selection.ts";
 import type { SelectionParam } from "./shell/selection.ts";
 import { When } from "./time.tsx";
 
-/** A row's state: its mark, its word, and when (a `When`, or words). */
 export interface RowState {
   readonly mark: StateMark;
   readonly word: string;
   readonly time?: ReactNode;
-  /** Settle the mark once: it landed while the page was open. */
   readonly stamp?: boolean;
 }
 
 export interface RowProps {
-  /** The thing's id: what selection and `j`/`k` name it by. */
   readonly id: string;
-  /** Its page. */
   readonly href: string;
-  /** The page's search, when the row names one state of it (`?head=`). */
   readonly search?: Readonly<Record<string, string>> | undefined;
-  /** Line 1: the want, the subject, the commit's first line. */
   readonly title: string;
-  /** Line 2 (or, one-line, after the title): metadata (`MetaLine`). */
   readonly meta?: ReactNode;
   readonly state?: RowState | undefined;
-  /** A `CopyAction`, at the row's end. */
   readonly action?: ReactNode;
-  /** A third line under the two: a family's fan. */
   readonly strip?: ReactNode;
-  /**
-   * What the row stands for, on its `<li>` (`data-ask`, `data-takeable`, …);
-   * an attribute left undefined is left out.
-   */
   readonly data?: Readonly<
     Record<`data-${string}`, string | boolean | undefined>
   >;
   readonly size?: "two-line" | "one-line";
-  /** The row whose facts the inspector shows. */
   readonly selected?: boolean | undefined;
-  /** Select the row, from the shell's width (`useRowSelection`). */
   readonly onSelect?: ((id: string) => void) | undefined;
-  /** Line 1 is code (a ref, a fork's name): set it in mono. */
   readonly mono?: boolean;
 }
 
-/** The shell's width, from which a row selects rather than opens. */
 const SHELL_WIDTH = "(min-width: 70rem)";
 
 /**
- * The word's colour (DESIGN.md's Mark Carries Rule): ink, its role's colour
- * left to the mark, so a list of waiting asks is not an ochre stripe; a
- * refusal keeps red and a landing green. A refusal that can be retried
- * keeps its ochre mark, but its word is a refusal's, as the status line
- * says it.
+ * Ink, the role's colour left to the mark, so a list of waiting asks is not an
+ * ochre stripe; a refusal keeps red and a landing green.
  */
 export const wordTone = (mark: StateMark) => {
   if (mark === "refused" || mark === "retry") {
@@ -99,12 +56,10 @@ export const wordTone = (mark: StateMark) => {
   return mark === "landed" ? STATE_MARKS.landed.tone : "text-foreground";
 };
 
-/** Whether a press on `target` was meant for a link or a control in the row. */
 const onControl = (target: EventTarget) =>
   target instanceof Element &&
   target.closest("a, button, summary, input, select, textarea") !== null;
 
-/** Metadata parted by ` · `, with every empty part left out. */
 export const MetaLine = ({
   parts,
 }: {
@@ -123,12 +78,10 @@ export const MetaLine = ({
   ));
 };
 
-/** Code in a row's metadata: an id, a territory, a SHA. */
 export const MetaCode = ({ children }: { readonly children: ReactNode }) => (
   <code className="text-mono font-mono">{children}</code>
 );
 
-/** A territory as a row shows it: nothing for the whole repo. */
 export const territoryPart = (territory: string) =>
   territory === "." || territory === "" ? undefined : (
     <MetaCode>{territory}</MetaCode>
@@ -137,10 +90,8 @@ export const territoryPart = (territory: string) =>
 const LINK =
   "text-foreground no-underline outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-ring focus-visible:after:outline-solid";
 
-/** From the shell's width a row that selects lets a press off its link through to the row. */
 const SELECTS = "shell:after:pointer-events-none";
 
-/** A press on the row, off its link and its controls, selects it from the shell's width. */
 const selectOnPress =
   (id: string, onSelect: ((id: string) => void) | undefined) =>
   (event: MouseEvent<HTMLLIElement>) => {
@@ -153,7 +104,6 @@ const selectOnPress =
     }
   };
 
-/** The row's state at its end: the word in its role, over (or beside) its time. */
 const StateEnd = ({
   state,
   stacked,
@@ -205,7 +155,6 @@ export const Row = ({
       aria-current={selected ? "true" : undefined}
       className={onSelect === undefined ? LINK : `${LINK} ${SELECTS}`}
       data-list-key={id}
-      // The thing in its own words: a want, a subject, a commit's line.
       data-said=""
       search={search}
       title={title}
@@ -220,8 +169,8 @@ export const Row = ({
       <StateMarkIcon mark={state.mark} stamp={state.stamp === true} />
     );
 
-  // `isolate` keeps the row's raised controls (its copy button, a fan's
-  // nodes) inside the row, so a sticky header passes over them.
+  // `isolate` keeps the row's raised controls inside the row, so a sticky
+  // header passes over them.
   const rowClass = `group/row border-rule relative isolate -mx-2 border-b px-2 transition-colors duration-[120ms] ${
     selected ? "bg-surface hover:bg-surface-2" : "hover:bg-surface/50"
   }`;
@@ -264,7 +213,6 @@ export const Row = ({
             {meta === undefined && state === undefined ? null : (
               <p className="text-ui text-muted-foreground truncate leading-5">
                 {state === undefined ? null : (
-                  // On a phone the want takes the width; its state leads line 2.
                   <span
                     className={`tablet:hidden font-medium ${wordTone(state.mark)}`}
                   >
@@ -291,13 +239,11 @@ export const Row = ({
   );
 };
 
-/** Where a group's header sticks: under the toolbar, or under the context bar when the list has none. */
 const STICK = {
   bar: "top-[2.6875rem] tablet:top-[2.9375rem] shell:top-[2.6875rem]",
   toolbar: "top-[5.1875rem] tablet:top-[5.4375rem] shell:top-[5.1875rem]",
 } as const;
 
-/** A list's group: a sticky header (its name as a link, its facts, its counts), then its rows. */
 export const RowGroup = ({
   children,
   counts,
@@ -307,20 +253,14 @@ export const RowGroup = ({
   under = "toolbar",
 }: {
   readonly name: ReactNode;
-  /** The group's facts after its name: a project's posture. */
   readonly facts?: ReactNode;
-  /** Its counts at the end, in words: "7 open · 6 to take". */
   readonly counts?: string | undefined;
-  /** The group's name in words, for its list (the name may be a link). */
   readonly label?: string;
-  /** What the header sticks under. */
   readonly under?: keyof typeof STICK;
   readonly children: ReactNode;
 }) => (
   <section aria-label={label} className="flex min-w-0 flex-col">
     <div
-      // On a phone a long posture wraps under the name rather than losing
-      // its last word; from a tablet the header is one 32 px line.
       className={`border-rule bg-background tablet:h-8 tablet:flex-nowrap tablet:py-0 sticky z-[5] -mx-2 flex min-h-8 min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5 border-b px-2 py-1 ${STICK[under]}`}
     >
       <h2 className="text-ui shrink-0 font-semibold [&_a]:no-underline [&_a:hover]:underline">
@@ -341,7 +281,6 @@ export const RowGroup = ({
   </section>
 );
 
-/** A list of rows with no groups. */
 export const RowList = ({
   children,
   label,
@@ -349,8 +288,6 @@ export const RowList = ({
   readonly children: ReactNode;
   readonly label: string;
 }) => (
-  // The top hairline runs as wide as the rows' own (each row reaches 8 px
-  // past the list on either side, for its fill).
   <ul
     aria-label={label}
     className="border-rule -mx-2 flex flex-col border-t px-2"
@@ -359,10 +296,6 @@ export const RowList = ({
   </ul>
 );
 
-/**
- * A list's selection and keys together: the row selected (from the
- * address), the one `j`/`k` rest on, and the select to hand each row.
- */
 export const useRowSelection = (
   ids: readonly string[],
   param: SelectionParam
@@ -373,7 +306,6 @@ export const useRowSelection = (
   return { clear, focused, select, selected };
 };
 
-/** An answer's latest outcome as a row's state: a retryable refusal turns back. */
 export const outcomeState = (outcome: Outcome): RowState =>
   Outcome.match(outcome, {
     AwaitingDecision: (): RowState => ({ mark: "waiting", word: "Waiting" }),
@@ -387,7 +319,6 @@ export const outcomeState = (outcome: Outcome): RowState =>
     WaitingOnParent: (): RowState => ({ mark: "waiting", word: "Waiting" }),
   });
 
-/** Each claim state as a row says it: its mark and its word. */
 export const CLAIM_STATES = {
   answered: { mark: "landed", word: "Answered" },
   lapsed: { mark: "notNeeded", word: "Lapsed" },
@@ -396,13 +327,11 @@ export const CLAIM_STATES = {
   warned: { mark: "waiting", word: "Warned, no push lately" },
 } as const satisfies Record<ClaimState, RowState>;
 
-/** Who an ask is held for, as its state word. */
 const reserveWords = {
   newcomers: "Held for newcomers",
   people: "Held for people",
 } as const;
 
-/** Where an open ask stands for its reader, as a row's state. */
 const askState = (
   listing: AskListing,
   takeable: boolean | undefined,
@@ -424,8 +353,6 @@ const askState = (
     return { mark: "waiting", word: "Waiting" };
   }
 
-  // An ask held for someone says so wherever it is listed and whoever
-  // reads it, before whether this reader may take it.
   if (listing.reserve !== undefined) {
     return { mark: "open", word: reserveWords[listing.reserve] };
   }
@@ -435,18 +362,9 @@ const askState = (
     : { mark: "open", word: "Open to take" };
 };
 
-/**
- * The time an ask row shows: its last push, else its last round, else its
- * opening, so a list scans by recency.
- */
 const askTime = (progress: AskProgress | undefined) =>
   progress?.lastPush?.at ?? progress?.rounds.at(-1)?.at ?? progress?.opened;
 
-/**
- * An open ask as a row: its want, its kind, territory and id, where it
- * stands (from the listing, and the event fold when the page has it), and
- * the claim command when the reader may take it.
- */
 export const AskRow = ({
   listing,
   now,
@@ -460,17 +378,12 @@ export const AskRow = ({
 }: {
   readonly listing: AskListing;
   readonly project: ProjectName;
-  /** Whether the viewer may take it (the front page knows); a project's page does not say. */
   readonly takeable?: boolean | undefined;
-  /** The ask's progress from the project's events, when the page folds them. */
   readonly progress?: AskProgress | undefined;
   readonly selected?: boolean | undefined;
   readonly onSelect?: ((id: string) => void) | undefined;
-  /** Name the project in the metadata: a list across projects with no groups. */
   readonly showProject?: boolean;
-  /** A family's fan, when the ask is a parent. */
   readonly strip?: ReactNode;
-  /** The page's now, which the row's time is told against. */
   readonly now?: DateTime.Utc | undefined;
 }) => {
   const at = askTime(progress);

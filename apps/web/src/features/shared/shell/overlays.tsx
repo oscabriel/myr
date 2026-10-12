@@ -1,11 +1,3 @@
-/**
- * The shell's overlays, loaded once the page is up, so no page's first load
- * carries them: the rail as a sheet (Menu, below the shell's width), the
- * phone's More and Projects sheets, and the keys dialog. Each opens on a
- * press, slides in over 200 ms, traps focus, and closes on Escape, a press
- * outside or Close; following a link inside closes it too (the shell's open
- * overlay belongs to the address it opened on).
- */
 import { Brand } from "@repo/brand";
 import { useRouter } from "@tanstack/react-router";
 import { BookOpen, Bot, FolderInput, Keyboard } from "lucide-react";
@@ -42,12 +34,10 @@ import {
 } from "./rail.tsx";
 
 export interface OverlayProps {
-  /** The overlay open now; none when all are closed. */
   readonly overlay: Overlay | undefined;
   readonly onClose: () => void;
 }
 
-/** A sheet's or dialog's open state, as the shell holds it. */
 const openState = (open: boolean, onClose: () => void) => ({
   onOpenChange: (next: boolean) => {
     if (!next) {
@@ -57,19 +47,12 @@ const openState = (open: boolean, onClose: () => void) => ({
   open,
 });
 
-/** Whether the screen is at least a tablet's width, read when an overlay opens. */
 const atLeastTablet = () => globalThis.matchMedia("(min-width: 40rem)").matches;
 
-/**
- * Every project, with a typed filter: choosing one opens its asks. The
- * names, their posture and their open asks come from the list the rail
- * reads.
- */
 const ProjectSwitcher = ({
   input,
   onChosen,
 }: {
-  /** The filter, which takes focus when the sheet opens. */
   readonly input: RefObject<HTMLInputElement | null>;
   readonly onChosen: () => void;
 }) => {
@@ -118,8 +101,6 @@ const ProjectSwitcher = ({
                 <ComboboxItem className="h-10 gap-3" key={name} value={name}>
                   <span className="min-w-0 truncate font-medium">{name}</span>
                   {listing === undefined ? null : (
-                    // One group at the row's end, so the count sits beside
-                    // the posture rather than midway along the row.
                     <span className="ml-auto flex shrink-0 items-center gap-3">
                       <span className="text-muted-foreground text-label tabular-nums">
                         {listing.openAsks} open
@@ -137,7 +118,6 @@ const ProjectSwitcher = ({
   );
 };
 
-/** The Projects sheet's body: the switcher, and the way to import a repo at its foot. */
 export const ProjectsSheetBody = ({
   input,
   onChosen,
@@ -160,7 +140,6 @@ export const ProjectsSheetBody = ({
   </>
 );
 
-/** The phone's More: Docs, For agents, the project's sections, the keys, the session. */
 const More = () => {
   const project = useCurrentProject();
   const listed = useProjectList();
@@ -256,10 +235,7 @@ const KeysDialog = ({
   );
 };
 
-/**
- * Every overlay the shell has, each closed until the shell opens it. They
- * stay mounted once loaded, so each one slides in from closed.
- */
+/** They stay mounted once loaded, so each one slides in from closed. */
 const ShellOverlays = ({ onClose, overlay }: OverlayProps) => {
   const filter = useRef<HTMLInputElement>(null);
 

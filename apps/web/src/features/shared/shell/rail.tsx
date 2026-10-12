@@ -1,18 +1,3 @@
-/**
- * The rail: where the reader is. Top to bottom, the wordmark, which leads
- * to the landing; the site's sections (Home, Asks, Today, Docs, For
- * agents), each a word beside its mark; the
- * projects, the current one first with its own sections under it; the
- * rail's slot on pages that fill it (the code pages' tree); and the session
- * with the Keys button at the foot.
- *
- * From the shell's width it is a column beside main; below it, the same
- * content opens as a sheet from the top bar's Menu (`RailContent`). The
- * current item is filled with the surface and set in ink at 600, never
- * coloured; the router marks a link to the page being read
- * `aria-current="page"`, and a section holding the page is marked
- * `aria-current="true"`.
- */
 import { Brand } from "@repo/brand";
 import type { ProjectListing } from "@repo/protocol/domain/front-page";
 import type { ProjectName } from "@repo/protocol/ids";
@@ -49,14 +34,11 @@ import {
 import { RailSlotOutlet, useRailContent } from "./rail-slot.tsx";
 import { projectSections, sectionOf } from "./sections.ts";
 
-/** A row of the rail, before the fill that marks the current one. */
 const RAIL_BASE =
   "text-ui text-foreground hover:bg-surface flex h-8 min-w-0 items-center gap-2.5 px-2 no-underline transition-colors duration-[120ms] focus-visible:outline-offset-[-2px] [&[aria-current]]:font-semibold [&[aria-current]>svg]:text-foreground";
 
-/** A row of the rail: a word (and its mark), 32 px, filled when current. */
 export const RAIL_ROW = `${RAIL_BASE} [&[aria-current]]:bg-surface`;
 
-/** A row's mark: 16 px at the marks' stroke, muted until the row is current. */
 const MARK = "text-muted-foreground size-4 shrink-0";
 
 const SITE = [
@@ -71,10 +53,8 @@ const SITE = [
   readonly to: string;
 }[];
 
-/** Only the page itself is current; its search (a filter, a selection) does not count. */
 const EXACT = { exact: true, includeSearch: false } as const;
 
-/** A count of things at a rail row's end, in tabular figures, with what it counts for a screen reader. */
 export const RailCount = ({
   count,
   of,
@@ -88,10 +68,8 @@ export const RailCount = ({
   </span>
 );
 
-/** Today's count, as the root route read it. */
 const TodayCount = () => useTodayCount() ?? null;
 
-/** The wordmark, leading to the landing (which sends a signed-in reader home). */
 export const Wordmark = ({
   className = "",
 }: {
@@ -106,7 +84,6 @@ export const Wordmark = ({
   </AppLink>
 );
 
-/** Home, Asks, Today, Docs and For agents. */
 const SiteSections = () => (
   <ul className="flex flex-col gap-px">
     {SITE.map(({ icon: Icon, label, to }) => (
@@ -121,7 +98,6 @@ const SiteSections = () => (
   </ul>
 );
 
-/** A project's posture at its row's end: the mark in its role, its short form muted (the head's), the full label as its title. */
 export const PostureMark = ({ posture }: { readonly posture: Posture }) => {
   const { icon: Icon, tone } = POSTURE_MARKS[posture];
 
@@ -142,11 +118,6 @@ export const PostureMark = ({ posture }: { readonly posture: Posture }) => {
   );
 };
 
-/**
- * A project's row: its name, and its posture once the list has it. The
- * current project's is in ink at 600 but unfilled, so the page being read
- * (a section under it) is the one filled row.
- */
 const ProjectRow = ({
   current,
   listing,
@@ -168,7 +139,6 @@ const ProjectRow = ({
   </AppLink>
 );
 
-/** The current project's sections, indented under it, the open asks counted beside Asks. */
 export const ProjectSectionList = ({
   openAsks,
   project,
@@ -204,7 +174,6 @@ export const ProjectSectionList = ({
   );
 };
 
-/** The list's place while it is read: three rows of the rail's height. */
 const PLACEHOLDERS = ["w-24", "w-20", "w-28"] as const;
 
 const PlaceholderRows = () => (
@@ -218,10 +187,8 @@ const PlaceholderRows = () => (
 );
 
 /**
- * The projects: the current one first, its sections under it, so the list
- * arriving after the page moves nothing above it; then the others that
- * lead (the most open asks first, a tie by name), up to eight in all, and
- * the switcher for the rest.
+ * The current one first, so the list arriving after the page moves nothing
+ * above it.
  */
 const Projects = () => {
   const current = useCurrentProject();
@@ -288,16 +255,13 @@ const Projects = () => {
 };
 
 /**
- * A ghost button set in muted text, ink on hover. The colour comes from
- * around the button, not through its `className`: the kit merges classes,
- * reads an unknown `text-*` as a colour, and would drop the button's
- * `text-ui` size for a colour given there.
+ * The colour comes from around the button: the kit merges classes, reads an
+ * unknown `text-*` as a colour, and would drop the button's `text-ui` size.
  */
 const Quiet = ({ children }: { readonly children: ReactNode }) => (
   <span className="text-muted-foreground flex shrink-0">{children}</span>
 );
 
-/** The rail's foot: the session, and the Keys button that opens the `?` dialog. */
 export const RailFoot = () => {
   const { open } = useShell();
 
@@ -320,7 +284,6 @@ export const RailFoot = () => {
   );
 };
 
-/** The rail's sections and projects: the column's middle, and the Menu sheet's body. */
 export const RailContent = (): ReactNode => (
   <div className="flex flex-col gap-2 px-2 py-2">
     <SiteSections />
@@ -328,11 +291,6 @@ export const RailContent = (): ReactNode => (
   </div>
 );
 
-/**
- * The project's line in the code pages' rail: its name and the section
- * being read, opening to the project's sections, so the tree below gets
- * the height.
- */
 const ProjectLine = ({ project }: { readonly project: ProjectName }) => {
   const listed = useProjectList();
 
@@ -369,12 +327,6 @@ const ProjectLine = ({ project }: { readonly project: ProjectName }) => {
   );
 };
 
-/**
- * The rail as a column, from the shell's width. On a page that fills the
- * slot (the code pages) it gives the slot the height: the site's sections
- * and the projects fold into the wordmark row's Menu, and the project's
- * sections into its line.
- */
 export const Rail = () => {
   const slotted = useRailContent() !== undefined;
   const project = useCurrentProject();
