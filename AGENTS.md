@@ -1,6 +1,6 @@
 # Myr
 
-Myr is a Git platform on Cloudflare. Everything a project ships is public, its contribution process is typed code on main, and a push lands only by passing a typed gate. It is our entry to Cloudflare's "Build the next GitHub" competition, which closes Wed Oct 14, 11:59 PM PDT.
+Myr is a Git platform on Cloudflare. Everything a project ships is public, its contribution process is typed code on main, and a push lands only by passing a typed gate. It was built as an entry to Cloudflare's "Build the next GitHub" competition.
 
 The core loop runs on Cloudflare today: a person claims an ask, pushes an answer through the platform's git gateway, and the platform checks it and lands it, or refuses it: the cheap stages answer in git's own output, and the rest arrive later in `status`, `watch`, MCP and the verdict note. The CLI, MCP and the web all serve the same contracts, and typed visibility (layers, held-back checks, posture, the ledger and write-only env values) plugs in as one cartridge. `README.md` says how to run it and deploy it; `GLOSSARY.md` defines the words.
 
@@ -27,7 +27,7 @@ A check wins over prose: if this file and a check disagree, fix this file.
 
 ## Verify
 
-`bun run verify` runs `lockfile:check`, `check`, `typecheck`, `test`, `brand:check` and `bytes:check`, and stops at the first failure. Run `bun run fix`, then `bun run verify`, before you stop. When a check fails, fix the cause. Loosening, skipping or disabling a check needs the user's sign-off.
+`bun run verify` runs `lockfile:check`, `check`, `typecheck`, `test`, `brand:check` and `bytes:check`, and stops at the first failure. Run `bun run fix`, then `bun run verify`, before you stop. When a check fails, fix the cause. Loosening, skipping or disabling a check needs the maintainer's sign-off.
 
 **Safe by default:**
 
@@ -38,7 +38,7 @@ A check wins over prose: if this file and a check disagree, fix this file.
 - docs;
 - a cut that removes a cartridge by deletion (see Nouns).
 
-**Needs the user's sign-off:**
+**Needs the maintainer's sign-off:**
 
 - a dependency that no `package.json` in the repo has yet;
 - any version change to effect, wrangler or pi;
@@ -87,9 +87,9 @@ Contributors meet four domain nouns: ask, answer, check and refusal. They are vo
 ## Boundaries
 
 - **Competition rules apply to repo text.** Describe rival projects by mechanism, neutrally. All of this repo's code is public; no part of the submission lives in a private layer.
-- **Git.** Commit on branches and merge locally. Pushing and adding a remote are the user's to do.
-- **Env.** To see the env, run `bun run env:check` (`varlock load --agent`, values redacted). That is the only way to read it: `.env`, `.env.local` and `.env.*.local` stay closed. To add a variable, edit the `.env.schema` that owns it (`infra/` for tool credentials, an app's for its Worker) and ask the user to set the value. Product code reads a project's `.env.schema` only through `@repo/visibility`'s parser, and never resolves it.
-- **Deploy and ops.** Deploy with Wrangler, through `infra/deploy.ts`. `cf` handles read-mostly API operations, run as `bun run ops -- <command>`. Find a command with `bun run ops -- cli search "…"` and `bun run ops -- schema <command>`, and try it with `--dry-run` before a real call. Leave cf's project commands (`dev`, `build`, `deploy`, `init`, `migrate`, `previews`) and the global `cf` alone. Ask the user before any cf `delete` or `revoke`, and keep `apps/platform` undeployed while a recording runs: `bun infra/recording.ts on` makes every deploy refuse until a person runs `off`. `wrangler delete` auto-confirms in a non-interactive shell, so never run it without the user's OK; cf deletes need `--force` when non-interactive. Throwaways leave through `bun infra/teardown.ts`, which prints its plan from the ledger (`infra/created.jsonl`); its `--apply` deletes, so it is the user's to run, as a cf `delete` is.
+- **Git.** Commit on branches and merge locally. Pushing and adding a remote are the maintainer's to do.
+- **Env.** To see the env, run `bun run env:check` (`varlock load --agent`, values redacted). That is the only way to read it: `.env`, `.env.local` and `.env.*.local` stay closed. To add a variable, edit the `.env.schema` that owns it (`infra/` for tool credentials, an app's for its Worker) and ask the maintainer to set the value. Product code reads a project's `.env.schema` only through `@repo/visibility`'s parser, and never resolves it.
+- **Deploy and ops.** Deploy with Wrangler, through `infra/deploy.ts`. `cf` handles read-mostly API operations, run as `bun run ops -- <command>`. Find a command with `bun run ops -- cli search "…"` and `bun run ops -- schema <command>`, and try it with `--dry-run` before a real call. Leave cf's project commands (`dev`, `build`, `deploy`, `init`, `migrate`, `previews`) and the global `cf` alone. Ask the maintainer before any cf `delete` or `revoke`, and keep `apps/platform` undeployed while a recording runs: `bun infra/recording.ts on` makes every deploy refuse until a person runs `off`. `wrangler delete` auto-confirms in a non-interactive shell, so never run it without the maintainer's OK; cf deletes need `--force` when non-interactive. Throwaways leave through `bun infra/teardown.ts`, which prints its plan from the ledger (`infra/created.jsonl`); its `--apply` deletes, so it is the maintainer's to run, as a cf `delete` is.
 - **Ported code is ours.** A ported file carries its upstream licence notice in its header; a vendored folder or a font keeps its licence file beside it. Change ported files freely; upstream `main` is never synced in. Borrowed code stays under 15% of the codebase (aim for about 5%).
 
 ## Effect traps
@@ -106,26 +106,26 @@ Contributors meet four domain nouns: ask, answer, check and refusal. They are vo
 Each was weighed and turned down; re-adding one needs sign-off.
 
 - `agents`: McpAgent is deprecated, it brings 17 peer dependencies, and it pins the MCP SDK at 2.0.0.
-- `alchemy`, until after Oct 14: released Alchemy can't declare DO-managed containers (PR #1905), so it would be a two-tool hybrid, with beta churn.
-- cf's project commands, `cloudflare.config.ts` and `@cloudflare/config`: the config can't declare `triggers.events`, the deploy refuses the sandbox's container self-binding, and it would be a second deploy tool in recording week.
+- `alchemy`: released Alchemy can't declare DO-managed containers, so it would be a two-tool hybrid, with beta churn.
+- cf's project commands, `cloudflare.config.ts` and `@cloudflare/config`: the config can't declare `triggers.events`, the deploy refuses the sandbox's container self-binding, and it would be a second deploy tool.
 - `@cloudflare/vite-plugin@beta`: a sha-tagged beta. Web stays on the stable plugin.
 - `@cloudflare/containers`: the pre-1.0 model.
-- `vite-plus`: after the deadline.
+- `vite-plus`: not yet.
 - v3 `@effect/platform` and `@effect/cli`; `effect/workflow`; `effect/cluster`.
 - `@effect/language-service` as a package: on TypeScript 7, `@effect/tsgo` serves the plugin.
 - nx, moon, biome, ink, commander, citty, @clack/prompts, rwsdk, react-router, foldkit, Terraform, Pulumi, SST, node-diff3, pnpm.
 - varlock's runtime (`@varlock/cloudflare-integration/init`, `varlock/env`, `varlock/auto-load`) in any Worker: it wraps the global `Response`, and the gateway streams git packs. `varlockCloudflareVitePlugin()` in `apps/web`: web has no secrets.
-- `@cloudflare/forge`, its SDK transformer, `fern-api` and cf's generator: they aren't on npm, Fern rejects our `_tag` unions, and the output carries Cloudflare branding. No HttpApi, OpenAPI or `openapi.json` surface in the window, and no "generated by Forge" claim.
+- `@cloudflare/forge`, its SDK transformer, `fern-api` and cf's generator: they aren't on npm, Fern rejects our `_tag` unions, and the output carries Cloudflare branding. No HttpApi, OpenAPI or `openapi.json` surface, and no "generated by Forge" claim.
 - From Rat Stack: `packages/capability` as the schema source (fallback only), `toHttpApi`, code mode, the subprocess sandbox, devtools, the 1,534-line oxlint boundaries plugin, and any fork or template of the repo.
-- XState in the window; the `no-comments` rule; Alchemy PR preview packages; `herdr-ts-sdk`.
+- XState; the `no-comments` rule; Alchemy PR preview packages; `herdr-ts-sdk`.
 - shadcn's `command` (it brings `cmdk`, built on Radix), `sidebar` (its source calls `Math.random()`, which typecheck refuses, and its `use-mobile` hook fails lint) and `resizable` (it adds `react-resizable-panels`, and a fixed grid does the job) in `apps/web`.
 - DOMPurify for a README's HTML: it needs a DOM, which the Worker has not got. `rehype-sanitize` runs the same on the server and in the browser.
-- Any inbound or two-way GitHub sync. It would be a second way onto `main` that skips the gate.
-- A decentralised-identity client (an atproto OAuth client, a DID resolver) behind the handle: a sign-in redesign and a third party's account as identity (ADR 0016). A second identity, if ever, is a key the person holds.
+- Any inbound or two-way sync with another code host. It would be a second way onto `main` that skips the gate.
+- A decentralised-identity client (an atproto OAuth client, a DID resolver) behind the handle: a sign-in redesign and a third party's account as identity. A second identity, if ever, is a key the person holds.
 
 ## Working docs
 
-The maintainer's working docs (the decisions and why each was made, the stage record, the issue tracker and the demo notes) live in a gitignored `.agents/` folder on the maintainer's machine, not in this repo. Nothing committed depends on them or links into them; a clone has `README.md`, `GLOSSARY.md` and this file.
+The maintainer's working notes (decision records, the stage record and the issue tracker) are not in this repo, and nothing committed depends on them; a clone has `README.md`, `GLOSSARY.md` and this file.
 
 <!-- BEGIN:turborepo-agent-rules -->
 

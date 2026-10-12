@@ -2,7 +2,7 @@
 
 <!-- impeccable:product-schema 1 -->
 
-What Myr is for, whom it serves, what it promises and what it declines. Any agent working on the web, the CLI's words or the docs starts here; [`DESIGN.md`](DESIGN.md) holds the web's look. Words follow [`GLOSSARY.md`](GLOSSARY.md). Facts marked ASSUMPTION are inferred from the build, not confirmed by the maintainer.
+What Myr is for, whom it serves, what it promises and what it declines. Any agent working on the web, the CLI's words or the docs starts here; [`DESIGN.md`](DESIGN.md) holds the web's look. Words follow [`GLOSSARY.md`](GLOSSARY.md).
 
 ## Platform
 
@@ -16,7 +16,7 @@ Three kinds of people, and the agents that work for them. The words below are pr
 
 1. **Maintainers** keep a project. Their jobs:
    - say what the project wants, as asks: a file on main with a want, a territory and a check that fails on main, which opens only when the check is red first;
-   - set how the project takes changes, as typed code in its config folder on main (deciders, ask kinds, budgets, vouches, ratchets, the run block, visibility), read from the platform's last landing; after the window, a path's deciders may carry a count, so a decision there takes effect only when that many of them choose alike (ADR 0034);
+   - set how the project takes changes, as typed code in its config folder on main (deciders, ask kinds, budgets, vouches, ratchets, the run block, visibility), read from the platform's last landing;
    - spend a daily budget of decisions on Today: open or decline a proposal, waive an escape, accept a posture change, finish a passing answer; doing nothing lets nothing in;
    - vouch for the people who may claim, each vouch a line that may say why and name the landing it followed, and denounce those who may not propose; a vouch is read as its line, never counted;
    - keep checks of their own in a layer only they read, and set write-only env values from a terminal;
@@ -33,7 +33,7 @@ Contributors meet four nouns, and only four: **ask**, **answer**, **check** and 
 
 ## Product Purpose
 
-Myr is a git platform where everything a project ships is public, the contribution process is typed code on main, and a change lands only by passing a typed gate. It turns the front door around: the project says what it wants, anyone (a person, or an agent working for one) may answer, an answer that passes its check lands with credit for every person involved, and work nobody asked for has nowhere to go. It is a prototype, entered in a competition that closes on Oct 14.
+Myr is a git platform where everything a project ships is public, the contribution process is typed code on main, and a change lands only by passing a typed gate. It turns the front door around: the project says what it wants, anyone (a person, or an agent working for one) may answer, an answer that passes its check lands with credit for every person involved, and work nobody asked for has nowhere to go. It is a prototype.
 
 The terminal and git are where work happens. The web is where people look: at what a project wants, where an answer stands, who is credited for a landing, and what a decider owes today.
 
@@ -46,23 +46,23 @@ The mechanism is the claim, not the feature count. What it promises:
 - **main moves only by a landing.** A landing is the platform's commit of a checked tree; a direct push to main is refused. Deciders' own changes go through the same gate.
 - **An answer cannot change what judges it.** The judge is read from the last landing, and its closure (check files, test and lint config, CI and hook configs, scripts, the config folder, `.env.schema`) is out of every answer's reach. An answer that edits them, or adds a disable comment with no reason, is refused; a reasoned one counts against the territory's escapes, and waits for a decider when it would raise them.
 - **Every refusal is a typed value**, from a closed union: a tag, a reason, where it points, the command to run next, and whether retrying can help. It reads the same in `git push` output, the CLI, MCP and the web, and accumulates at the cheap stages, so one push hears every independent problem.
-- **Credit is git trailers on the landing commit** (`Asked-by`, `Signed-off-by`, `Decided-by`, `Mentored-by`, `Finished-by`, `Advised-by`). Agents are disclosed, never credited. Trust is a vouch: a public line on main that may carry the member's reason and the landing it followed (ADR 0036), read as a line and never as a number.
+- **Credit is git trailers on the landing commit** (`Asked-by`, `Signed-off-by`, `Decided-by`, `Mentored-by`, `Finished-by`, `Advised-by`). Agents are disclosed, never credited. Trust is a vouch: a public line on main that may carry the member's reason and the landing it followed, read as a line and never as a number.
 - **Held-back checks disclose one bit per area.** A layer's files never enter a public tree; a contributor learns which area failed, never a check's name or output, with a few attempts a week. A landing judged by them says "checked against N sealed checks" in its `Held-back:` trailer.
 - **Write-only values stay write-only.** A decider sets a sensitive env value from a terminal; nobody reads it back, and an unlanded answer's code sees a placeholder.
-- **Export is `git clone`.** Code, asks and credit trailers leave with a clone; verdict notes take one more fetch of `refs/notes/*`. Said plainly: the ledger and the decisions are the one record not yet in the clone. Decided for after the window: the platform writes the ledger as a note on main, so the same fetch carries it (ADR 0038), and signs every landing with one platform key, so a clone proves that main moved only by a landing with no platform in reach (ADR 0037).
+- **Export is `git clone`.** Code, asks and credit trailers leave with a clone; verdict notes take one more fetch of `refs/notes/*`. Said plainly: the ledger and the decisions are the one record not yet in the clone.
 
 What it declines:
 
-- **No inbound or two-way GitHub sync.** It would be a second way onto main that skips the gate. Sign-in uses the platform's own accounts, with Google as an option.
+- **No inbound or two-way sync with another code host.** It would be a second way onto main that skips the gate. Sign-in uses the platform's own accounts, with Google as an option.
 - **No model's opinion in the gate.** Checks are commands with exit statuses and counts; an answer is judged by them, and taste is a decider's finish.
 - **No scores.** A person appears by handle and role; their record serves trust rules only and is never shown as a number, rank or leaderboard.
 - **No overclaiming.** Held-back checks are hidden from people and agents, not from the code under test, so they are no security boundary. Myr is a prototype, not a whole forge; it makes no claim about speed or scale beyond measured, dated numbers.
-- **No second way to land.** The web adds no form for what git or the CLI does. Its only writes are a decider's choices, proposing an ask (and asking the platform's agent to draft it), and signing in or out; after the window, posting in a discussion joins them (ADR 0040). Landed code and each landing's diff are public, as a clone already makes them; an answer that has not landed shows its diff only to the decider finishing it.
+- **No second way to land.** The web adds no form for what git or the CLI does. Its only writes are a decider's choices, proposing an ask (and asking the platform's agent to draft it), and signing in or out. Landed code and each landing's diff are public, as a clone already makes them; an answer that has not landed shows its diff only to the decider finishing it.
 - **No stacks of submissions.** A contributor's commits are not ordered into a stack that lands in parts; work is ordered by asks, and a family is the typed dependency, with a delete child that waits. A stack is a second ordering outside the gate.
 - **No free labels.** Kinds and territories are typed; a label with no check behind it is work nobody asked for.
-- **No discussion on rounds, and no reactions anywhere.** The gate's verdict is the only voice on a round. Decided for after the window: a project has freeform discussions, outside the gate, that a decider turns into an ask with the platform's agent (ADR 0040).
-- **No mirroring by a second push URL.** It is a second way onto main (ADR 0010).
-- **No identity held by a third party.** A person is a platform account (ADR 0016); a second identity, if ever, is a key the person holds.
+- **No discussion on rounds, and no reactions anywhere.** The gate's verdict is the only voice on a round.
+- **No mirroring by a second push URL.** It is a second way onto main.
+- **No identity held by a third party.** A person is a platform account; a second identity, if ever, is a key the person holds.
 - **No vouch counts.** A vouch is read as the line it is, with its reason and the landing it followed; "vouched for by 3 people" is a score by another name.
 
 ## Operating Context
@@ -71,31 +71,30 @@ What it declines:
 - Harnesses plug in without installing anything: the project's AGENTS.md block and skill, `/llms.txt`, an ask as Markdown, and `/.well-known/mcp.json`. The CLI also answers harness hooks (`hook`), and pi users can load a user-level adapter.
 - Every page sits in one shell: a rail of where you are (the site's sections, the projects with their posture, the current project's sections, the file tree on code pages), the page, and an inspector of the typed facts of the thing in hand, each with its command numbered to copy. Below 1120 px the rail opens from a Menu and the facts follow the page's head; phones get a bottom bar (Asks, Today, Projects, More).
 - Pages per job on the web:
-  - **Front page** (`/asks`; `/` is the landing, ADR 0030): open asks across projects a viewer may take, grouped by project with each project's posture said once, in the group heading, filtered by kind, by open to take and by asks held for newcomers; every row carries its last event's time; a split family is one row with its children as a fan. Selecting an ask fills the inspector with its state and its claim command. The same list as Markdown by `Accept: text/markdown`.
-  - **Project** (`/$project`): its head says the project's posture once and, in one sentence of typed facts, how a change lands here (the gate's stages, deciders by path, what is held back, the last landing's age); then its asks (families expanded as fans), then its README; beside them, the gate, who decides, what is held back, how to take part (clone, `asks`, `claim`, `check`) and its last three landings with their credit. The same as the project's `llms.txt` by `Accept: text/markdown`.
+  - **Front page** (`/asks`; `/` is the landing): open asks across projects a viewer may take, grouped by project with each project's posture said once, in the group heading, filtered by kind, by open to take and by asks held for newcomers; a split family is one row with its children as a fan. Selecting an ask fills the inspector with its state and its claim command. The same list as Markdown by `Accept: text/markdown`.
+  - **Project** (`/$project`): its head says the project's posture once and, in one sentence of typed facts, how a change lands here; then its asks, then its README; beside them, the gate, who decides, what is held back, how to take part and its last three landings with their credit. The same as the project's `llms.txt` by `Accept: text/markdown`.
   - **Code** (`/$project/tree/…`, `blob/…`, `why/…`, `commits/…`, `commit/…`, `refs`): the files at any commit with a persistent tree, highlighted code with `#L` links, why each line is there, the landings by day, each commit's diff, and the refs; raw bytes under a sandboxing CSP.
   - **Ask** (`/$project/asks/$ask`): the want, the territory, the check, who may claim, and the commands; the same as Markdown by `Accept: text/markdown` or at `/$project/asks/$ask.md`.
-  - **Answer** (`/$project/answers/$ask`): the outcome, the gate's stages, the rounds (one row per push the gate checked, the round read selected, its verdict never read against a later round), the lanes, held-back results as one line per area, the refusal, and the landing. A waiting answer says the one thing the contributor needs ("Nothing for you to run. Pushing again starts round 3; this verdict stays as round 2."). A landed one is told as a sentence first (landed as which commit, asked by whom, answered by whom, when), then credits its people, and only then shows its sealed roots, shortened.
+  - **Answer** (`/$project/answers/$ask`): the outcome, the gate's stages, the rounds, the lanes, held-back results as one line per area, the refusal, and the landing. A waiting answer says the one thing the contributor needs; a landed one is told as a sentence first, then credits its people, and only then shows its sealed roots.
   - **Person** (`/people/$handle`): their credits by role and area, in words, never a number or a score.
-  - **Policy** (`/$project/people`): who decides which paths, who is vouched for or denounced, the limits and the agent rules, read from the config folder at the landed commit, with the commands that change them. Decided for after the window: each vouch line shows its reason and the landing it followed when it carries them (ADR 0036), and a path whose deciders carry a count reads "2 of 3 deciders for `src/**`" (ADR 0034).
+  - **Policy** (`/$project/people`): who decides which paths, who is vouched for or denounced, the limits and the agent rules, read from the config folder at the landed commit, with the commands that change them.
   - **Proposals** (`/$project/proposals/new`, `/$project/proposals/$proposal`): a want proposed from the web or the CLI, the platform's agent's draft if one was asked for (the ask file, the check, its red-first runs), and the decision it waits on.
-  - **Today** (`/today`): a decider's decisions in sections (due today, within the budget, waiting for tomorrow), each with its evidence, safe default, expiry and one-tap choices whose consequence is written under each, against the budget said as a sentence, with newcomers to welcome and a sample of landings that needed nobody; each decision has its own page (`/$project/decisions/$decision`), where a finish shows the answer's diff with refusals marked at their lines and the decider's own read marks, kept only in their browser. ASSUMPTION until the platform opens finish decisions (it does not yet): the finish view is built and tested, but no live decision reaches it. Decided for after the window: a decision on a path that needs more than one decider shows how many have chosen ("1 of 2") and stays waiting, never refused, until the count is met or it expires to its default (ADR 0034); and Newcomers to welcome gains a one-tap Vouch whose consequence reads "adds a line to the vouch file and lands it with you as Decided-by" (ADR 0036), a decider's choice and so one of the web's permitted writes.
+  - **Today** (`/today`): a decider's decisions in sections (due today, within the budget, waiting for tomorrow), each with its evidence, safe default, expiry and one-tap choices whose consequence is written under each, against the budget said as a sentence, with newcomers to welcome and a sample of landings that needed nobody; each decision has its own page (`/$project/decisions/$decision`), where a finish shows the answer's diff with refusals marked at their lines.
   - **Ledger** (`/$project/ledger`): the posture label, each declared layer with its reason, each sealed area's count, authors, committed root and admission, and every entry, newest first.
   - **Env shape** (`/$project/env`): every item the project's committed `.env.schema` declares, parsed at the landed commit and never resolved; for a sensitive item, who set its value and when. Never a value.
   - **Sign-in** (`/auth/signin`): through the platform's own accounts; the session lives in an HttpOnly cookie the browser cannot read.
-  - **For agents** (`/agents`, and `/agents.md`): a reference in the voice of a man page (Synopsis, Connect, Endpoints, Limits, Refusals) over `/llms.txt`, `/llms-full.txt`, each project's `/$project/llms.txt`, `/.well-known/mcp.json` and the skills under `/.well-known/agent-skills/`.
-- Pages arrive with their data in the server's HTML, and moving between them never reloads the document. The project, ask and answer pages update live while open (the project's `watch` stream), and fall back to reading again every 5 s when the stream cannot be held; a landing seen while a page is open settles its mark once.
+  - **For agents** (`/agents`, and `/agents.md`): a reference in the voice of a man page over `/llms.txt`, `/llms-full.txt`, each project's `/$project/llms.txt`, `/.well-known/mcp.json` and the skills under `/.well-known/agent-skills/`.
+- Pages arrive with their data in the server's HTML, and moving between them never reloads the document. The project, ask and answer pages update live while open (the project's `watch` stream), and fall back to reading again every 5 s when the stream cannot be held.
 - A minimal keyboard set works on every page: `?` (the keys, with a switch that turns the rest off), `j`/`k` through a list, `J`/`K` through files, `1`–`9` to copy the page's numbered commands, and Escape.
 - A project may not take a name the web uses for its own pages (`agents`, `today`, `people`, `auth`, `rpc`, `releases`, `icons`, `assets`).
-- Phone width is a first-class target (Today installs as a PWA). ASSUMPTION: deciders use Today mostly on a phone, and the other pages mostly on a laptop beside a terminal.
+- Phone width is a first-class target (Today installs as a PWA).
 
 ## Capabilities and Constraints
 
 - The web Worker holds no storage binding and no secrets; every read goes through `/rpc` to the platform, and no public-serving Worker can reach the private namespace (AGENTS.md principle 7). It cannot show what the platform does not return.
 - Refusal text comes only from `@repo/protocol/render` (`explain`, `headline`), the one renderer for git, the CLI, MCP and the web (principle 3).
-- The host that keeps a project's repos is a port behind the gateway's custody (ADR 0035): the gateway holds every credential and every rule, and a host is whatever passes the one `RepoHost` contract. A second host is an adapter, not a rewrite, and the web reads through the same contracts whichever host answers.
-- The web never: shows an unlanded answer's diff to anyone but the decider finishing it; shows a score, rank or count of a person as a measure of quality; reads a write-only value back, or shows the placeholder an answer sees (it reads like a value); names a held-back path, check or case to someone outside its layer.
-- Undecided: a theme beyond following the system's light or dark setting (no toggle); a custom domain.
+- The host that keeps a project's repos is a port behind the gateway's custody: the gateway holds every credential and every rule, and a host is whatever passes the one `RepoHost` contract. A second host is an adapter, not a rewrite.
+- The web never: shows an unlanded answer's diff to anyone but the decider finishing it; shows a score, rank or count of a person as a measure of quality; reads a write-only value back, or shows the placeholder an answer sees; names a held-back path, check or case to someone outside its layer.
 
 ## Brand Commitments
 
@@ -106,10 +105,8 @@ What it declines:
 
 ## Evidence on Hand
 
-- The examples `examples/datekit` (a date library with a maintainers layer of sealed checks and an `.env.schema`) and `examples/burrow` (six services with a lint ratchet and a migrate ask split six ways) are fictional projects with fictional people (`ines-v`, `okonkwo`, `bram`, `okafor`, `lin-h`, and burrow's vouched contributors). Pages and the video show them as examples, never as real users.
-- The demo is planned in the maintainer's working notes (not committed): a narration script, a shot list, the swarm scenario and a rehearsal checklist. What it stages is labelled there.
-- Measured numbers come only from recorded live runs on a stage, each with its date (the README's Numbers table). No testimonials, customers or adoption figures exist; none may be invented.
-- A heuristic critique of the web's front page, project home and answer pages, dated 2026-10-11 and kept in the design tool's working files (not committed), scored them 31 of 40. Its findings (the inspector's commands wrapping at 19 rem, one ask reading two state words, lists stacking their state words into a colour stripe, the Landed page ending on hashes, rows with no time) are the source of DESIGN.md's row, inspector, posture and Landed page rules of October 2026, and of ADR 0039. Two peer platforms were read from their own sources the same week, by mechanism; what was taken and declined from them is in ADRs 0034 to 0038 and DESIGN.md's "Rejected on purpose".
+- The examples `examples/datekit` (a date library with a maintainers layer of sealed checks and an `.env.schema`) and `examples/burrow` (six services with a lint ratchet and a migrate ask split six ways) are fictional projects with fictional people (`ines-v`, `okonkwo`, `bram`, `okafor`, `lin-h`, and burrow's vouched contributors). Pages show them as examples, never as real users.
+- Measured numbers come only from live runs on a stage, each with its date. No testimonials, customers or adoption figures exist; none may be invented.
 
 ## Product Principles
 
@@ -121,4 +118,4 @@ What it declines:
 
 ## Accessibility & Inclusion
 
-WCAG 2.2 AA: text contrast at least 4.5:1 (every state colour measures at least 5:1 in both themes), controls and borders at 3:1, nothing set below 13 px, visible focus on every control and a skip link to the page, every state carried by a word and a mark as well as a colour, single-key shortcuts that one switch turns off, `prefers-reduced-motion` honoured, and usable at 360 px wide with no horizontal scroll. `apps/web/e2e/a11y.e2e.ts` runs axe and a keyboard walk over every page in both schemes at 1440 and 390 px against the dev world.
+WCAG 2.2 AA: text contrast at least 4.5:1 (every state colour measures at least 5:1 in both themes), controls and borders at 3:1, nothing set below 13 px, visible focus on every control and a skip link to the page, every state carried by a word and a mark as well as a colour, single-key shortcuts that one switch turns off, `prefers-reduced-motion` honoured, and usable at 360 px wide with no horizontal scroll. `apps/web/e2e/a11y.e2e.ts` runs axe and a keyboard walk over every page in both schemes at 1440 and 390 px.
