@@ -2,6 +2,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { compile } from "tailwindcss";
 
 import { Input } from "../src/components/ui/input.tsx";
 import { Textarea } from "../src/components/ui/textarea.tsx";
@@ -11,17 +12,17 @@ import styles from "../src/styles.css?raw";
 /** The stylesheet with its comments gone, so a comment never reads as a rule. */
 const css = styles.replaceAll(/\/\*[\s\S]*?\*\//gu, "");
 
-const blockFrom = (open: number): string => {
+const blockFrom = (text: string, open: number): string => {
   let depth = 0;
 
-  for (let index = open; index < css.length; index += 1) {
-    if (css[index] === "{") {
+  for (let index = open; index < text.length; index += 1) {
+    if (text[index] === "{") {
       depth += 1;
-    } else if (css[index] === "}") {
+    } else if (text[index] === "}") {
       depth -= 1;
 
       if (depth === 0) {
-        return css.slice(open + 1, index);
+        return text.slice(open + 1, index);
       }
     }
   }
@@ -29,11 +30,19 @@ const blockFrom = (open: number): string => {
   return "";
 };
 
-const blockOf = (selector: string, from = 0): string => {
-  const at = css.indexOf(`${selector} {`, from);
+const blockIn = (text: string, selector: string, from = 0): string => {
+  const at = text.indexOf(`${selector} {`, from);
 
-  return at === -1 ? "" : blockFrom(css.indexOf("{", at));
+  return at === -1 ? "" : blockFrom(text, text.indexOf("{", at));
 };
+
+const blockOf = (selector: string, from = 0): string =>
+  blockIn(css, selector, from);
+
+/** Every top-level `:root` block, in order. */
+const rootBlocks = [...css.matchAll(/^:root \{/gmu)].map(({ index }) =>
+  blockFrom(css, css.indexOf("{", index))
+);
 
 const declarations = (block: string): ReadonlyMap<string, string> =>
   new Map(
@@ -45,18 +54,78 @@ const declarations = (block: string): ReadonlyMap<string, string> =>
     )
   );
 
-const lightTokens = declarations(blockOf(":root"));
+const DARK_VARIANT = `@custom-variant dark {${blockOf("@custom-variant dark")}}`;
+
+/**
+ * ADR 0042: the head script sets `data-theme` on `<html>`, and the dark
+ * palette is written once, under the `dark` variant. Tailwind expands the
+ * variant here as it does in the build, so the palette measured below is the
+ * one drawn under the attribute, and the media query's is checked against it.
+ */
+const compiler = await compile(
+  `${DARK_VARIANT}\n${rootBlocks.map((block) => `:root {${block}}`).join("\n")}\n@tailwind utilities;`
+);
+
+const compiled = compiler.build(["dark:hidden"]);
+
+/** The element, or anything inside it, under `<html data-theme="dark">`. */
+const UNDER_ATTRIBUTE = ':where([data-theme="dark"], [data-theme="dark"] *)';
+
+/** The element, or anything inside it, while `<html>` has no data-theme. */
+const UNDER_NO_ATTRIBUTE =
+  ":where(:root:not([data-theme]), :root:not([data-theme]) *)";
+
+const SYSTEM_DARK = "@media (prefers-color-scheme: dark)";
+
+const lightTokens = declarations(
+  rootBlocks.find((block) => !block.includes("@variant dark")) ?? ""
+);
+
+const darkUnderAttribute = blockIn(compiled, `:root${UNDER_ATTRIBUTE}`);
+
+const darkUnderQuery = blockIn(
+  blockIn(compiled, SYSTEM_DARK),
+  `:root${UNDER_NO_ATTRIBUTE}`
+);
 
 const darkTokens = new Map([
   ...lightTokens,
-  ...declarations(
-    blockOf(
-      ":root",
-      // The block, not the `dark` variant's own mention of the query.
-      css.indexOf("@media (prefers-color-scheme: dark) {")
-    )
-  ),
+  ...declarations(darkUnderAttribute),
 ]);
+
+describe("the dark palette", () => {
+  it('is drawn under data-theme="dark", and is the whole palette', () => {
+    expect(declarations(darkUnderAttribute).size).toBeGreaterThan(20);
+    expect(darkUnderAttribute).toContain("color-scheme: dark;");
+  });
+
+  it("falls back to the system's scheme only where no data-theme is set, unchanged", () => {
+    expect(declarations(darkUnderQuery)).toStrictEqual(
+      declarations(darkUnderAttribute)
+    );
+    expect(darkUnderQuery).toContain("color-scheme: dark;");
+  });
+
+  // So data-theme="light" on a dark system draws the light palette.
+  it("is the only thing the system's scheme sets", () => {
+    const queries = [...css.matchAll(/@media \(prefers-color-scheme/gu)];
+
+    expect(queries.map(({ index }) => index)).toStrictEqual([
+      css.indexOf(SYSTEM_DARK, css.indexOf("@custom-variant dark")),
+    ]);
+    expect(lightTokens.get("background")).toBeDefined();
+    expect(blockOf(":root")).toContain("color-scheme: light;");
+  });
+
+  it("turns every `dark:` utility by the same attribute and fallback", () => {
+    expect(blockIn(compiled, `.dark\\:hidden${UNDER_ATTRIBUTE}`)).toContain(
+      "display: none;"
+    );
+    expect(compiled).toContain(
+      `${SYSTEM_DARK} {\n  .dark\\:hidden${UNDER_NO_ATTRIBUTE} {`
+    );
+  });
+});
 
 type Scheme = "dark" | "light";
 
@@ -402,6 +471,14 @@ describe("Pierre's shadow roots", () => {
   const trees = blockOf("file-tree-container");
 
   const roles = new RegExp(`var\\(--(?:${STATES.join("|")})\\)`, "u");
+
+  // Each sets `color-scheme: light dark` on its host, so its own
+  // `light-dark()` colours would follow the system, not the page's resolved
+  // theme; the page's rule for the host wins over the shadow root's.
+  it("take the page's resolved colour scheme, not the system's", () => {
+    expect(diffs).toMatch(/^\s*color-scheme: inherit;/mu);
+    expect(trees).toMatch(/^\s*color-scheme: inherit;/mu);
+  });
 
   it("draw code without ligatures, so `=>` stays two characters", () => {
     expect(declarations(diffs).get("diffs-font-features")).toBe(

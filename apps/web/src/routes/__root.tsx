@@ -19,7 +19,7 @@ import { MANIFEST_PATH } from "../features/agents/manifest.ts";
 import { useSignedIn } from "../features/auth/session-slot.tsx";
 import { AppShell } from "../features/shared/shell/app-shell.tsx";
 import type { ShellReads } from "../features/shared/shell/context.ts";
-import { themeColors } from "../features/shared/theme.ts";
+import { THEME_SCRIPT, themeColors } from "../features/shared/theme.ts";
 
 import styles from "../styles.css?url";
 
@@ -30,27 +30,36 @@ const siteFacts = createServerFn({ method: "GET" }).handler(() => ({
 }));
 
 // Rendered into the head directly, not through `rootHead`: both metas are named `theme-color`,
-// and TanStack's `HeadContent` keeps one meta per name.
-export const ThemeColors = () => (
+// and TanStack's `HeadContent` keeps one meta per name. Each meta names its scheme's paper for a
+// page whose script never runs, so they sit in a noscript: React's hydration matches a meta by its
+// content and adds a fresh one beside any the script changed, and the browser takes the first that
+// matches. The script (ADR 0042) sets `data-theme` on `<html>` and owns the one live `theme-color`
+// meta, before the body is parsed, so nothing paints in the other theme. `<html>` takes no
+// hydration warning for the attribute.
+export const ThemeHead = () => (
   <>
-    <meta
-      content={themeColors.light}
-      media="(prefers-color-scheme: light)"
-      name="theme-color"
-    />
-    <meta
-      content={themeColors.dark}
-      media="(prefers-color-scheme: dark)"
-      name="theme-color"
-    />
+    <noscript>
+      <meta
+        content={themeColors.light}
+        media="(prefers-color-scheme: light)"
+        name="theme-color"
+      />
+      <meta
+        content={themeColors.dark}
+        media="(prefers-color-scheme: dark)"
+        name="theme-color"
+      />
+    </noscript>
+    {/* oxlint-disable-next-line react/no-danger -- the theme must apply before first paint, so its script is inline and verbatim (THEME_SCRIPT_SOURCE is its hash); the text is the module's own constant, never input */}
+    <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
   </>
 );
 
 const Document = ({ children }: Readonly<{ children: ReactNode }>) => (
-  <html lang="en">
+  <html lang="en" suppressHydrationWarning>
     <head>
       <HeadContent />
-      <ThemeColors />
+      <ThemeHead />
     </head>
     <body>
       {children}

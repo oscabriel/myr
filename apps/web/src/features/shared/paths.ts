@@ -20,6 +20,9 @@ export const INBOX_PATH = "/inbox";
 
 export const PRIVACY_PATH = "/privacy";
 
+/** A reader's own choices, kept in their browser (ADR 0042). */
+export const SETTINGS_PATH = "/settings";
+
 export const TERMS_PATH = "/terms";
 
 export const docsPath = (page?: string) =>

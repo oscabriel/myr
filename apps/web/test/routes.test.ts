@@ -86,6 +86,7 @@ describe("the web's own paths", () => {
       "releases",
       "robots.txt",
       "rpc",
+      "settings",
       "terms",
       "today",
     ]);

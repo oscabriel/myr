@@ -2,7 +2,7 @@
 @import "shadcn/tailwind.css";
 
 /* `prose` for rendered Markdown (a README, an ask's brief); its `dark:`
-   variant is the media query below, like every other one here. */
+   variant is the attribute below, like every other one here. */
 @plugin "@tailwindcss/typography";
 
 /*
@@ -45,11 +45,28 @@
   lines in teal and rose (--diff-*), a family of their own, so a deletion
   never reads as a refusal or an addition as a landing.
 
-  Light and dark follow the system setting (no toggle, no script, no flash):
-  shadcn's `dark:` variant is the media query, not a class, until issue 14
-  adds ADR 0042's preference and attribute.
+  Light and dark follow the system setting, or its opposite by the reader's
+  choice on /settings (ADR 0042). One inline script in the head
+  (features/shared/theme.ts) reads the choice from localStorage, never a
+  cookie, and sets data-theme="light" or "dark" on <html> before first
+  paint. The `dark` variant reads that attribute, and the media query
+  stands in only where no attribute is set (the script never ran). The dark
+  palette is written once, under the variant, so `data-theme="light"` on a
+  dark system draws the light palette and nothing else ever sets a colour
+  by the system's scheme. color-scheme follows the resolved theme, so the
+  browser's own controls and scrollbars match it.
 */
-@custom-variant dark (@media (prefers-color-scheme: dark));
+@custom-variant dark {
+  &:where([data-theme="dark"], [data-theme="dark"] *) {
+    @slot;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not([data-theme]), :root:not([data-theme]) *) {
+      @slot;
+    }
+  }
+}
 
 /*
   The faces: IBM Plex Sans (variable, 100 to 700) for the UI and IBM Plex
@@ -196,7 +213,7 @@
 }
 
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
 
   /* Paper, ink and rules. The paper is hex: the theme-color meta and the
      manifest repeat it (src/features/shared/theme.ts, held by a test). */
@@ -274,8 +291,10 @@
   --radius: 0.125rem;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
+:root {
+  @variant dark {
+    color-scheme: dark;
+
     --background: #0a0a0a;
     --foreground: oklch(0.9702 0 0);
     --surface: oklch(0.2178 0 0);
@@ -555,11 +574,16 @@
     Pierre draws code inside shadow roots: `diffs-container` (@pierre/diffs)
     and `file-tree-container` (@pierre/trees). Each reads these variables
     from its host, so setting them here maps both onto the tokens above,
-    and both follow the media-query dark mode with them. Nothing outside
+    and both follow the resolved theme with them. Nothing outside
     them reaches in: the `code` rule above stops at the shadow root, so the
     ligatures are switched off again here.
   */
   diffs-container {
+    /* Pierre's host says `light dark`, which follows the system; this rule,
+       from outside the shadow root, wins, so its `light-dark()` colours take
+       the page's resolved theme (ADR 0042). */
+    color-scheme: inherit;
+
     /* Metrics: the mono token on Pierre's 20 px line. */
     --diffs-font-family: var(--font-mono);
     --diffs-font-size: 0.8125rem;
@@ -608,6 +632,9 @@
   }
 
   file-tree-container {
+    /* As for a diff: the page's resolved theme, not the system's. */
+    color-scheme: inherit;
+
     /* A tree is read like a list, in the UI's own face and size. */
     --trees-font-family-override: var(--font-sans);
     --trees-font-size-override: 0.875rem;

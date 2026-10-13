@@ -360,6 +360,7 @@ describe("the footer", () => {
         expect(linksOf(footer).map(({ text }) => text)).toStrictEqual([
           "Docs",
           "Install",
+          "Settings",
           "Privacy",
           "Terms",
         ]);
