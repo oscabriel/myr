@@ -6,6 +6,8 @@
 import { Option, Result, Schema } from "effect";
 import { useCallback, useEffect, useState } from "react";
 
+import { browserStorage } from "../shared/storage.ts";
+
 const Kept = Schema.Struct({
   head: Schema.String,
   read: Schema.Record(Schema.String, Schema.String),
@@ -71,9 +73,6 @@ export const writeMark = (
 
   Result.try(() => storage?.setItem(key, JSON.stringify({ head, read: next })));
 };
-
-const browserStorage = (): Storage | undefined =>
-  Result.getOrUndefined(Result.try(() => globalThis.localStorage));
 
 export const useReadMarks = (
   key: string,

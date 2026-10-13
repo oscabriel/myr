@@ -16,6 +16,7 @@ import {
 import type { ReactNode } from "react";
 
 import { Kbd } from "../../components/ui/kbd.tsx";
+import { browserStorage } from "./storage.ts";
 
 export interface KeyPress {
   readonly altKey: boolean;
@@ -87,9 +88,6 @@ export const readShortcuts = (storage?: Storage): boolean =>
 export const writeShortcuts = (storage: Storage | undefined, on: boolean) => {
   Result.try(() => storage?.setItem(SWITCH, on ? "on" : "off"));
 };
-
-const localStorageOf = (): Storage | undefined =>
-  Result.getOrUndefined(Result.try(() => globalThis.localStorage));
 
 const KEYS = [
   { does: "Show these keys", keys: ["?"] },
@@ -369,7 +367,7 @@ export const KeysProvider = ({
 }) => {
   // The server has no storage and renders the keys on; nothing it renders
   // depends on them.
-  const [on, setOn] = useState(() => readShortcuts(localStorageOf()));
+  const [on, setOn] = useState(() => readShortcuts(browserStorage()));
   const [commands, setCommands] = useState<readonly Command[]>([]);
   const [copied, setCopied] = useState<string>();
 
@@ -391,7 +389,7 @@ export const KeysProvider = ({
 
   const turn = useCallback((next: boolean) => {
     setOn(next);
-    writeShortcuts(localStorageOf(), next);
+    writeShortcuts(browserStorage(), next);
   }, []);
 
   const numbered = useMemo(() => numberOf(commands), [commands]);

@@ -453,6 +453,7 @@ Square. The radius is 2 px (`--radius: 0.125rem`), and shadcn's base-lyra compon
 - **Strip:** "How to take an ask", a plain bordered card with three numbered steps, each a `CommandLine` (claim, check, push), and a line onward to Install and `llms.txt`. A ghost X button dismisses it; the dismissal is kept in `localStorage`, never a cookie, and "How to take an ask" at the foot of the filters brings it back. The server always draws it, so a reader who dismissed it sees it go once the page reads the storage.
 - **Filters:** a `nav` landmark ("Filter the asks") of three groups, Kind, State (who may take it: any, open to take, held for newcomers or for people) and Project, each a list of links with its count, the current one on the field surface at 600 with `aria-current="page"`. Every filter is an address (`/asks?kind=fix&take=open`), each link keeps the other filters, and "Reset filters" shows once one is set. Sticky under the top bar from 1100 px.
 - **List:** rows in a `RowGroup` per project, sticky under the top bar; a migrate family is its parent row with the family fan, its children listed under it.
+- **Open asks only:** the board lists the asks still open, as the `frontPage` contract gives them, so it has no "show landed" filter. Offering landed asks here needs a read of them across every project, a protocol change of its own, so the issue's "show landed" is left for that change.
 
 ### Copy action (`CopyAction`, `CommandChip`) and command line (`CommandLine`)
 

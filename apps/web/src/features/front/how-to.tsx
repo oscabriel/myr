@@ -5,6 +5,7 @@
  * theme). The server has no storage and draws the strip; a reader who
  * dismissed it sees it go once the page has read the storage.
  */
+import { pushCommand } from "@repo/agent-kit/install";
 import { Brand } from "@repo/brand";
 import { Result } from "effect";
 import { X } from "lucide-react";
@@ -14,6 +15,7 @@ import { Button } from "../../components/ui/button.tsx";
 import { CommandLine } from "../shared/command.tsx";
 import { AppLink } from "../shared/link.tsx";
 import { INSTALL_PATH } from "../shared/paths.ts";
+import { browserStorage } from "../shared/storage.ts";
 
 const DISMISSED = "asks.how-to";
 
@@ -31,9 +33,6 @@ export const dismissHowTo = (storage?: Storage) => {
 export const restoreHowTo = (storage?: Storage) => {
   Result.try(() => storage?.removeItem(DISMISSED));
 };
-
-const browserStorage = (): Storage | undefined =>
-  Result.getOrUndefined(Result.try(() => globalThis.localStorage));
 
 /** Said on this page when it changes the storage; another tab says `storage`. */
 const CHANGED = "asks-how-to";
@@ -81,15 +80,17 @@ const STEPS = [
   },
   { command: `${Brand.cli} check`, label: "Check your answer before you push" },
   {
-    command: `git push ${Brand.slug} HEAD:main`,
+    command: pushCommand,
     label: "Push it to your fork",
   },
 ] as const;
 
 const LINK = "decoration-rule underline hover:decoration-current";
 
-// `llms.txt` is a server route, so its link is a plain anchor.
-
+/**
+ * The strip itself. Its onward line links Install through the router and
+ * `llms.txt` as a plain anchor, since `llms.txt` is a server route.
+ */
 export const HowToTake = ({
   onDismiss,
 }: {
