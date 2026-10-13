@@ -16,9 +16,9 @@ const labelOf = ({ area, tag }: ShownRefusal) =>
   area === undefined ? tag : `${tag} · ${area}`;
 
 /** A refusal as the list may show it: its tag, then its area. */
-const RefusalLabel = ({ area, tag }: ShownRefusal) => (
-  <span className="text-mono font-mono" data-refusal={tag}>
-    {labelOf({ area, tag })}
+const RefusalLabel = ({ refusal }: { readonly refusal: ShownRefusal }) => (
+  <span className="text-mono font-mono" data-refusal={refusal.tag}>
+    {labelOf(refusal)}
   </span>
 );
 
@@ -113,7 +113,7 @@ const rowOf = (landing: RecentLanding, now: DateTime.Utc) =>
             refusals,
             (one, other) => labelOf(one) === labelOf(other)
           ).map((refusal) => (
-            <RefusalLabel key={labelOf(refusal)} {...refusal} />
+            <RefusalLabel key={labelOf(refusal)} refusal={refusal} />
           ))}
         </p>
       </Row>
