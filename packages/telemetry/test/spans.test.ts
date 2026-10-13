@@ -1,9 +1,14 @@
 import { describe, expect, it } from "@effect/vitest";
-import { VerifierBlocked } from "@repo/protocol/refusal";
+import { ProjectName } from "@repo/protocol/ids";
+import { UnknownProject, VerifierBlocked } from "@repo/protocol/refusal";
 import { Effect, Layer, Logger, Option, Redacted } from "effect";
 
 import { scrubberOf } from "../src/logger.ts";
-import { annotateInvocation, withInvocation } from "../src/spans.ts";
+import {
+  annotateInvocation,
+  refusedWith,
+  withInvocation,
+} from "../src/spans.ts";
 import { tracerOver } from "../src/spans/binding.ts";
 import type { Keeping } from "../src/spans/binding.ts";
 import {
@@ -81,18 +86,18 @@ describe("the spans bridge", () => {
   );
 
   it.effect(
-    "carries a listed id that is a string, a number or a boolean, and drops any other",
+    "carries a listed id whose value is a string, a number or a boolean, and drops any other key or value",
     () =>
       Effect.gen(function* () {
         const spans = yield* recorded(
           Effect.void.pipe(
             Effect.withSpan("Workflow.step", {
               attributes: {
-                attempt: 2,
+                lane: "unit",
                 path: "secret/plan.md",
+                project: { name: "alice/datekit" },
                 repo: "alice__datekit",
                 sha: "7".repeat(40),
-                stage: { name: "shape" },
                 step: "cheap#2",
                 "url.full": "https://example.com/?code=abc",
               },
@@ -101,7 +106,7 @@ describe("the spans bridge", () => {
         );
 
         expect(Object.fromEntries(spans[1]?.attributes ?? [])).toStrictEqual({
-          attempt: 2,
+          lane: "unit",
           sha: "7".repeat(40),
           step: "cheap#2",
         });
@@ -266,6 +271,17 @@ describe(annotateInvocation, () => {
         ]);
       })
   );
+
+  it("names each tag an invocation was refused with once, and none when it was not", () => {
+    expect([
+      refusedWith([
+        new VerifierBlocked({}),
+        new UnknownProject({ project: ProjectName.make("alice/datekit") }),
+        new VerifierBlocked({}),
+      ]),
+      refusedWith([]),
+    ]).toStrictEqual([{ refusal: "VerifierBlocked,UnknownProject" }, {}]);
+  });
 
   it.effect("is a no-op where no Worker's spans are installed", () =>
     annotateInvocation({ project: "alice/datekit" }).pipe(

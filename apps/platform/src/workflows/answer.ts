@@ -4,6 +4,8 @@ import type { RepoHost } from "@repo/artifacts/repo-host";
 import type { Drafter } from "@repo/drafting/drafter";
 import type { Projects } from "@repo/project/projects";
 import { Outcome } from "@repo/protocol/domain/outcome";
+import { annotateInvocation, refusedWith } from "@repo/telemetry/spans";
+import type { InvocationIds } from "@repo/telemetry/spans";
 import { WorkflowEntrypoint } from "cloudflare:workers";
 import type { WorkflowEvent } from "cloudflare:workers";
 import { Effect, Layer, Schema } from "effect";
@@ -25,6 +27,17 @@ export const OutcomeJson = Schema.toCodecJson(Outcome);
 
 export type OutcomeEncoded = typeof OutcomeJson.Encoded;
 
+// What Issues shows beside a run that ended: the SHA it landed, or what refused it.
+const outcomeIds = (outcome: Outcome): InvocationIds =>
+  Outcome.match(outcome, {
+    AwaitingDecision: () => ({}),
+    AwaitingFinish: () => ({}),
+    Checking: () => ({}),
+    Landed: ({ sha }) => ({ sha }),
+    Refused: ({ refusals }) => refusedWith(refusals),
+    WaitingOnParent: () => ({}),
+  });
+
 export const runWorkflow = <E>(
   ports: Layer.Layer<Exclude<AnswerPorts, StepRunner>, E>,
   payload: typeof AnswerParams.Encoded,
@@ -35,6 +48,7 @@ export const runWorkflow = <E>(
       const params = yield* Schema.decodeEffect(AnswerParams)(payload);
 
       return yield* runAnswer(params).pipe(
+        Effect.tap((outcome) => annotateInvocation(outcomeIds(outcome))),
         Effect.flatMap(Schema.encodeEffect(OutcomeJson)),
         invocation({ project: params.project, requestId: params.requestId })
       );

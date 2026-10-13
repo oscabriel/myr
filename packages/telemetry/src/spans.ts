@@ -4,7 +4,7 @@
 // here by what the bridge uses of it, so no package imports the Workers
 // runtime: a Worker hands its own `tracing` to `spans/binding.ts`, and a test
 // hands `spans/memory.ts`'s recording one.
-import { Context, Effect } from "effect";
+import { Array, Context, Effect } from "effect";
 import { constVoid } from "effect/Function";
 
 export type SpanValue = string | number | boolean;
@@ -60,17 +60,10 @@ export const INVOCATION_KEYS = [
  * or a value onto a trace by mistake.
  */
 export const SPAN_KEYS: ReadonlySet<string> = new Set([
-  "ask",
-  "attempt",
-  "lane",
-  "method",
-  "phase",
-  "project",
-  "refusal",
-  "requestId",
-  "sha",
-  "stage",
+  ...INVOCATION_KEYS,
+  // A Workflow step's whole name, or the subcommand of a Lander's step.
   "step",
+  // The kind of repo a push reached: `Canonical`, `ClaimFork` and the rest.
   "target",
 ]);
 
@@ -79,6 +72,14 @@ export const InvocationSpan = Context.Reference<{
 }>("telemetry/InvocationSpan", {
   defaultValue: () => ({ annotate: constVoid }),
 });
+
+/** The tags an invocation was refused with, each once; none when it was not. */
+export const refusedWith = (
+  refusals: readonly { readonly _tag: string }[]
+): InvocationIds =>
+  Array.isReadonlyArrayNonEmpty(refusals)
+    ? { refusal: Array.dedupe(refusals.map(({ _tag }) => _tag)).join(",") }
+    : {};
 
 /** Sets ids on the invocation's root span, where Issues reads them; a no-op off a Worker. */
 export const annotateInvocation = (ids: InvocationIds): Effect.Effect<void> =>

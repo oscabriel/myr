@@ -2,10 +2,10 @@
 import type { PushReport } from "@repo/project/project";
 import type { Projects } from "@repo/project/projects";
 import { Anonymous, Person } from "@repo/protocol/principal";
-import { annotateInvocation } from "@repo/telemetry/spans";
+import { annotateInvocation, refusedWith } from "@repo/telemetry/spans";
 import { WorkflowEntrypoint } from "cloudflare:workers";
 import type { WorkflowEvent, WorkflowStep } from "cloudflare:workers";
-import { Array, Data, Effect, Layer, Option, Schema } from "effect";
+import { Data, Effect, Layer, Option, Schema } from "effect";
 
 import { decodeEnv } from "../platform.ts";
 import { telemetryOf, workerPorts } from "../ports.ts";
@@ -50,13 +50,10 @@ const recordOf = (event: OnPushEvent) =>
       : Anonymous.make({});
 
     const refusals = yield* api.recordPush(reportOf(event, pusher));
-    const tags = refusals.map(({ _tag }) => _tag);
 
-    if (Array.isReadonlyArrayNonEmpty(tags)) {
-      yield* annotateInvocation({ refusal: tags.join(",") });
-    }
+    yield* annotateInvocation(refusedWith(refusals));
 
-    return tags;
+    return refusals.map(({ _tag }) => _tag);
   });
 
 class LooksStray extends Data.TaggedError("LooksStray") {}
