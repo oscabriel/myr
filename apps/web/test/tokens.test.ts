@@ -597,3 +597,29 @@ describe("the faces", () => {
     expect(Object.keys(vendored)).toStrictEqual([]);
   });
 });
+
+describe("the shells' widths", () => {
+  const layout = declarations(blockOf("@theme static"));
+  const breakpoints = declarations(blockOf("@theme"));
+
+  // Spec 3.1: each shell's container, its side columns, and prose's measure.
+  it.each([
+    ["container-site", "85rem"],
+    ["container-project", "100rem"],
+    ["container-focus", "25rem"],
+    ["column-about", "21.25rem"],
+    ["column-tree", "17.5rem"],
+    ["column-docs-nav", "15rem"],
+    ["column-docs-toc", "13.75rem"],
+    ["gutter-site", "2rem"],
+    ["gutter-project", "1.75rem"],
+    ["measure", "72ch"],
+  ])("names --%s as %s", (token, width) => {
+    expect(layout.get(token)).toBe(width);
+  });
+
+  it("stacks side columns below 1100 px and folds the top bar's links below 900 px", () => {
+    expect(breakpoints.get("breakpoint-columns")).toBe("68.75rem");
+    expect(breakpoints.get("breakpoint-nav")).toBe("56.25rem");
+  });
+});

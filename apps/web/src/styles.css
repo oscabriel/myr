@@ -334,8 +334,44 @@
 @theme {
   --breakpoint-tablet: 40rem;
   --breakpoint-diffsplit: 48rem;
+  --breakpoint-nav: 56.25rem;
+  --breakpoint-columns: 68.75rem;
   --breakpoint-shell: 70rem;
   --breakpoint-codefacts: 90rem;
+}
+
+/*
+  The four shells' widths (DESIGN.md "Shells"), so a page names a width by
+  its job and never as a literal. Static, so each is a variable on :root
+  whether or not a utility reads it: `max-w-site`, `max-w-project` and
+  `max-w-focus` read the containers, and a column or the measure is read
+  as `w-(--column-about)` or `max-w-(--measure)`.
+
+  site     a centred 1360 px container with 32 px gutters
+  project  fluid to 1600 px with 28 px gutters; the about column (340 px)
+           on Overview and the file tree (280 px) on Code are its only
+           side columns
+  docs     the site's container: a 240 px nav tree, the article at the
+           measure, a 220 px "on this page"
+  focus    one 400 px card
+  measure  prose stops at 72ch (DESIGN.md allows 72 to 80ch; 72 is the
+           docs article's cap, so one measure serves every page)
+
+  From `columns` (1100 px) a side column stands beside its main column,
+  and below it stacks under it; from `nav` (900 px) the top bar's links
+  are shown, and below it they fold into a menu.
+*/
+@theme static {
+  --container-site: 85rem;
+  --container-project: 100rem;
+  --container-focus: 25rem;
+  --column-about: 21.25rem;
+  --column-tree: 17.5rem;
+  --column-docs-nav: 15rem;
+  --column-docs-toc: 13.75rem;
+  --gutter-site: 2rem;
+  --gutter-project: 1.75rem;
+  --measure: 72ch;
 }
 
 @theme inline {
