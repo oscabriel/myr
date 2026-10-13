@@ -39,6 +39,37 @@ export const stageNames = Match.type<StageName>().pipe(
   Match.exhaustive
 );
 
+/** What each stage runs, in a sentence. */
+export const stageRuns = Match.type<StageName>().pipe(
+  Match.when(
+    "parse",
+    () => "Who may push what: the branch, the pusher and their claim."
+  ),
+  Match.when(
+    "shape",
+    () => "What the change touches, read from its paths and added lines."
+  ),
+  Match.when("merge", () => "The answer merged onto the landed main."),
+  Match.when(
+    "cheap",
+    () => "Counts on the merged tree: the project's ratchets."
+  ),
+  Match.when(
+    "checks",
+    () =>
+      "The ask's check first, then every lane of the project, on the merged tree."
+  ),
+  Match.when(
+    "heldBack",
+    () => "Checks kept in a layer, one result per area and nothing more."
+  ),
+  Match.when(
+    "human",
+    () => "A maintainer's finish, when the ask's kind asks for one."
+  ),
+  Match.exhaustive
+);
+
 export type StatusSubject =
   | {
       readonly kind: "answer";

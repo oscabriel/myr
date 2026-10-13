@@ -8,7 +8,7 @@ import { StageName } from "@repo/protocol/domain/outcome";
 import type { Outcome } from "@repo/protocol/domain/outcome";
 import type { AreaName, Handle, ProjectName } from "@repo/protocol/ids";
 import type { Posture } from "@repo/protocol/posture";
-import { DateTime, Match } from "effect";
+import { DateTime } from "effect";
 import { ChevronDown, LockKeyhole } from "lucide-react";
 import { useState } from "react";
 import type { ReactNode } from "react";
@@ -28,7 +28,12 @@ import type { StageHolds, StageState } from "./outcome.tsx";
 import { ledgerPath } from "./paths.ts";
 import { PostureBadge } from "./posture.tsx";
 import { MetaCode } from "./row.tsx";
-import { StatusLine, readStatus, stageNames } from "./status-line.tsx";
+import {
+  StatusLine,
+  readStatus,
+  stageNames,
+  stageRuns,
+} from "./status-line.tsx";
 import type { StatusSubject } from "./status-line.tsx";
 import { When } from "./time.tsx";
 
@@ -188,36 +193,6 @@ export const ClaimFacts = ({
     </FactBlock>
   );
 };
-
-export const stageRuns = Match.type<StageName>().pipe(
-  Match.when(
-    "parse",
-    () => "Who may push what: the branch, the pusher and their claim."
-  ),
-  Match.when(
-    "shape",
-    () => "What the change touches, read from its paths and added lines."
-  ),
-  Match.when("merge", () => "The answer merged onto the landed main."),
-  Match.when(
-    "cheap",
-    () => "Counts on the merged tree: the project's ratchets."
-  ),
-  Match.when(
-    "checks",
-    () =>
-      "The ask's check first, then every lane of the project, on the merged tree."
-  ),
-  Match.when(
-    "heldBack",
-    () => "Checks kept in a layer, one result per area and nothing more."
-  ),
-  Match.when(
-    "human",
-    () => "A maintainer's finish, when the ask's kind asks for one."
-  ),
-  Match.exhaustive
-);
 
 const stageMarks = {
   current: { mark: "now", word: "now" },

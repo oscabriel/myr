@@ -4,9 +4,10 @@
  */
 import { Client } from "@repo/protocol/contracts";
 import type { ProjectListing } from "@repo/protocol/domain/front-page";
-import { Effect } from "effect";
+import { DateTime, Effect } from "effect";
 
-import { LandingProjects, listedProjects } from "./projects.ts";
+import { landedLatest, LandingNow } from "./landing-now.ts";
+import { LandingProjects } from "./projects.ts";
 
 const readProjects = (
   order: (projects: readonly ProjectListing[]) => LandingProjects
@@ -22,12 +23,23 @@ const readProjects = (
     )
   );
 
-/** The landing's few. */
-export const readLandingProjects = readProjects((projects) =>
-  listedProjects(projects)
-);
-
 /** Every public project, as the platform lists them: Explore groups and orders them. */
 export const readEveryProject = readProjects((projects) =>
   LandingProjects.cases.Listed.make({ projects })
 );
+
+/** The landing's "landing now": the projects that landed last, read at one instant. */
+export const readLandingNow: Effect.Effect<LandingNow, never, Client> =
+  Effect.gen(function* () {
+    const client = yield* Client;
+    const { projects } = yield* client.listProjects({});
+
+    return LandingNow.cases.Listed.make({
+      now: yield* DateTime.now,
+      projects: landedLatest(projects),
+    });
+  }).pipe(
+    Effect.catchCause(() =>
+      Effect.succeed(LandingNow.cases.Unreachable.make({}))
+    )
+  );
