@@ -4,11 +4,8 @@ import { env } from "cloudflare:workers";
 import { Effect, Schema } from "effect";
 import { useMemo } from "react";
 
-import {
-  EXPLORE_LEDE,
-  EXPLORE_TITLE,
-  ExploreView,
-} from "../features/explore/explore-page.tsx";
+import { ExploreView } from "../features/explore/explore-page.tsx";
+import { EXPLORE_LEDE, EXPLORE_TITLE } from "../features/explore/words.ts";
 import { LandingProjects } from "../features/landing/projects.ts";
 import { readEveryProject } from "../features/landing/read.ts";
 import { pageHead } from "../features/shared/head.ts";

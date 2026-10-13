@@ -12,11 +12,7 @@ import { UnreachableNotice } from "../shared/pending.tsx";
 import { PostureBadge } from "../shared/posture.tsx";
 import { GUTTER } from "../shared/shell/gutter.ts";
 import { exploreGroups } from "./groups.ts";
-
-export const EXPLORE_TITLE = "Explore";
-
-export const EXPLORE_LEDE =
-  "Every public project, the ones taking answers first.";
+import { EXPLORE_LEDE, EXPLORE_TITLE } from "./words.ts";
 
 const plural = (count: number, one: string, many: string) =>
   `${count} ${count === 1 ? one : many}`;
