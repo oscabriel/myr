@@ -396,7 +396,6 @@ const AsksSection = ({
   parents,
   project,
   selected,
-  signedIn,
   stamps,
   states,
   unreachable,
@@ -409,7 +408,6 @@ const AsksSection = ({
   readonly states: ReadonlyMap<AskId, AskProgress>;
   readonly stamps: ReadonlySet<AskId>;
   readonly selected: string | undefined;
-  readonly signedIn: boolean;
 }) => {
   let list: ReactNode;
 
@@ -442,7 +440,6 @@ const AsksSection = ({
       className="flex min-w-0 flex-col gap-2"
     >
       <SectionHead
-        action={signedIn ? <ProposeLink project={project} /> : undefined}
         count={asks === undefined ? undefined : countOf(openAsks(asks))}
         id="open-asks"
         title="Open asks"
@@ -453,7 +450,33 @@ const AsksSection = ({
 };
 
 /**
- * Overview: open asks, recent landings and the README in the main column,
+ * The Proposals tab opens this region until a project's proposals have a
+ * page of their own, so the tab keeps the project's header and tabs.
+ */
+const ProposalsSection = ({
+  project,
+  signedIn,
+}: {
+  readonly project: ProjectName;
+  readonly signedIn: boolean;
+}) => (
+  <section aria-labelledby="proposals" className="flex min-w-0 flex-col gap-2">
+    <SectionHead
+      action={signedIn ? <ProposeLink project={project} /> : undefined}
+      id="proposals"
+      title="Proposals"
+    />
+    <p className="text-ui text-muted-foreground max-w-(--measure)">
+      A proposal asks a maintainer to open an ask. An agent on the platform
+      drafts its ask file and check, and it expires unless a maintainer accepts
+      it.
+      {signedIn ? null : " Sign in to propose one."}
+    </p>
+  </section>
+);
+
+/**
+ * Overview: open asks, recent landings, proposals and the README in the main column,
  * and the about column beside it from `columns`, under it below.
  */
 const ProjectPanes = ({
@@ -486,7 +509,6 @@ const ProjectPanes = ({
               parents={props.parents ?? []}
               project={project}
               selected={selected}
-              signedIn={props.signedIn === true}
               stamps={props.stamps ?? new Set()}
               states={states}
               unreachable={props.unreachable === true}
@@ -497,6 +519,10 @@ const ProjectPanes = ({
               now={props.now}
               platformUrl={props.platformUrl}
               project={project}
+            />
+            <ProposalsSection
+              project={project}
+              signedIn={props.signedIn === true}
             />
             {code?.readme === undefined ? null : (
               <div className="max-w-(--measure) min-w-0">

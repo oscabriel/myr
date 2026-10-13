@@ -59,7 +59,10 @@ import {
 import type { ProjectViewProps } from "../src/features/project/project-page.tsx";
 import { UnknownProjectView } from "../src/features/project/unknown-project.tsx";
 import { askStates } from "../src/features/shared/ask-progress.ts";
-import { projectTabOf } from "../src/features/shared/shell/sections.ts";
+import {
+  projectSections,
+  projectTabOf,
+} from "../src/features/shared/shell/sections.ts";
 import {
   ProjectHeaderData,
   ProjectPageData,
@@ -682,14 +685,14 @@ const headerFrom = (name: string, world: Layer.Layer<Client>) =>
     Effect.provide(world)
   );
 
-/** A project page as its route draws it: the project's frame, its header, then the page. */
+/** A project page as its route draws it: the project's frame, its header (its tab from the path alone), then the page. */
 const framed = (url: string, header: ProjectHeaderData, body: ReactNode) =>
   renderAt(
     url,
     <ProjectFrame
       header={
         <ProjectHeader
-          current={projectTabOf(url)}
+          current={projectTabOf(new URL(url, platformUrl).pathname)}
           header={header}
           platformUrl={platformUrl}
         />
@@ -815,10 +818,13 @@ const headerFacts = {
 const headerOf = (markup: string) =>
   elementWith(markup, 'data-project-header=""');
 
-/** The header as a page draws it, its current tab's mark and its name's element taken out. */
+/** The header as a page draws it, its current tab's marks (its own and the router's) and its name's element taken out. */
 const sameHeader = (markup: string) =>
   headerOf(markup)
     .replaceAll(' aria-current="page"', "")
+    .replaceAll(' data-current=""', "")
+    .replaceAll(' data-status="active"', "")
+    .replaceAll(' active"', '"')
     .replace('<h1 class="text-headline', '<p class="text-headline')
     .replace("</h1>", "</p>");
 
@@ -864,17 +870,49 @@ const answeringAtOnce = Layer.unwrap(
   })
 );
 
+/** Each read asked of `handler`, written down by its contract's name. */
+const counting =
+  (
+    handler: (request: Request) => Promise<Response>,
+    seen: Ref.Ref<readonly string[]>
+  ) =>
+  (request: Request) =>
+    Effect.runPromise(
+      Effect.gen(function* () {
+        const body = yield* Effect.promise(() => request.clone().text());
+
+        const tags = [...body.matchAll(/"tag":"(?<tag>\w+)"/gu)].map(
+          ({ groups }) => groups?.tag ?? ""
+        );
+
+        yield* Ref.update(seen, (before) => [...before, ...tags]);
+
+        return yield* Effect.promise(() => handler(request));
+      })
+    );
+
+/** The dev world, each read it is asked for written down. */
+const countingWorld = (seen: Ref.Ref<readonly string[]>) =>
+  Layer.unwrap(
+    Effect.gen(function* () {
+      const { dispose, handler } = devServer({});
+
+      yield* Effect.addFinalizer(() => Effect.promise(dispose));
+
+      return clientOver(counting(handler, seen));
+    })
+  );
+
 describe("a project's page in its frame", () => {
   it.effect(
     "opens burrow on Overview: eight tabs, the clone command and the seven stages in the about column, and no inspector",
     () =>
       Effect.gen(function* () {
-        const header = yield* headerFrom("oscabriel/burrow", devWorld);
         const data = yield* readFrom("oscabriel/burrow", devWorld);
 
         const markup = yield* framed(
           "/oscabriel/burrow",
-          header,
+          data.header,
           <ProjectView {...propsFrom(data)} />
         );
 
@@ -979,6 +1017,46 @@ describe("a project's page in its frame", () => {
       })
   );
 
+  it.effect(
+    "opens each tab that stands for a region of Overview on that region, inside the frame",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* framed(
+          "/oscabriel/datekit",
+          headerFacts,
+          <ProjectView {...props()} />
+        );
+
+        const hashes = projectSections("oscabriel/datekit").flatMap(
+          ({ hash }) => (hash === undefined ? [] : [hash])
+        );
+
+        expect(hashes).toStrictEqual(["open-asks", "proposals", "who-decides"]);
+        expect(
+          hashes.filter((hash) => !markup.includes(`id="${hash}"`))
+        ).toStrictEqual([]);
+      })
+  );
+
+  it.effect(
+    "titles Overview with the project whichever region its tabs have opened",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* framed(
+          "/oscabriel/datekit#proposals",
+          headerFacts,
+          null
+        );
+
+        expect(headerOf(markup)).toMatch(/<h1 class="text-headline/u);
+        expect(
+          tabsOf(markup)
+            .filter(({ current }) => current)
+            .map(({ label }) => label)
+        ).toStrictEqual(["Overview"]);
+      })
+  );
+
   it("says the commands its popovers give whole, each a real CLI command with its project", () => {
     const steps = textOf(
       <>
@@ -1038,6 +1116,34 @@ describe("the project's header as the server sends it", () => {
         const markup = yield* framed("/oscabriel/vellum", header, null);
 
         expect(markup.match(/data-posture="/gu)?.length ?? 0).toBe(0);
+      }),
+    seededWorld
+  );
+
+  it.effect(
+    "comes with Overview's own read on Overview, each of its reads made once",
+    () =>
+      Effect.gen(function* () {
+        const seen = yield* Ref.make<readonly string[]>([]);
+
+        const { alone, data, tags } = yield* Effect.gen(function* () {
+          const overview = yield* readProjectPage("oscabriel/datekit").pipe(
+            Effect.flatMap(decodePage)
+          );
+
+          const made = yield* Ref.get(seen);
+
+          const header = yield* readProjectHeader("oscabriel/datekit").pipe(
+            Effect.flatMap(decodeHeader)
+          );
+
+          return { alone: header, data: overview, tags: made };
+        }).pipe(Effect.provide(countingWorld(seen)));
+
+        expect(
+          HEADER_READS.map((read) => tags.filter((tag) => tag === read).length)
+        ).toStrictEqual(HEADER_READS.map(() => 1));
+        expect(data.header).toStrictEqual(alone);
       }),
     seededWorld
   );

@@ -25,7 +25,7 @@ const tabs = (current: string) =>
     { href: "/oscabriel/datekit/tree/main", text: "Code" },
     { href: "/oscabriel/datekit#open-asks", text: "Asks" },
     { href: "/oscabriel/datekit/commits/main", text: "Landings" },
-    { href: "/oscabriel/datekit/proposals/new", text: "Proposals" },
+    { href: "/oscabriel/datekit#proposals", text: "Proposals" },
     { href: "/oscabriel/datekit#who-decides", text: "People" },
     { href: "/oscabriel/datekit/people", text: "Policy" },
     { href: "/oscabriel/datekit/ledger", text: "Visibility" },
@@ -78,7 +78,9 @@ describe("a project's tabs", () => {
         );
 
         expect(linksOf(markup)).toStrictEqual(tabs("Visibility"));
-        expect(markup).toMatch(/href="\/oscabriel\/datekit\/ledger"/u);
+        expect(markup).toMatch(
+          /<a\b[^>]*data-status="active"[^>]*>Visibility<\/a>/u
+        );
       })
   );
 
@@ -95,6 +97,28 @@ describe("a project's tabs", () => {
           linksOf(markup)
             .filter(({ current }) => current)
             .map(({ text }) => text)
+        ).toStrictEqual(["Overview"]);
+      })
+  );
+
+  it.effect(
+    "keeps Overview current where a tab has opened one of its regions, so the mark never rests on a fragment",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* renderAt(
+          "/oscabriel/datekit#open-asks",
+          <ProjectTabs
+            current={projectTabOf("/oscabriel/datekit")}
+            project={datekit}
+          />
+        );
+
+        expect(
+          [
+            ...markup.matchAll(
+              /<a\b[^>]*data-current=""[^>]*>(?<text>[^<]*)/gu
+            ),
+          ].map(({ groups }) => groups?.text)
         ).toStrictEqual(["Overview"]);
       })
   );

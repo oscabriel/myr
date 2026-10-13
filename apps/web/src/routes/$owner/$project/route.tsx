@@ -3,19 +3,16 @@ import {
   getRouteApi,
   Outlet,
   useLocation,
+  useMatch,
 } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { env } from "cloudflare:workers";
 import { Effect, Option, Schema } from "effect";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 import { ProjectFrame } from "../../../features/project/project-frame.tsx";
 import { ProjectHeader } from "../../../features/project/project-header.tsx";
-import {
-  projectSections,
-  projectTabOf,
-} from "../../../features/shared/shell/sections.ts";
-import type { ProjectTab } from "../../../features/shared/shell/sections.ts";
+import { projectTabOf } from "../../../features/shared/shell/sections.ts";
 import { useShellName } from "../../../features/shared/shell/shells.ts";
 import { projectParams } from "../../../server/addresses.ts";
 import { serverClient } from "../../../server/client.ts";
@@ -43,31 +40,45 @@ const root = getRouteApi("__root__");
 
 const decodeHeader = Schema.decodeSync(ProjectHeaderData);
 
-/** Overview's regions stand for the tabs whose own pages are not built yet. */
-const tabAt = (pathname: string, hash: string): ProjectTab | undefined => {
-  const tab = projectTabOf(pathname);
+/** Overview reads its header with its own reads, so the layout reads none there. */
+const onOverview = (pathname: string) => projectTabOf(pathname) === "overview";
 
-  return tab === "overview"
-    ? (projectSections("").find((section) => section.hash === hash)?.tab ?? tab)
-    : tab;
+/**
+ * Overview's header when Overview is open, else the layout's own. The last
+ * one drawn stays while the reader moves on from Overview: the layout's loader
+ * runs when the reader enters the project, not on each move inside it.
+ */
+const useHeaderRead = () => {
+  const loaded = Route.useLoaderData();
+
+  const fromOverview = useMatch({
+    from: "/$owner/$project/",
+    select: (match) => match.loaderData?.header,
+    shouldThrow: false,
+  });
+
+  const latest = fromOverview ?? loaded;
+  const [kept, setKept] = useState(latest);
+
+  if (latest !== undefined && latest !== kept) {
+    setKept(latest);
+  }
+
+  const encoded = latest ?? kept;
+
+  return useMemo(
+    () => (encoded === undefined ? undefined : decodeHeader(encoded)),
+    [encoded]
+  );
 };
 
 const ProjectLayout = () => {
-  const loaded = Route.useLoaderData();
   const { platformUrl } = root.useLoaderData();
   const shell = useShellName();
+  const header = useHeaderRead();
 
-  const { hash, pathname } = useLocation({
-    select: (location) => ({
-      hash: location.hash,
-      pathname: location.pathname,
-    }),
-  });
-
-  const header = useMemo(
-    () => (loaded === undefined ? undefined : decodeHeader(loaded)),
-    [loaded]
-  );
+  // The current tab and the title's element follow the path alone: a fragment never reaches the server.
+  const pathname = useLocation({ select: (location) => location.pathname });
 
   // A focused page under a project (a new proposal) draws no project frame.
   if (shell !== "project") {
@@ -79,7 +90,7 @@ const ProjectLayout = () => {
       header={
         header === undefined ? undefined : (
           <ProjectHeader
-            current={tabAt(pathname, hash)}
+            current={projectTabOf(pathname)}
             header={header}
             platformUrl={platformUrl}
           />
@@ -96,6 +107,9 @@ const ProjectLayout = () => {
 export const Route = createFileRoute("/$owner/$project")({
   staticData: { shell: "project" },
   params: projectParams,
-  loader: ({ params }) => projectHeader({ data: params.project }),
+  loader: ({ location, params }) =>
+    onOverview(location.pathname)
+      ? undefined
+      : projectHeader({ data: params.project }),
   component: ProjectLayout,
 });

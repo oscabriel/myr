@@ -241,11 +241,23 @@ const Facts = ({ facts }: { readonly facts: ProjectHeaderFacts }) => {
 };
 
 const TAB =
-  "text-ui text-muted-foreground hover:text-foreground aria-[current=page]:border-foreground aria-[current=page]:text-foreground -mb-px flex h-(--tabs) shrink-0 items-center gap-1.5 border-b-2 border-transparent px-3 whitespace-nowrap no-underline transition-colors duration-[120ms] first:pl-0 focus-visible:outline-offset-[-2px] aria-[current=page]:font-medium";
+  "text-ui text-muted-foreground hover:text-foreground data-current:border-foreground data-current:text-foreground -mb-px flex h-(--tabs) shrink-0 items-center gap-1.5 border-b-2 border-transparent px-3 whitespace-nowrap no-underline transition-colors duration-[120ms] first:pl-0 focus-visible:outline-offset-[-2px] data-current:font-medium";
 
 /**
- * Text tabs, the current one ink with the 2 px underline. Each matches the
- * router's own path and hash exactly, so the router never marks a second tab.
+ * The router marks a link to the page being read. A tab that opens a region
+ * of Overview counts the fragment, so the router marks it only in the browser
+ * once the reader has opened that region; every other tab counts the path.
+ */
+const activeFor = (hash: string | undefined) => ({
+  exact: true,
+  includeHash: hash !== undefined,
+  includeSearch: false,
+});
+
+/**
+ * Text tabs, the current one ink with the 2 px underline. The current tab
+ * follows the page's path alone, so the server and the browser draw the same
+ * mark, and a region of Overview opened by its tab leaves Overview current.
  */
 export const ProjectTabs = ({
   current,
@@ -264,13 +276,10 @@ export const ProjectTabs = ({
     <div className="flex [scrollbar-width:none] overflow-x-auto overscroll-x-contain">
       {projectSections(project).map(({ hash, label, tab, to }) => (
         <AppLink
-          activeOptions={{
-            exact: true,
-            includeHash: true,
-            includeSearch: false,
-          }}
+          activeOptions={activeFor(hash)}
           aria-current={tab === current ? "page" : undefined}
           className={TAB}
+          data-current={tab === current ? "" : undefined}
           key={tab}
           to={to}
           {...(hash === undefined ? {} : { hash })}

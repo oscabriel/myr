@@ -396,7 +396,7 @@ From `columns` (1100 px, `--breakpoint-columns`) a side column stands beside its
 ### Inside a page
 
 1. **Top bar**, sticky (below).
-2. **Page header**: on a project, the project header and its tabs, sticky under the top bar; elsewhere the page's title and one line under it, not sticky. A page's facts follow its head inside the page; the only column beside a page is the about column on Overview or the file tree on Code (or, in the docs, the nav tree and "on this page").
+2. **Page header**: on a project, the project header, which scrolls away, and its tabs, which stick under the top bar (a tall sticky header would cost the reader height on every page); elsewhere the page's title and one line under it, not sticky. A page's facts follow its head inside the page; the only column beside a page is the about column on Overview or the file tree on Code (or, in the docs, the nav tree and "on this page").
 3. **Toolbar**, 40 px, sticky under the header on list and code pages.
 4. **Content**: rows under sticky group headers, a document of regions 32 px apart, cards in a grid where a page lists projects, or code.
 
@@ -429,8 +429,8 @@ Square. The radius is 2 px (`--radius: 0.125rem`), and shadcn's base-lyra compon
 
 ### Project header and tabs
 
-- **Header:** the name (`owner / project`, the owner muted, both in the UI sans at Headline size), the posture (`PostureBadge`), the description (the README's first sentence), a facts row in UI type, muted (open asks, last landing, latest tag, licence if known, deciders), and three actions at the right: **Watch** (a popover: what to follow, plus `myr watch --project`), **Clone** (a popover: the `git clone` URL, `myr claim <ask> --project`, and that forks come with a claim), **Contribute** (a popover: take an ask, propose an ask, read the policy). It never changes between tabs.
-- **Tabs:** Overview · Code · Asks · Landings · Proposals · People · Policy · Visibility, each a text tab with its count in label type; the current one ink at 500 with a 2 px ink underline (the one current-tab style of the whole web), the rest muted. The header and tabs stick under the top bar together; on a phone the tabs scroll sideways inside their own strip.
+- **Header:** the name (`owner / project`, the owner muted, both in the UI sans at Headline size), the posture (`PostureBadge`), the description (the README's first sentence), a facts row in UI type, muted (open asks, last landing, latest tag, licence if known, deciders), and three actions at the right: **Watch** (a popover: what already follows the project, this page and its events, plus `myr status --project` for your own claims and answers; the CLI has no watch command), **Clone** (a popover: the `git clone` URL, `myr claim <ask> --project`, and that forks come with a claim), **Contribute** (a popover: take an ask, propose an ask, read the policy). It never changes between tabs.
+- **Tabs:** Overview · Code · Asks · Landings · Proposals · People · Policy · Visibility, each a text tab with its count in label type; the current one ink at 500 with a 2 px ink underline (the one current-tab style of the whole web), the rest muted. The tabs stick under the top bar and the header scrolls away above them, so the reader keeps the height a tall sticky header would take; on a phone the tabs scroll sideways inside their own strip.
 - **Overview** (the default tab): open asks, recent landings and the README in the main column; the about column (`--column-about`) with clone, how a change lands (the seven stages), who decides, a visibility summary and languages.
 - **Code:** under the header, a Files/Commits toggle, the ref switcher (`main`, tags, and answers in forks, ADR 0043), the HEAD commit bar, go to file, and the file tree in `--column-tree`.
 - **Visibility:** posture, layers, held-back checks, the environment (once "Env shape") and the ledger, one tab.
