@@ -162,7 +162,7 @@ const WorkspaceView = ({
         ) : null}
         {toolbar === undefined ? null : (
           <div
-            className={`border-rule bg-background sticky top-[3.4375rem] z-10 h-10 shrink-0 border-y ${GUTTER}`}
+            className={`border-rule bg-background sticky top-(--stick-bar) z-10 h-(--toolbar) shrink-0 border-y ${GUTTER}`}
             data-toolbar=""
           >
             {/* Its controls end where the rows end; its rules run the pane. */}

@@ -90,7 +90,7 @@ const Controls = () => {
   );
 };
 
-const BAR = "flex h-14 min-w-0 items-center gap-4";
+const BAR = "flex h-(--top-bar) min-w-0 items-center gap-4";
 
 /**
  * Framed in the site and the docs (inside the container, its hairline too),

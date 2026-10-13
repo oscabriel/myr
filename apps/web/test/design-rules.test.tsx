@@ -133,6 +133,8 @@ const LAYOUT = [
   "gutter-site",
   "gutter-project",
   "measure",
+  "top-bar",
+  "toolbar",
 ] as const;
 
 /** Every class the shell draws at an address, the page itself left empty. */

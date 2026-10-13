@@ -364,6 +364,10 @@
   From `columns` (1100 px) a side column stands beside its main column,
   and below it stacks under it; from `nav` (900 px) the top bar's links
   are shown, and below it they fold into a menu.
+
+  top-bar  the top bar's height (56 px), and the toolbar's (40 px) under
+           it; what sticks under them reads `--stick-bar` or
+           `--stick-toolbar`, each overlapping the hairline above it
 */
 @theme static {
   --container-site: 85rem;
@@ -376,6 +380,10 @@
   --gutter-site: 2rem;
   --gutter-project: 1.75rem;
   --measure: 72ch;
+  --top-bar: 3.5rem;
+  --toolbar: 2.5rem;
+  --stick-bar: calc(var(--top-bar) - 1px);
+  --stick-toolbar: calc(var(--top-bar) + var(--toolbar) - 1px);
 }
 
 @theme inline {

@@ -287,6 +287,24 @@ describe("the top bar", () => {
     })
   );
 
+  // A colour given to a kit button must not cost it the UI size: the
+  // class merger reads an unknown `text-*` as a colour, so a colour class
+  // drops `text-ui` and the button falls back to the body's 16 px.
+  it.effect("sets every button in it at the UI size", () =>
+    Effect.gen(function* () {
+      const buttons = [
+        ...topBarOf(yield* inShell(PROJECT)).matchAll(
+          /<button\b[^>]*class="(?<classes>[^"]*)"/gu
+        ),
+      ].map(({ groups }) => groups?.classes?.split(" ") ?? []);
+
+      expect(buttons.length).toBeGreaterThanOrEqual(2);
+      expect(
+        buttons.filter((classes) => !classes.includes("text-ui"))
+      ).toStrictEqual([]);
+    })
+  );
+
   it.effect("marks the section being read as the current page", () =>
     Effect.gen(function* () {
       const bar = topBarOf(yield* inShell(DOCS));

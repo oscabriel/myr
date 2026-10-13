@@ -211,10 +211,10 @@ export const Row = ({
   );
 };
 
-// Under the top bar (56 px), or under it and a page's 40 px toolbar, each overlapping the hairline above it.
+// Under the top bar, or under it and a page's toolbar (styles.css's `--stick-*`).
 const STICK = {
-  bar: "top-[3.4375rem]",
-  toolbar: "top-[5.9375rem]",
+  bar: "top-(--stick-bar)",
+  toolbar: "top-(--stick-toolbar)",
 } as const;
 
 export const RowGroup = ({

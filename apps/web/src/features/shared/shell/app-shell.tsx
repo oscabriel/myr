@@ -15,14 +15,18 @@ import type { ShellName } from "./shells.ts";
 import { SideColumnOutlet, useSideColumn } from "./side-column.tsx";
 import { TopBar } from "./top-bar.tsx";
 
-/** A project page's side column, beside its main column from `columns` and gone below it. */
+/**
+ * A project page's side column, beside its main column from `columns`.
+ * Below it the column is hidden rather than stacked: the Files button's
+ * sheet is the file tree's narrow form until issue 04 decides the Code tab.
+ */
 const ProjectFrame = ({ children }: { readonly children: ReactNode }) => {
   const column = useSideColumn() !== undefined;
 
   return (
     <div className="max-w-project mx-auto flex w-full flex-1">
       {column ? (
-        <div className="border-rule columns:flex sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-(--column-tree) shrink-0 flex-col border-r">
+        <div className="border-rule columns:flex sticky top-(--top-bar) hidden h-[calc(100dvh-var(--top-bar))] w-(--column-tree) shrink-0 flex-col border-r">
           <SideColumnOutlet />
         </div>
       ) : null}
@@ -38,7 +42,7 @@ const DocsFrame = ({ children }: { readonly children: ReactNode }) => (
       {children}
     </div>
     <div
-      className={`border-rule columns:col-start-1 columns:row-start-1 columns:sticky columns:top-14 columns:self-start columns:max-h-[calc(100dvh-3.5rem)] columns:overflow-y-auto columns:border-t-0 border-t py-6 ${GUTTER}`}
+      className={`border-rule columns:col-start-1 columns:row-start-1 columns:sticky columns:top-(--top-bar) columns:self-start columns:max-h-[calc(100dvh-var(--top-bar))] columns:overflow-y-auto columns:border-t-0 border-t py-6 ${GUTTER}`}
     >
       <DocsNav />
     </div>

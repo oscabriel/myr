@@ -124,6 +124,8 @@ spacing:
   column-docs-nav: "15rem"
   column-docs-toc: "13.75rem"
   measure: "72ch"
+  top-bar: "3.5rem"
+  toolbar: "2.5rem"
   row-phone: "88px"
 components:
   top-bar:
