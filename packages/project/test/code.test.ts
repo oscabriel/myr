@@ -393,6 +393,28 @@ describe("a fork", () => {
   );
 
   it.effect(
+    "reads a commit only at a revision every other read resolves: nonsense, an unlisted fork and a fork's repo name are UnknownRevision",
+    () =>
+      Effect.gen(function* () {
+        const { answer, code } = yield* forked;
+
+        const refused = [
+          "nonsense",
+          "@carol/parse-iso",
+          "alice__datekit--parse-iso--bob",
+        ];
+
+        expect(
+          yield* Effect.forEach(refused, (rev) =>
+            Effect.exit(commitOf(code, answer, revision(rev)))
+          )
+        ).toStrictEqual(
+          refused.map((rev) => Exit.fail(new UnknownRevision({ rev })))
+        );
+      }).pipe(Effect.provide(RepoHostMemory))
+  );
+
+  it.effect(
     "is kept in the code store under no key, and cached under the fork's repo alone",
     () =>
       Effect.gen(function* () {

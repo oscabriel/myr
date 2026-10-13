@@ -198,26 +198,23 @@ export const resolveAt = (
 };
 
 /**
- * The repo a commit is read in: a listed fork's when `at` is its address, the
- * canonical repo's otherwise.
+ * The repo a commit is read in. With no `at`, the canonical repo; otherwise
+ * `at` is resolved as every other read resolves it, so `main`, a full commit
+ * id and a tag read the canonical repo, a listed fork's address reads that
+ * fork, and any other text is `UnknownRevision`.
  */
 export const repoAt = (
   project: CodeProject,
   at: Option.Option<Rev>
-): Effect.Effect<Omit<Resolved, "commit">, UnknownRevision> => {
-  const address = Option.flatMap(at, forkAddressOf);
-
-  if (Option.isNone(address)) {
-    return Effect.succeed({ canonical: true, repo: project.repo });
-  }
-
-  return Effect.flatMap(listedFork(project, address.value), (listed) =>
-    Option.match(listed, {
-      onNone: () =>
-        Effect.fail(
-          new UnknownRevision({ rev: Option.getOrElse(at, () => "main") })
-        ),
-      onSome: (repo) => Effect.succeed({ canonical: false, repo }),
-    })
-  );
-};
+): Effect.Effect<Omit<Resolved, "commit">, UnknownRevision, RepoHost> =>
+  Option.match(at, {
+    onNone: () => Effect.succeed({ canonical: true, repo: project.repo }),
+    onSome: (rev) =>
+      Effect.map(
+        resolveAt(project, Option.some(rev)),
+        ({ canonical, repo }) => ({
+          canonical,
+          repo,
+        })
+      ),
+  });

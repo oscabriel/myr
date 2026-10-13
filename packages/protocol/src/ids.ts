@@ -173,6 +173,18 @@ export const RepoName = Schema.String.pipe(
 
 export type RepoName = typeof RepoName.Type;
 
+/** A branch by its short name: never `refs/...`, never `..`, no empty part. */
+export const BranchName = Schema.String.pipe(
+  Schema.check(
+    Schema.isPattern(
+      /^(?!refs\/)(?!.*\.\.)[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/u
+    )
+  ),
+  Schema.brand("BranchName")
+);
+
+export type BranchName = typeof BranchName.Type;
+
 export const RepoPath = Schema.NonEmptyString.pipe(Schema.brand("RepoPath"));
 
 export type RepoPath = typeof RepoPath.Type;

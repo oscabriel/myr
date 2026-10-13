@@ -16,10 +16,11 @@ import { RefChoices } from "../../../features/code/ref-switcher.tsx";
 import type { RefChoicesReader } from "../../../features/code/ref-switcher.tsx";
 import { FilesButton } from "./tree/-files-button.tsx";
 
-const ReadChoices: RefChoicesReader = (
-  props: Omit<ComponentProps<typeof RefChoices>, "refs">
-) => {
-  const read = useAtomValue(refsAtom(props.project));
+const ReadChoices: RefChoicesReader = ({
+  project,
+  ...props
+}: ComponentProps<RefChoicesReader>) => {
+  const read = useAtomValue(refsAtom(project));
 
   return (
     <RefChoices

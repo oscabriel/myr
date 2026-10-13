@@ -2,7 +2,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { Option } from "effect";
 
 import { forkAddressOf, ForkPoint, forkRev } from "../src/domain/code.ts";
-import { AskId, CommitSha, Handle } from "../src/ids.ts";
+import { AskId, BranchName, CommitSha, Handle } from "../src/ids.ts";
 
 const bob = { ask: AskId.make("parse-iso"), handle: Handle.make("bob") };
 
@@ -18,9 +18,18 @@ describe("a fork address", () => {
         `@bob/parse-iso:${sha}`,
       ].map(forkAddressOf)
     ).toStrictEqual([
-      Option.some({ ...bob, point: ForkPoint.Branch({ name: "main" }) }),
-      Option.some({ ...bob, point: ForkPoint.Branch({ name: "main" }) }),
-      Option.some({ ...bob, point: ForkPoint.Branch({ name: "fix/tz" }) }),
+      Option.some({
+        ...bob,
+        point: ForkPoint.Branch({ name: BranchName.make("main") }),
+      }),
+      Option.some({
+        ...bob,
+        point: ForkPoint.Branch({ name: BranchName.make("main") }),
+      }),
+      Option.some({
+        ...bob,
+        point: ForkPoint.Branch({ name: BranchName.make("fix/tz") }),
+      }),
       Option.some({ ...bob, point: ForkPoint.Commit({ sha }) }),
     ]);
   });

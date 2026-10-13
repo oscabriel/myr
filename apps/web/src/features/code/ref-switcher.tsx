@@ -125,8 +125,6 @@ export const RefChoices = ({
   readonly filter?: string;
   readonly hrefAt: (rev: string) => string;
   readonly onPick: () => void;
-  /** The project whose refs these are: the reader reads them by it. */
-  readonly project: ProjectName;
   readonly refs: RefsView | undefined;
   readonly rev: string;
 }) => {

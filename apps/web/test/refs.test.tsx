@@ -353,7 +353,6 @@ describe(RefChoices, () => {
         filter={filter}
         hrefAt={(rev) => `/oscabriel/datekit/tree/${rev}`}
         onPick={pickNothing}
-        project={refs.project}
         refs={refs}
         rev="main"
       />
@@ -366,7 +365,6 @@ describe(RefChoices, () => {
         <RefChoices
           hrefAt={(to) => `/oscabriel/datekit/tree/${to}`}
           onPick={pickNothing}
-          project={refs.project}
           refs={refs}
           rev={rev}
         />

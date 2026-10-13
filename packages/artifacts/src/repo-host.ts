@@ -1,5 +1,5 @@
 import { CommitSha, RepoName } from "@repo/protocol/ids";
-import type { RepoPath } from "@repo/protocol/ids";
+import type { BranchName, RepoPath } from "@repo/protocol/ids";
 import {
   Context,
   Data,
@@ -12,18 +12,7 @@ import {
 import type { Array, DateTime, Duration, Redacted } from "effect";
 import type { FsClient } from "isomorphic-git";
 
-export { RepoName } from "@repo/protocol/ids";
-
-export const BranchName = Schema.String.pipe(
-  Schema.check(
-    Schema.isPattern(
-      /^(?!refs\/)(?!.*\.\.)[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/u
-    )
-  ),
-  Schema.brand("BranchName")
-);
-
-export type BranchName = typeof BranchName.Type;
+export { BranchName, RepoName } from "@repo/protocol/ids";
 
 export const RefName = Schema.String.pipe(
   Schema.check(

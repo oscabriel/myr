@@ -4,6 +4,7 @@ import { Data, Option, Schema } from "effect";
 import {
   AskId,
   BlobSha,
+  BranchName,
   CommitSha,
   Handle,
   LandedSha,
@@ -36,7 +37,7 @@ export type Rev = typeof Rev.Type;
 
 /** Where in a fork an address points: a branch by its exact name, or a commit the fork holds. */
 export type ForkPoint = Data.TaggedEnum<{
-  Branch: { readonly name: string };
+  Branch: { readonly name: BranchName };
   Commit: { readonly sha: CommitSha };
 }>;
 
@@ -54,27 +55,24 @@ export interface ForkAddress {
 
 const FORK = /^@(?<handle>[^/:]+)\/(?<ask>[^/:]+)(?::(?<point>.*))?$/u;
 
-// The shape `BranchName` takes: never `refs/...`, never `..`, no empty part.
-const BRANCH = /^(?!refs\/)(?!.*\.\.)[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/u;
-
 const FULL_SHA = /^[0-9a-f]{40}$/u;
 
 const decodeHandle = Schema.decodeUnknownOption(Handle);
 
 const decodeAsk = Schema.decodeUnknownOption(AskId);
 
+const decodeBranch = Schema.decodeUnknownOption(BranchName);
+
 const pointOf = (text: string | undefined): Option.Option<ForkPoint> => {
   if (text === undefined) {
-    return Option.some(ForkPoint.Branch({ name: "main" }));
+    return Option.some(ForkPoint.Branch({ name: BranchName.make("main") }));
   }
 
   if (FULL_SHA.test(text)) {
     return Option.some(ForkPoint.Commit({ sha: CommitSha.make(text) }));
   }
 
-  return BRANCH.test(text)
-    ? Option.some(ForkPoint.Branch({ name: text }))
-    : Option.none();
+  return Option.map(decodeBranch(text), (name) => ForkPoint.Branch({ name }));
 };
 
 /**

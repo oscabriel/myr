@@ -158,12 +158,21 @@ describe("the code reads over /rpc", () => {
           sha: tree.at,
         });
 
-        const refused = ["@carol/parse-iso", "alice__datekit--parse-iso--bob"];
+        const refused = [
+          "nonsense",
+          "@carol/parse-iso",
+          "alice__datekit--parse-iso--bob",
+        ];
 
         expect([tree.at, commit.sha]).toStrictEqual([landed, landed]);
         expect(
           yield* Effect.forEach(refused, (at) =>
             Effect.flip(anyone.readTree({ at, project }))
+          )
+        ).toStrictEqual(refused.map((rev) => new UnknownRevision({ rev })));
+        expect(
+          yield* Effect.forEach(refused, (at) =>
+            Effect.flip(anyone.showCommit({ at, project, sha: tree.at }))
           )
         ).toStrictEqual(refused.map((rev) => new UnknownRevision({ rev })));
       })
