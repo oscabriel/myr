@@ -4,7 +4,7 @@
  * it turns. The choice is kept in this browser's `localStorage` alone.
  */
 import { Result } from "effect";
-import { useCallback, useState, useSyncExternalStore } from "react";
+import { useCallback, useMemo, useSyncExternalStore } from "react";
 
 import {
   applyTheme,
@@ -81,6 +81,8 @@ export const AppearanceView = ({
   </fieldset>
 );
 
+// Not `useMedia` from `features/code/media.ts`: its server snapshot is
+// `false`, and this page must name no theme the server cannot see.
 const subscribeToSystem = (changed: () => void) => {
   const scheme = globalThis.matchMedia(DARK_SCHEME_QUERY);
 
@@ -96,25 +98,62 @@ const systemNow = (): Theme =>
 
 const systemOnServer = (): Theme | undefined => undefined;
 
-/** Another tab may write the choice; this one hears it as a storage event. */
-const subscribeToStorage = (changed: () => void) => {
-  const heard = (event: StorageEvent) => {
-    if (event.key === THEME_PREFERENCE_KEY) {
-      changed();
-    }
-  };
+type StorageListener = (event: { readonly key: string | null }) => void;
 
-  globalThis.addEventListener("storage", heard);
+/** The window's storage events, by which this tab hears another one write. */
+export interface StorageEvents {
+  readonly addEventListener: (
+    type: "storage",
+    listener: StorageListener
+  ) => void;
+  readonly removeEventListener: (
+    type: "storage",
+    listener: StorageListener
+  ) => void;
+}
 
-  return () => {
-    globalThis.removeEventListener("storage", heard);
+/**
+ * The choice as this tab shows it: the one made here, or what storage holds
+ * once another tab writes one. A browser that refuses storage keeps the one
+ * made here, which storage cannot give back.
+ */
+export const preferenceStore = (
+  storage: () => Storage | undefined,
+  events: StorageEvents
+) => {
+  let chosen: ThemePreference | undefined;
+  const listeners = new Set<() => void>();
+
+  return {
+    choose: (preference: ThemePreference) => {
+      chosen = preference;
+
+      for (const changed of listeners) {
+        changed();
+      }
+    },
+    current: (): ThemePreference => chosen ?? readPreference(storage()),
+    subscribe: (changed: () => void) => {
+      const heard: StorageListener = ({ key }) => {
+        if (key === THEME_PREFERENCE_KEY) {
+          chosen = undefined;
+          changed();
+        }
+      };
+
+      listeners.add(changed);
+      events.addEventListener("storage", heard);
+
+      return () => {
+        listeners.delete(changed);
+        events.removeEventListener("storage", heard);
+      };
+    },
   };
 };
 
 const localStorageOf = (): Storage | undefined =>
   Result.getOrUndefined(Result.try(() => globalThis.localStorage));
-
-const storedNow = () => readPreference(localStorageOf());
 
 const storedOnServer = (): ThemePreference => "same";
 
@@ -125,28 +164,27 @@ export const Appearance = () => {
     systemOnServer
   );
 
-  const stored = useSyncExternalStore(
-    subscribeToStorage,
-    storedNow,
+  const store = useMemo(() => preferenceStore(localStorageOf, globalThis), []);
+
+  const preference = useSyncExternalStore(
+    store.subscribe,
+    store.current,
     storedOnServer
   );
 
-  const [chosen, setChosen] = useState<ThemePreference>();
-
-  const choose = useCallback((preference: ThemePreference) => {
-    setChosen(preference);
-    choosePreference(preference, {
-      document: globalThis.document,
-      storage: localStorageOf(),
-      system: systemNow(),
-    });
-  }, []);
+  const choose = useCallback(
+    (chosen: ThemePreference) => {
+      choosePreference(chosen, {
+        document: globalThis.document,
+        storage: localStorageOf(),
+        system: systemNow(),
+      });
+      store.choose(chosen);
+    },
+    [store]
+  );
 
   return (
-    <AppearanceView
-      onChoose={choose}
-      preference={chosen ?? stored}
-      system={system}
-    />
+    <AppearanceView onChoose={choose} preference={preference} system={system} />
   );
 };

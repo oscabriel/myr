@@ -4,7 +4,10 @@
  * colour scheme, and a cookie jar that records every write, so a test can say none
  * happened.
  */
-import { THEME_META } from "../src/features/shared/theme.ts";
+import {
+  THEME_META,
+  THEME_PREFERENCE_KEY,
+} from "../src/features/shared/theme.ts";
 import type { Theme } from "../src/features/shared/theme.ts";
 
 interface FakeMeta {
@@ -25,6 +28,8 @@ const fakeMeta = (entries: readonly (readonly [string, string])[] = []) => {
   return meta;
 };
 
+type StorageListener = (event: { readonly key: string | null }) => void;
+
 const SYSTEM_DARK = "(prefers-color-scheme: dark)";
 
 const rendered = (scheme: Theme, content: string) =>
@@ -44,7 +49,7 @@ export const themePage = (system: Theme) => {
 
   const cookies: string[] = [];
   const changes: (() => void)[] = [];
-  const stored: (() => void)[] = [];
+  const stored = new Set<StorageListener>();
   const scheme = { matches: system === "dark" };
 
   const document = {
@@ -91,8 +96,8 @@ export const themePage = (system: Theme) => {
 
   return {
     /** The window's, which hears another tab write to storage. */
-    addEventListener: (_: "storage", listener: () => void) => {
-      stored.push(listener);
+    addEventListener: (_: "storage", listener: StorageListener) => {
+      stored.add(listener);
     },
     cookies,
     document,
@@ -107,10 +112,13 @@ export const themePage = (system: Theme) => {
             meta.attributes.get("name") === "theme-color" && matching(meta)
         )
         ?.attributes.get("content"),
-    /** Another tab writes to storage. */
-    storageWritten: () => {
+    removeEventListener: (_: "storage", listener: StorageListener) => {
+      stored.delete(listener);
+    },
+    /** Another tab writes to storage, under the theme's key unless named. */
+    storageWritten: (key: string | null = THEME_PREFERENCE_KEY) => {
       for (const listener of stored) {
-        listener();
+        listener({ key });
       }
     },
     theme: () => root.theme,

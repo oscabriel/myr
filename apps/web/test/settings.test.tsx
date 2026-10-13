@@ -5,16 +5,18 @@ import { Effect } from "effect";
 import {
   AppearanceView,
   choosePreference,
+  preferenceStore,
 } from "../src/features/settings/appearance.tsx";
 import { SettingsView } from "../src/features/settings/settings-page.tsx";
 import {
   readPreference,
   THEME_PREFERENCE_KEY,
+  writePreference,
 } from "../src/features/shared/theme.ts";
 import type { Theme, ThemePreference } from "../src/features/shared/theme.ts";
 import { attributeOf, textIn } from "./markup.ts";
 import { renderAt } from "./render.tsx";
-import { keptStorage } from "./storage.ts";
+import { keptStorage, refusingStorage } from "./storage.ts";
 import { themePage } from "./theme-page.ts";
 
 const ignore = () => {};
@@ -127,6 +129,79 @@ describe(choosePreference, () => {
     expect(readPreference(storage)).toBe("same");
     expect(page.theme()).toBe("dark");
     expect(page.cookies).toStrictEqual([]);
+  });
+});
+
+/** The store over a page, with what it heard counted. */
+const storeOn = (storage: Storage) => {
+  const page = themePage("light");
+  const store = preferenceStore(() => storage, page);
+  const heard = { times: 0 };
+
+  store.subscribe(() => {
+    heard.times += 1;
+  });
+
+  return { heard, page, store };
+};
+
+describe(preferenceStore, () => {
+  it("shows the choice made here", () => {
+    const storage = keptStorage();
+    const { heard, store } = storeOn(storage);
+
+    writePreference(storage, "opposite");
+    store.choose("opposite");
+
+    expect(store.current()).toBe("opposite");
+    expect(heard.times).toBe(1);
+  });
+
+  // The head script redraws the page in what the other tab wrote; the
+  // checked radio says the same.
+  it("shows what another tab writes after a choice made here", () => {
+    const storage = keptStorage();
+    const { heard, page, store } = storeOn(storage);
+
+    writePreference(storage, "opposite");
+    store.choose("opposite");
+    writePreference(storage, "same");
+    page.storageWritten();
+
+    expect(store.current()).toBe("same");
+    expect(heard.times).toBe(2);
+  });
+
+  it("keeps the choice made here when another key is written", () => {
+    const storage = keptStorage();
+    const { page, store } = storeOn(storage);
+
+    store.choose("opposite");
+    page.storageWritten("another.key");
+
+    expect(store.current()).toBe("opposite");
+  });
+
+  it("keeps the choice made here where the browser refuses storage", () => {
+    const { store } = storeOn(refusingStorage);
+
+    store.choose("opposite");
+
+    expect(store.current()).toBe("opposite");
+  });
+
+  it("stops hearing another tab once unsubscribed", () => {
+    const storage = keptStorage();
+    const page = themePage("light");
+    const store = preferenceStore(() => storage, page);
+    const heard = { times: 0 };
+
+    store.subscribe(() => {
+      heard.times += 1;
+    })();
+    page.storageWritten();
+
+    expect(heard.times).toBe(0);
   });
 });
 
