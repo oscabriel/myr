@@ -12,6 +12,7 @@ import {
 } from "@repo/project/code";
 import type { CodeProject } from "@repo/project/code";
 import { envSchemaMethod } from "@repo/project/deciders";
+import { landedProjectOf, withDescriptions } from "@repo/project/description";
 import { FrontPage } from "@repo/project/front-page";
 import { GatewayUrl } from "@repo/project/project";
 import type { ProjectApi } from "@repo/project/project";
@@ -276,6 +277,14 @@ export const Handlers: Layer.Layer<
         frontPage.projects().pipe(
           Effect.flatMap(withStandingPosture),
           Effect.provideService(Projects, projects),
+          Effect.flatMap((listed) =>
+            withDescriptions(listed, (project) =>
+              Effect.map(projects.get(project), (api) =>
+                landedProjectOf(api, project)
+              )
+            )
+          ),
+          Effect.provideService(RepoHost, host),
           Effect.map((listed) => ({ projects: listed }))
         ),
       listRefs: ({ project }) => code(project, refsOf),

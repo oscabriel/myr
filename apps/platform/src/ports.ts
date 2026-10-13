@@ -12,12 +12,14 @@ import type { Upstream } from "@repo/git/upstream";
 import { UpstreamRepoHost } from "@repo/git/upstream/repo-host";
 import { CodeStoreR2 } from "@repo/project/code-store/binding";
 import { CodeCacheLive } from "@repo/project/code/cache";
+import { ProjectDescriptionsMemory } from "@repo/project/description/memory";
 import type { FrontPage } from "@repo/project/front-page";
 import { FrontPageMemory } from "@repo/project/front-page/memory";
 import type { Lander } from "@repo/project/lander";
 import { LanderIsogit } from "@repo/project/lander/isogit";
 import { FinishersFromChecks } from "@repo/project/project";
 import type { Projection } from "@repo/project/projection";
+import { ProjectDescriptionsD1 } from "@repo/project/projection-d1/descriptions";
 import { FrontPageD1 } from "@repo/project/projection-d1/front-page";
 import { StandingPosturesD1 } from "@repo/project/projection-d1/postures";
 import { ProjectionD1 } from "@repo/project/projection-d1/projection";
@@ -66,9 +68,10 @@ const plugIn = (
     ...plugged.map((cartridge) => cartridge(config).pipe(Layer.provide(ports)))
   );
 
-const memoryFrontPage = Layer.merge(
+const memoryFrontPage = Layer.mergeAll(
   FrontPageMemory.layer({ credits: [], entries: [], projects: [] }),
-  ProjectionMemory
+  ProjectionMemory,
+  ProjectDescriptionsMemory
 );
 
 const corePorts = (config: PlatformConfig): Layer.Layer<WorkerPorts> =>
@@ -76,7 +79,12 @@ const corePorts = (config: PlatformConfig): Layer.Layer<WorkerPorts> =>
     memoryFrontPage,
     // The D1 cartridge: delete this entry and the platform falls back to the memory
     // front page.
-    Layer.mergeAll(FrontPageD1, ProjectionD1, StandingPosturesD1).pipe(
+    Layer.mergeAll(
+      FrontPageD1,
+      ProjectionD1,
+      StandingPosturesD1,
+      ProjectDescriptionsD1
+    ).pipe(
       Layer.provide(D1Client.layer({ db: config.FRONT_PAGE })),
       Layer.orDie
     ),

@@ -6,6 +6,7 @@ import { cannedDrafter } from "@repo/drafting/draft-runs/canned";
 import { withDraftRunsInline } from "@repo/drafting/draft-runs/inline";
 import { AlarmsMemory } from "@repo/project/alarms/memory";
 import { AnswerRunsInline } from "@repo/project/answer-runs/inline";
+import { ProjectDescriptionsMemory } from "@repo/project/description/memory";
 import type { FrontPage } from "@repo/project/front-page";
 import { FinishersFromChecks } from "@repo/project/project";
 import type { Projects } from "@repo/project/projects";
@@ -42,7 +43,12 @@ export const devWorldWith = <Out, E, In extends DevCore>(
   between: Layer.Layer<Out, E, In>,
   start: DateTime.Utc = devStart
 ) =>
-  Layer.mergeAll(DevFrontPage, EvidenceStoreMemory).pipe(
+  // Descriptions kept as the platform keeps them, so a list reads each landed project once per landing.
+  Layer.mergeAll(
+    DevFrontPage,
+    EvidenceStoreMemory,
+    ProjectDescriptionsMemory
+  ).pipe(
     Layer.provideMerge(between),
     Layer.provideMerge(core),
     Layer.provideMerge(devClockAt(start)),

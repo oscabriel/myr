@@ -209,6 +209,11 @@ export const ProjectStoreMemory = Layer.effect(
             ? Option.none()
             : Option.some(yield* Tables.landings.decode(row.body));
         }),
+      landingCount: () =>
+        Effect.map(
+          SynchronizedRef.get(ref),
+          (state) => rowsIn(state, Tables.landings).size
+        ),
       layerReadsSince: (seq, limit) =>
         Effect.gen(function* () {
           const reads = yield* all(

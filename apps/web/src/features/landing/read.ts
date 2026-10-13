@@ -27,7 +27,7 @@ export const readLandingProjects = readProjects((projects) =>
   listedProjects(projects)
 );
 
-/** Every public project, in the landing's order. */
+/** Every public project, as the platform lists them: Explore groups and orders them. */
 export const readEveryProject = readProjects((projects) =>
-  listedProjects(projects, projects.length)
+  LandingProjects.cases.Listed.make({ projects })
 );

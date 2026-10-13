@@ -88,6 +88,7 @@ import { ForkRef } from "@repo/protocol/domain/code";
 import {
   AtLeastOne,
   ConfigFile,
+  NoneOrMore,
   RefNameText,
 } from "@repo/protocol/domain/common";
 import type { Evidence } from "@repo/protocol/domain/common";
@@ -378,6 +379,8 @@ export interface ProjectApi extends AnswerQueue, DeciderApi {
     sha: CommitSha
   ) => Effect.Effect<{ readonly landing: LandingView }, UnknownCommit>;
   readonly head: () => Effect.Effect<{ readonly landed?: LandedSha }>;
+  /** How many landings the platform has made on main, every one it keeps. */
+  readonly landingCount: () => Effect.Effect<number>;
   readonly forks: () => Effect.Effect<readonly ForkRef[]>;
   readonly standing: () => Effect.Effect<StandingNow>;
   readonly policy: () => Effect.Effect<PolicyStatus>;
@@ -621,6 +624,7 @@ export const MethodSchemas = {
     error: LandingOf.errorSchema,
     success: LandingOf.successSchema,
   },
+  landingCount: { args: [], error: Schema.Never, success: NoneOrMore },
   landings: {
     args: [Schema.Array(CommitSha).check(Schema.isMaxLength(MAX_LANDINGS))],
     error: Schema.Never,
@@ -5185,6 +5189,8 @@ export const projectService = (
             })
           )
         ),
+      landingCount: () =>
+        checked(MethodSchemas.landingCount, [], store.landingCount()),
       landings: (shas) =>
         checked(
           MethodSchemas.landings,

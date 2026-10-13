@@ -19,7 +19,7 @@ const children = (value: Schema.Json): readonly Schema.Json[] => {
   return isJsonObject(value) ? Object.values(value) : [];
 };
 
-const nested = (value: Schema.Json): readonly Schema.Json[] => [
+export const nested = (value: Schema.Json): readonly Schema.Json[] => [
   value,
   ...children(value).flatMap(nested),
 ];

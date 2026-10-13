@@ -84,6 +84,7 @@ export const ProjectCalls = byMethod({
   initProject: callOf(MethodSchemas.initProject),
   land: callOf(MethodSchemas.land),
   landing: callOf(MethodSchemas.landing),
+  landingCount: callOf(MethodSchemas.landingCount),
   landings: callOf(MethodSchemas.landings),
   layerAccess: callOf(MethodSchemas.layerAccess),
   layerFacts: callOf(MethodSchemas.layerFacts),

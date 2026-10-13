@@ -11,6 +11,7 @@ import {
   whyOf,
 } from "@repo/project/code";
 import type { CodeProject } from "@repo/project/code";
+import { landedProjectOf, withDescriptions } from "@repo/project/description";
 import { FrontPage } from "@repo/project/front-page";
 import type { ProjectApi } from "@repo/project/project";
 import { Projects } from "@repo/project/projects";
@@ -247,6 +248,14 @@ export const devHandlers: Layer.Layer<
         frontPage.projects().pipe(
           Effect.flatMap(withStandingPosture),
           Effect.provideService(Projects, projects),
+          Effect.flatMap((listed) =>
+            withDescriptions(listed, (project) =>
+              Effect.map(projects.get(project), (api) =>
+                landedProjectOf(api, project)
+              )
+            )
+          ),
+          Effect.provideService(RepoHost, host),
           Effect.map((listed) => ({ projects: listed }))
         ),
       listRefs: ({ project }) => code(project, refsOf),

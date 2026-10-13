@@ -549,6 +549,12 @@ The platform's own label, never rewritten, through the state badge: a lock and t
 - **Names:** a project is named in full wherever a page names it, `<owner>/<name>`; the owner is never dropped. A field that holds the namespace is labelled "Owner".
 - **Words:** "Import a repo" is the page at `/import` and every link to it; "Imported from" heads an import's source fact. The glossary's avoided words for an import (mirror, fork of the source, sync) stay banned.
 
+### Explore
+
+- **Where:** `/explore`, in the site shell: one page for every reader, which the edge keeps (`branchPage`). It lists projects; `/asks` lists asks.
+- **Shape:** the title and one line under it (how many public projects, and a link to every open ask), then two groups, each an h2 with a line under it and a grid of cards (one column on a phone, two from `tablet`, three from `columns`): **Taking answers now** (projects with an open ask) and **Other projects**. Each group puts the latest landing first, a project not yet landed last, and a tie by name. When no project has an open ask, the first group says so as an empty state.
+- **Card:** the full name (the owner muted, the name at 600) linking the project, its posture (`PostureBadge`), its description, then under a hairline its open asks ("3 open asks", or "No open asks"), its landings ("12 landings", left out when the project has not landed or its record was not read) and when it last landed, as a day ("Last landed Oct 12, 2026"), never a span: a page the edge keeps would go stale saying "5 min ago". The description is the first paragraph of the README on main as plain text, at most 160 characters (`ProjectDescription`), shown at most two lines. The count of landings is the project's record's, read with the README and kept beside it until the next landing. No stars, follows, scores or activity sparklines.
+
 ### The landing
 
 - **Where:** `/`, in the site shell (ADR 0041 amends ADR 0030's bare page). A reader who carries a session is sent to `/inbox`.
