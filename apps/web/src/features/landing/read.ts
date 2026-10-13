@@ -6,7 +6,7 @@ import { Client } from "@repo/protocol/contracts";
 import type { ProjectListing } from "@repo/protocol/domain/front-page";
 import { DateTime, Effect } from "effect";
 
-import { landedLatest, LandingNow } from "./landing-now.ts";
+import { LANDINGS_SHOWN, LandingNow } from "./landing-now.ts";
 import { LandingProjects } from "./projects.ts";
 
 const readProjects = (
@@ -28,15 +28,15 @@ export const readEveryProject = readProjects((projects) =>
   LandingProjects.cases.Listed.make({ projects })
 );
 
-/** The landing's "landing now": the projects that landed last, read at one instant. */
+/** The landing's "landing now": the latest landings and refused answers, as the platform orders them, read at one instant. */
 export const readLandingNow: Effect.Effect<LandingNow, never, Client> =
   Effect.gen(function* () {
     const client = yield* Client;
-    const { projects } = yield* client.listProjects({});
+    const { landings } = yield* client.recentLandings({});
 
     return LandingNow.cases.Listed.make({
+      landings: landings.slice(0, LANDINGS_SHOWN),
       now: yield* DateTime.now,
-      projects: landedLatest(projects),
     });
   }).pipe(
     Effect.catchCause(() =>
