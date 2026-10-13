@@ -189,7 +189,7 @@ export const ClaimFacts = ({
   );
 };
 
-const runs = Match.type<StageName>().pipe(
+export const stageRuns = Match.type<StageName>().pipe(
   Match.when(
     "parse",
     () => "Who may push what: the branch, the pusher and their claim."
@@ -266,7 +266,7 @@ export const GateFacts = (
                   {stageNames(stage).label}
                 </dt>
                 <dd className="text-label text-muted-foreground font-normal">
-                  {runs(stage)}
+                  {stageRuns(stage)}
                 </dd>
               </div>
             ))}

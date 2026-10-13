@@ -4,6 +4,7 @@ import { Effect } from "effect";
 
 import design from "../../../DESIGN.md?raw";
 import { PathTrail } from "../src/features/code/file-header.tsx";
+import { ProjectFrame } from "../src/features/project/project-frame.tsx";
 import {
   STATE_MARK_NAMES,
   STATE_MARKS,
@@ -136,14 +137,26 @@ const LAYOUT = [
   "measure",
   "top-bar",
   "toolbar",
+  "tabs",
 ] as const;
 
-/** Every class the shell draws at an address, the page itself left empty. */
+const PROJECT = "/oscabriel/";
+
+/**
+ * Every class the shell draws at an address, the page itself left empty. A
+ * project's page sits in the project's frame, which holds its side column.
+ */
 const shellClasses = (url: string) =>
   renderAt(
     url,
     <AppShell>
-      <main id="main" />
+      {url.startsWith(PROJECT) ? (
+        <ProjectFrame>
+          <main id="main" />
+        </ProjectFrame>
+      ) : (
+        <main id="main" />
+      )}
     </AppShell>,
     { column: () => <p>Files</p> }
   ).pipe(

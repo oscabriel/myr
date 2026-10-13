@@ -127,6 +127,7 @@ spacing:
   measure: "72ch"
   top-bar: "3.5rem"
   toolbar: "2.5rem"
+  tabs: "2.75rem"
   row-phone: "88px"
 components:
   top-bar:
@@ -429,7 +430,7 @@ Square. The radius is 2 px (`--radius: 0.125rem`), and shadcn's base-lyra compon
 
 ### Project header and tabs
 
-- **Header:** the name (`owner / project`, the owner muted, both in the UI sans at Headline size), the posture (`PostureBadge`), the description (the README's first sentence), a facts row in UI type, muted (open asks, last landing, latest tag, licence if known, deciders), and three actions at the right: **Watch** (a popover: what to follow, plus `myr watch --project`), **Clone** (a popover: the `git clone` URL, `myr claim <ask> --project`, and that forks come with a claim), **Contribute** (a popover: take an ask, propose an ask, read the policy). It never changes between tabs.
+- **Header:** the name (`owner / project`, the owner muted, both in the UI sans at Headline size), the posture (`PostureBadge`), the description (the README's first sentence), a facts row in UI type, muted (open asks, last landing, latest tag, licence if known, deciders), and three actions at the right: **Watch** (a popover: what already follows the project, this page and its events, plus `myr status --project` for your own claims and answers; the CLI has no watch command), **Clone** (a popover: the `git clone` URL, `myr claim <ask> --project`, and that forks come with a claim), **Contribute** (a popover: take an ask, propose an ask, read the policy). It never changes between tabs.
 - **Tabs:** Overview · Code · Asks · Landings · Proposals · People · Policy · Visibility, each a text tab with its count in label type; the current one ink at 500 with a 2 px ink underline (the one current-tab style of the whole web), the rest muted. The header and tabs stick under the top bar together; on a phone the tabs scroll sideways inside their own strip.
 - **Overview** (the default tab): open asks, recent landings and the README in the main column; the about column (`--column-about`) with clone, how a change lands (the seven stages), who decides, a visibility summary and languages.
 - **Code:** under the header, a Files/Commits toggle, the ref switcher (`main`, tags, and answers in forks, ADR 0043), the HEAD commit bar, go to file, and the file tree in `--column-tree`.
