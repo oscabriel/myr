@@ -541,7 +541,11 @@ The platform's own label, never rewritten, through the state badge: a lock and t
 
 ### Theme preference
 
-Light and dark follow the system by default. On `/settings` (Appearance) a reader may choose "Same as system" or "Opposite of system", each shown with what it resolves to now ("Light", "Dark"). It lives in `localStorage`, never a cookie (a cookie would take every page out of the edge cache), and one inline script in the head sets `data-theme` before first paint (ADR 0042).
+Light and dark follow the system by default. On `/settings` (Appearance) a reader may choose "Same as system" or "Opposite of system", each shown with what it resolves to now ("Light", "Dark") and following the system as it turns. There is no "always light" or "always dark". It lives in `localStorage` (`theme.preference`), never a cookie (a cookie would take every page out of the edge cache), and is not synced to the account (ADR 0042).
+
+- **The script:** one inline script in the head (`THEME_SCRIPT` in `features/shared/theme.ts`, no imports, under 640 bytes) resolves the theme as `resolveTheme` does and sets `data-theme="light"` or `"dark"` on `<html>` before first paint, colours both `theme-color` metas for it, and runs again when the system's scheme changes or another tab writes the choice. The web sets no Content-Security-Policy on its pages; one that is added lists `THEME_SCRIPT_SOURCE`, the script's hash, which `apps/web/test/theme.test.ts` holds to its text.
+- **The stylesheet:** the `dark` variant reads `data-theme`, and the `prefers-color-scheme` media query stands in only where no attribute is set (the script never ran). The dark palette is written once, under the variant, so nothing sets a colour by the system's scheme alone, and `data-theme="light"` on a dark system draws the light palette. `color-scheme` follows the resolved theme, and Pierre's shadow roots inherit it. `apps/web/test/tokens.test.ts` expands the variant with Tailwind and measures both palettes as drawn under the attribute.
+- **The control:** two radios in a fieldset, each a plain bordered row with the choice, then the theme it gives, muted, at the right. The server cannot see the system, so it names no theme until the page is up.
 
 ### The platform's own pages
 
