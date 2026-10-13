@@ -35,11 +35,13 @@
   "upload_source_maps": true,
   "workers_dev": true,
   "preview_urls": false,
-  // Every invocation's logs, unsampled, and Issues, which groups what
-  // failed. Traces stay off: the runtime's own spans record each Durable
-  // Object SQL statement's bound values and each fetch's full URL, and the
-  // Project DO's rows hold layer names and repos and sealed values, which no
-  // trace may (principle 7). Turning them on needs the maintainer's sign-off.
+  // Every invocation's logs and trace, unsampled, and Issues, which groups
+  // what failed. The runtime's own spans record each Durable Object SQL
+  // statement's bound values and each fetch's full URL, so these traces hold
+  // the Project DO's layer names and repos and sealed values (never a plain
+  // one). The maintainer keeps them in the account's trace store alone: no
+  // `destinations`, and no Issues automation sends the platform's anywhere
+  // (principle 7).
   // Unlike bindings, wrangler gives `observability` and `upload_source_maps`
   // to every stage that does not set its own
   // (packages/config/test/observability.test.ts holds each stage to them).
@@ -50,7 +52,7 @@
       "head_sampling_rate": 1,
       "invocation_logs": true,
     },
-    "traces": { "enabled": false },
+    "traces": { "enabled": true, "head_sampling_rate": 1 },
     "issues": { "enabled": true },
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Project"] }],

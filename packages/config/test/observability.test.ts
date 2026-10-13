@@ -45,26 +45,30 @@ const Recorded = Schema.Struct({
 
 const isRecorded = Schema.is(Recorded);
 
-// Its trace: every invocation's, or none.
+// Its trace: every invocation's, kept in the account.
+const unsampled = {
+  enabled: Schema.Literal(true),
+  head_sampling_rate: Schema.Literal(1),
+  persist: Schema.optionalKey(Schema.Literal(true)),
+};
+
 const Traces = {
-  off: Schema.Struct({
-    traces: Schema.Struct({ enabled: Schema.Literal(false) }),
-  }),
-  unsampled: Schema.Struct({
+  // Sent nowhere: a destination would take it out of the account.
+  kept: Schema.Struct({
     traces: Schema.Struct({
-      enabled: Schema.Literal(true),
-      head_sampling_rate: Schema.Literal(1),
-      persist: Schema.optionalKey(Schema.Literal(true)),
+      ...unsampled,
+      destinations: Schema.optionalKey(Schema.Never),
     }),
   }),
+  unsampled: Schema.Struct({ traces: Schema.Struct(unsampled) }),
 };
 
 // The runtime's own spans record each Durable Object SQL statement's bound
-// values and each fetch's full URL. The platform's Project DO holds layer
-// names and repos and sealed values, and the platform fetches layer repos,
-// so its traces stay off until the maintainer signs off (principle 7).
+// values and each fetch's full URL, so the platform's traces hold layer
+// names and repos and sealed values. The maintainer keeps them, in the
+// account's own trace store alone (principle 7).
 const TRACING: Readonly<Record<Worker, keyof typeof Traces>> = {
-  platform: "off",
+  platform: "kept",
   sandbox: "unsampled",
   web: "unsampled",
 };
@@ -130,7 +134,7 @@ describe("every Worker, in every stage", () => {
   );
 
   it.effect(
-    "traces each invocation, unsampled, but the platform, which traces none",
+    "traces each invocation, unsampled, and sends the platform's nowhere",
     () =>
       Effect.gen(function* () {
         const all = yield* everyStage;
