@@ -7,7 +7,7 @@ import {
 } from "@repo/protocol/contracts";
 import { Context } from "effect";
 
-import { synopsisLine } from "../agent-setup.ts";
+import { endpointLines, limitLines, synopsisLine } from "../agent-setup.ts";
 import { events, gitHere, landing, refusals } from "../llms-sections.ts";
 import { exitCodeSection } from "../refusals.ts";
 import { code, table } from "../text.ts";
@@ -74,6 +74,16 @@ export const mcpPage: DocSource = {
     "",
   ],
   slug: "mcp",
+};
+
+export const limitsPage: DocSource = {
+  body: (input) => [
+    "These are the defaults: a project's policy can change any of them, and each project shows its own. Past a cap the platform refuses with `CapReached` (see [Refusals](/docs/refusals)).",
+    "",
+    ...limitLines(),
+    ...endpointLines(input),
+  ],
+  slug: "limits",
 };
 
 export const importedPage: DocSource = {

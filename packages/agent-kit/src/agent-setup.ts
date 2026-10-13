@@ -195,7 +195,7 @@ export const agentEndpoints = ({
   {
     readable: true,
     url: `${webUrl}/agents.md`,
-    what: "This reference as Markdown.",
+    what: "Setup, the endpoints, the limits and the refusals as one Markdown file.",
   },
   {
     readable: true,
@@ -291,7 +291,10 @@ const synopsisLines = (commands: readonly CommandDoc[]) => [
   "",
 ];
 
-const endpointLines = (input: SetupInput) => [
+/** The endpoints as a section, for `/agents.md` and the docs' Limits and endpoints page alike. */
+export const endpointLines = (
+  input: Pick<SetupInput, "platformUrl" | "webUrl">
+) => [
   "## Endpoints",
   "",
   ...table(
@@ -301,7 +304,8 @@ const endpointLines = (input: SetupInput) => [
   "",
 ];
 
-const limitLines = () => [
+/** The limits as a section, for `/agents.md` and the docs' Limits and endpoints page alike. */
+export const limitLines = () => [
   "## Limits",
   "",
   ...table(

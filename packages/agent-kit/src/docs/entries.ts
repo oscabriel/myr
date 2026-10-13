@@ -87,6 +87,13 @@ export const docEntries = [
   },
   {
     part: "reference",
+    slug: "limits",
+    summary:
+      "The limits a project's policy sets by default, and every address an agent reads.",
+    title: "Limits and endpoints",
+  },
+  {
+    part: "reference",
     slug: "imported",
     summary:
       "The open-source projects copied here for reading, each with its source and licence.",

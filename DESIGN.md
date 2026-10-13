@@ -550,7 +550,7 @@ The platform's own label, never rewritten, through the state badge: a lock and t
 
 - **Where:** `/install`, in the site shell; the old `/agents` is a 301 to it, and `/agents.md`, `/llms.txt` and `/llms-full.txt` keep answering.
 - **Shape:** the title and one line under it, then one card per way in, two across from `columns` and stacked below: the CLI (the install script, npm, signing in), the MCP server (Claude Code, Cursor, VS Code and stdio as tabs, every panel in the HTML), skills, text for agents (`llms.txt`, `llms-full.txt`, Markdown by `Accept`), git over HTTPS with the CLI as its credential helper (no SSH keys), the web (signing in), and the pi extension, planned, on a dashed border with no command. Each card says who it is for after its title, never above it.
-- **Source:** every card, snippet and link is `installChannels` in `@repo/agent-kit` (`apps/web/test/agents.test.tsx`); the page draws no command of its own. The command synopsis lives at Docs › Commands.
+- **Source:** every card, snippet and link is `installChannels` in `@repo/agent-kit` (`apps/web/test/agents.test.tsx`); the page draws no command of its own. The command synopsis lives at Docs › Commands, and the endpoints and the policy's default limits at Docs › Limits and endpoints, which the text card links. The web card's sign-in link returns the reader to `/install`, as the top bar's does.
 
 ### Theme preference
 

@@ -5,6 +5,7 @@ import type { ProjectEvent } from "@repo/protocol/domain/event";
 import { groups } from "@repo/protocol/refusal";
 import { Context, Option } from "effect";
 
+import { agentEndpoints, agentLimits } from "../src/agent-setup.ts";
 import { commandDocs } from "../src/command-doc.ts";
 import { importedProjects } from "../src/docs/imported.ts";
 import { docEntries, docPage, docPages } from "../src/docs/index.ts";
@@ -64,6 +65,7 @@ describe("the docs", () => {
       ["reference", "landing", "How a landing happens"],
       ["reference", "events", "Events"],
       ["reference", "mcp", "MCP tools"],
+      ["reference", "limits", "Limits and endpoints"],
       ["reference", "imported", "Imported projects"],
     ]);
 
@@ -211,6 +213,26 @@ describe("the reference", () => {
     expect(served).toContain("readFile");
     expect(
       served.filter((tag) => !markdown.includes(`\`${tag}\``))
+    ).toStrictEqual([]);
+  });
+
+  it("names every limit and endpoint agent-kit gives, each with its value or what it is", () => {
+    const markdown = markdownOf("limits");
+
+    expect(agentLimits().length).toBeGreaterThan(4);
+    expect(
+      agentLimits()
+        .filter(
+          ({ limit, value }) => !markdown.includes(`| ${limit} | ${value} |`)
+        )
+        .map(({ limit }) => limit)
+    ).toStrictEqual([]);
+    expect(
+      agentEndpoints(input)
+        .filter(
+          ({ url, what }) => !markdown.includes(`| \`${url}\` | ${what} |`)
+        )
+        .map(({ url }) => url)
     ).toStrictEqual([]);
   });
 

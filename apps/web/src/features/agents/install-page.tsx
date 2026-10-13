@@ -14,14 +14,17 @@ import {
   TabsList,
   TabsTrigger,
 } from "../../components/ui/tabs.tsx";
+import { signInHref } from "../auth/session-slot.tsx";
 import { LINK } from "../shared/classes.ts";
 import { CommandLine } from "../shared/command.tsx";
 import { useCopy } from "../shared/copy-action.tsx";
 import { AppLink } from "../shared/link.tsx";
-import { docsPath, EXPLORE_PATH } from "../shared/paths.ts";
+import { docsPath, EXPLORE_PATH, INSTALL_PATH } from "../shared/paths.ts";
 import { GUTTER } from "../shared/shell/gutter.ts";
 
 export const INSTALL_TITLE = "Install";
+
+const SIGN_IN_PATH = "/auth/signin";
 
 export const INSTALL_LEDE =
   "Every way in reaches the same gate and hears the same refusals. Install the CLI for a terminal, connect an agent over MCP, or point anything that reads text at llms.txt.";
@@ -96,14 +99,18 @@ const SnippetTabs = ({
   </Tabs>
 );
 
-/** A page of the web through the router; a file the web serves as a plain link. */
+/** Signing in brings the reader back here, as the top bar's control does. */
+export const installHref = ({ path }: InstallLink) =>
+  path === SIGN_IN_PATH ? signInHref(INSTALL_PATH) : path;
+
+/** A page of the web through the router; a file or a server page the web serves as a plain link. */
 const Reference = ({ link }: { readonly link: InstallLink }) =>
   link.page ? (
     <AppLink className={`text-foreground ${LINK}`} to={link.path}>
       {link.label}
     </AppLink>
   ) : (
-    <a className={`text-foreground ${LINK}`} href={link.path}>
+    <a className={`text-foreground ${LINK}`} href={installHref(link)}>
       {link.label}
     </a>
   );
@@ -145,8 +152,11 @@ const ChannelCard = ({ channel }: { readonly channel: InstallChannel }) => (
     }`}
   >
     <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
-      {/* The anchor's target: its margin clears the sticky top bar. */}
-      <h2 className="text-title scroll-mt-20" id={channel.id}>
+      {/* The anchor's target: its margin clears the sticky top bar, with room above the title. */}
+      <h2
+        className="text-title scroll-mt-[calc(var(--top-bar)+1.5rem)]"
+        id={channel.id}
+      >
         {channel.title}
       </h2>
       <p className="text-label text-muted-foreground ml-auto">

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import { commandDocs } from "@repo/agent-kit/command-doc";
+import { agentEndpoints, agentLimits } from "@repo/agent-kit/agent-setup";
 import { docPage, docPages } from "@repo/agent-kit/docs/index";
 import { Brand } from "@repo/brand";
 import { Contracts } from "@repo/protocol/contracts";
@@ -259,6 +260,27 @@ describe("a page of the docs", () => {
       expect(markup).toContain("<table");
       expect(markup).toContain("<code>OutOfScope</code>");
     })
+  );
+
+  it.effect(
+    "draws every limit and endpoint agent-kit gives on the Limits and endpoints page",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* renderAt(
+          "/docs/limits",
+          <DocsPageView page={pageNamed("limits")} />
+        );
+
+        const text = textOf(markup);
+
+        expect(markup.match(/<table/gu)).toHaveLength(2);
+        expect(
+          [
+            ...agentLimits().flatMap(({ limit, value }) => [limit, value]),
+            ...agentEndpoints(input).flatMap(({ url, what }) => [url, what]),
+          ].filter((words) => !text.includes(words))
+        ).toStrictEqual([]);
+      })
   );
 
   it("names its Markdown in its head, with its summary as its description", () => {

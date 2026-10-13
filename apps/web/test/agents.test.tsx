@@ -1,5 +1,6 @@
 // The setup page moved from `/agents` to `/install` (ADR 0041); its guarantee moved with it: every snippet and command
-// on the page is `@repo/agent-kit`'s.
+// on the page is `@repo/agent-kit`'s. Its endpoints and limits moved to the docs' Limits and endpoints page, held by
+// `docs.test.tsx` and agent-kit's `docs.test.ts`.
 import { describe, expect, it } from "@effect/vitest";
 import { agentSetupMarkdown } from "@repo/agent-kit/agent-setup";
 import { installChannels } from "@repo/agent-kit/install-channels";
@@ -7,7 +8,10 @@ import { isRedirect } from "@tanstack/react-router";
 import { Effect, Option } from "effect";
 
 import { commands } from "../src/features/agents/catalog.ts";
-import { InstallView } from "../src/features/agents/install-page.tsx";
+import {
+  installHref,
+  InstallView,
+} from "../src/features/agents/install-page.tsx";
 import { getRouter } from "../src/router.tsx";
 import { agentsLoader } from "../src/routes/agents.tsx";
 import { agentsMarkdownHandler } from "../src/routes/agents[.]md.ts";
@@ -102,8 +106,8 @@ describe("the Install page", () => {
         ).toStrictEqual(channels.map(({ id, title }) => [id, title]));
 
         for (const { groups: found } of headings) {
-          expect(found?.attributes, `#${found?.id}`).toMatch(
-            /\bscroll-mt-\d+\b/u
+          expect(found?.attributes, `#${found?.id}`).toContain(
+            "scroll-mt-[calc(var(--top-bar)+"
           );
         }
 
@@ -184,20 +188,25 @@ describe("the Install page", () => {
   );
 
   it.effect(
-    "links each channel's references, the commands at the docs, and signing in on the web",
+    "links each channel's references, the commands and the limits at the docs, and signing in back to /install",
     () =>
       Effect.gen(function* () {
         const html = yield* page;
 
         expect(
           channels
-            .flatMap(({ id, links }) => links.map(({ path }) => ({ id, path })))
+            .flatMap(({ id, links }) =>
+              links.map((link) => ({ href: installHref(link), id }))
+            )
             .filter(
-              ({ id, path }) => !sectionOf(html, id).includes(`href="${path}"`)
+              ({ href, id }) => !sectionOf(html, id).includes(`href="${href}"`)
             )
         ).toStrictEqual([]);
         expect(sectionOf(html, "cli")).toContain('href="/docs/commands"');
-        expect(sectionOf(html, "web")).toContain('href="/auth/signin"');
+        expect(sectionOf(html, "text")).toContain('href="/docs/limits"');
+        expect(sectionOf(html, "web")).toContain(
+          'href="/auth/signin?return=%2Finstall"'
+        );
       })
   );
 });

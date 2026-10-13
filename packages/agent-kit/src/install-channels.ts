@@ -113,6 +113,7 @@ const text = (input: SetupInput) =>
       { label: "llms.txt", page: false, path: "/llms.txt" },
       { label: "llms-full.txt", page: false, path: "/llms-full.txt" },
       { label: "agents.md", page: false, path: "/agents.md" },
+      { label: "Limits and endpoints", page: true, path: "/docs/limits" },
     ],
     snippets: [
       ...anyAgent(input).snippets,
