@@ -14,7 +14,7 @@ import {
 import { docsHead } from "../src/features/docs/head.ts";
 import { AppShell } from "../src/features/shared/shell/app-shell.tsx";
 import { docsMarkdownHandler } from "../src/routes/docs/{$page}[.]md.ts";
-import { textIn } from "./markup.ts";
+import { attributeOf, tagsWith, textIn } from "./markup.ts";
 import { renderAt } from "./render.tsx";
 
 const input = {
@@ -126,6 +126,54 @@ describe("a page of the docs in the docs shell", () => {
         });
         expect(contentsOf(markup)).toStrictEqual(headingsOf(markup));
       })
+  );
+});
+
+/** The classes on the docs tree's wrapper. */
+const treeClasses = (tag: string) =>
+  (attributeOf(tag, "class") ?? "").split(" ");
+
+describe("the docs below `columns`", () => {
+  it.effect(
+    "fold a page's headings into a disclosure ahead of its body, linking what On this page links",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* inDocsShell("start-here");
+        const ahead = elementOf(markup, "details", 'class="');
+        const article = elementOf(markup, "article", "data-doc");
+
+        expect(ahead).toContain("columns:hidden");
+        expect(
+          linksOf(ahead).map(({ href, text }) => [href.slice(1), text])
+        ).toStrictEqual(contentsOf(markup));
+        expect(article.indexOf("<details")).toBeLessThan(
+          article.indexOf("<h2")
+        );
+      })
+  );
+
+  // The index already lists every page, so the tree under it would say it twice.
+  it.effect("show no tree under the index, and the tree under a page", () =>
+    Effect.gen(function* () {
+      const index = tagsWith(
+        yield* renderAt(
+          "/docs",
+          <AppShell>
+            <DocsIndexView pages={pages} />
+          </AppShell>
+        ),
+        "data-docs-tree"
+      );
+
+      const page = tagsWith(yield* inDocsShell("landing"), "data-docs-tree");
+
+      expect(
+        ["hidden", "columns:block"].filter(
+          (name) => !index.flatMap(treeClasses).includes(name)
+        )
+      ).toStrictEqual([]);
+      expect(page.flatMap(treeClasses)).not.toContain("hidden");
+    })
   );
 });
 

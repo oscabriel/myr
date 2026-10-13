@@ -181,7 +181,7 @@ export const InstallView = (input: SetupInput) => (
         {INSTALL_LEDE}
       </p>
     </div>
-    <div className="columns:grid-cols-2 grid gap-5">
+    <div className="columns:grid-cols-2 grid items-start gap-5">
       {installChannels(input).map((channel) => (
         <ChannelCard channel={channel} key={channel.id} />
       ))}

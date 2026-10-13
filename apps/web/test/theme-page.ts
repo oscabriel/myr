@@ -121,6 +121,8 @@ export const themePage = (system: Theme) => {
         listener({ key });
       }
     },
+    /** The system's own scheme, as the head script names it. */
+    system: () => root.system,
     theme: () => root.theme,
     /** The system turns the other way, as at sunset. */
     turnSystem: () => {

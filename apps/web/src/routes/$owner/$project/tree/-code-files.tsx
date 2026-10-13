@@ -31,6 +31,7 @@ import {
   treeHref,
   whyHref,
 } from "../../../../features/code/paths.ts";
+import { TreeSkeleton } from "../../../../features/code/tree-skeleton.tsx";
 
 const isProject = Schema.is(ProjectName);
 
@@ -124,14 +125,23 @@ const ProjectTree = ({
 
   useCodeFileKeys(ordered, path, open);
 
-  return shown && paths !== undefined ? (
+  if (!shown) {
+    return null;
+  }
+
+  if (AsyncResult.isInitial(read)) {
+    return <TreeSkeleton />;
+  }
+
+  return paths === undefined ? null : (
     <ClientTree
       current={path}
+      fallback={<TreeSkeleton />}
       key={`${project}@${rev}`}
       onOpen={open}
       paths={paths}
     />
-  ) : null;
+  );
 };
 
 export const CodeFiles = ({
@@ -145,7 +155,7 @@ export const CodeFiles = ({
   return project === undefined ? null : (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="min-h-0 flex-1 pt-3">
-        <ClientOnly fallback={null}>
+        <ClientOnly fallback={<TreeSkeleton />}>
           <ProjectTree
             kind={kind}
             path={path}
@@ -199,6 +209,7 @@ export const CommitFiles = ({
       <ClientTree
         counts={counts}
         current={current}
+        fallback={<TreeSkeleton />}
         key={paths.join("\n")}
         onOpen={open}
         open

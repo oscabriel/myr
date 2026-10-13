@@ -1,9 +1,11 @@
 import { useHydrated, useLocation } from "@tanstack/react-router";
+import { cn } from "cn";
 import { Suspense, useCallback, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
 import { KeysProvider } from "../keys.tsx";
 import { SkipLink } from "../layout.tsx";
+import { docsPath } from "../paths.ts";
 import { ShellContext, ShellReadsContext } from "./context.ts";
 import type { Overlay, ShellReads } from "./context.ts";
 import { DocsNav } from "./docs-nav.tsx";
@@ -24,19 +26,33 @@ const ProjectContainer = ({ children }: { readonly children: ReactNode }) => (
   </div>
 );
 
-/** The article first, so it is read first; from `columns` the tree stands to its left. */
-const DocsFrame = ({ children }: { readonly children: ReactNode }) => (
-  <div className="columns:grid columns:grid-cols-[var(--column-docs-nav)_minmax(0,1fr)] max-w-site mx-auto flex w-full flex-1 flex-col">
-    <div className="columns:col-start-2 columns:row-start-1 flex min-w-0 flex-col">
-      {children}
+/**
+ * The article first, so it is read first; from `columns` the tree stands to its left. Below `columns` the index
+ * shows no tree under itself: the index already lists every page.
+ */
+const DocsFrame = ({ children }: { readonly children: ReactNode }) => {
+  const index = useLocation({
+    select: ({ pathname }) => pathname.replace(/\/$/u, "") === docsPath(),
+  });
+
+  return (
+    <div className="columns:grid columns:grid-cols-[var(--column-docs-nav)_minmax(0,1fr)] max-w-site mx-auto flex w-full flex-1 flex-col">
+      <div className="columns:col-start-2 columns:row-start-1 flex min-w-0 flex-col">
+        {children}
+      </div>
+      <div
+        className={cn(
+          "border-rule columns:col-start-1 columns:row-start-1 columns:sticky columns:top-(--top-bar) columns:self-start columns:max-h-[calc(100dvh-var(--top-bar))] columns:overflow-y-auto columns:block columns:border-t-0 border-t py-6",
+          index && "hidden",
+          GUTTER
+        )}
+        data-docs-tree={index ? "index" : "page"}
+      >
+        <DocsNav />
+      </div>
     </div>
-    <div
-      className={`border-rule columns:col-start-1 columns:row-start-1 columns:sticky columns:top-(--top-bar) columns:self-start columns:max-h-[calc(100dvh-var(--top-bar))] columns:overflow-y-auto columns:border-t-0 border-t py-6 ${GUTTER}`}
-    >
-      <DocsNav />
-    </div>
-  </div>
-);
+  );
+};
 
 const FRAMES = {
   docs: DocsFrame,

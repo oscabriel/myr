@@ -109,9 +109,11 @@ export const applyTheme = (document: ThemeDocument, theme: Theme) => {
  * colours a `theme-color` meta of its own, and does it again when the
  * system's scheme changes or another tab writes the preference. Plain ES5
  * with no imports; where it never runs, the stylesheet's media query and the
- * rendered metas are the fallback. `test/theme.test.ts` runs it.
+ * rendered metas are the fallback. It also names the system's own scheme in
+ * `data-system`, so /settings can show what each choice gives before React
+ * runs. `test/theme.test.ts` runs it.
  */
-export const THEME_SCRIPT = `(function(){var d=document,m=matchMedia(${JSON.stringify(DARK_SCHEME_QUERY)}),c=${JSON.stringify(themeColors)};function a(){var p,s;try{p=localStorage.getItem(${JSON.stringify(THEME_PREFERENCE_KEY)})}catch(x){}var t=m.matches!==(p==="opposite")?"dark":"light";d.documentElement.dataset.theme=t;s="meta[data-theme-color]";if(!d.querySelector(s))d.head.insertAdjacentHTML("afterbegin",${JSON.stringify(THEME_META)});d.querySelector(s).setAttribute("content",c[t])}a();m.addEventListener("change",a);addEventListener("storage",a)})()`;
+export const THEME_SCRIPT = `(function(){var d=document,m=matchMedia(${JSON.stringify(DARK_SCHEME_QUERY)}),c=${JSON.stringify(themeColors)};function a(){var p,s,e=d.documentElement.dataset;try{p=localStorage.getItem(${JSON.stringify(THEME_PREFERENCE_KEY)})}catch(x){}var t=m.matches!==(p==="opposite")?"dark":"light";e.theme=t;e.system=m.matches?"dark":"light";s="meta[data-theme-color]";if(!d.querySelector(s))d.head.insertAdjacentHTML("afterbegin",${JSON.stringify(THEME_META)});d.querySelector(s).setAttribute("content",c[t])}a();m.addEventListener("change",a);addEventListener("storage",a)})()`;
 
 /**
  * The script's hash as a CSP source. The web sets no Content-Security-Policy
@@ -119,4 +121,4 @@ export const THEME_SCRIPT = `(function(){var d=document,m=matchMedia(${JSON.stri
  * to the script's text.
  */
 export const THEME_SCRIPT_SOURCE =
-  "'sha256-AVNSogXudFMj8DxU6fv5GiySiexVFS9KraUSG8LLOSo='";
+  "'sha256-wBIkzc5HrsCSaxUQgB2fHQqInWgTrPnNbdSjB9xjqnk='";

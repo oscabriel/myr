@@ -550,6 +550,28 @@ describe(FrontPageView, () => {
   );
 
   it.effect(
+    "keeps one command box in the strip on a phone, the other two steps as code in the list",
+    () =>
+      Effect.gen(function* () {
+        const strip = stripIn(yield* front({}));
+
+        expect(
+          [
+            ...strip.matchAll(
+              /<code\b[^>]*data-step-text=""[^>]*>(?<command>[^<]*)<\/code>/gu
+            ),
+          ].map(({ groups }) => groups?.command)
+        ).toStrictEqual([
+          `${Brand.cli} check`,
+          `git push ${Brand.slug} HEAD:main`,
+        ]);
+        expect(strip.match(/<div class="max-tablet:hidden">/gu)).toHaveLength(
+          2
+        );
+      })
+  );
+
+  it.effect(
     "puts one strip of three steps above the list, each a command, with a control that dismisses it",
     () =>
       Effect.gen(function* () {

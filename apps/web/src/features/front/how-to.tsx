@@ -89,7 +89,9 @@ const LINK = "decoration-rule underline hover:decoration-current";
 
 /**
  * The strip itself. Its onward line links Install through the router and
- * `llms.txt` as a plain anchor, since `llms.txt` is a server route.
+ * `llms.txt` as a plain anchor, since `llms.txt` is a server route. On a phone
+ * only the first step is a command box; the other two read as code in the
+ * list, so the strip never becomes a column of code blocks (ADR 0041).
  */
 export const HowToTake = ({
   onDismiss,
@@ -119,13 +121,27 @@ export const HowToTake = ({
           <X aria-hidden="true" strokeWidth={1.75} />
         </Button>
       </div>
-      <ol className="columns:grid-cols-3 grid gap-4">
+      <ol className="columns:grid-cols-3 tablet:gap-4 grid gap-3">
         {STEPS.map(({ command, label }, index) => (
           <li className="flex min-w-0 flex-col gap-1" key={command}>
             <p className="text-label text-muted-foreground">
               {index + 1}. {label}
             </p>
-            <CommandLine command={command} numbered />
+            {index === 0 ? (
+              <CommandLine command={command} numbered />
+            ) : (
+              <>
+                <code
+                  className="text-mono tablet:hidden font-mono [overflow-wrap:anywhere]"
+                  data-step-text=""
+                >
+                  {command}
+                </code>
+                <div className="max-tablet:hidden">
+                  <CommandLine command={command} numbered />
+                </div>
+              </>
+            )}
           </li>
         ))}
       </ol>

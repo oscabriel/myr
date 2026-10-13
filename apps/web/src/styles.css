@@ -520,6 +520,22 @@
   }
 }
 
+/*
+  What each theme choice on /settings gives, before React can see the
+  system (ADR 0042): the head script names the system's scheme in
+  data-system, and these name the resolution the same way the component
+  does once it runs. Where the script never ran, nothing is named.
+*/
+:root[data-system="light"] [data-system-resolves="same"]::after,
+:root[data-system="dark"] [data-system-resolves="opposite"]::after {
+  content: "Light";
+}
+
+:root[data-system="dark"] [data-system-resolves="same"]::after,
+:root[data-system="light"] [data-system-resolves="opposite"]::after {
+  content: "Dark";
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

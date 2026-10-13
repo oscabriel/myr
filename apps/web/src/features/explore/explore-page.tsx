@@ -173,7 +173,7 @@ export const ExploreView = ({
       <h1 className="text-headline">{EXPLORE_TITLE}</h1>
       <p className="text-body text-muted-foreground max-w-[72ch]">
         <Lede projects={projects} /> Looking for something to work on?{" "}
-        <AppLink to={ASKS_PATH}>Every open ask</AppLink>
+        <AppLink to={ASKS_PATH}>See every open ask</AppLink>.
       </p>
     </div>
     <Body projects={projects} />

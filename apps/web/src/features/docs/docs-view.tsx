@@ -86,70 +86,99 @@ const CopyMarkdown = ({ markdown }: { readonly markdown: string }) => {
   );
 };
 
-/** The page's headings and its Markdown, beside the article from `columns`, under it below. */
-const OnThisPage = ({ page }: { readonly page: DocPage }) => {
-  const headings = docHeadings(page);
+type Headings = ReturnType<typeof docHeadings>;
 
-  return (
-    <aside
-      aria-label="On this page"
-      className="border-rule columns:sticky columns:top-[calc(var(--top-bar)+1.5rem)] columns:self-start columns:border-t-0 columns:pt-0 columns:mt-0 mt-8 flex min-w-0 flex-col gap-6 border-t pt-6"
-      data-column="toc"
-    >
-      {headings.length === 0 ? null : (
-        <div className="flex flex-col gap-1">
-          <h2 className="text-ui font-semibold">On this page</h2>
-          <ul className="flex flex-col">
-            {headings.map(({ id, text }) => (
-              <li key={id}>
-                {/* An anchor in this page, not a page of its own. */}
-                <a className={CONTENTS_LINK} href={`#${id}`}>
-                  {text}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      <div className="flex flex-col gap-2">
-        <CopyMarkdown markdown={page.markdown} />
-        {/* A server route, not a page of the app. */}
-        <a className={MARKDOWN_LINK} href={docsMarkdownPath(page.slug)}>
-          <FileText aria-hidden="true" strokeWidth={1.75} />
-          View as .md
+const Contents = ({ headings }: { readonly headings: Headings }) => (
+  <ul className="flex flex-col">
+    {headings.map(({ id, text }) => (
+      <li key={id}>
+        {/* An anchor in this page, not a page of its own. */}
+        <a className={CONTENTS_LINK} href={`#${id}`}>
+          {text}
         </a>
-      </div>
-    </aside>
+      </li>
+    ))}
+  </ul>
+);
+
+/**
+ * Below `columns` the headings fold into a disclosure above the article, so a
+ * reader meets them before what they link to, not after.
+ */
+const ContentsAhead = ({ headings }: { readonly headings: Headings }) =>
+  headings.length === 0 ? null : (
+    <details className="border-rule columns:hidden mb-6 border-y py-2">
+      <summary className="text-ui flex min-h-8 cursor-pointer items-center font-semibold">
+        On this page
+      </summary>
+      <Contents headings={headings} />
+    </details>
   );
-};
+
+/** The page's headings and its Markdown, beside the article from `columns`; below, its Markdown under it. */
+const OnThisPage = ({
+  headings,
+  page,
+}: {
+  readonly headings: Headings;
+  readonly page: DocPage;
+}) => (
+  <aside
+    aria-label="On this page"
+    className="border-rule columns:sticky columns:top-[calc(var(--top-bar)+1.5rem)] columns:self-start columns:border-t-0 columns:pt-0 columns:mt-0 mt-8 flex min-w-0 flex-col gap-6 border-t pt-6"
+    data-column="toc"
+  >
+    {headings.length === 0 ? null : (
+      <div className="max-columns:hidden flex flex-col gap-1">
+        <h2 className="text-ui font-semibold">On this page</h2>
+        <Contents headings={headings} />
+      </div>
+    )}
+    <div className="flex flex-col gap-2">
+      <CopyMarkdown markdown={page.markdown} />
+      {/* A server route, not a page of the app. */}
+      <a className={MARKDOWN_LINK} href={docsMarkdownPath(page.slug)}>
+        <FileText aria-hidden="true" strokeWidth={1.75} />
+        View as .md
+      </a>
+    </div>
+  </aside>
+);
 
 /**
  * The docs shell's main column: the article at the measure, then "On this
  * page", which stands to its right from `columns`.
  */
-export const DocsPageView = ({ page }: { readonly page: DocPage }) => (
-  <main
-    className="flex min-w-0 flex-1 flex-col outline-none"
-    data-scroll-restoration-id="main"
-    id="main"
-    tabIndex={-1}
-  >
-    <ContextBar
-      crumbs={[
-        { label: "Docs", to: docsPath() },
-        { label: PART_TITLE[page.part] },
-        { label: page.title },
-      ]}
-    />
-    <div
-      className={`columns:grid columns:grid-cols-[minmax(0,1fr)_var(--column-docs-toc)] columns:gap-x-14 flex flex-col pt-6 pb-16 ${GUTTER}`}
+export const DocsPageView = ({ page }: { readonly page: DocPage }) => {
+  const headings = docHeadings(page);
+
+  return (
+    <main
+      className="flex min-w-0 flex-1 flex-col outline-none"
+      data-scroll-restoration-id="main"
+      id="main"
+      tabIndex={-1}
     >
-      <article className="max-w-(--measure) min-w-0" data-doc={page.slug}>
-        <h1 className="text-headline text-balance break-words">{page.title}</h1>
-        <p className="text-want mt-3 mb-6 font-normal">{page.summary}</p>
-        <SiteMarkdown source={docBody(page)} />
-      </article>
-      <OnThisPage page={page} />
-    </div>
-  </main>
-);
+      <ContextBar
+        crumbs={[
+          { label: "Docs", to: docsPath() },
+          { label: PART_TITLE[page.part] },
+          { label: page.title },
+        ]}
+      />
+      <div
+        className={`columns:grid columns:grid-cols-[minmax(0,1fr)_var(--column-docs-toc)] columns:gap-x-14 flex flex-col pt-6 pb-16 ${GUTTER}`}
+      >
+        <article className="max-w-(--measure) min-w-0" data-doc={page.slug}>
+          <h1 className="text-headline text-balance break-words">
+            {page.title}
+          </h1>
+          <p className="text-want mt-3 mb-6 font-normal">{page.summary}</p>
+          <ContentsAhead headings={headings} />
+          <SiteMarkdown source={docBody(page)} />
+        </article>
+        <OnThisPage headings={headings} page={page} />
+      </div>
+    </main>
+  );
+};

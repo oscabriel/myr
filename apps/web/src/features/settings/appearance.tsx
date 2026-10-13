@@ -71,7 +71,13 @@ export const AppearanceView = ({
           value={choice}
         />
         <span className="font-medium">{CHOICE_LABELS[choice]}</span>
-        {system === undefined ? null : (
+        {/* Before React knows the system, the head script's `data-system` names it through the stylesheet. */}
+        {system === undefined ? (
+          <span
+            className="text-muted-foreground ml-auto"
+            data-system-resolves={choice}
+          />
+        ) : (
           <span className="text-muted-foreground ml-auto">
             {THEME_LABELS[resolveTheme(system, choice)]}
           </span>

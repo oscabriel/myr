@@ -144,7 +144,7 @@ describe(When, () => {
 const hangs = (command: string) =>
   [
     ...markupOf(<CommandLine command={command} />).matchAll(
-      /padding-left:(?<hang>\d+)ch;text-indent:-\k<hang>ch/gu
+      /class="tablet:pl-\(--hang\) tablet:-indent-\(--hang\) block" style="--hang:(?<hang>\d+)ch"/gu
     ),
   ].map((found) => Number(found.groups?.hang));
 
@@ -172,7 +172,7 @@ describe(CommandLine, () => {
     expect(textOf(<CommandLine command={command} />)).toContain(command);
   });
 
-  it("hangs a line 6ch, less when its longest word would not fit beside the hang", () => {
+  it("hangs a line 6ch from tablet, less when its longest word would not fit beside the hang", () => {
     // `today` (5ch) beside a 6ch hang needs 11ch; the line is 9ch, so the
     // box hugging it would break the word in two. It never wraps, so its
     // hang never shows.

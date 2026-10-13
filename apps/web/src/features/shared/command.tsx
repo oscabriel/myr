@@ -1,4 +1,5 @@
 import { Check, Copy } from "lucide-react";
+import type { CSSProperties } from "react";
 
 import { Button } from "../../components/ui/button.tsx";
 import { useCopy } from "./copy-action.tsx";
@@ -19,6 +20,13 @@ const hangOf = (hang: number, words: readonly string[], line: string) =>
     line.length - Math.max(0, ...words.map(({ length }) => length))
   );
 
+/** The hang as a variable, which the line takes from `tablet` only: on a phone the words want the whole width. */
+const hangStyle = (
+  hang: number
+): CSSProperties & { readonly "--hang": string } => ({
+  "--hang": `${hang}ch`,
+});
+
 // Breaks between words, never after a word's own hyphen (`--project`) nor
 // before a closing ` \`.
 const wordsOf = (command: string) =>
@@ -34,9 +42,9 @@ const wordsOf = (command: string) =>
     return (
       // A line never moves: its place in the command is its key.
       <span
-        className="block"
+        className="tablet:pl-(--hang) tablet:-indent-(--hang) block"
         key={at}
-        style={{ paddingLeft: `${hang}ch`, textIndent: `-${hang}ch` }}
+        style={hangStyle(hang)}
       >
         {parts.map((part, index) =>
           part.trim() === "" ? (

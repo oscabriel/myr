@@ -3,16 +3,26 @@
 import { ClientOnly } from "@tanstack/react-router";
 import { lazy, Suspense } from "react";
 
+import { TreeSkeleton } from "../../../../features/code/tree-skeleton.tsx";
 import { SideColumn } from "../../../../features/shared/shell/side-column.tsx";
 
 const Body = import.meta.env.SSR
   ? undefined
   : lazy(() => import("./-code-files.tsx"));
 
+// The server and the first paint draw the tree's shape, so the column never stands empty while its body loads.
+const waiting = (
+  <div className="flex min-h-0 flex-1 flex-col pt-3">
+    <TreeSkeleton />
+  </div>
+);
+
 const Later = ({ commit }: { readonly commit: boolean }) =>
-  Body === undefined ? null : (
-    <ClientOnly fallback={null}>
-      <Suspense fallback={null}>
+  Body === undefined ? (
+    waiting
+  ) : (
+    <ClientOnly fallback={waiting}>
+      <Suspense fallback={waiting}>
         <Body commit={commit} />
       </Suspense>
     </ClientOnly>

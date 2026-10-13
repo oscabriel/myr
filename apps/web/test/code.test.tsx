@@ -52,6 +52,10 @@ import { readCommitPage } from "../src/routes/$owner/$project/commit/$sha.tsx";
 import { readLogPage } from "../src/routes/$owner/$project/commits/$rev.tsx";
 import { readRefsPage } from "../src/routes/$owner/$project/refs.tsx";
 import { readTreePage } from "../src/routes/$owner/$project/tree/$rev/$.tsx";
+import {
+  CodeColumn,
+  CommitColumn,
+} from "../src/routes/$owner/$project/tree/-code-column.tsx";
 import { elementWith, elementsWith } from "./records.ts";
 import { renderAt } from "./render.tsx";
 import { reachingTransport } from "./transport.ts";
@@ -2019,5 +2023,22 @@ describe("an answer fork in the Code tab", () => {
           )
         );
       })
+  );
+});
+
+// The column's body loads once the page is up; until then it draws the
+// tree's shape, so it never stands as an empty box beside the page.
+describe("the Code tab's side column before its body loads", () => {
+  it.effect.each([
+    ["the tree", <CodeColumn key="tree" />],
+    ["a commit's files", <CommitColumn key="commit" />],
+  ] as const)("draws %s as a filter and rows, busy", ([, column]) =>
+    Effect.gen(function* () {
+      const markup = yield* renderAt("/oscabriel/burrow/tree/main", column);
+
+      expect(markup).toContain('aria-busy="true"');
+      expect(markup).toContain("Reading the files");
+      expect(markup.match(/data-slot="skeleton"/gu)?.length).toBeGreaterThan(1);
+    })
   );
 });

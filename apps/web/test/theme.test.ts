@@ -144,6 +144,18 @@ describe("the head script", () => {
     expect(page.shownColour()).toBe(themeColors.light);
   });
 
+  it("names the system's own scheme whatever the preference, as it turns", () => {
+    const page = themePage("light");
+
+    runHeadScript(page, storedAs("opposite"));
+
+    expect(page.system()).toBe("light");
+
+    page.turnSystem();
+
+    expect(page.system()).toBe("dark");
+  });
+
   it("follows a preference another tab writes", () => {
     const page = themePage("light");
     const storage = storedAs("same");

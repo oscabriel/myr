@@ -10,7 +10,9 @@ import {
 import { SettingsView } from "../src/features/settings/settings-page.tsx";
 import {
   readPreference,
+  resolveTheme,
   THEME_PREFERENCE_KEY,
+  THEME_PREFERENCES,
   writePreference,
 } from "../src/features/shared/theme.ts";
 import type { Theme, ThemePreference } from "../src/features/shared/theme.ts";
@@ -18,6 +20,8 @@ import { attributeOf, textIn } from "./markup.ts";
 import { renderAt } from "./render.tsx";
 import { keptStorage, refusingStorage } from "./storage.ts";
 import { themePage } from "./theme-page.ts";
+
+import styles from "../src/styles.css?raw";
 
 const ignore = () => {};
 
@@ -35,6 +39,21 @@ const choicesIn = (markup: string) =>
       };
     }
   );
+
+/** The word the stylesheet draws after a choice's span on a system, before React can see it. */
+const drawnBefore = (system: Theme, choice: ThemePreference) => {
+  const css = styles.replaceAll(/\/\*[\s\S]*?\*\//gu, "");
+  const selector = `:root[data-system="${system}"] [data-system-resolves="${choice}"]::after`;
+
+  return [
+    ...css.matchAll(/(?<selectors>[^{}]+)\{\s*content: "(?<word>\w+)";\s*\}/gu),
+  ].flatMap(({ groups }) =>
+    groups?.selectors?.split(",").some((each) => each.trim() === selector) ===
+    true
+      ? [groups.word]
+      : []
+  );
+};
 
 const appearanceAt = (system: Theme | undefined, preference: ThemePreference) =>
   renderAt(
@@ -78,6 +97,35 @@ describe(AppearanceView, () => {
         "Opposite of system",
       ]);
     })
+  );
+
+  // The head script names the system before first paint, so the stylesheet
+  // can show what each choice gives without waiting for React.
+  it.effect(
+    "marks each choice for the stylesheet until the system is known",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* appearanceAt(undefined, "same");
+
+        expect(
+          [...markup.matchAll(/data-system-resolves="(?<choice>\w+)"/gu)].map(
+            ({ groups }) => groups?.choice
+          )
+        ).toStrictEqual([...THEME_PREFERENCES]);
+      })
+  );
+
+  it.each(["light", "dark"] as const)(
+    "draws, before React runs, what each choice gives on a %s system",
+    (system) => {
+      expect(
+        THEME_PREFERENCES.map((choice) => drawnBefore(system, choice))
+      ).toStrictEqual(
+        THEME_PREFERENCES.map((choice) => [
+          resolveTheme(system, choice) === "dark" ? "Dark" : "Light",
+        ])
+      );
+    }
   );
 });
 

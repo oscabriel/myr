@@ -26,7 +26,10 @@ const RefusalLabel = ({ refusal }: { readonly refusal: ShownRefusal }) => (
 const titleOf = (want: string | undefined, code: string): ReactNode =>
   want ?? <span className="text-mono font-mono">{code}</span>;
 
-/** One row: the mark, the project over what landed or was refused, why it was refused, and when. */
+/**
+ * One row: the mark, the project over what landed or was refused, why it was refused, and when. Below `tablet` why
+ * and when sit under the title in its column, so every row keeps one shape whatever the want's length.
+ */
 const Row = ({
   children,
   outcome,
@@ -43,7 +46,7 @@ const Row = ({
   readonly when: ReactNode;
 }) => (
   <li
-    className="border-rule tablet:flex-nowrap flex min-h-16 flex-wrap items-center gap-x-4 gap-y-1 border-b py-2.5"
+    className="border-rule tablet:flex grid min-h-16 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-4 gap-y-1 border-b py-2.5"
     data-outcome={outcome}
     data-project={project}
   >
@@ -63,7 +66,7 @@ const Row = ({
       </AppLink>
     </div>
     {children}
-    <p className="text-ui tablet:w-32 tablet:text-right shrink-0 tabular-nums">
+    <p className="text-ui tablet:w-32 tablet:text-right col-start-2 shrink-0 tabular-nums">
       {when}
     </p>
   </li>
@@ -111,7 +114,7 @@ const rowOf = (landing: RecentLanding, now: DateTime.Utc) =>
           </>
         }
       >
-        <p className="text-ui tablet:max-w-64 tablet:text-right flex flex-wrap gap-x-3 gap-y-0.5">
+        <p className="text-ui tablet:max-w-64 tablet:text-right col-start-2 flex flex-wrap gap-x-3 gap-y-0.5">
           {/* Two lanes failing read as one tag: the list names no lane. */}
           {Arr.dedupeWith(
             refusals,

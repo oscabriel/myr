@@ -6,9 +6,9 @@
  * with `schema`, the last gate (no script, handler, `javascript:` or `data:`
  * URL, iframe, style or form; every `id` and `name` prefixed, so a README
  * cannot clobber the page's globals); 6. `rehypeSlug`, after the sanitizer, so
- * `#usage` finds `## Usage` unprefixed; 7. `rehypeFragmentLinks`, last, once
- * every id is final. react-markdown's `defaultUrlTransform` stays on as a
- * second net.
+ * `#usage` finds `## Usage` unprefixed; 7. `rehypeFragmentLinks`, once
+ * every id is final; 8. `rehypeShiftHeadings`, a README's only, which moves no
+ * id or URL. react-markdown's `defaultUrlTransform` stays on as a second net.
  */
 import { Predicate } from "effect";
 import type { Element, Properties, Root } from "hast";
@@ -178,6 +178,24 @@ export const rehypeFragmentLinks = () => (tree: Root) => {
   });
 };
 
+const SHIFTED = new Map([
+  ["h1", "h2"],
+  ["h2", "h3"],
+  ["h3", "h4"],
+  ["h4", "h5"],
+  ["h5", "h6"],
+]);
+
+/**
+ * A README sits under the page's own h1 (the project's name), so its headings
+ * go down a level: its `# name` reads as an h2, and an h6 stays an h6.
+ */
+export const rehypeShiftHeadings = () => (tree: Root) => {
+  visit(tree, "element", (node) => {
+    node.tagName = SHIFTED.get(node.tagName) ?? node.tagName;
+  });
+};
+
 export const remarkPlugins: PluggableList = [remarkGfm];
 
 export const rehypePluginsFor = (at: MarkdownAt): PluggableList => [
@@ -187,6 +205,7 @@ export const rehypePluginsFor = (at: MarkdownAt): PluggableList => [
   [rehypeSanitize, schema],
   rehypeSlug,
   rehypeFragmentLinks,
+  rehypeShiftHeadings,
 ];
 
 export const sitePlugins: PluggableList = [
