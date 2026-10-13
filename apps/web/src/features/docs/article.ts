@@ -31,12 +31,6 @@ const slugOf = (text: string) =>
     .replaceAll(/[^\p{L}\p{M}\p{N}\p{Pc} -]/gu, "")
     .replaceAll(" ", "-");
 
-interface Walk {
-  readonly fenced: boolean;
-  readonly seen: ReadonlyMap<string, number>;
-  readonly headings: readonly DocHeading[];
-}
-
 const unique = (seen: ReadonlyMap<string, number>, slug: string) => {
   let count = seen.get(slug);
   let id = slug;
@@ -49,35 +43,31 @@ const unique = (seen: ReadonlyMap<string, number>, slug: string) => {
   return { count: count ?? 0, id };
 };
 
-const step = (walk: Walk, line: string): Walk => {
-  if (FENCE.test(line)) {
-    return { ...walk, fenced: !walk.fenced };
-  }
-
-  const found = walk.fenced ? null : HEADING.exec(line);
-
-  if (found?.groups === undefined) {
-    return walk;
-  }
-
-  const text = plain(found.groups.source ?? "");
-  const slug = slugOf(text);
-  const { count, id } = unique(walk.seen, slug);
-  const seen = new Map(walk.seen).set(slug, count).set(id, 0);
-
-  return {
-    fenced: false,
-    headings:
-      found.groups.marks === "##"
-        ? [...walk.headings, { id, text }]
-        : walk.headings,
-    seen,
-  };
-};
-
 /** The article's `h2`s, in order, each with the id its rendered heading carries. */
-export const docHeadings = (page: DocPage): readonly DocHeading[] =>
-  docBody(page)
-    .split("\n")
-    .reduce<Walk>(step, { fenced: false, headings: [], seen: new Map() })
-    .headings;
+export const docHeadings = (page: DocPage): readonly DocHeading[] => {
+  const seen = new Map<string, number>();
+  const headings: DocHeading[] = [];
+  let fenced = false;
+
+  for (const line of docBody(page).split("\n")) {
+    if (FENCE.test(line)) {
+      fenced = !fenced;
+    }
+
+    const found = fenced ? null : HEADING.exec(line);
+
+    if (found?.groups !== undefined) {
+      const text = plain(found.groups.source ?? "");
+      const slug = slugOf(text);
+      const { count, id } = unique(seen, slug);
+
+      seen.set(slug, count).set(id, 0);
+
+      if (found.groups.marks === "##") {
+        headings.push({ id, text });
+      }
+    }
+  }
+
+  return headings;
+};

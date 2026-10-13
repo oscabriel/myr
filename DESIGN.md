@@ -499,6 +499,13 @@ The platform's own label, never rewritten, through the state badge: a lock and t
 - **Commits and a commit:** rows under sticky day headers; a commit's subject as Title, its status line, the body as prose, then the diff (Unified | Split from 48 rem).
 - **Missing path:** a soft landing on the nearest folder, with the refusal's own text above it.
 
+### The docs
+
+- **Tree:** every page under Guides then Reference, from `@repo/agent-kit`'s entries; the page being read ink at 500 with `aria-current="page"`.
+- **Article:** the breadcrumb (Docs, its part, the page), the title at Headline, the summary at Want 400, then the page's Markdown, all held to `--measure`.
+- **On this page** (`--column-docs-toc`): the article's `h2`s as in-page links, each to the id its heading carries, then Copy as Markdown (the page's whole Markdown) and View as .md (the page's `.md` server route), both outline buttons. Sticky beside the article from `columns`; under it below.
+- **Commands** (Reference): every command as its synopsis (`myr <words> <positional> [--flag]`), what it does, and whether it only reads, from `commandDocs`.
+
 ### Visibility, policy and refs
 
 - **Ledger:** the head sentence carries the facts; layers as rows (name in sealed-violet mono, readers, writers, disclosure, reason), sealed areas with root and admission, history newest first. No path, check name or file name.

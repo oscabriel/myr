@@ -115,7 +115,9 @@ describe("a page of the docs in the docs shell", () => {
             .filter(({ current }) => current)
             .map(({ text }) => text)
         ).toStrictEqual(["How a landing happens"]);
-        expect(aside).toMatch(/<button\b[^>]*>[\s\S]*?Copy as Markdown[\s\S]*?<\/button>/u);
+        expect(aside).toMatch(
+          /<button\b[^>]*>[\s\S]*?Copy as Markdown[\s\S]*?<\/button>/u
+        );
         expect(linksOf(aside)).toContainEqual({
           current: false,
           href: "/docs/landing.md",
@@ -155,7 +157,10 @@ describe("a page of the docs", () => {
               <DocsPageView page={pageNamed("start-here")} />
             )
           )
-        ).toContainEqual(["how-a-change-reaches-main", "How a change reaches main"]);
+        ).toContainEqual([
+          "how-a-change-reaches-main",
+          "How a change reaches main",
+        ]);
       })
   );
 

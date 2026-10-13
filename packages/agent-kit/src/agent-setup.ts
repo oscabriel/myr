@@ -150,8 +150,7 @@ export const synopsisLine = ({
 
 export const synopsis = (
   commands: readonly CommandDoc[]
-): readonly SynopsisLine[] =>
-  commands.map((command) => synopsisLine(command));
+): readonly SynopsisLine[] => commands.map((command) => synopsisLine(command));
 
 export interface Endpoint {
   readonly url: string;

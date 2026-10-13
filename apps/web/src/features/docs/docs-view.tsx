@@ -1,4 +1,5 @@
 import type { DocPage, DocPart } from "@repo/agent-kit/docs/index";
+import { cn } from "cn";
 import { Check, Copy, FileText } from "lucide-react";
 
 import { Button, buttonVariants } from "../../components/ui/button.tsx";
@@ -59,6 +60,12 @@ const PART_TITLE = {
 const CONTENTS_LINK =
   "text-ui text-muted-foreground hover:text-foreground flex min-h-8 items-center py-1 no-underline transition-colors duration-[120ms]";
 
+/** Merged, so the outline's control border wins over the base's transparent one. */
+const MARKDOWN_LINK = cn(
+  buttonVariants({ variant: "outline" }),
+  "justify-start no-underline"
+);
+
 const CopyMarkdown = ({ markdown }: { readonly markdown: string }) => {
   const { copied, copy } = useCopy(markdown);
 
@@ -107,13 +114,7 @@ const OnThisPage = ({ page }: { readonly page: DocPage }) => {
       <div className="flex flex-col gap-2">
         <CopyMarkdown markdown={page.markdown} />
         {/* A server route, not a page of the app. */}
-        <a
-          className={buttonVariants({
-            className: "justify-start no-underline",
-            variant: "outline",
-          })}
-          href={docsMarkdownPath(page.slug)}
-        >
+        <a className={MARKDOWN_LINK} href={docsMarkdownPath(page.slug)}>
           <FileText aria-hidden="true" strokeWidth={1.75} />
           View as .md
         </a>
@@ -144,9 +145,7 @@ export const DocsPageView = ({ page }: { readonly page: DocPage }) => (
       className={`columns:grid columns:grid-cols-[minmax(0,1fr)_var(--column-docs-toc)] columns:gap-x-14 flex flex-col pt-6 pb-16 ${GUTTER}`}
     >
       <article className="max-w-(--measure) min-w-0" data-doc={page.slug}>
-        <h1 className="text-headline text-balance break-words">
-          {page.title}
-        </h1>
+        <h1 className="text-headline text-balance break-words">{page.title}</h1>
         <p className="text-want mt-3 mb-6 font-normal">{page.summary}</p>
         <SiteMarkdown source={docBody(page)} />
       </article>
