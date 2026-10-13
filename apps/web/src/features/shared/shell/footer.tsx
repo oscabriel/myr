@@ -1,12 +1,19 @@
 import { Brand } from "@repo/brand";
 
 import { AppLink } from "../link.tsx";
-import { docsPath, INSTALL_PATH, PRIVACY_PATH, TERMS_PATH } from "../paths.ts";
+import {
+  docsPath,
+  INSTALL_PATH,
+  PRIVACY_PATH,
+  SETTINGS_PATH,
+  TERMS_PATH,
+} from "../paths.ts";
 import { GUTTER } from "./gutter.ts";
 
 const LINKS = [
   { label: "Docs", to: docsPath() },
   { label: "Install", to: INSTALL_PATH },
+  { label: "Settings", to: SETTINGS_PATH },
   { label: "Privacy", to: PRIVACY_PATH },
   { label: "Terms", to: TERMS_PATH },
 ] as const;
