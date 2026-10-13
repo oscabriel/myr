@@ -212,11 +212,7 @@ const ProjectPage = () => {
 
   return (
     <SeededAtoms id={project} seeds={seeds}>
-      <LiveProject
-        data={data}
-        platformUrl={platformUrl}
-        signedIn={signedIn}
-      />
+      <LiveProject data={data} platformUrl={platformUrl} signedIn={signedIn} />
     </SeededAtoms>
   );
 };

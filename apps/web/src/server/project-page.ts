@@ -20,8 +20,8 @@ import {
 import { wantsMarkdown } from "../features/ask/markdown.ts";
 import { familiesIn, stillWaiting } from "../features/front/families.ts";
 import { ledeOf } from "../features/front/head.ts";
-import { openAsks, openToTake } from "../features/project/asks.tsx";
 import { variedByAccept } from "../features/front/markdown.ts";
+import { openAsks, openToTake } from "../features/project/asks.tsx";
 import { readFolderWithReadme } from "./folder.ts";
 import { projectLlmsHandler } from "./llms.ts";
 import type { ClientFor } from "./llms.ts";
@@ -152,11 +152,11 @@ export type ProjectHeaderData = typeof ProjectHeaderData.Type;
 const byNewest = (a: TagName, b: TagName) =>
   b.localeCompare(a, "en", { numeric: true });
 
-const onlySome = <K extends string, A>(key: K, read: Option.Option<A>) =>
-  Option.match(read, {
-    onNone: () => ({}),
-    onSome: (value) => ({ [key]: value }) as Record<K, A>,
-  });
+/** A field only when its read gave it; the header never says what it was not told. */
+const onlySome = <A, B extends object>(
+  read: Option.Option<A>,
+  field: (value: A) => B
+) => Option.match(read, { onNone: () => ({}), onSome: field });
 
 /**
  * Every read at once and none waiting on another, beside the page's own
@@ -197,39 +197,34 @@ export const readProjectHeader = (name: string) =>
         : [...new Set(policy.deciders.flatMap(({ handles }) => handles))]
     );
 
-    const lede = Option.flatMapNullishOr(read.code, ({ readme }) =>
-      Option.match(readme, {
-        onNone: () => undefined,
-        onSome: ({ text }) => (text === undefined ? undefined : ledeOf(text)),
-      })
+    const lede = read.code.pipe(
+      Option.flatMap(({ readme }) => readme),
+      Option.flatMapNullishOr(({ text }) => text),
+      Option.flatMapNullishOr(ledeOf)
     );
 
     // What the platform sent decoded, so it encodes; a failure is a defect.
     return yield* Schema.encodeEffect(ProjectHeaderData)({
-      ...onlySome("open", open),
-      ...onlySome("deciders", deciders),
+      ...onlySome(open, (counted) => ({ open: counted })),
+      ...onlySome(deciders, (handles) => ({ deciders: handles })),
       ...onlySome(
-        "landedAt",
         Option.flatMapNullishOr(
           read.log,
           ({ commits }) => commits[0]?.landing?.landedAt
-        )
+        ),
+        (landedAt) => ({ landedAt })
       ),
       ...onlySome(
-        "latestTag",
         Option.flatMapNullishOr(
           read.refs,
           ({ tags }) => tags.map((tag) => tag.name).toSorted(byNewest)[0]
-        )
+        ),
+        (latestTag) => ({ latestTag })
       ),
-      ...onlySome("lede", lede),
-      ...onlySome(
-        "posture",
-        Option.map(read.ledger, ({ posture, postureLabel }) => ({
-          label: postureLabel,
-          posture,
-        }))
-      ),
+      ...onlySome(lede, (sentence) => ({ lede: sentence })),
+      ...onlySome(read.ledger, ({ posture, postureLabel }) => ({
+        posture: { label: postureLabel, posture },
+      })),
       now: yield* DateTime.now,
       project,
     }).pipe(Effect.orDie);

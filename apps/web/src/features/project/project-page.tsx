@@ -376,9 +376,7 @@ const RecentLandings = ({
       className="flex min-w-0 flex-col gap-2"
     >
       <SectionHead
-        action={
-          <Onward to={`/${project}/commits/main`}>Every landing</Onward>
-        }
+        action={<Onward to={`/${project}/commits/main`}>Every landing</Onward>}
         id="recent-landings"
         title="Recent landings"
       />

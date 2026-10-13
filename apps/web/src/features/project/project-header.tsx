@@ -87,8 +87,8 @@ export const CloneSteps = ({
 export const WatchSteps = ({ project }: { readonly project: ProjectName }) => (
   <div className="flex min-w-0 flex-col gap-3" data-steps="watch">
     <p className="text-ui">
-      This page follows the project as it happens: claims, pushes, verdicts
-      and landings arrive without a reload.
+      This page follows the project as it happens: claims, pushes, verdicts and
+      landings arrive without a reload.
     </p>
     <div className="flex min-w-0 flex-col gap-1">
       <p className="text-ui">Your own claims and answers here</p>
@@ -264,7 +264,11 @@ export const ProjectTabs = ({
     <div className="flex [scrollbar-width:none] overflow-x-auto overscroll-x-contain">
       {projectSections(project).map(({ hash, label, tab, to }) => (
         <AppLink
-          activeOptions={{ exact: true, includeHash: true, includeSearch: false }}
+          activeOptions={{
+            exact: true,
+            includeHash: true,
+            includeSearch: false,
+          }}
           aria-current={tab === current ? "page" : undefined}
           className={TAB}
           key={tab}

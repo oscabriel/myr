@@ -48,8 +48,7 @@ const tabAt = (pathname: string, hash: string): ProjectTab | undefined => {
   const tab = projectTabOf(pathname);
 
   return tab === "overview"
-    ? (projectSections("").find((section) => section.hash === hash)?.tab ??
-        tab)
+    ? (projectSections("").find((section) => section.hash === hash)?.tab ?? tab)
     : tab;
 };
 

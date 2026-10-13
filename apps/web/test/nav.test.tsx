@@ -51,7 +51,8 @@ describe("a project's tabs", () => {
     );
 
     expect(
-      linksOf(markup).find(({ href }) => href?.endsWith("#open-asks"))?.text
+      linksOf(markup).find(({ href }) => href?.endsWith("#open-asks") === true)
+        ?.text
     ).toBe("Asks5");
   });
 

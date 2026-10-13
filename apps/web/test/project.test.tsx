@@ -43,15 +43,14 @@ import { devServer } from "../src/dev/server.ts";
 import { ledeOf } from "../src/features/front/head.ts";
 import { stampStep } from "../src/features/front/stamps.ts";
 import { ImportOffer, offerFor } from "../src/features/import/import-offer.tsx";
+import { recentShown } from "../src/features/project/landings.tsx";
+import { postureWord } from "../src/features/project/posture-label.ts";
 import { ProjectFrame } from "../src/features/project/project-frame.tsx";
 import {
   CloneSteps,
   ProjectHeader,
   WatchSteps,
 } from "../src/features/project/project-header.tsx";
-import { recentShown } from "../src/features/project/landings.tsx";
-import { postureWord } from "../src/features/project/posture-label.ts";
-import { PostureMark } from "../src/features/project/posture-mark.tsx";
 import {
   ProjectView,
   heldBackOf,
@@ -387,7 +386,10 @@ describe(ProjectView, () => {
         const text = textIn(about);
 
         expect(
-          missingFrom(text, ["How a change lands here", "export: 7 sealed checks"])
+          missingFrom(text, [
+            "How a change lands here",
+            "export: 7 sealed checks",
+          ])
         ).toStrictEqual([]);
         expect(allInOrder(text, STAGES)).toBeTruthy();
         expect(text).toMatch(/src\/\*\*\s*·\s*ines-v, okonkwo/u);
@@ -471,7 +473,11 @@ describe(ProjectView, () => {
         expect(textIn(main)).toContain("Dates, kept.");
         // The README comes after the asks and the landings.
         expect(
-          allInOrder(main, ['id="open-asks"', 'id="recent-landings"', "data-readme"])
+          allInOrder(main, [
+            'id="open-asks"',
+            'id="recent-landings"',
+            "data-readme",
+          ])
         ).toBeTruthy();
       })
   );
@@ -663,10 +669,7 @@ const sentFrom = (
   data: ProjectPageData,
   more: Partial<ProjectViewProps> = {}
 ) =>
-  renderAt(
-    `/${data.project}`,
-    <ProjectView {...propsFrom(data)} {...more} />
-  );
+  renderAt(`/${data.project}`, <ProjectView {...propsFrom(data)} {...more} />);
 
 const readFrom = (name: string, world: Layer.Layer<Client>) =>
   readProjectPage(name).pipe(Effect.flatMap(decodePage), Effect.provide(world));
@@ -680,7 +683,7 @@ const headerFrom = (name: string, world: Layer.Layer<Client>) =>
   );
 
 /** A project page as its route draws it: the project's frame, its header, then the page. */
-const framed = (url: string, header: ProjectHeaderData, page: ReactNode) =>
+const framed = (url: string, header: ProjectHeaderData, body: ReactNode) =>
   renderAt(
     url,
     <ProjectFrame
@@ -692,7 +695,7 @@ const framed = (url: string, header: ProjectHeaderData, page: ReactNode) =>
         />
       }
     >
-      {page}
+      {body}
     </ProjectFrame>
   );
 
@@ -703,7 +706,9 @@ const tabsOf = (markup: string) =>
     ),
   ].map(({ groups }) => ({
     current: /aria-current="page"/u.test(groups?.attributes ?? ""),
-    label: textIn(groups?.text ?? "").replaceAll(/\d+/gu, "").trim(),
+    label: textIn(groups?.text ?? "")
+      .replaceAll(/\d+/gu, "")
+      .trim(),
   }));
 
 describe("the project's home as the server sends it", () => {
@@ -807,7 +812,8 @@ const headerFacts = {
   project: ProjectName.make("oscabriel/datekit"),
 } satisfies ProjectHeaderData;
 
-const headerOf = (markup: string) => elementWith(markup, 'data-project-header=""');
+const headerOf = (markup: string) =>
+  elementWith(markup, 'data-project-header=""');
 
 /** The header as a page draws it, its current tab's mark and its name's element taken out. */
 const sameHeader = (markup: string) =>
@@ -830,13 +836,13 @@ const HEADER_READS = [
 const answeringAtOnce = Layer.unwrap(
   Effect.gen(function* () {
     const started = yield* Ref.make(0);
-    const all = yield* Deferred.make<void>();
+    const all = yield* Deferred.make<boolean>();
 
     const held = Effect.gen(function* () {
       const count = yield* Ref.updateAndGet(started, (seen) => seen + 1);
 
       if (count === HEADER_READS.length) {
-        yield* Deferred.succeed(all, undefined);
+        yield* Deferred.succeed(all, true);
       }
 
       yield* Deferred.await(all);
@@ -848,7 +854,9 @@ const answeringAtOnce = Layer.unwrap(
       Layer.provide([
         Layer.mergeAll(
           unanswered,
-          ...HEADER_READS.map((read) => Contracts.toLayerHandler(read, () => held))
+          ...HEADER_READS.map((read) =>
+            Contracts.toLayerHandler(read, () => held)
+          )
         ),
         asTester,
       ])
@@ -863,6 +871,7 @@ describe("a project's page in its frame", () => {
       Effect.gen(function* () {
         const header = yield* headerFrom("oscabriel/burrow", devWorld);
         const data = yield* readFrom("oscabriel/burrow", devWorld);
+
         const markup = yield* framed(
           "/oscabriel/burrow",
           header,
@@ -906,7 +915,9 @@ describe("a project's page in its frame", () => {
         ).toStrictEqual([["Overview"], ["Code"], ["Asks"]]);
         // Overview's title is the project; the others title their own subject.
         expect(new Set(markups.map(sameHeader)).size).toBe(1);
-        expect(markups.map(headerOf).every((header) => header !== "")).toBeTruthy();
+        expect(
+          markups.map(headerOf).every((header) => header !== "")
+        ).toBeTruthy();
       })
   );
 
@@ -962,9 +973,9 @@ describe("a project's page in its frame", () => {
             ({ groups }) => groups?.action
           )
         ).toStrictEqual(["watch", "clone", "contribute"]);
-        expect(
-          textIn(elementWith(markup, 'data-project-tabs=""'))
-        ).toContain("Asks5");
+        expect(textIn(elementWith(markup, 'data-project-tabs=""'))).toContain(
+          "Asks5"
+        );
       })
   );
 
@@ -1006,9 +1017,7 @@ describe("the project's header as the server sends it", () => {
           devWorldWith({ fixtures: "on" }, listed)
         );
 
-        const head = headerOf(
-          yield* framed("/oscabriel/vellum", header, null)
-        );
+        const head = headerOf(yield* framed("/oscabriel/vellum", header, null));
 
         expect(yield* Ref.get(listed)).toBe(0);
         expect(head).toContain('data-posture="openWithSealedEvidence"');
