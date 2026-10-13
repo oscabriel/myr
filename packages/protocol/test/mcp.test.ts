@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Context, Effect, Layer, Schema } from "effect";
+import { Context, Effect, Layer, Option, Predicate, Schema } from "effect";
 import { Tool } from "effect/ai";
 import { Rpc, RpcGroup } from "effect/rpc";
 
@@ -11,6 +11,7 @@ import {
   SubmitAnswer,
   surfaced,
 } from "../src/contracts.ts";
+import { PROJECT_DESCRIPTION_CAP } from "../src/domain/front-page.ts";
 import { AskId, CommitSha, KindName, ProjectName } from "../src/ids.ts";
 import { listTools, toJsonSchema, toToolkit } from "../src/mcp.ts";
 import { StaleBase } from "../src/refusal.ts";
@@ -78,6 +79,30 @@ const ListedTools = Schema.Struct({
     })
   ),
 });
+
+const ProjectDescriptionSchema = Schema.Struct({
+  maxLength: Schema.Int,
+  type: Schema.Literal("string"),
+});
+
+/** Every object in a JSON Schema whose properties name a project's listing. */
+const listingsIn = (value: unknown): readonly Record<string, unknown>[] => {
+  if (Array.isArray(value)) {
+    return value.flatMap(listingsIn);
+  }
+
+  if (!Predicate.isObject(value)) {
+    return [];
+  }
+
+  const here = Predicate.hasProperty(value, "properties") &&
+    Predicate.isObject(value.properties) &&
+    Predicate.hasProperty(value.properties, "openAsks")
+    ? [value]
+    : [];
+
+  return [...here, ...Object.values(value).flatMap(listingsIn)];
+};
 
 const receipt = {
   additionalProperties: true,
@@ -243,6 +268,23 @@ describe("the contracts as MCP tools", () => {
     expect(tools.length).toBeGreaterThan(20);
     expect(schemas).toHaveLength(2 * tools.length);
     expect(schemas.flatMap(leaks)).toStrictEqual([]);
+  });
+
+  it("lists each project with an optional description, capped in length", () => {
+    const listProjects = listTools(
+      toToolkit(surfaced("mcp"), Effect.service(Client)).toolkit
+    ).find(({ name }) => name === "listProjects");
+
+    const [listing] = listingsIn(listProjects?.outputSchema);
+
+    const description = Schema.decodeUnknownOption(ProjectDescriptionSchema)(
+      Reflect.get(Object(listing?.["properties"]), "description")
+    );
+
+    expect(description).toStrictEqual(
+      Option.some({ maxLength: PROJECT_DESCRIPTION_CAP, type: "string" })
+    );
+    expect(listing?.["required"]).not.toContain("description");
   });
 
   it("inlines a named root schema, since MCP wants an object at the root", () => {
