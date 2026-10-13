@@ -4,7 +4,7 @@
 // child of the invocation's root span, a sibling of the others and of the
 // runtime's own (fetch, RPC, D1, storage) opened while it runs. Effect keeps
 // the nesting; the trace shows each span's name, timing, ids and failures.
-import { Cause, Exit, Layer, Predicate, Tracer } from "effect";
+import { Array, Cause, Exit, Layer, Predicate, Tracer } from "effect";
 
 import type { DefectKeeping } from "../defects.ts";
 import type { Scrub } from "../logger.ts";
@@ -31,8 +31,10 @@ export interface Keeping {
   readonly defects: DefectKeeping;
 }
 
-// A typed failure is a refusal or a port's error: its tag says what it was.
-// Only a defect brings its message and stack, scrubbed.
+// A typed failure is a refusal or a port's error, the product working: its
+// tag goes on the span as `failure`. workerd logs each recorded exception at
+// error level, where Issues, smoke and the alerts count it, so only a defect
+// is recorded as one, with its message and stack, scrubbed.
 const recordFailures = <A, E>(
   span: WorkerSpan,
   exit: Exit.Exit<A, E>,
@@ -42,19 +44,28 @@ const recordFailures = <A, E>(
     return;
   }
 
-  for (const reason of exit.cause.reasons) {
-    if (Cause.isFailReason(reason)) {
+  const failures = Array.dedupe(
+    exit.cause.reasons.flatMap((reason) => {
+      if (!Cause.isFailReason(reason)) {
+        return [];
+      }
+
       const failure = reason.error;
 
-      span.recordException({
-        name:
-          Predicate.hasProperty(failure, "_tag") &&
-          Predicate.isString(failure._tag)
-            ? failure._tag
-            : "Failure",
-      });
-    }
+      return [
+        Predicate.hasProperty(failure, "_tag") &&
+        Predicate.isString(failure._tag)
+          ? failure._tag
+          : "Failure",
+      ];
+    })
+  );
 
+  if (Array.isReadonlyArrayNonEmpty(failures)) {
+    span.setAttribute("failure", failures.join(","));
+  }
+
+  for (const reason of exit.cause.reasons) {
     if (Cause.isDieReason(reason)) {
       for (const error of Cause.prettyErrors(Cause.fromReasons([reason]))) {
         span.recordException(
