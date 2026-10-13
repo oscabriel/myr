@@ -436,7 +436,7 @@ const Run = ({
         "AwaitingFinish",
         "WaitingOnParent",
       ])(verdict.outcome) ? (
-        <p className="text-body max-w-[70ch]" data-waiting="">
+        <p className="text-body max-w-(--measure)" data-waiting="">
           {waitingSentence(round)}
         </p>
       ) : null}
@@ -463,7 +463,7 @@ const Run = ({
 
     {verdict.heldBack.length === 0 ? null : (
       <Region id="answer-held-back" title="Held back">
-        <p className="text-ui text-muted-foreground max-w-[70ch]">
+        <p className="text-ui text-muted-foreground max-w-(--measure)">
           Checks the answer could not see: how many passed in each area, and the
           root of the suite the project committed to before the claim.
         </p>

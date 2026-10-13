@@ -408,7 +408,7 @@ export const CommitView = ({
           <LandingStatus commit={commit} project={project} />
           {body === "" ? null : (
             <p
-              className="text-body max-w-[70ch] [overflow-wrap:anywhere] whitespace-pre-wrap"
+              className="text-body max-w-(--measure) [overflow-wrap:anywhere] whitespace-pre-wrap"
               data-body=""
               data-said=""
             >

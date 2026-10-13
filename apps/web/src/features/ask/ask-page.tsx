@@ -206,7 +206,10 @@ const Brief = ({ ask }: { readonly ask: Ask }) => {
 
   return parts.length === 0 ? null : (
     <Region id="ask-brief" title="Brief">
-      <div className="text-body flex max-w-[70ch] flex-col gap-5" data-said="">
+      <div
+        className="text-body flex max-w-(--measure) flex-col gap-5"
+        data-said=""
+      >
         {parts}
       </div>
     </Region>
@@ -598,7 +601,7 @@ export const AskView = ({
       <Brief ask={ask} />
 
       <Region id="ask-check" title="The check">
-        <p className="text-ui max-w-[70ch]">
+        <p className="text-ui max-w-(--measure)">
           <CheckSummary ask={ask} />
         </p>
         {check === undefined ? null : <CheckFile source={check} />}

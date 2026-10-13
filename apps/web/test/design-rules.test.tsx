@@ -11,6 +11,7 @@ import {
 } from "../src/features/shared/marks.tsx";
 import { wordTone } from "../src/features/shared/row.tsx";
 import { AppShell } from "../src/features/shared/shell/app-shell.tsx";
+import { MEASURE } from "../src/features/shared/shell/workspace.tsx";
 import { renderAt } from "./render.tsx";
 
 import styles from "../src/styles.css?raw";
@@ -135,6 +136,7 @@ const LAYOUT = [
   "gutter-site",
   "gutter-project",
   "measure",
+  "measure-page",
   "top-bar",
   "toolbar",
   "tabs",
@@ -332,6 +334,20 @@ describe("DESIGN.md's shells", () => {
     expect(shells).toContain("**No generic right rail.**");
     expect(shells).toContain("**A command at most once per screen.**");
     expect(shells).toContain("**Prose stops at 72 to 80ch.**");
+  });
+
+  it("holds a page's document and its prose to the measure tokens, never a literal", () => {
+    const literal = /max-w-\[(?:[6-8]\dch|56rem)\]/gu;
+
+    const found = Object.entries(sources).flatMap(([path, source]) =>
+      [...source.matchAll(literal)].map(([width]) => `${path}: ${width}`)
+    );
+
+    expect(found).toStrictEqual([]);
+    expect(MEASURE).toBe("max-w-(--measure-page)");
+    expect(sources["../src/features/markdown/markdown.tsx"]).toContain(
+      "max-w-(--measure)"
+    );
   });
 
   it("drops the old shell's rail, inspector and bottom bar sections", () => {

@@ -336,8 +336,9 @@ describe("a README drawn in the page's own type", () => {
     expect(classes.has("prose-pre:text-mono")).toBeTruthy();
   });
 
-  it("keeps lines to 70 characters", () => {
-    expect(proseClasses().has("max-w-[70ch]")).toBeTruthy();
+  // `--measure` is 72ch, which design-rules.test.tsx holds against DESIGN.md.
+  it("keeps lines to the measure", () => {
+    expect(proseClasses().has("max-w-(--measure)")).toBeTruthy();
   });
 
   // Its `#` is an h2 by then (`rehypeShiftHeadings`), under the page's own h1.

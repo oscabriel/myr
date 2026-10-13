@@ -17,11 +17,7 @@ import { statsOf } from "../code/diff-model.ts";
 import { DiffPane, PANE_SCROLLER } from "../code/diff-pane.tsx";
 import type { DiffAnnotation, DiffFileSlot } from "../code/diff-view.tsx";
 import { shortSha } from "../code/paths.ts";
-import {
-  Choices,
-  DecisionRecord,
-  stuckAboveBar,
-} from "../decision/choices.tsx";
+import { Choices, DecisionRecord, stuckAtFoot } from "../decision/choices.tsx";
 import { DecisionCard, ExpiryLines } from "../decision/decision-card.tsx";
 import type { DecideInput } from "../decision/decision-card.tsx";
 import { describeSubject } from "../decision/subject.ts";
@@ -483,7 +479,7 @@ const PhoneFinish = ({
   >) => (
   <div className={`tablet:hidden flex flex-col gap-6 ${GUTTER}`}>
     {ask === undefined ? null : (
-      <p className="text-want max-w-[70ch]" data-said="">
+      <p className="text-want max-w-(--measure)" data-said="">
         {ask.brief.want}
       </p>
     )}
@@ -504,7 +500,7 @@ const PhoneFinish = ({
     <Failure>{failure}</Failure>
     <DecisionCard
       busy={busy}
-      choices={stuckAboveBar}
+      choices={stuckAtFoot}
       decision={decision}
       finishLink={false}
       now={now}

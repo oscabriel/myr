@@ -9,7 +9,7 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 
 import { commitHref, shortSha } from "../code/paths.ts";
-import { stuckAboveBar } from "../decision/choices.tsx";
+import { stuckAtFoot } from "../decision/choices.tsx";
 import { DecisionCard } from "../decision/decision-card.tsx";
 import type { DecideInput } from "../decision/decision-card.tsx";
 import {
@@ -151,7 +151,7 @@ const DecisionRow = ({
           >
             <DecisionCard
               busy={props.busy}
-              choices={stuckAboveBar}
+              choices={stuckAtFoot}
               decision={decision}
               now={props.now}
               onDecide={props.onDecide}

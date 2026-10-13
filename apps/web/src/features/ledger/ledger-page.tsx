@@ -64,7 +64,7 @@ export const HeadSentence = ({ ledger }: { readonly ledger: Ledger }) => {
   const { lead, rest } = ledgerHead(ledger);
 
   return (
-    <p className="text-want max-w-[70ch] text-pretty" data-ledger-head="">
+    <p className="text-want max-w-(--measure) text-pretty" data-ledger-head="">
       <Mark
         className="mr-2 inline-block -translate-y-px align-middle"
         look={POSTURE_MARKS[ledger.posture]}
@@ -369,7 +369,7 @@ export const LayersRegion = ({ ledger }: { readonly ledger: Ledger }) => (
       />
     ) : (
       <>
-        <p className="text-ui text-muted-foreground max-w-[70ch]">
+        <p className="text-ui text-muted-foreground max-w-(--measure)">
           Everything on main is public. A layer&apos;s readers clone it with
           git, and none of its files is shown here.
         </p>
@@ -395,7 +395,7 @@ export const HeldBackRegion = ({
       <EmptyState title="No held-back checks: every check that judges an answer is in the public repo." />
     ) : (
       <>
-        <p className="text-ui text-muted-foreground max-w-[70ch]">
+        <p className="text-ui text-muted-foreground max-w-(--measure)">
           Held-back checks judge every answer in their area, unseen. A landing
           they judged names each area&apos;s root in its <Code>Held-back:</Code>{" "}
           trailer.
@@ -418,7 +418,7 @@ export const LedgerRegion = ({
   readonly now: DateTime.Utc;
 }) => (
   <Region id="ledger" title="Ledger">
-    <p className="text-ui text-muted-foreground max-w-[70ch]">
+    <p className="text-ui text-muted-foreground max-w-(--measure)">
       {`Public and append-only · ${plural(ledger.entries.length, "entry", "entries")}`}
     </p>
     <History ledger={ledger} now={now} />

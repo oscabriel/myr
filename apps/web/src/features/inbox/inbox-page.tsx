@@ -265,7 +265,7 @@ const Record = ({ handle }: { readonly handle: Handle }) => (
 );
 
 const SignedOutNotice = () => (
-  <div className="flex max-w-[70ch] flex-col items-start gap-3">
+  <div className="flex max-w-(--measure) flex-col items-start gap-3">
     <p className="text-body">{WHAT_THE_INBOX_IS}</p>
     <p className="text-ui">
       <a className={LINK} href={signInHref(INBOX_PATH)}>
@@ -351,7 +351,7 @@ const SignedInInbox = ({
       status={
         budget === undefined ? undefined : (
           <p
-            className="text-want max-w-[70ch]"
+            className="text-want max-w-(--measure)"
             data-budget={`${budget.used}/${budget.total}`}
           >
             {budgetSentence(budget)}
@@ -400,7 +400,7 @@ export const InboxView = ({
     ),
     Refused: ({ refusal }) => (
       <Unlisted>
-        <p className="text-body max-w-[70ch]">{WHAT_THE_INBOX_IS}</p>
+        <p className="text-body max-w-(--measure)">{WHAT_THE_INBOX_IS}</p>
         <RefusalView refusals={[refusal]} />
         <CommandLine command={`${Brand.cli} status`} />
       </Unlisted>

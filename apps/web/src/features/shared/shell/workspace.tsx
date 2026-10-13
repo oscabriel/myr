@@ -38,7 +38,8 @@ export interface WorkspaceProps {
   readonly children: ReactNode;
 }
 
-export const MEASURE = "max-w-[56rem]";
+/** A page's head, facts, toolbar and document body stop at `--measure-page`. */
+export const MEASURE = "max-w-(--measure-page)";
 
 const LONG_TITLE = 80;
 

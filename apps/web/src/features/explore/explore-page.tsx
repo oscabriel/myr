@@ -171,7 +171,7 @@ export const ExploreView = ({
   >
     <div className="flex flex-col gap-3">
       <h1 className="text-headline">{EXPLORE_TITLE}</h1>
-      <p className="text-body text-muted-foreground max-w-[72ch]">
+      <p className="text-body text-muted-foreground max-w-(--measure)">
         <Lede projects={projects} /> Looking for something to work on?{" "}
         <AppLink to={ASKS_PATH}>See every open ask</AppLink>.
       </p>

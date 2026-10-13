@@ -24,7 +24,7 @@ import { RefusalView } from "../shared/refusal.tsx";
 import { Workspace } from "../shared/shell/workspace.tsx";
 import { StatusLine } from "../shared/status-line.tsx";
 import { When } from "../shared/time.tsx";
-import { stuckAboveBar } from "./choices.tsx";
+import { stuckAtFoot } from "./choices.tsx";
 import { DecisionCard } from "./decision-card.tsx";
 import type { DecideInput } from "./decision-card.tsx";
 import { DecisionRead } from "./read.ts";
@@ -168,7 +168,7 @@ const ForAnyone = ({
   readonly id: DecisionId;
   readonly project: ProjectName;
 }) => (
-  <div className="flex max-w-[70ch] flex-col items-start gap-3">
+  <div className="flex max-w-(--measure) flex-col items-start gap-3">
     <p className="text-body">
       Decision <code className="text-mono font-mono">{id}</code> is a choice put
       to {project}&apos;s maintainers: the people its policy names for what it
@@ -254,7 +254,7 @@ const Found = ({
     >
       <DecisionCard
         busy={busy}
-        choices={stuckAboveBar}
+        choices={stuckAtFoot}
         decision={decision}
         expiry={false}
         now={now}

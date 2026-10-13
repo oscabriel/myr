@@ -197,7 +197,7 @@ const ItemRow = ({
   >
     <ItemLine item={item} now={now} />
     {item.description === undefined || item.description === "" ? null : (
-      <p className="max-w-[70ch] text-pretty">{item.description}</p>
+      <p className="max-w-(--measure) text-pretty">{item.description}</p>
     )}
     <Definitions label={`Env item ${item.key}`}>
       {item.type === undefined ? null : (
@@ -229,7 +229,7 @@ const ItemRow = ({
 );
 
 const Caption = () => (
-  <p className="text-ui text-muted-foreground max-w-[70ch]">
+  <p className="text-ui text-muted-foreground max-w-(--measure)">
     Declared in{" "}
     <a className={LINK} href={VARLOCK} rel="noreferrer">
       varlock&apos;s <Code>.env.schema</Code> format

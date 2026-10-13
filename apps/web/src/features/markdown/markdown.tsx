@@ -86,7 +86,7 @@ const Image = ({
 const components: Components = { a: Anchor, img: Image };
 
 const PROSE_BASE = [
-  "prose prose-tokens text-body max-w-[70ch] min-w-0",
+  "prose prose-tokens text-body max-w-(--measure) min-w-0",
   "prose-headings:font-semibold prose-headings:tracking-[-0.01em]",
   "prose-code:before:content-none prose-code:after:content-none prose-code:font-normal",
   "[&_:not(pre)>code]:bg-surface [&_:not(pre)>code]:text-mono [&_:not(pre)>code]:px-1 [&_:not(pre)>code]:py-px",
@@ -155,7 +155,7 @@ export const RepoText = ({
 }: {
   readonly source: string;
 }): ReactNode => (
-  <pre className="text-mono leading-terminal max-w-[70ch] overflow-x-auto font-mono whitespace-pre-wrap">
+  <pre className="text-mono leading-terminal max-w-(--measure) overflow-x-auto font-mono whitespace-pre-wrap">
     {source}
   </pre>
 );

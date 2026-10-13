@@ -125,6 +125,7 @@ spacing:
   column-docs-toc: "13.75rem"
   column-filters: "15rem"
   measure: "72ch"
+  measure-page: "56rem"
   top-bar: "3.5rem"
   toolbar: "2.5rem"
   tabs: "2.75rem"
@@ -392,7 +393,7 @@ From `columns` (1100 px, `--breakpoint-columns`) a side column stands beside its
 - **No global left rail.** The project list moves to Explore and the account menu; a project's navigation is its tabs.
 - **No generic right rail.** A side column exists only where it holds facts about what is on screen (a project's about column, a doc's headings), 220 to 340 px wide, and stacks under 1100 px. The asks board's filters are the one column that is not facts: they narrow the list beside them, and stand above it under 1100 px.
 - **A command at most once per screen.** As content, a command sits in a popover, a single strip or a card. Never a column of code blocks.
-- **Prose stops at 72 to 80ch.** Lists and tables run to the container; prose, a README and a doc's article stop at `--measure` (72ch).
+- **Prose stops at 72 to 80ch.** Lists and tables run to the container; prose, a README and a doc's article stop at `--measure` (72ch). A project page's head, facts, toolbar and document body stop at `--measure-page` (56rem), so its prose and the table beside it share one edge.
 
 ### Inside a page
 
@@ -589,7 +590,7 @@ shadcn 4.21.2, style `base-lyra` on Base UI, in `src/components/ui/` (generated,
 
 ### Do:
 
-- **Do** name exactly one shell per route, and read every width from its token (`max-w-site`, `w-(--column-about)`, `max-w-(--measure)`).
+- **Do** name exactly one shell per route, and read every width from its token (`max-w-site`, `w-(--column-about)`, `max-w-(--measure)`, `max-w-(--measure-page)`).
 - **Do** draw rows, status lines, the fan, refusals, credit, held-back lines, posture, outcomes and stages with the shared components; change the component, not a page's copy of it.
 - **Do** show the command for every action once, its text in the DOM, through `CommandLine` or `CopyAction`.
 - **Do** carry every state as a mark, then a word, then a colour, and key tests and styles on the `data-*` attribute that names it.

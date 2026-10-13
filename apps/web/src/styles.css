@@ -368,7 +368,7 @@
   its job and never as a literal. Static, so each is a variable on :root
   whether or not a utility reads it: `max-w-site`, `max-w-project` and
   `max-w-focus` read the containers, and a column or the measure is read
-  as `w-(--column-about)` or `max-w-(--measure)`.
+  as `w-(--column-about)`, `max-w-(--measure)` or `max-w-(--measure-page)`.
 
   site     a centred 1360 px container with 32 px gutters
   project  fluid to 1600 px with 28 px gutters; the about column (340 px)
@@ -380,7 +380,10 @@
   filters  the asks board's filters (240 px), the one side column in the
            site, left of the list
   measure  prose stops at 72ch (DESIGN.md allows 72 to 80ch; 72 is the
-           docs article's cap, so one measure serves every page)
+           docs article's cap, so one measure serves every page's prose)
+  measure-page
+           a project page's head, facts, toolbar and document body stop
+           at 56rem (Workspace), wide enough for a table beside its prose
 
   From `columns` (1100 px) a side column stands beside its main column,
   and below it stacks under it; from `nav` (900 px) the top bar's links
@@ -407,6 +410,7 @@
   --gutter-site: 2rem;
   --gutter-project: 1.75rem;
   --measure: 72ch;
+  --measure-page: 56rem;
   --top-bar: 3.5rem;
   --toolbar: 2.5rem;
   --tabs: 2.75rem;
@@ -552,12 +556,12 @@
     caret-color: var(--checking);
   }
 
-  /* On a phone a decision's choices are a bar fixed above the bottom bar
-     (decision/choices.tsx): main keeps room for it at its foot, so the
-     page's last lines scroll clear of it. */
+  /* On a phone a decision's choices are a bar fixed at the foot of the
+     screen (decision/choices.tsx): main keeps room for the bar's own height
+     at its foot, so the page's last lines scroll clear of it. */
   @media (width < 40rem) {
     main:has([data-choices-bar]) {
-      padding-bottom: 10rem;
+      padding-bottom: calc(6.5rem + env(safe-area-inset-bottom));
     }
   }
 

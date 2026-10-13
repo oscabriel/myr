@@ -355,7 +355,7 @@ const ProposalStatus = ({ proposal }: { readonly proposal: Proposal }) => {
         <StatusLine subject={{ kind: "proposal", proposal }} />
       )}
       {drafting ? (
-        <p className="text-ui text-muted-foreground max-w-[70ch]">
+        <p className="text-ui text-muted-foreground max-w-(--measure)">
           The platform&apos;s agent is writing the ask and a check, then running
           the check on main, where it must fail twice the same way. This takes a
           few minutes; the page follows it.
@@ -386,7 +386,7 @@ const DraftGuide = ({
 
   if (files.length === 0) {
     return proposal.draft === undefined ? (
-      <p className="text-body max-w-[70ch]">
+      <p className="text-body max-w-(--measure)">
         A want alone: no ask file or check yet. A maintainer who accepts it
         writes the change it asks for.
       </p>

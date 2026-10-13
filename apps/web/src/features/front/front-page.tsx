@@ -392,7 +392,7 @@ export const FrontPageView = ({
       count={frontCount(shown)}
       crumbs={[{ label: "Asks" }]}
       status={
-        <p className="text-want text-muted-foreground max-w-[70ch]">
+        <p className="text-want text-muted-foreground max-w-(--measure)">
           {EXPLAINER}
         </p>
       }
