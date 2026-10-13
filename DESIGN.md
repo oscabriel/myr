@@ -418,9 +418,9 @@ Square. The radius is 2 px (`--radius: 0.125rem`), and shadcn's base-lyra compon
 
 ### Top bar
 
-- **Character:** the same contents in every shell: the wordmark (linking `/`), Explore, Asks, Docs, Install, search, and the account (handle and inbox count, or Sign in). Framed in the site and docs shells (inside the container, a hairline under it), full-bleed in the project shell; the focus shell shows the wordmark alone.
+- **Character:** the same contents in every shell: the wordmark (linking `/`), Explore, Asks, Docs, Install, search, Keys (a keyboard icon that opens the keys dialog, the `?` key's pointer twin) and the account (handle and inbox count, or Sign in). Framed in the site and docs shells (inside the container, a hairline under it), full-bleed in the project shell; the focus shell shows the wordmark alone.
 - **Current item:** ink at 500 with `aria-current="page"`; the others muted. Never a coloured bar.
-- **Below 900 px:** the links fold into a menu (a sheet), the wordmark and the account stay.
+- **Below 900 px:** the links and Keys fold into a menu (a sheet), the wordmark and the account stay.
 
 ### Footer
 
@@ -507,6 +507,13 @@ The platform's own label, never rewritten, through the state badge: a lock and t
 - **Why:** a mode of the file view: consecutive lines from one landing under a band that reads ask and answer first, SHA second.
 - **Commits and a commit:** rows under sticky day headers; a commit's subject as Title, its status line, the body as prose, then the diff (Unified | Split from 48 rem).
 - **Missing path:** a soft landing on the nearest folder, with the refusal's own text above it.
+
+### The docs
+
+- **Tree:** every page under Guides then Reference, from `@repo/agent-kit`'s entries; the page being read ink at 500 with `aria-current="page"`.
+- **Article:** the breadcrumb (Docs, its part, the page), the title at Headline, the summary at Want 400, then the page's Markdown, all held to `--measure`.
+- **On this page** (`--column-docs-toc`): the article's `h2`s as in-page links, each to the id its heading carries, then Copy as Markdown (the page's whole Markdown) and View as .md (the page's `.md` server route), both outline buttons. Sticky beside the article from `columns`; under it below.
+- **Commands** (Reference): every command as its synopsis (`myr <words> <positional> [--flag]`), what it does, and whether it only reads, from `commandDocs`.
 
 ### Visibility, policy and refs
 
