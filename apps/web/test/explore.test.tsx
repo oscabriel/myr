@@ -85,7 +85,11 @@ describe("Explore, read on the server", () => {
 describe(exploreGroups, () => {
   it("puts the projects taking answers first, each group by its latest landing", () => {
     const { rest, taking } = exploreGroups([
-      { openAsks: 2, posture: "open", project: ProjectName.make("oscabriel/alpha") },
+      {
+        openAsks: 2,
+        posture: "open",
+        project: ProjectName.make("oscabriel/alpha"),
+      },
       {
         landedAt: at("2026-10-12T08:00:00Z"),
         openAsks: 1,
@@ -166,7 +170,11 @@ describe(ExploreView, () => {
     () =>
       Effect.gen(function* () {
         const markup = yield* explored([
-          { openAsks: 0, posture: "open", project: ProjectName.make("oscabriel/zeta") },
+          {
+            openAsks: 0,
+            posture: "open",
+            project: ProjectName.make("oscabriel/zeta"),
+          },
         ]);
 
         expect(textIn(markup)).toContain(
