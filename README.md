@@ -74,7 +74,7 @@ Files ported from other projects name their upstream in their first line and car
 - **Rat Stack** ([joelhooks/rat-stack](https://github.com/joelhooks/rat-stack), MIT): the CLI and MCP projections in `packages/protocol/src/{cli,mcp}.ts`, the Effect diagnostics map, and burrow's `no-module-level-mutable-state` rule.
 - **anti-slop** ([dmmulroy/anti-slop](https://github.com/dmmulroy/anti-slop), MIT): the lint plugins in `tools/oxlint/anti-slop/`.
 - **shadcn/ui** (MIT): the web's base components, in `apps/web/src/components/ui/`.
-- **Public Sans** and **JetBrains Mono** (SIL Open Font License): the web's typefaces, in `apps/web/src/assets/fonts/`.
+- **IBM Plex Sans** and **IBM Plex Mono** (SIL Open Font License): the web's typefaces, installed from fontsource (`@fontsource-variable/ibm-plex-sans`, `@fontsource/ibm-plex-mono`), each package carrying its licence.
 - **Pierre** (`@pierre/diffs`, `@pierre/trees`, Apache-2.0), **unified** (MIT), **Effect** and **isomorphic-git**: highlighting and diffs, Markdown, the whole codebase, and git inside a Worker.
 - Ideas, no code: Cloudflare's cf (one command catalog), Ghostty's `VOUCHED.td` format and Matt Pocock's agent-brief shape.
 
