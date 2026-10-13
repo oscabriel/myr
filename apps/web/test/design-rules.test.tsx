@@ -13,6 +13,62 @@ import { wordTone } from "../src/features/shared/row.tsx";
 import { Workspace } from "../src/features/shared/shell/workspace.tsx";
 import { renderAt } from "./render.tsx";
 
+const sources: Readonly<Record<string, string>> = import.meta.glob(
+  "../src/**/*.{ts,tsx,css}",
+  { eager: true, import: "default", query: "?raw" }
+);
+
+/** A small, tracked line above a headline, by any of its usual names. */
+const EYEBROW = /eyebrow|kicker|overline/giu;
+
+const eyebrowsIn = (source: string) =>
+  [...source.matchAll(EYEBROW)].map(([name]) => name);
+
+const EDGE_COLOURS =
+  "landed|checking|waiting|refused|sealed|primary|destructive";
+
+const thickEdge =
+  /(?<![\w-])(?:[\w-]+:)*border-(?<edge>[lrtbse])-(?<width>\d+|\[[\d.]+(?:px|rem)\])(?![\w-])/gu;
+
+const colouredEdge = new RegExp(
+  `(?<![\\w-])(?:[\\w-]+:)*border-(?<edge>[lrtbse])-(?:${EDGE_COLOURS})(?:/\\d+)?(?![\\w-])`,
+  "gu"
+);
+
+const colouredBorder = new RegExp(
+  `(?<![\\w-])(?:[\\w-]+:)*border-(?:${EDGE_COLOURS})(?:/\\d+)?(?![\\w-])`,
+  "u"
+);
+
+const pixels = (width: string) => {
+  const [, amount = "0", unit = "px"] =
+    /^\[?(?<amount>[\d.]+)(?<unit>px|rem)?\]?$/u.exec(width) ?? [];
+
+  return unit === "rem" ? Number(amount) * 16 : Number(amount);
+};
+
+/**
+ * A fingernail: one edge of a card, row or panel drawn thicker than a
+ * hairline in a state's colour or the primary's, in the same string of
+ * classes or on the same edge anywhere in the file.
+ */
+const fingernailsIn = (source: string) => {
+  const literals = source.match(/"[^"]*"|'[^']*'|`[^`]*`/gu) ?? [];
+
+  const coloured = new Set(
+    [...source.matchAll(colouredEdge)].map(({ groups }) => groups?.edge)
+  );
+
+  return literals.flatMap((literal) =>
+    [...literal.matchAll(thickEdge)].flatMap(({ 0: found, groups }) =>
+      pixels(groups?.width ?? "0") > 1 &&
+      (coloured.has(groups?.edge) || colouredBorder.test(literal))
+        ? [found]
+        : []
+    )
+  );
+};
+
 const spacing = (name: string) =>
   new RegExp(`^ {2}${name}: "(?<value>[^"]+)"$`, "mu").exec(design)?.groups
     ?.value;
@@ -98,4 +154,44 @@ describe("DESIGN.md's named values", () => {
         );
       })
   );
+});
+
+describe("the overrides' two Don'ts", () => {
+  it("reads every source file of the web", () => {
+    expect(Object.keys(sources).length).toBeGreaterThan(100);
+  });
+
+  it("names no component or class an eyebrow, a kicker or an overline", () => {
+    const found = Object.entries(sources).flatMap(([path, source]) =>
+      eyebrowsIn(source).map((name) => `${path}: ${name}`)
+    );
+
+    expect(found).toStrictEqual([]);
+  });
+
+  it("puts no state or primary colour on one edge of a card or row", () => {
+    const found = Object.entries(sources).flatMap(([path, source]) =>
+      fingernailsIn(source).map((edge) => `${path}: ${edge}`)
+    );
+
+    expect(found).toStrictEqual([]);
+  });
+
+  it("catches each eyebrow and fingernail it refuses, and lets hairlines and ink rules be", () => {
+    expect(
+      eyebrowsIn(
+        "const SectionEyebrow = () => <p className='kicker overline' />"
+      )
+    ).toStrictEqual(["Eyebrow", "kicker", "overline"]);
+    expect(
+      fingernailsIn(
+        '"border-l-4 border-l-landed" "border-t-2 border-refused" "md:border-l-[3px] border-l-primary/60"'
+      )
+    ).toStrictEqual(["border-l-4", "border-t-2", "md:border-l-[3px]"]);
+    expect(
+      fingernailsIn(
+        '"border-b-2 border-rule-strong" "border-t border-t-refused" "border-l-2 border-rule"'
+      )
+    ).toStrictEqual([]);
+  });
 });

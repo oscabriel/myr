@@ -223,7 +223,7 @@ const Transcript = ({ platformUrl }: { readonly platformUrl: string }) => {
   return (
     <figure className="flex flex-col gap-2">
       <pre
-        className="border-rule border-t-refused bg-surface text-mono leading-terminal border border-t-2 px-4 py-3 font-mono [overflow-wrap:anywhere] whitespace-pre-wrap"
+        className="border-rule bg-surface text-mono leading-terminal border px-4 py-3 font-mono [overflow-wrap:anywhere] whitespace-pre-wrap"
         data-refusal={tag}
       >
         <span className="text-muted-foreground select-none">$ </span>
