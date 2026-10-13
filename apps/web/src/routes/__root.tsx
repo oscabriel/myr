@@ -1,4 +1,6 @@
 import { useAtomValue } from "@effect/atom-react";
+import sansFont from "@fontsource-variable/ibm-plex-sans/files/ibm-plex-sans-latin-wght-normal.woff2?url";
+import monoFont from "@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-400-normal.woff2?url";
 import { Brand } from "@repo/brand";
 import {
   createRootRoute,
@@ -12,8 +14,6 @@ import { env } from "cloudflare:workers";
 import { AsyncResult } from "effect/reactivity";
 import type { ReactNode } from "react";
 
-import monoFont from "../assets/fonts/jetbrains-mono-latin.woff2?url";
-import sansFont from "../assets/fonts/public-sans-latin.woff2?url";
 import { projectsAtom } from "../client/front.ts";
 import { todayAtom } from "../client/today.ts";
 import { TooltipProvider } from "../components/ui/tooltip.tsx";

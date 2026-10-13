@@ -37,7 +37,7 @@ export const RefusalView = ({
 }) => (
   <section
     aria-label={`Refused: ${headline(refusals)}`}
-    className="border-t-refused border-b-rule border-t-2 border-b"
+    className="border-rule border-y"
   >
     <h2 className="text-refused flex items-center gap-2 py-2 font-mono text-sm font-semibold">
       <OctagonX aria-hidden="true" className="size-4 shrink-0" />
