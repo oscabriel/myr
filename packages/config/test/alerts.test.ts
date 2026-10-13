@@ -1,5 +1,8 @@
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
+import { MetricPoint } from "@repo/project/metrics";
+import { dataPointOf } from "@repo/project/metrics/binding";
+import { ProjectName } from "@repo/protocol/ids";
 import { Duration, Effect, Option } from "effect";
 
 import {
@@ -8,10 +11,11 @@ import {
   alerts,
   CONTAINER_FAILURES,
   Detection,
+  REFUSED,
 } from "../../../infra/alerts.ts";
 import type { Alert } from "../../../infra/alerts.ts";
 import { ERRORED, errorsQuery, workersOf } from "../../../infra/logs.ts";
-import { OUTCOMES_JOB, resources, stages } from "../../../infra/stages.ts";
+import { resources, stages } from "../../../infra/stages.ts";
 import { textOf } from "./root.ts";
 
 const ACCOUNT = "0123456789abcdef0123456789abcdef";
@@ -60,13 +64,11 @@ describe("a stage's alerts", () => {
     ).toStrictEqual([]);
   });
 
-  it("read the Workers Logs, Issues and outcomes of their own stage alone, never a layer's or another stage's", () => {
+  it("read the Workers Logs, Issues and metrics of their own stage alone, never a layer's or another stage's", () => {
     expect(
       everyStage.flatMap(({ alert, stage }) => {
         const others = stages.flatMap((other) =>
-          other === stage
-            ? []
-            : [...workersOf(other), resources(other).outcomes]
+          other === stage ? [] : [...workersOf(other), resources(other).metrics]
         );
 
         // A name in the SQL is a quoted string or a quoted dataset.
@@ -87,7 +89,7 @@ describe("a stage's alerts", () => {
       "logs.workersLogs",
       "logs.issues",
       "logs.workersLogs",
-      `events.analyticsEngine."${OUTCOMES_JOB}_prod"`,
+      'events.analyticsEngine."metrics_prod"',
     ]);
   });
 
@@ -102,20 +104,30 @@ describe("a stage's alerts", () => {
     }).toStrictEqual({ alerts: [true, true, true], smoke: true });
   });
 
-  it("read refusals from the stage's outcomes dataset, named `<job>_<stage>` in the stage table", () => {
+  it("read refusals from the stage's metrics dataset, the one its platform's `METRICS` binding writes", () => {
     expect(
-      stages.map((stage) => ({
-        dataset: resources(stage).outcomes,
-        read: alerts(stage, ACCOUNT)
+      stages.map((stage) =>
+        alerts(stage, ACCOUNT)
           .filter(({ kind }) => kind === "refusal spike")
-          .map(datasetOf),
-      }))
+          .map(datasetOf)
+      )
     ).toStrictEqual(
-      stages.map((stage) => ({
-        dataset: `${OUTCOMES_JOB}_${stage}`,
-        read: [`events.analyticsEngine."${OUTCOMES_JOB}_${stage}"`],
-      }))
+      stages.map((stage) => [
+        `events.analyticsEngine."${resources(stage).metrics}"`,
+      ])
     );
+  });
+
+  it("count a refusal as the platform's writer lays it out: a row whose first blob is a Refused point's kind", () => {
+    const { blobs } = dataPointOf(
+      MetricPoint.cases.Refused.make({
+        project: ProjectName.make("alice/datekit"),
+        stage: "shape",
+        tag: "OutOfScope",
+      })
+    );
+
+    expect(REFUSED).toBe(`blob1 = '${blobs[0] ?? ""}'`);
   });
 
   it("give each anomaly a baseline of at least six windows and at most a day, over a window of at least a minute", () => {
@@ -182,7 +194,7 @@ describe("what bootstrap prints of them", () => {
       "  demo container failures: threshold, value >= 3, evaluation window 30m",
       `    SELECT count() AS value FROM logs.workersLogs WHERE accountTag = '${ACCOUNT}' AND scriptName IN ('platform-demo', 'sandbox-demo') AND level = 'error' AND (message LIKE '%sandbox job blocked%' OR message LIKE '%the Checker could not be reached%')`,
       "  demo refusal spike: anomaly detection on spikes, evaluation window 15m, baseline window 6h, sensitivity 3, minimum event count 5",
-      `    SELECT count() AS value FROM events.analyticsEngine."outcomes_demo" WHERE accountTag = '${ACCOUNT}' AND blob1 = 'refused'`,
+      `    SELECT count() AS value FROM events.analyticsEngine."metrics_demo" WHERE accountTag = '${ACCOUNT}' AND blob1 = 'Refused'`,
     ]);
   });
 

@@ -64,7 +64,7 @@ Each stage has six alerts, declared in `infra/alerts.ts` as Cloudflare Custom Al
 - **errors**, one per Worker: five or more exceptions or error-level lines in 15 minutes.
 - **issue spike**: the stage's Workers report Issues three standard deviations above the two hours before, as after a bad deploy.
 - **container failures**: three or more sandbox jobs whose container never answered, in 30 minutes.
-- **refusal spike**: refusals, from the stage's outcomes dataset in Analytics Engine, three standard deviations above the six hours before.
+- **refusal spike**: refusals, from the stage's metrics dataset in Analytics Engine, three standard deviations above the six hours before.
 
 No API takes a custom alert's query yet, so a person makes each by hand, once per stage, and again when `infra/alerts.ts` changes:
 

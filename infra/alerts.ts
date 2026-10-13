@@ -51,15 +51,17 @@ export const CONTAINER_FAILURES = [
   "the Checker could not be reached",
 ] as const;
 
-// The outcomes dataset's layout, shared with the platform's writer: its
-// first blob is the outcome, `refused` for a refusal.
-export const REFUSED = "blob1 = 'refused'";
+// The metrics dataset's layout, as the platform's writer
+// (`packages/project/src/metrics/binding.ts`) lays it out: its first blob is
+// the point's kind, `Refused` for one refusal. `alerts.test.ts` holds it to
+// the writer.
+export const REFUSED = "blob1 = 'Refused'";
 
 const within = (column: string, values: readonly string[]) =>
   `${column} IN (${values.map(quoted).join(", ")})`;
 
 export const alerts = (stage: Stage, account: string): readonly Alert[] => {
-  const { outcomes, platform, sandbox } = resources(stage);
+  const { metrics, platform, sandbox } = resources(stage);
   // A custom alert's SQL names its account. Smoke's names none: the SQL API
   // refuses a query that names one beside the request's own scope.
   const scoped = `accountTag = ${quoted(account)}`;
@@ -102,7 +104,7 @@ export const alerts = (stage: Stage, account: string): readonly Alert[] => {
       }),
       kind: "refusal spike",
       name: `${stage} refusal spike`,
-      query: `SELECT count() AS value FROM events.analyticsEngine."${outcomes}" WHERE ${scoped} AND ${REFUSED}`,
+      query: `SELECT count() AS value FROM events.analyticsEngine."${metrics}" WHERE ${scoped} AND ${REFUSED}`,
       window: Duration.minutes(15),
     },
   ];
