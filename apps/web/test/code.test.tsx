@@ -1812,7 +1812,7 @@ describe("a missing path", () => {
     "keeps the code bar's Tree button over the folder it lands on, so a phone still reaches the tree",
     () =>
       Effect.gen(function* () {
-        const data = Schema.encodeSync(SoftLanding)({
+        const data = yield* Schema.encodeEffect(SoftLanding)({
           nearest: nested,
           now,
           project: datekit,
