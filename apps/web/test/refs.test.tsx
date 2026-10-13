@@ -6,6 +6,7 @@ import { Effect, Option, Schema } from "effect";
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
+import { RefChoices } from "../src/features/code/ref-switcher.tsx";
 import { packageParamOf } from "../src/features/code/refs-param.ts";
 import { RefsView, TAGS_PAGE } from "../src/features/code/refs-view.tsx";
 import { plainText } from "./ask-fixtures.ts";
@@ -39,6 +40,8 @@ const IMPORTED = "2".repeat(40);
 const OLDER = "3".repeat(40);
 
 const TAG_SEGMENT = "%40datekit%2Fcore%401.0.0";
+
+const pickNothing = () => {};
 
 describe(RefsView, () => {
   const refs = Schema.decodeSync(Refs)({
@@ -320,6 +323,78 @@ describe("a monorepo's refs page", () => {
       Option.none(),
       Option.none(),
       Option.none(),
+    ]);
+  });
+});
+
+describe(RefChoices, () => {
+  const refs = Schema.decodeSync(Refs)({
+    forks: [
+      {
+        ask: "parse-iso",
+        handle: "ines-v",
+        kind: "claim",
+        repo: "datekit--parse-iso--ines-v",
+        state: "warned",
+      },
+      { handle: "bram", kind: "working", repo: "datekit--me--bram" },
+    ],
+    landed: LANDED,
+    project: "oscabriel/datekit",
+    tags: [
+      { name: "v1.1.0", sha: IMPORTED },
+      { name: "v1.0.0", sha: OLDER },
+    ],
+  });
+
+  const choices = (filter = "") =>
+    markupOf(
+      <RefChoices
+        filter={filter}
+        hrefAt={(rev) => `/oscabriel/datekit/tree/${rev}`}
+        onPick={pickNothing}
+        project={refs.project}
+        refs={refs}
+        rev="main"
+      />
+    );
+
+  it("lists main as current, then the tags, then the answers in forks", () => {
+    const markup = choices();
+
+    expect(
+      [
+        ...markup.matchAll(/data-(?:ref-choice|tag|fork)="(?<name>[^"]*)"/gu),
+      ].map(({ groups }) => groups?.name)
+    ).toStrictEqual(["main", "v1.1.0", "v1.0.0", "ines-v/parse-iso"]);
+    expect(elementWith(markup, 'data-ref-choice="main"')).toContain(
+      'aria-current="true"'
+    );
+  });
+
+  it("names each answer's ask, claimant and claim state, and opens its answer's page", () => {
+    const fork = elementWith(choices(), 'data-fork="ines-v/parse-iso"');
+
+    expect(hrefsOf(fork)).toStrictEqual([
+      "/oscabriel/datekit/answers/parse-iso",
+    ]);
+    expect(plainText(fork)).toContain("parse-iso");
+    expect(plainText(fork)).toContain("ines-v · Warned, no push lately");
+  });
+
+  it("lists no working fork and names no fork's repo", () => {
+    const markup = choices();
+
+    expect(markup).not.toContain("datekit--me--bram");
+    expect(markup).not.toContain("datekit--parse-iso--ines-v");
+  });
+
+  it("finds a fork by its claimant or its ask, and a tag by its name", () => {
+    expect(choices("ines").match(/data-(?:tag|fork)="[^"]*"/gu)).toStrictEqual([
+      'data-fork="ines-v/parse-iso"',
+    ]);
+    expect(choices("v1.0").match(/data-(?:tag|fork)="[^"]*"/gu)).toStrictEqual([
+      'data-tag="v1.0.0"',
     ]);
   });
 });

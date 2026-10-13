@@ -117,13 +117,11 @@ export interface BlobViewProps {
   readonly plain?: boolean;
   readonly last?: CommitView | undefined;
   readonly now: DateTime.Utc;
-  readonly files?: ReactNode;
 }
 
 export const BlobView = ({
   code,
   file,
-  files,
   last,
   now,
   plain = false,
@@ -150,7 +148,6 @@ export const BlobView = ({
     toolbar={
       <FileHeader
         file={file}
-        files={files}
         mode="code"
         path={file.path}
         project={project}

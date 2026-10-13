@@ -56,13 +56,11 @@ export interface WhyLinesProps {
   readonly text?: string;
   readonly code?: ReactNode;
   readonly last?: CommitView | undefined;
-  readonly files?: ReactNode;
 }
 
 export const WhyLines = ({
   code,
   file,
-  files,
   last,
   now,
   project,
@@ -95,7 +93,6 @@ export const WhyLines = ({
       title={name}
       toolbar={
         <FileHeader
-          files={files}
           mode="why"
           path={view.path}
           project={project}

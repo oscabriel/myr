@@ -1038,7 +1038,12 @@ describe("a project's page in its frame", () => {
           ({ hash }) => (hash === undefined ? [] : [hash])
         );
 
-        expect(hashes).toStrictEqual(["open-asks", "proposals", "who-decides"]);
+        expect(hashes).toStrictEqual([
+          "open-asks",
+          "recent-landings",
+          "proposals",
+          "who-decides",
+        ]);
         expect(
           hashes.filter((hash) => !markup.includes(`id="${hash}"`))
         ).toStrictEqual([]);

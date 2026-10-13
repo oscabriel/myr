@@ -24,15 +24,21 @@ export interface Section {
 
 /**
  * Each tab opens a page inside the project's frame that exists today: Asks,
- * Proposals and People open their regions of Overview, Policy the policy at
- * the address it has always had, and Visibility the ledger. Starting a
+ * Landings, Proposals and People open their regions of Overview (the history
+ * of commits is the Code tab's), Policy the policy at the address it has
+ * always had, and Visibility the ledger. Starting a
  * proposal is a focused page of its own, so it is Contribute's, not a tab's.
  */
 export const projectSections = (project: string): readonly Section[] => [
   { label: "Overview", tab: "overview", to: `/${project}` },
   { label: "Code", tab: "code", to: `/${project}/tree/main` },
   { hash: "open-asks", label: "Asks", tab: "asks", to: `/${project}` },
-  { label: "Landings", tab: "landings", to: `/${project}/commits/main` },
+  {
+    hash: "recent-landings",
+    label: "Landings",
+    tab: "landings",
+    to: `/${project}`,
+  },
   {
     hash: "proposals",
     label: "Proposals",
@@ -49,8 +55,8 @@ const TAB_OF = {
   answers: "landings",
   asks: "asks",
   blob: "code",
-  commit: "landings",
-  commits: "landings",
+  commit: "code",
+  commits: "code",
   decisions: "asks",
   env: "visibility",
   ledger: "visibility",

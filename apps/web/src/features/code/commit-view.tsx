@@ -349,7 +349,6 @@ export interface CommitViewProps {
   readonly onFold?: ((path: string, folded: boolean) => void) | undefined;
   readonly onFoldAll?: ((folded: boolean) => void) | undefined;
   readonly drawing?: ReactNode;
-  readonly files?: ReactNode;
   readonly drawn?: readonly DrawnFile[] | undefined;
 }
 
@@ -357,7 +356,6 @@ export const CommitView = ({
   diff,
   drawing,
   drawn: parsed,
-  files: filesButton,
   folded,
   now,
   onFold,
@@ -415,7 +413,6 @@ export const CommitView = ({
       toolbar={
         <DiffToolbar
           allFolded={allFolded}
-          files={filesButton}
           onFoldAll={onFoldAll}
           onSplit={onSplit}
           split={split}

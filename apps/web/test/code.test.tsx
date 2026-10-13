@@ -32,27 +32,27 @@ import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { BlobView } from "../src/features/code/blob-view.tsx";
+import { codeAddressOf } from "../src/features/code/code-address.ts";
+import { checkoutCommand } from "../src/features/code/code-bar.tsx";
 import { CommitView } from "../src/features/code/commit-view.tsx";
 import { FileFacts } from "../src/features/code/file-facts.tsx";
+import { filesMatching } from "../src/features/code/file-match.ts";
 import { LOG_PAGE } from "../src/features/code/log-page.ts";
 import { LogView } from "../src/features/code/log-view.tsx";
 import { CodeNotFound } from "../src/features/code/not-found.tsx";
 import { SoftLanding } from "../src/features/code/soft-landing.ts";
 import { TreeView } from "../src/features/code/tree-view.tsx";
+import { ProjectFrame } from "../src/features/project/project-frame.tsx";
+import { ProjectHeader } from "../src/features/project/project-header.tsx";
 import { Refusals } from "../src/features/shared/refusals.ts";
-import {
-  readBlobPage,
-  Route as BlobRoute,
-} from "../src/routes/$owner/$project/blob/$rev/$.tsx";
+import { projectTabOf } from "../src/features/shared/shell/sections.ts";
+import { ProjectCodeBar } from "../src/routes/$owner/$project/-code-bar.tsx";
+import { readBlobPage } from "../src/routes/$owner/$project/blob/$rev/$.tsx";
 import { readCommitPage } from "../src/routes/$owner/$project/commit/$sha.tsx";
 import { readLogPage } from "../src/routes/$owner/$project/commits/$rev.tsx";
 import { readRefsPage } from "../src/routes/$owner/$project/refs.tsx";
-import {
-  readTreePage,
-  Route as TreeRoute,
-} from "../src/routes/$owner/$project/tree/$rev/$.tsx";
-import { Route as WhyRoute } from "../src/routes/$owner/$project/why/$rev/$.tsx";
-import { elementWith } from "./records.ts";
+import { readTreePage } from "../src/routes/$owner/$project/tree/$rev/$.tsx";
+import { elementWith, elementsWith } from "./records.ts";
 import { renderAt } from "./render.tsx";
 import { reachingTransport } from "./transport.ts";
 
@@ -650,6 +650,305 @@ describe(BlobView, () => {
     );
     expect(plain).toContain('id="L3"');
     expect(plain).not.toContain("data-readme=");
+  });
+});
+
+const platformUrl = "https://platform-test.example.workers.dev";
+
+/** A code page as the project's layout draws it: the frame, the project's header and its tab from the path, then the page. */
+const inCodeTab = (url: string, page: ReactElement, head?: Commit) =>
+  renderAt(
+    url,
+    <ProjectFrame
+      header={
+        <ProjectHeader
+          current={projectTabOf(new URL(url, platformUrl).pathname)}
+          header={{ now, project: datekit }}
+          platformUrl={platformUrl}
+        />
+      }
+      codeBar={<ProjectCodeBar platformUrl={platformUrl} />}
+    >
+      {page}
+    </ProjectFrame>,
+    {
+      loaderData:
+        head === undefined
+          ? undefined
+          : {
+              head: Schema.encodeSync(Commit)(head),
+              now: DateTime.formatIso(now),
+            },
+    }
+  );
+
+const codeBarOf = (markup: string) => elementWith(markup, 'data-code-bar=""');
+
+const parseTs = decodeFile({
+  at: AT,
+  binary: false,
+  path: "src/format/parse.ts",
+  sha: "e".repeat(40),
+  size: 14,
+  text: "one\ntwo\nthree\n",
+  truncated: false,
+});
+
+const treeAndBlob = Effect.all([
+  inCodeTab(
+    "/oscabriel/datekit/tree/main/src/format/locale",
+    <TreeView listing={nested} now={now} project={datekit} rev="main" />
+  ),
+  inCodeTab(
+    "/oscabriel/datekit/blob/main/src/format/parse.ts",
+    <BlobView file={parseTs} now={now} project={datekit} rev="main" />
+  ),
+]);
+
+/** Each link of a control, with whether it is marked as the page being read. */
+const linksIn = (markup: string) =>
+  [...markup.matchAll(/<a\b(?<attributes>[^>]*)>(?<text>[\s\S]*?)<\/a>/gu)].map(
+    ({ groups }) => ({
+      current: /aria-current="page"/u.test(groups?.attributes ?? ""),
+      href: hrefsOf(groups?.attributes ?? "")[0],
+      text: (groups?.text ?? "").replaceAll(/<[^>]+>/gu, "").trim(),
+    })
+  );
+
+describe("a code page in the Code tab", () => {
+  it.effect(
+    "keeps the project header, with Code its current tab, over the code bar",
+    () =>
+      Effect.gen(function* () {
+        const pages = yield* treeAndBlob;
+
+        expect(
+          pages.map(
+            (markup) =>
+              elementWith(markup, 'data-project-header=""') !== "" &&
+              /aria-current="page"[^>]*>Code</u.test(
+                elementWith(markup, 'data-project-tabs=""')
+              )
+          )
+        ).toStrictEqual([true, true]);
+        expect(
+          pages.map(
+            (markup) =>
+              markup.indexOf('data-project-header=""') <
+              markup.indexOf('data-code-bar=""')
+          )
+        ).toStrictEqual([true, true]);
+      })
+  );
+
+  it.effect(
+    "has the Files/Commits toggle, Files current, and the ref switcher on main",
+    () =>
+      Effect.gen(function* () {
+        const bars = (yield* treeAndBlob).map(codeBarOf);
+
+        expect(
+          bars.map((bar) =>
+            linksIn(navOf(bar, 'aria-label="Files or commits"'))
+          )
+        ).toStrictEqual(
+          bars.map(() => [
+            {
+              current: true,
+              href: "/oscabriel/datekit/tree/main",
+              text: "Files",
+            },
+            {
+              current: false,
+              href: "/oscabriel/datekit/commits/main",
+              text: "Commits",
+            },
+          ])
+        );
+        expect(
+          bars.map((bar) => /<button\b[^>]*data-ref="main"[^>]*>/u.test(bar))
+        ).toStrictEqual([true, true]);
+      })
+  );
+
+  it.effect(
+    "draws no Menu control: the top bar's links stay where they are",
+    () =>
+      Effect.gen(function* () {
+        const pages = yield* treeAndBlob;
+
+        expect(
+          pages.flatMap((markup) => [
+            ...elementsWith(markup, '(?:aria-label|title)="[^"]*Menu'),
+            ...[...markup.matchAll(/>\s*Menu\s*</gu)].map(([found]) => found),
+          ])
+        ).toStrictEqual([]);
+      })
+  );
+
+  it.effect(
+    "shows the revision's head commit in the bar: its short id and subject linking it, then its author",
+    () =>
+      Effect.gen(function* () {
+        const [head] = commits;
+
+        const bar = codeBarOf(
+          yield* inCodeTab(
+            "/oscabriel/datekit/tree/main",
+            <TreeView listing={root} now={now} project={datekit} rev="main" />,
+            head
+          )
+        );
+
+        const shown = elementWith(bar, `data-head-commit="${LANDED}"`);
+
+        expect(
+          linksIn(shown).map(({ href, text }) => [href, text])
+        ).toStrictEqual([
+          [`/oscabriel/datekit/commit/${LANDED}`, LANDED.slice(0, 7)],
+          [`/oscabriel/datekit/commit/${LANDED}`, "Answer parse-iso-week"],
+        ]);
+        expect(shown).toContain("Bram");
+      })
+  );
+
+  it.effect(
+    "marks Commits on the history and on a commit, at the same revision, and nothing on the refs list",
+    () =>
+      Effect.gen(function* () {
+        const pages = yield* Effect.forEach(
+          [
+            `/oscabriel/datekit/commits/${TAG_SEGMENT}`,
+            `/oscabriel/datekit/commit/${LANDED}`,
+            "/oscabriel/datekit/refs",
+          ],
+          (url) => inCodeTab(url, <main id="main" />)
+        );
+
+        const toggles = pages.map((markup) =>
+          linksIn(navOf(codeBarOf(markup), 'aria-label="Files or commits"'))
+        );
+
+        expect(
+          toggles.map((links) =>
+            links.flatMap(({ current, text }) => (current ? [text] : []))
+          )
+        ).toStrictEqual([["Commits"], ["Commits"], []]);
+        expect(toggles[0]?.map(({ href }) => href)).toStrictEqual([
+          `/oscabriel/datekit/tree/${TAG_SEGMENT}`,
+          `/oscabriel/datekit/commits/${TAG_SEGMENT}`,
+        ]);
+      })
+  );
+
+  it.effect("draws no code bar on a page of another tab", () =>
+    Effect.gen(function* () {
+      const pages = yield* Effect.forEach(
+        ["/oscabriel/datekit", "/oscabriel/datekit/asks/parse-iso-week"],
+        (url) => inCodeTab(url, <main id="main" />)
+      );
+
+      expect(pages.map(codeBarOf)).toStrictEqual(["", ""]);
+    })
+  );
+
+  it.effect(
+    "opens the file tree from the bar's Files button below the columns, and offers Go to file and Clone",
+    () =>
+      Effect.gen(function* () {
+        const [tree] = yield* treeAndBlob;
+        const bar = codeBarOf(tree);
+
+        expect(bar).toMatch(
+          /class="columns:hidden[^"]*"><button[^>]*aria-haspopup="dialog"[^>]*>[\s\S]*?Files<\/button>/u
+        );
+        expect(bar).toMatch(/title="Go to file \(t\)"/u);
+        expect(bar).toContain('data-action="clone-here"');
+      })
+  );
+
+  it.effect(
+    "gives the blob page's file header a Why toggle to the why page for the same path and revision",
+    () =>
+      Effect.gen(function* () {
+        const [, blob] = yield* treeAndBlob;
+        const toggle = navOf(blob, 'aria-label="Mode"');
+
+        expect(linksIn(toggle).find(({ text }) => text === "Why")?.href).toBe(
+          "/oscabriel/datekit/why/main/src/format/parse.ts"
+        );
+        expect(elementWith(blob, 'data-toolbar=""')).toContain(
+          'aria-label="Mode"'
+        );
+      })
+  );
+});
+
+describe(codeAddressOf, () => {
+  it.each([
+    [
+      "/oscabriel/datekit/tree/main",
+      { page: "tree", path: undefined, rev: "main" },
+    ],
+    [
+      `/oscabriel/datekit/blob/${TAG_SEGMENT}/src/a%20b.ts`,
+      { page: "blob", path: "src/a b.ts", rev: TAG },
+    ],
+    [
+      "/oscabriel/datekit/why/main/src/parse.ts",
+      { page: "why", path: "src/parse.ts", rev: "main" },
+    ],
+    [
+      `/oscabriel/datekit/commit/${LANDED}`,
+      { page: "commit", path: undefined, rev: LANDED },
+    ],
+    ["/oscabriel/datekit/refs", { page: "refs", rev: "main" }],
+  ])("reads %s", (pathname, address) => {
+    expect(codeAddressOf(pathname)).toStrictEqual(Option.some(address));
+  });
+
+  it("reads no address off the Code tab", () => {
+    expect(
+      [
+        "/oscabriel/datekit",
+        "/oscabriel/datekit/asks/parse-iso-week",
+        "/oscabriel/datekit/tree",
+      ].map((pathname) => Option.isNone(codeAddressOf(pathname)))
+    ).toStrictEqual([true, true, true]);
+  });
+});
+
+describe(filesMatching, () => {
+  const paths = [
+    "src/format/locale/en.ts",
+    "src/parse.ts",
+    "test/parse.test.ts",
+    "README.md",
+  ];
+
+  it("keeps the paths holding every word, a match in the file's own name first", () => {
+    expect(filesMatching(paths, "parse")).toStrictEqual([
+      "src/parse.ts",
+      "test/parse.test.ts",
+    ]);
+    expect(filesMatching(paths, "src ts")).toStrictEqual([
+      "src/parse.ts",
+      "src/format/locale/en.ts",
+    ]);
+  });
+
+  it("matches without regard to case, and stops at its limit", () => {
+    expect(filesMatching(paths, "readme")).toStrictEqual(["README.md"]);
+    expect(filesMatching(paths, "", 2)).toHaveLength(2);
+  });
+});
+
+describe(checkoutCommand, () => {
+  it("checks out a tag or a commit as it is, and quotes anything else", () => {
+    expect(checkoutCommand(TAG)).toBe(`git checkout ${TAG}`);
+    expect(checkoutCommand(LANDED)).toBe(`git checkout ${LANDED}`);
+    expect(checkoutCommand("v1;rm -rf ~")).toBe("git checkout 'v1;rm -rf ~'");
+    expect(checkoutCommand("it's")).toBe(`git checkout 'it'\\''s'`);
   });
 });
 
@@ -1264,22 +1563,30 @@ const refusedBy = <A, E>(
   }).pipe(Effect.orDie);
 
 describe("the code pages' reads", () => {
-  it.effect("read a folder and its README for the folder's page", () =>
-    Effect.gen(function* () {
-      const calls = yield* Ref.make<readonly Sent[]>([]);
+  it.effect(
+    "read a folder, its README and the revision's head for the folder's page, and no entry's last change",
+    () =>
+      Effect.gen(function* () {
+        const calls = yield* Ref.make<readonly Sent[]>([]);
 
-      const read = yield* readTreePage({
-        project: "datekit",
-        rev: "main",
-      }).pipe(Effect.provide(platformOf(calls)));
+        const read = yield* readTreePage({
+          project: "datekit",
+          rev: "main",
+        }).pipe(Effect.provide(platformOf(calls)));
 
-      expect(read.listing.entries.map((entry) => entry.path)).toStrictEqual([
-        "src",
-        "README.md",
-      ]);
-      expect(read.readme?.text).toBe(readme.text);
-      expect(yield* Ref.get(calls)).toHaveLength(2);
-    })
+        expect(read.listing.entries.map((entry) => entry.path)).toStrictEqual([
+          "src",
+          "README.md",
+        ]);
+        expect(read.readme?.text).toBe(readme.text);
+        expect(read.head?.sha).toBe(LANDED);
+        // The entries' last changes are the browser's to read, after the page is up.
+        expect(
+          (yield* Ref.get(calls)).filter((call) => "limit" in call)
+        ).toStrictEqual([
+          { at: "main", limit: 1, project: "oscabriel/datekit" },
+        ]);
+      })
   );
 
   it.effect(
@@ -1392,7 +1699,12 @@ describe("the code pages' reads", () => {
         rev: "main",
       }).pipe(Effect.provide(platformOf(calls)));
 
-      expect(yield* Ref.get(calls)).toStrictEqual([
+      // The page, and the revision's head for the code bar beside it.
+      expect(
+        (yield* Ref.get(calls)).toSorted((one, other) =>
+          JSON.stringify(one).localeCompare(JSON.stringify(other))
+        )
+      ).toStrictEqual([
         {
           at: "main",
           from: 30,
@@ -1400,6 +1712,7 @@ describe("the code pages' reads", () => {
           path: "src/parse.ts",
           project: "oscabriel/datekit",
         },
+        { at: "main", limit: 1, project: "oscabriel/datekit" },
       ]);
       expect([read.from, read.next, read.path]).toStrictEqual([
         30,
@@ -1495,34 +1808,36 @@ describe("a missing path", () => {
     );
   });
 
-  it("keeps the Files button on the folder it lands on, so a phone still reaches the tree", () => {
-    const data = Schema.encodeSync(SoftLanding)({
-      nearest: nested,
-      now,
-      project: datekit,
-      refusals: [noPath(RepoPath.make("src/format/locale/gone/x.ts"))],
-      rev: "main",
-    });
+  it.effect(
+    "keeps the code bar's Files button over the folder it lands on, so a phone still reaches the tree",
+    () =>
+      Effect.gen(function* () {
+        const data = Schema.encodeSync(SoftLanding)({
+          nearest: nested,
+          now,
+          project: datekit,
+          refusals: [noPath(RepoPath.make("src/format/locale/gone/x.ts"))],
+          rev: "main",
+        });
 
-    const pages = [
-      ["tree", TreeRoute],
-      ["blob", BlobRoute],
-      ["why", WhyRoute],
-    ] as const;
+        const pages = yield* Effect.forEach(
+          ["tree", "blob", "why"] as const,
+          (page) =>
+            inCodeTab(
+              `/oscabriel/datekit/${page}/main/src/format/locale/gone/x.ts`,
+              <CodeNotFound data={data} />
+            )
+        );
 
-    const withoutFiles = pages.flatMap(([page, route]) => {
-      const Landing = route.options.notFoundComponent;
-
-      return Landing !== undefined &&
-        /aria-haspopup="dialog"[^>]*>[\s\S]*?Files<\/button>/u.test(
-          markupOf(<Landing data={data} isNotFound routeId={route.id} />)
-        )
-        ? []
-        : [page];
-    });
-
-    expect(withoutFiles).toStrictEqual([]);
-  });
+        expect(
+          pages.map((markup) =>
+            /aria-haspopup="dialog"[^>]*>[\s\S]*?Files<\/button>/u.test(
+              codeBarOf(markup)
+            )
+          )
+        ).toStrictEqual([true, true, true]);
+      })
+  );
 
   it("keeps any other refusal verbatim, with a way onward", () => {
     const refusal = new UnknownRevision({ rev: "v9" });

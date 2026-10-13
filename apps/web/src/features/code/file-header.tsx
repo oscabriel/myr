@@ -2,7 +2,6 @@ import type { FileView } from "@repo/protocol/domain/code";
 import type { ProjectName } from "@repo/protocol/ids";
 import { Check, Copy, Link2 } from "lucide-react";
 import { Fragment, useEffect } from "react";
-import type { ReactNode } from "react";
 
 import { buttonVariants } from "@/components/ui/button";
 
@@ -224,7 +223,7 @@ export const PathTrail = ({
   );
 };
 
-const SEGMENT =
+export const SEGMENT =
   "text-ui hover:bg-surface aria-[current]:bg-foreground aria-[current]:text-background aria-[current]:hover:bg-foreground flex h-7 items-center px-2.5 font-medium no-underline transition-colors duration-150";
 
 export const ModeToggle = ({
@@ -264,7 +263,6 @@ const TOOL = buttonVariants({
 
 export const FileHeader = ({
   file,
-  files,
   mode,
   path,
   project,
@@ -275,12 +273,8 @@ export const FileHeader = ({
   readonly path?: string | undefined;
   readonly mode?: "code" | "why";
   readonly file?: FileView;
-  readonly files?: ReactNode;
 }) => (
   <>
-    {files === undefined ? null : (
-      <div className="columns:hidden flex shrink-0">{files}</div>
-    )}
     <div className="flex min-w-0 flex-1 items-center gap-3">
       <PathTrail path={path} project={project} rev={rev} />
       {file === undefined ? null : (
