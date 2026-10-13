@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
-import { commandDocs } from "@repo/agent-kit/command-doc";
 import { agentEndpoints, agentLimits } from "@repo/agent-kit/agent-setup";
+import { commandDocs } from "@repo/agent-kit/command-doc";
 import { docPage, docPages } from "@repo/agent-kit/docs/index";
 import { Brand } from "@repo/brand";
 import { Contracts } from "@repo/protocol/contracts";
