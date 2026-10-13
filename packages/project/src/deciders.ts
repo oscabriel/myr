@@ -116,7 +116,14 @@ import {
   transition,
 } from "./landing.ts";
 import type { Request, Step } from "./landing.ts";
-import { draftRow, OutboxBody, outboxRow, startRow } from "./outbox.ts";
+import { MetricPoint, millisBetween } from "./metrics.ts";
+import {
+  draftRow,
+  measuredRow,
+  OutboxBody,
+  outboxRow,
+  startRow,
+} from "./outbox.ts";
 import type {
   AnswerRow,
   BudgetDayRow,
@@ -427,6 +434,23 @@ export const drafterOf = (model: string): AgentTrailer => ({
   model,
   verified: true,
 });
+
+/** A round from its start to its settle: the proposal names its start while it drafts. */
+const draftedPoints = (
+  proposal: Proposal,
+  result: DraftResult,
+  now: DateTime.Utc
+): readonly MetricPoint[] =>
+  proposal.draft !== undefined && DraftState.guards.Drafting(proposal.draft)
+    ? [
+        MetricPoint.cases.Drafted.make({
+          attempts: result.attempts,
+          latencyMs: millisBetween(proposal.draft.startedAt, now),
+          project: proposal.project,
+          ready: DraftResult.guards.Red(result),
+        }),
+      ]
+    : [];
 
 const assistedBy = (evidence: readonly Evidence[]): readonly AgentTrailer[] =>
   Option.toArray(
@@ -904,6 +928,15 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
 
         writes.proposals.set(settled.id, settled);
         emitted(writes, moved.value.effects);
+
+        // A settle moves only the round still drafting, so a replayed one counts nothing.
+        writes.outbox.push(
+          ...(yield* measuredRow(
+            `drafted:${settled.id}:r${input.round}`,
+            draftedPoints(proposal, input.result, now),
+            now
+          ))
+        );
 
         // The drafted files may lie under other maintainers than the want did.
         const decidedBy = decidersOn(

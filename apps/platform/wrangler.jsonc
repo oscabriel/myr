@@ -109,6 +109,13 @@
   "worker_loaders": [{ "binding": "LOADER" }],
   // Workers AI, for the drafter (no key: the account's own).
   "ai": { "binding": "AI" },
+  // Domain metrics (landings, refusals, lanes, waits, drafts) in Workers
+  // Analytics Engine, one dataset per stage so no stage's counts mix with
+  // another's. A dataset is made by its first write, so bootstrap makes none;
+  // its name takes `_`, since SQL reads it as a table.
+  "analytics_engine_datasets": [
+    { "binding": "METRICS", "dataset": "metrics_local" },
+  ],
   "services": [{ "binding": "SANDBOX", "service": "sandbox" }],
   // Namespace ids differ per stage, so one stage's counts never spend
   // another's.
@@ -202,6 +209,9 @@
       "send_email": [{ "name": "EMAIL" }],
       "worker_loaders": [{ "binding": "LOADER" }],
       "ai": { "binding": "AI" },
+      "analytics_engine_datasets": [
+        { "binding": "METRICS", "dataset": "metrics_dev_oscabriel" },
+      ],
       "services": [
         { "binding": "SANDBOX", "service": "sandbox-dev-oscabriel" },
       ],
@@ -290,6 +300,9 @@
       "send_email": [{ "name": "EMAIL" }],
       "worker_loaders": [{ "binding": "LOADER" }],
       "ai": { "binding": "AI" },
+      "analytics_engine_datasets": [
+        { "binding": "METRICS", "dataset": "metrics_demo" },
+      ],
       "services": [{ "binding": "SANDBOX", "service": "sandbox-demo" }],
       "ratelimits": [
         {
@@ -381,6 +394,9 @@
       "send_email": [{ "name": "EMAIL" }],
       "worker_loaders": [{ "binding": "LOADER" }],
       "ai": { "binding": "AI" },
+      "analytics_engine_datasets": [
+        { "binding": "METRICS", "dataset": "metrics_prod" },
+      ],
       "services": [{ "binding": "SANDBOX", "service": "sandbox-prod" }],
       "ratelimits": [
         {

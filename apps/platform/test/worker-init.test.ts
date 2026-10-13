@@ -6,6 +6,7 @@ import { FrontPage } from "@repo/project/front-page";
 import { Lander, Rebuild } from "@repo/project/lander";
 import type { LandJob } from "@repo/project/lander";
 import { LandExit } from "@repo/project/lander/wire";
+import { MetricPoint, Metrics } from "@repo/project/metrics";
 import {
   CommitSha,
   Handle,
@@ -266,6 +267,33 @@ describe("the Worker's ports", () => {
       expect(entries).toStrictEqual(Exit.succeed([]));
       expect(prepared).toHaveLength(1);
       expect(prepared[0]).toContain("FROM front_page");
+    })
+  );
+
+  it.effect("write domain metrics to the METRICS dataset", () =>
+    Effect.gen(function* () {
+      const written: AnalyticsEngineDataPoint[] = [];
+
+      const dataset = untouchable<AnalyticsEngineDataset>("METRICS", {
+        writeDataPoint: (point) => {
+          if (point !== undefined) {
+            written.push(point);
+          }
+        },
+      });
+
+      const config = yield* decodeEnv({
+        ...fakeEnv(),
+        METRICS: dataset,
+      }).pipe(Effect.orDie);
+
+      yield* Metrics.use((metrics) =>
+        metrics.write([MetricPoint.cases.Landed.make({ project: datekit })])
+      ).pipe(Effect.provide(workerPorts(config)));
+
+      expect(written).toStrictEqual([
+        { blobs: ["Landed"], doubles: [1], indexes: ["alice/datekit"] },
+      ]);
     })
   );
 });

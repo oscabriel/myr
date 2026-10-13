@@ -63,6 +63,7 @@ export const PlatformBindings = Schema.Struct({
   EVIDENCE: binding<Env["EVIDENCE"]>("an R2 bucket"),
   FRONT_PAGE: binding<Env["FRONT_PAGE"]>("a D1 database"),
   LOADER: binding<Env["LOADER"]>("a Worker Loader"),
+  METRICS: binding<Env["METRICS"]>("an Analytics Engine dataset"),
   OAUTH_KV: binding<Env["OAUTH_KV"]>("a KV namespace"),
   ON_PUSH: binding<Env["ON_PUSH"]>("the OnPush Workflow"),
   PROJECT: binding<Env["PROJECT"]>("the Project Durable Object"),

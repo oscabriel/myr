@@ -11,7 +11,7 @@ import { Lander } from "@repo/project/lander";
 import type { MergeJob } from "@repo/project/lander";
 import { LanderIsogit } from "@repo/project/lander/isogit";
 import { LanderJob } from "@repo/project/lander/memory";
-import type { LandingCommand } from "@repo/project/landing";
+import { LandingCommand } from "@repo/project/landing";
 import { FinishersFromChecks } from "@repo/project/project";
 import type { ProjectApi } from "@repo/project/project";
 import { ProjectionMemory } from "@repo/project/projection/memory";
@@ -320,6 +320,15 @@ export class DoCalls extends Context.Service<
   DoCalls,
   { readonly advances: Effect.Effect<readonly Advance[]> }
 >()("test/DoCalls") {}
+
+/** The stage each `Checked` report the project heard names. */
+export const checkedStages = DoCalls.use(({ advances }) =>
+  Effect.map(advances, (all) =>
+    all
+      .filter(({ command }) => LandingCommand.$is("Checked")(command))
+      .map(({ report }) => report?.stage)
+  )
+);
 
 const projects = Layer.effectContext(
   Effect.gen(function* () {

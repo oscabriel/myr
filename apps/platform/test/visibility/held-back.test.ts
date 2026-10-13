@@ -63,6 +63,7 @@ import {
   bob,
   bobFork,
   changed,
+  checkedStages,
   Checker,
   finishRequired,
   fixed,
@@ -207,7 +208,10 @@ describe("the held-back step", () => {
           Option.map(yield* noteOn(answer.head), ({ outcome: noted }) => noted)
         ).toStrictEqual(Option.some(refused));
         expect(answers.map((each) => each.outcome)).toStrictEqual([refused]);
-        expect(yield* mainTip).toBe(answer.opened);
+        expect({
+          main: yield* mainTip,
+          stages: yield* checkedStages,
+        }).toStrictEqual({ main: answer.opened, stages: ["heldBack"] });
       }).pipe(Effect.provide(sealedWorld(policy)))
   );
 
@@ -553,6 +557,7 @@ describe("the landing guards", () => {
         );
         expect(yield* jobsOn(answer.merged)).toStrictEqual([]);
         expect(yield* mainTip).toBe(answer.opened);
+        expect(yield* checkedStages).toStrictEqual(["shape"]);
       }).pipe(Effect.provide(sealedWorld(policy)))
   );
 
