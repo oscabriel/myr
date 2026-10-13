@@ -20,7 +20,9 @@ export const runGate = <R>(
 > =>
   Effect.gen(function* () {
     for (const stage of stages) {
-      const refusals = yield* stage.run(facts);
+      const refusals = yield* stage
+        .run(facts)
+        .pipe(Effect.withSpan(`Gate.${stage.name}`));
 
       if (Array.isReadonlyArrayNonEmpty(refusals)) {
         return Option.some(

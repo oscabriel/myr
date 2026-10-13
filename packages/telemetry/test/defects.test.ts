@@ -1,12 +1,12 @@
 import { describe, expect, it } from "@effect/vitest";
 import { ProjectName } from "@repo/protocol/ids";
 import { UnknownProject, VerifierBlocked } from "@repo/protocol/refusal";
-import { Cause, Console, Effect, Redacted } from "effect";
+import { Cause, Effect, Layer, Redacted } from "effect";
 
-import { reportedElsewhere } from "../src/defects.ts";
+import { reportDefects, reportedElsewhere } from "../src/defects.ts";
+import { recordingConsole } from "../src/logger/memory.ts";
 import { recordingTracing } from "../src/spans/memory.ts";
 import { Telemetry } from "../src/telemetry.ts";
-import { capturing } from "./console.ts";
 
 // A boundary that hands every failure to the reporters, as effect's HTTP and
 // RPC servers do with a request's: telling a defect from a refusal is the
@@ -18,22 +18,24 @@ const reported = <A, E>(
   secrets: readonly Redacted.Redacted[] = []
 ) =>
   Effect.gen(function* () {
-    const { console, written } = capturing();
+    const console = recordingConsole();
     const recording = recordingTracing();
 
     yield* body.pipe(
       Effect.withSpan("Project.claim"),
-      Effect.provide(Telemetry({ secrets, tracing: recording.tracing })),
-      Effect.provideService(Console.Console, console),
+      Effect.provide(
+        Layer.merge(
+          Telemetry({ secrets, tracing: recording.tracing }),
+          console.layer
+        )
+      ),
       Effect.exit
     );
 
     return {
-      errors: written.flatMap(({ line, method }) =>
-        method === "error" ? [line] : []
-      ),
+      errors: console.errors(),
       spans: recording.spans(),
-      written,
+      written: console.written(),
     };
   });
 
@@ -80,6 +82,32 @@ describe("a defect", () => {
       expect(errors).toHaveLength(1);
       expect(JSON.stringify(errors)).not.toContain("VerifierBlocked");
     })
+  );
+
+  it.effect(
+    "is reported at the innermost boundary, with the ids its lines carry there, and passes every boundary further out",
+    () =>
+      Effect.gen(function* () {
+        const { errors } = yield* reported(
+          Effect.forEach(
+            [new Error("the store is gone"), "the Project DO has no name"],
+            (defect) =>
+              Effect.die(defect).pipe(
+                reportDefects,
+                Effect.annotateLogs({ requestId: "push-1" }),
+                reportDefects,
+                boundary,
+                Effect.exit
+              )
+          )
+        );
+
+        expect(errors).toHaveLength(2);
+        expect(errors).toMatchObject([
+          { message: "Error: the store is gone", requestId: "push-1" },
+          { message: "Error: the Project DO has no name", requestId: "push-1" },
+        ]);
+      })
   );
 
   it.effect(

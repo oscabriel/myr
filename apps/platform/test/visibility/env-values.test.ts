@@ -343,7 +343,7 @@ describe("a write-only value over the platform", () => {
   );
 
   it.effect(
-    "is in no response body, log line, row or event, while the set is logged by key and setter",
+    "is in no response body, log line, row or event, while the set is logged by project, key and setter",
     () =>
       Effect.gen(function* () {
         const kept = keptFresh();
@@ -355,7 +355,7 @@ describe("a write-only value over the platform", () => {
             line.includes('"a write-only value was set"')
           )
         ).toStrictEqual([
-          `["a write-only value was set"] {"by":"ines-v","key":"SENTRY_AUTH_TOKEN"} `,
+          `["a write-only value was set"] {"project":"ines-v/datekit","by":"ines-v","key":"SENTRY_AUTH_TOKEN"} `,
         ]);
         expect({
           bodies: kept.bodies.filter((body) => body.includes(value)),

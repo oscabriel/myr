@@ -51,12 +51,14 @@ export type PlatformFetch = (
 ) => Promise<Response>;
 
 // Each origin's server is made on its first request and kept: a Worker is reached only on its own hostnames.
-export const oauthProvider = <E>(
+export const oauthProvider = <E, TE = never>(
   services: Layer.Layer<GoogleServices, E>,
-  platformFetch: PlatformFetch
+  platformFetch: PlatformFetch,
+  telemetry?: Layer.Layer<never, TE>
 ) => {
   const { dispose, handler } = buildHandler(
-    Layer.mergeAll(signInRoutes, googleRoutes).pipe(Layer.provide(services))
+    Layer.mergeAll(signInRoutes, googleRoutes).pipe(Layer.provide(services)),
+    telemetry
   );
 
   const servers = new Map<string, OAuthAuthorizationServer<OAuthEnv>>();

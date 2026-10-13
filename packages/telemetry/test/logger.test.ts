@@ -1,23 +1,27 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Cause, Console, Effect, Logger, Redacted } from "effect";
+import { Cause, Effect, Layer, Logger, Redacted } from "effect";
 
 import { jsonLogger, scrubberOf } from "../src/logger.ts";
-import { capturing } from "./console.ts";
+import { recordingConsole } from "../src/logger/memory.ts";
 
 const logged = <A, E>(
   body: Effect.Effect<A, E>,
   secrets: readonly Redacted.Redacted[] = []
 ) =>
   Effect.gen(function* () {
-    const { console, written } = capturing();
+    const console = recordingConsole();
 
     yield* body.pipe(
-      Effect.provide(Logger.layer([jsonLogger(scrubberOf(secrets))])),
-      Effect.provideService(Console.Console, console),
+      Effect.provide(
+        Layer.merge(
+          Logger.layer([jsonLogger(scrubberOf(secrets))]),
+          console.layer
+        )
+      ),
       Effect.exit
     );
 
-    return written;
+    return console.written();
   });
 
 describe(jsonLogger, () => {

@@ -4,8 +4,8 @@ import type { ProjectApi } from "@repo/project/project";
 import { ProjectName } from "@repo/protocol/ids";
 import { Person, Principal } from "@repo/protocol/principal";
 import { UnknownProject } from "@repo/protocol/refusal";
-import { Effect, Record, Schema } from "effect";
-import type { Exit } from "effect";
+import { reportedElsewhere } from "@repo/telemetry/defects";
+import { Effect, Exit, Record, Schema } from "effect";
 
 export type ProjectMethod = keyof ProjectApi;
 
@@ -160,5 +160,11 @@ export const decodeReply = <M extends ProjectMethod>(
 ): Effect.Effect<SuccessOf<M>, ErrorOf<M>> =>
   Schema.decodeEffect(ProjectCalls[method].exit)(reply).pipe(
     Effect.orDie,
-    Effect.flatten
+    // The Project DO reported its defects, with their stacks, before it replied.
+    Effect.flatMap(
+      Exit.match({
+        onFailure: (cause) => Effect.failCause(reportedElsewhere(cause)),
+        onSuccess: Effect.succeed,
+      })
+    )
   );

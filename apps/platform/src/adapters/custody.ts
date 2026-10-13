@@ -11,6 +11,8 @@ import type { Person } from "@repo/protocol/principal";
 import { ClaimLapsed, DirectPush, NotClaimed } from "@repo/protocol/refusal";
 import type { Refusal } from "@repo/protocol/refusal";
 import { receiptLine } from "@repo/protocol/render";
+import { annotateInvocation } from "@repo/telemetry/spans";
+import type { InvocationIds } from "@repo/telemetry/spans";
 import { Array, Effect, Option, Result } from "effect";
 
 import type { LayerTarget } from "../layer-gate.ts";
@@ -160,13 +162,12 @@ const offer = (input: {
       return [NotClaimed.of(ask)];
     }
 
+    const requestId = pushRequestId(person.handle, head);
+
+    yield* annotateInvocation({ requestId });
+
     const submitted = yield* Effect.result(
-      api.submitAnswer(person, {
-        ask,
-        base: claim.value.base,
-        head,
-        requestId: pushRequestId(person.handle, head),
-      })
+      api.submitAnswer(person, { ask, base: claim.value.base, head, requestId })
     );
 
     if (Result.isFailure(submitted)) {
@@ -239,15 +240,43 @@ const annotationsOf = (
   target: kind._tag,
 });
 
+// What Issues shows beside a push's failure: the project and ask it reached,
+// the tip it carried to main and the tags it was refused with.
+const targetIds = (kind: RepoKind): InvocationIds =>
+  RepoKind.$match(kind, {
+    Canonical: ({ project }) => ({ project }),
+    ClaimFork: ({ ask, project }) => ({ ask, project }),
+    Unknown: () => ({}),
+    WorkingFork: ({ project }) => ({ project }),
+  });
+
+const refusalIds = (refusals: readonly Refusal[]): InvocationIds =>
+  Array.isReadonlyArrayNonEmpty(refusals)
+    ? { refusal: Array.dedupe(refusals.map(({ _tag }) => _tag)).join(",") }
+    : {};
+
+const judged =
+  (commands: readonly Command[]) => (refusals: readonly Refusal[]) =>
+    annotateInvocation({
+      ...Option.match(mainTip(commands), {
+        onNone: () => ({}),
+        onSome: ({ head }) => ({ sha: head }),
+      }),
+      ...refusalIds(refusals),
+    });
+
 // `admit` stays synchronous: the gateway's body locks the moment the fiber yields.
 const annotated = (custody: Custody["Service"], annotations: PushAnnotations) =>
   Custody.of({
     admit: (repo, commands) =>
-      custody.admit(repo, commands).pipe(Effect.annotateLogs(annotations)),
+      custody
+        .admit(repo, commands)
+        .pipe(Effect.tap(judged(commands)), Effect.annotateLogs(annotations)),
     review: (repo, commands) =>
       custody
         .review(repo, commands)
         .pipe(
+          Effect.tap(judged(commands)),
           Effect.annotateLogs(annotations),
           Effect.withSpan("custody.review", { attributes: annotations })
         ),
@@ -274,6 +303,7 @@ export const custodyFor = (
     const projects = yield* Projects;
     const annotations = annotationsOf(pusher, kind, audit);
 
+    yield* annotateInvocation(targetIds(kind));
     yield* Effect.logInfo("a push reached custody").pipe(
       Effect.annotateLogs(annotations)
     );

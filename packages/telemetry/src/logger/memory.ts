@@ -1,4 +1,6 @@
-import type { Console } from "effect";
+// A console in memory, for the logger to write to in a test: each line kept
+// as the logger handed it over, by the method it was written through.
+import { Console, Layer } from "effect";
 import { constVoid } from "effect/Function";
 
 export type Method = "debug" | "error" | "info" | "log" | "trace" | "warn";
@@ -8,8 +10,14 @@ export interface Written {
   readonly line: unknown;
 }
 
-/** A console that keeps each line a leveled method writes, by its method. */
-export const capturing = () => {
+export interface RecordingConsole {
+  readonly layer: Layer.Layer<never>;
+  readonly written: () => readonly Written[];
+  /** What reached `console.error`, where Issues hears it. */
+  readonly errors: () => readonly Written["line"][];
+}
+
+export const recordingConsole = (): RecordingConsole => {
   const written: Written[] = [];
 
   const write =
@@ -40,5 +48,10 @@ export const capturing = () => {
     warn: write("warn"),
   };
 
-  return { console, written };
+  return {
+    errors: () =>
+      written.flatMap(({ line, method }) => (method === "error" ? [line] : [])),
+    layer: Layer.succeed(Console.Console, console),
+    written: () => [...written],
+  };
 };

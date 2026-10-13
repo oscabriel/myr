@@ -87,3 +87,11 @@ export const annotateInvocation = (ids: InvocationIds): Effect.Effect<void> =>
       annotate(ids);
     })
   );
+
+/** Runs `effect` as the invocation `ids` name: they go onto its root span, and onto each line it logs. */
+export const withInvocation =
+  (ids: InvocationIds) =>
+  <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
+    Effect.andThen(annotateInvocation(ids), effect).pipe(
+      Effect.annotateLogs({ ...ids })
+    );

@@ -2,7 +2,7 @@
 // root span is active throughout, and `startSpan` opens a span under whatever
 // is active without making it active, so its parent is always the root.
 import { Context, Effect, Layer } from "effect";
-import { identity } from "effect/Function";
+import { constUndefined, constVoid, identity } from "effect/Function";
 
 import type { Scrub } from "../logger.ts";
 import type { SpanValue, WorkerSpan, WorkerTracing } from "../spans.ts";
@@ -88,6 +88,19 @@ export const recordingTracing = (traced = true): RecordingTracing => {
       startSpan: (name) => open(name, ROOT),
     },
   };
+};
+
+const untracedSpan: WorkerSpan = {
+  end: constVoid,
+  isTraced: false,
+  recordException: constVoid,
+  setAttribute: constVoid,
+};
+
+/** A runtime outside workerd, where no invocation is traced: every span is a no-op. */
+export const untracedTracing: WorkerTracing = {
+  getActiveSpan: constUndefined,
+  startSpan: () => untracedSpan,
 };
 
 export class SpansRecorded extends Context.Service<

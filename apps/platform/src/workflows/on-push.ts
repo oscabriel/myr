@@ -2,16 +2,18 @@
 import type { PushReport } from "@repo/project/project";
 import type { Projects } from "@repo/project/projects";
 import { Anonymous, Person } from "@repo/protocol/principal";
+import { annotateInvocation } from "@repo/telemetry/spans";
 import { WorkflowEntrypoint } from "cloudflare:workers";
 import type { WorkflowEvent, WorkflowStep } from "cloudflare:workers";
-import { Data, Effect, Layer, Option, Schema } from "effect";
+import { Array, Data, Effect, Layer, Option, Schema } from "effect";
 
 import { decodeEnv } from "../platform.ts";
-import { workerPorts } from "../ports.ts";
-import { RepoKind } from "../repo-names.ts";
+import { telemetryOf, workerPorts } from "../ports.ts";
+import { RepoKind, repoKind } from "../repo-names.ts";
+import { instance, invocation } from "./instance.ts";
 import { classifyPush, PushVerdict } from "./on-push/classify.ts";
 import { isZero, OnPushEvent } from "./on-push/event.ts";
-import { factsOf, projectFor } from "./on-push/facts.ts";
+import { factsOf, projectFor, projectOf } from "./on-push/facts.ts";
 import { StepRunner, workflowSteps } from "./step.ts";
 import type { StepRetry, WorkflowSteps } from "./step.ts";
 
@@ -48,8 +50,13 @@ const recordOf = (event: OnPushEvent) =>
       : Anonymous.make({});
 
     const refusals = yield* api.recordPush(reportOf(event, pusher));
+    const tags = refusals.map(({ _tag }) => _tag);
 
-    return refusals.map(({ _tag }) => _tag);
+    if (Array.isReadonlyArrayNonEmpty(tags)) {
+      yield* annotateInvocation({ refusal: tags.join(",") });
+    }
+
+    return tags;
   });
 
 class LooksStray extends Data.TaggedError("LooksStray") {}
@@ -107,11 +114,24 @@ export const runInstance = (
     const event = yield* Schema.decodeEffect(OnPushEvent)(params);
     const config = yield* decodeEnv(env);
 
-    const verdict = yield* runOnPush(event).pipe(
-      Effect.provide(Layer.merge(workerPorts(config), workflowSteps(steps)))
-    );
+    const ids = Option.match(projectOf(repoKind(event.source.repoName)), {
+      onNone: () => ({ sha: event.payload.after }),
+      onSome: (project) => ({ project, sha: event.payload.after }),
+    });
 
-    return yield* Effect.orDie(Schema.encodeEffect(PushVerdict)(verdict));
+    // Its params and its env are decoded before it runs, and refuse as they are.
+    return yield* runOnPush(event).pipe(
+      Effect.flatMap(Schema.encodeEffect(PushVerdict)),
+      invocation(ids),
+      instance("OnPush.run"),
+      Effect.provide(
+        Layer.mergeAll(
+          workerPorts(config),
+          telemetryOf(config),
+          workflowSteps(steps)
+        )
+      )
+    );
   });
 
 export class OnPush extends WorkflowEntrypoint<

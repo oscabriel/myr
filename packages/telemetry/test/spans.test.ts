@@ -1,9 +1,9 @@
 import { describe, expect, it } from "@effect/vitest";
 import { VerifierBlocked } from "@repo/protocol/refusal";
-import { Effect, Layer, Option, Redacted } from "effect";
+import { Effect, Layer, Logger, Option, Redacted } from "effect";
 
 import { scrubberOf } from "../src/logger.ts";
-import { annotateInvocation } from "../src/spans.ts";
+import { annotateInvocation, withInvocation } from "../src/spans.ts";
 import { tracerOver } from "../src/spans/binding.ts";
 import {
   recordingTracing,
@@ -205,6 +205,35 @@ describe(annotateInvocation, () => {
           refusal: "OutOfScope,Weakened",
           requestId: "push-1",
         });
+      })
+  );
+
+  it.effect(
+    "goes, by withInvocation, onto the root span and onto each line logged under it",
+    () =>
+      Effect.gen(function* () {
+        const lines: unknown[] = [];
+
+        const spans = yield* recorded(
+          Effect.logInfo("a run started").pipe(
+            withInvocation({ project: "alice/datekit", requestId: "push-1" }),
+            Effect.provide(
+              Logger.layer([
+                Logger.map(Logger.formatStructured, ({ annotations }) => {
+                  lines.push(annotations);
+                }),
+              ])
+            )
+          )
+        );
+
+        expect([
+          Object.fromEntries(spans[0]?.attributes ?? []),
+          lines,
+        ]).toStrictEqual([
+          { project: "alice/datekit", requestId: "push-1" },
+          [{ project: "alice/datekit", requestId: "push-1" }],
+        ]);
       })
   );
 
