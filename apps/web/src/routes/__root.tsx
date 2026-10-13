@@ -31,23 +31,25 @@ const siteFacts = createServerFn({ method: "GET" }).handler(() => ({
 
 // Rendered into the head directly, not through `rootHead`: both metas are named `theme-color`,
 // and TanStack's `HeadContent` keeps one meta per name. Each meta names its scheme's paper for a
-// page whose script never runs; the script (ADR 0042) then sets `data-theme` on `<html>` and colours
-// both metas for the resolved theme, before the body is parsed, so nothing paints in the other one.
-// What it writes is there before React hydrates, so those elements take no warning for it.
+// page whose script never runs, so they sit in a noscript: React's hydration matches a meta by its
+// content and adds a fresh one beside any the script changed, and the browser takes the first that
+// matches. The script (ADR 0042) sets `data-theme` on `<html>` and owns the one live `theme-color`
+// meta, before the body is parsed, so nothing paints in the other theme. `<html>` takes no
+// hydration warning for the attribute.
 export const ThemeHead = () => (
   <>
-    <meta
-      content={themeColors.light}
-      media="(prefers-color-scheme: light)"
-      name="theme-color"
-      suppressHydrationWarning
-    />
-    <meta
-      content={themeColors.dark}
-      media="(prefers-color-scheme: dark)"
-      name="theme-color"
-      suppressHydrationWarning
-    />
+    <noscript>
+      <meta
+        content={themeColors.light}
+        media="(prefers-color-scheme: light)"
+        name="theme-color"
+      />
+      <meta
+        content={themeColors.dark}
+        media="(prefers-color-scheme: dark)"
+        name="theme-color"
+      />
+    </noscript>
     {/* oxlint-disable-next-line react/no-danger -- the theme must apply before first paint, so its script is inline and verbatim (THEME_SCRIPT_SOURCE is its hash); the text is the module's own constant, never input */}
     <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
   </>

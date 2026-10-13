@@ -100,12 +100,36 @@ describe("the head script", () => {
       const theme = resolveTheme(system, readPreference(storage));
 
       expect(page.theme()).toBe(theme);
-      expect(page.metaColours()).toStrictEqual([
-        themeColors[theme],
-        themeColors[theme],
-      ]);
+      expect(page.shownColour()).toBe(themeColors[theme]);
     }
   );
+
+  // A meta already in the head is left as it is: the script adds one of its
+  // own ahead of it, which the browser takes first.
+  it("colours the browser's bar with a meta of its own, leaving the head's as they were", () => {
+    const page = themePage("light");
+
+    runHeadScript(page, storedAs("opposite"));
+    page.turnSystem();
+
+    expect(page.metas()).toStrictEqual([
+      {
+        content: themeColors.light,
+        "data-theme-color": "",
+        name: "theme-color",
+      },
+      {
+        content: "react-light",
+        media: "(prefers-color-scheme: light)",
+        name: "theme-color",
+      },
+      {
+        content: "react-dark",
+        media: "(prefers-color-scheme: dark)",
+        name: "theme-color",
+      },
+    ]);
+  });
 
   it("follows the system as it changes", () => {
     const page = themePage("light");
@@ -117,10 +141,7 @@ describe("the head script", () => {
     page.turnSystem();
 
     expect(page.theme()).toBe("light");
-    expect(page.metaColours()).toStrictEqual([
-      themeColors.light,
-      themeColors.light,
-    ]);
+    expect(page.shownColour()).toBe(themeColors.light);
   });
 
   it("follows a preference another tab writes", () => {

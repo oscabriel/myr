@@ -28,19 +28,21 @@ describe("the document's head", () => {
     expect(names).toStrictEqual([...new Set(names)]);
   });
 
-  // ADR 0042: the metas name each scheme's paper for a page whose script
-  // never runs; the script then colours both for the resolved theme.
-  it("carries each scheme's theme colour, then the theme script, verbatim", () => {
+  // ADR 0042: the metas name each scheme's paper only for a page whose
+  // script never runs. Out of a noscript, React's hydration matches a meta by
+  // its content and adds a fresh one beside any the script coloured, so the
+  // browser's bar could take the other theme's paper.
+  it("carries each scheme's theme colour for a page without scripts, then the theme script, verbatim", () => {
     const markup = renderToStaticMarkup(<ThemeHead />);
 
     expect(markup).toBe(
-      `<meta content="${themeColors.light}" media="(prefers-color-scheme: light)" name="theme-color"/><meta content="${themeColors.dark}" media="(prefers-color-scheme: dark)" name="theme-color"/><script>${THEME_SCRIPT}</script>`
+      `<noscript><meta content="${themeColors.light}" media="(prefers-color-scheme: light)" name="theme-color"/><meta content="${themeColors.dark}" media="(prefers-color-scheme: dark)" name="theme-color"/></noscript><script>${THEME_SCRIPT}</script>`
     );
   });
 
-  // The script writes `data-theme` and the metas' colour before React
-  // hydrates, so those elements accept what they find.
-  it("puts the theme in the document's head, and lets hydration find it changed", () => {
+  // The script writes `data-theme` before React hydrates, so `<html>`
+  // accepts the attribute it finds.
+  it("puts the theme in the document's head, and lets hydration find <html> changed", () => {
     expect(rootSource).toMatch(
       /<html lang="en" suppressHydrationWarning>\s*<head>[^]*<ThemeHead \/>[^]*<\/head>/u
     );

@@ -1,8 +1,10 @@
 /**
  * A browser page as far as the theme reaches into one: the root element, the
- * two `theme-color` metas, the system's colour scheme, and a cookie jar that
- * records every write, so a test can say none happened.
+ * head with two `theme-color` metas per scheme already in it, the system's
+ * colour scheme, and a cookie jar that records every write, so a test can say none
+ * happened.
  */
+import { THEME_META } from "../src/features/shared/theme.ts";
 import type { Theme } from "../src/features/shared/theme.ts";
 
 interface FakeMeta {
@@ -10,26 +12,34 @@ interface FakeMeta {
   readonly setAttribute: (name: string, value: string) => void;
 }
 
-const fakeMeta = (media: string): FakeMeta => {
-  const attributes = new Map([
-    ["media", media],
-    ["name", "theme-color"],
-  ]);
+const fakeMeta = (entries: readonly (readonly [string, string])[] = []) => {
+  const attributes = new Map(entries);
 
-  return {
+  const meta: FakeMeta = {
     attributes,
     setAttribute: (name, value) => {
       attributes.set(name, value);
     },
   };
+
+  return meta;
 };
+
+const SYSTEM_DARK = "(prefers-color-scheme: dark)";
+
+const rendered = (scheme: Theme, content: string) =>
+  fakeMeta([
+    ["content", content],
+    ["media", `(prefers-color-scheme: ${scheme})`],
+    ["name", "theme-color"],
+  ]);
 
 export const themePage = (system: Theme) => {
   const root: DOMStringMap = {};
 
-  const metas = [
-    fakeMeta("(prefers-color-scheme: light)"),
-    fakeMeta("(prefers-color-scheme: dark)"),
+  const head = [
+    rendered("light", "react-light"),
+    rendered("dark", "react-dark"),
   ];
 
   const cookies: string[] = [];
@@ -45,8 +55,23 @@ export const themePage = (system: Theme) => {
     set cookie(value: string) {
       cookies.push(value);
     },
-    querySelectorAll: (selector: string) =>
-      selector === 'meta[name="theme-color"]' ? metas : [],
+    head: {
+      insertAdjacentHTML: (_: "afterbegin", html: typeof THEME_META) => {
+        if (html === THEME_META) {
+          head.unshift(
+            fakeMeta([
+              ["data-theme-color", ""],
+              ["name", "theme-color"],
+            ])
+          );
+        }
+      },
+    },
+    querySelector: (selector: string) =>
+      selector === "meta[data-theme-color]"
+        ? (head.find(({ attributes }) => attributes.has("data-theme-color")) ??
+          null)
+        : null,
   };
 
   const matchMedia = (query: string) => ({
@@ -54,9 +79,15 @@ export const themePage = (system: Theme) => {
       changes.push(listener);
     },
     get matches() {
-      return query === "(prefers-color-scheme: dark)" && scheme.matches;
+      return query === SYSTEM_DARK && scheme.matches;
     },
   });
+
+  const matching = (meta: FakeMeta) => {
+    const media = meta.attributes.get("media");
+
+    return media === undefined || (media === SYSTEM_DARK) === scheme.matches;
+  };
 
   return {
     /** The window's, which hears another tab write to storage. */
@@ -66,8 +97,23 @@ export const themePage = (system: Theme) => {
     cookies,
     document,
     matchMedia,
-    /** The colour each `theme-color` meta now carries. */
-    metaColours: () => metas.map(({ attributes }) => attributes.get("content")),
+    /** Each `theme-color` meta in the head, in order, as its attributes. */
+    metas: () => head.map(({ attributes }) => Object.fromEntries(attributes)),
+    /** The browser's: the first `theme-color` meta whose media matches. */
+    shownColour: () =>
+      head
+        .find(
+          (meta) =>
+            meta.attributes.get("name") === "theme-color" && matching(meta)
+        )
+        ?.attributes.get("content"),
+    /** Another tab writes to storage. */
+    storageWritten: () => {
+      for (const listener of stored) {
+        listener();
+      }
+    },
+    theme: () => root.theme,
     /** The system turns the other way, as at sunset. */
     turnSystem: () => {
       scheme.matches = !scheme.matches;
@@ -76,12 +122,5 @@ export const themePage = (system: Theme) => {
         changed();
       }
     },
-    /** Another tab writes to storage. */
-    storageWritten: () => {
-      for (const listener of stored) {
-        listener();
-      }
-    },
-    theme: () => root.theme,
   };
 };
