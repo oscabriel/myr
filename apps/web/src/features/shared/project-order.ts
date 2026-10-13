@@ -1,8 +1,6 @@
 import type { ProjectListing } from "@repo/protocol/domain/front-page";
 import { Array as Arr, Order } from "effect";
 
-export const PROJECTS_SHOWN = 8;
-
 const leading = Order.combine(
   Order.mapInput(
     Order.flip(Order.Number),

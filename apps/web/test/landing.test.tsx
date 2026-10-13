@@ -258,6 +258,9 @@ describe(LandingView, () => {
         expect(output).toContain(
           `remote: checking parse-iso at 1a2b3c4; follow with ${Brand.cli} status`
         );
+        expect(output).toContain(
+          "$ git fetch && git log -1 --format='%(trailers:key=Asked-by,key=Signed-off-by)' origin/main"
+        );
         expect(output).toContain(`Asked-by: ${credit("dora")}`);
         expect(output).toContain(`Signed-off-by: ${credit("alice")}`);
       })

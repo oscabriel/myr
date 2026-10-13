@@ -4,11 +4,12 @@
  * `apps/platform/test/core-loop.test.ts` asserts from real git, the landed
  * commit's trailers among them.
  */
-import { Brand } from "@repo/brand";
+import { creditLine } from "@repo/git/trailers";
 import { Outcome } from "@repo/protocol/domain/outcome";
 import {
   AskId,
   CommitSha,
+  Handle,
   ProjectName,
   RepoPath,
   RequestId,
@@ -60,8 +61,13 @@ export const refusedPush = (platformUrl: string): Transcript => {
   };
 };
 
-const credited = (handle: string) =>
-  `${handle} <${handle}@users.${Brand.domain}>`;
+/**
+ * Asks for the two credit trailers alone, so git prints exactly the two lines
+ * drawn under it; a landing's other trailers (`Ask`, `Verdict`, `Request-Id`)
+ * stay out of its output.
+ */
+export const LANDED_CREDITS =
+  "git fetch && git log -1 --format='%(trailers:key=Asked-by,key=Signed-off-by)' origin/main";
 
 const HEAD = CommitSha.make("1a2b3c4d5e6f708192a3b4c5d6e7f80912a3b4c5");
 
@@ -82,8 +88,8 @@ export const landedPush = (): Transcript => ({
         () => ""
       )
     ),
-    command("git fetch && git log -1 --format=%(trailers) origin/main"),
-    printed(`Asked-by: ${credited("dora")}`),
-    printed(`Signed-off-by: ${credited("alice")}`),
+    command(LANDED_CREDITS),
+    printed(`Asked-by: ${creditLine(Handle.make("dora"))}`),
+    printed(`Signed-off-by: ${creditLine(Handle.make("alice"))}`),
   ],
 });
