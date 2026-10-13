@@ -85,9 +85,17 @@ const ProjectDescriptionSchema = Schema.Struct({
   type: Schema.Literal("string"),
 });
 
-/** A project's listing in a JSON Schema, its description's schema beside what it requires. */
+const LandingsSchema = Schema.Struct({
+  minimum: Schema.Int,
+  type: Schema.Literal("integer"),
+});
+
+/** A project's listing in a JSON Schema, its description's and landings' schemas beside what it requires. */
 const ListingSchema = Schema.Struct({
-  properties: Schema.Struct({ description: ProjectDescriptionSchema }),
+  properties: Schema.Struct({
+    description: ProjectDescriptionSchema,
+    landings: LandingsSchema,
+  }),
   required: Schema.Array(Schema.String),
 });
 
@@ -259,7 +267,7 @@ describe("the contracts as MCP tools", () => {
     expect(schemas.flatMap(leaks)).toStrictEqual([]);
   });
 
-  it("lists each project with an optional description, capped in length", () => {
+  it("lists each project with an optional description, capped in length, and an optional count of landings", () => {
     const listProjects = listTools(
       toToolkit(surfaced("mcp"), Effect.service(Client)).toolkit
     ).find(({ name }) => name === "listProjects");
@@ -271,8 +279,14 @@ describe("the contracts as MCP tools", () => {
     expect(
       listings.map(({ properties }) => properties.description)
     ).toStrictEqual([{ maxLength: PROJECT_DESCRIPTION_CAP, type: "string" }]);
+    expect(listings.map(({ properties }) => properties.landings)).toStrictEqual(
+      [{ minimum: 0, type: "integer" }]
+    );
     expect(listings.flatMap(({ required }) => required)).not.toContain(
       "description"
+    );
+    expect(listings.flatMap(({ required }) => required)).not.toContain(
+      "landings"
     );
   });
 

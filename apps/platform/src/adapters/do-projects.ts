@@ -89,6 +89,7 @@ const apiOf = (
     initProject: (caller, input) => on("initProject", [caller, input]),
     land: (caller, input) => assumingMade(on("land", [caller, input])),
     landing: (caller, sha) => assumingMade(on("landing", [caller, sha])),
+    landingCount: () => on("landingCount", []),
     landings: (shas) => on("landings", [shas]),
     layerAccess: (caller, layer) => on("layerAccess", [caller, layer]),
     layerFacts: (caller) => on("layerFacts", [caller]),

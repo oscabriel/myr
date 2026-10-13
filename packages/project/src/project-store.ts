@@ -92,6 +92,8 @@ export class ProjectStore extends Context.Service<
     readonly landing: (
       sha: CommitSha
     ) => Effect.Effect<Option.Option<LandingRow>>;
+    /** Every landing the project keeps, past the snapshot's newest. */
+    readonly landingCount: () => Effect.Effect<number>;
     readonly layerReadsSince: (
       seq: number,
       limit: number

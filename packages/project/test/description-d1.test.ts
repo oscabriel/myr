@@ -23,6 +23,7 @@ const at = DateTime.makeUnsafe("2026-10-12T12:00:00Z");
 const helpers: KeptDescription = {
   description: Schema.decodeSync(ProjectDescription)("Date helpers."),
   landedAt: at,
+  landings: 12,
 };
 
 const keptFor = (projects: readonly ProjectName[]) =>
@@ -45,18 +46,18 @@ describe("the kept descriptions in D1", () => {
   );
 
   it.effect(
-    "keeps each project's description beside the landing it read, and a README with none",
+    "keeps each project's description and count of landings beside the landing it read, and a README with none",
     () =>
       Effect.gen(function* () {
         yield* keep([
           [datekit, helpers],
-          [burrow, { landedAt: at }],
+          [burrow, { landedAt: at, landings: 1 }],
         ]);
 
         expect(yield* keptFor([datekit, burrow])).toStrictEqual(
           new Map([
             [datekit, helpers],
-            [burrow, { landedAt: at }],
+            [burrow, { landedAt: at, landings: 1 }],
           ])
         );
       }).pipe(
@@ -72,10 +73,11 @@ describe("the kept descriptions in D1", () => {
     Effect.gen(function* () {
       const sql = yield* SqlClient;
 
-      yield* sql`INSERT INTO project_descriptions (project, landed_at, description)
-        VALUES ('alice__datekit', '2026-10-12T12:00:00.000Z', ${"x".repeat(161)})`;
+      yield* sql`INSERT INTO project_descriptions (project, landed_at, description, landings)
+        VALUES ('alice__datekit', '2026-10-12T12:00:00.000Z', ${"x".repeat(161)}, 3),
+          ('alice__burrow', '2026-10-12T12:00:00.000Z', NULL, -1)`;
 
-      expect(yield* keptFor([datekit])).toStrictEqual(new Map());
+      expect(yield* keptFor([datekit, burrow])).toStrictEqual(new Map());
     }).pipe(
       Effect.provide(
         ProjectDescriptionsD1.pipe(

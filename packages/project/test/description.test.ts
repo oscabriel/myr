@@ -7,6 +7,7 @@ import { DateTime, Effect, Layer, Logger, Option, Ref } from "effect";
 
 import type { CodeProject } from "../src/code.ts";
 import { descriptionOf, withDescriptions } from "../src/description.ts";
+import type { LandedProject } from "../src/description.ts";
 import { ProjectDescriptionsMemory } from "../src/description/memory.ts";
 import { Content, writer } from "./code-fixtures.ts";
 
@@ -83,6 +84,17 @@ describe(descriptionOf, () => {
     expect(long).toMatch(/^A word that repeats .+ repeats…$/u);
   });
 
+  it("cuts a long run with no space by whole characters, never half of one", () => {
+    // The cap falls just after a whole pair, which a cut of one code unit would split.
+    const cut = descriptionOf(`ab${"\u{1F501}".repeat(100)}`).pipe(
+      Option.getOrThrow
+    );
+
+    expect(cut.length).toBeLessThanOrEqual(PROJECT_DESCRIPTION_CAP);
+    expect(cut).not.toMatch(/\p{Cs}/u);
+    expect(cut).toMatch(/^ab(?:\u{1F501})+…$/u);
+  });
+
   it("is none for a README of headings, badges and code alone", () => {
     expect(
       descriptionOf(
@@ -113,7 +125,7 @@ const listingOf = (project: ProjectName, landed?: string): ProjectListing =>
     ? { openAsks: 1, posture: "open", project }
     : { landedAt: landedAt(landed), openAsks: 1, posture: "open", project };
 
-/** A repo whose main holds one README, read through a record that counts its reads. */
+/** A repo whose main holds one README and three landings, read through a record that counts its reads. */
 const withReadme = (project: ProjectName, readme: string) =>
   Effect.gen(function* () {
     const git = yield* writer;
@@ -141,20 +153,25 @@ const withReadme = (project: ProjectName, readme: string) =>
       repo,
     };
 
-    return { code, reads };
+    const landed: LandedProject = { code, landingCount: Effect.succeed(3) };
+
+    return { landed, reads };
   });
 
 const described = (listed: readonly ProjectListing[]) =>
   Object.fromEntries(
-    listed.map(({ description, project }) => [project, description])
+    listed.map(({ description, landings, project }) => [
+      project,
+      { description, landings },
+    ])
   );
 
 describe(withDescriptions, () => {
   it.effect(
-    "gives each landed project its README's first paragraph, and one not yet landed none",
+    "gives each landed project its README's first paragraph and its count of landings, and one not yet landed neither",
     () =>
       Effect.gen(function* () {
-        const { code } = yield* withReadme(
+        const { landed } = yield* withReadme(
           datekit,
           "# datekit\n\nDate helpers.\n"
         );
@@ -163,13 +180,13 @@ describe(withDescriptions, () => {
           [listingOf(datekit, "2026-10-12T12:00:00Z"), listingOf(burrow)],
           (project) =>
             project === datekit
-              ? Effect.succeed(code)
+              ? Effect.succeed(landed)
               : Effect.die("never read")
         );
 
         expect(described(listed)).toStrictEqual({
-          [burrow]: undefined,
-          [datekit]: "Date helpers.",
+          [burrow]: { description: undefined, landings: undefined },
+          [datekit]: { description: "Date helpers.", landings: 3 },
         });
       }).pipe(Effect.provide(RepoHostMemory))
   );
@@ -178,12 +195,12 @@ describe(withDescriptions, () => {
     "reads a project once while its last landing stands, and again after the next",
     () =>
       Effect.gen(function* () {
-        const { code, reads } = yield* withReadme(
+        const { landed, reads } = yield* withReadme(
           datekit,
           "# datekit\n\nDate helpers.\n"
         );
 
-        const codeOf = () => Effect.succeed(code);
+        const codeOf = () => Effect.succeed(landed);
 
         yield* withDescriptions(
           [listingOf(datekit, "2026-10-12T12:00:00Z")],
@@ -202,7 +219,9 @@ describe(withDescriptions, () => {
           codeOf
         );
 
-        expect(described(kept)).toStrictEqual({ [datekit]: "Date helpers." });
+        expect(described(kept)).toStrictEqual({
+          [datekit]: { description: "Date helpers.", landings: 3 },
+        });
         expect([readOnce, yield* Ref.get(reads)]).toStrictEqual([1, 2]);
       }).pipe(
         Effect.provide(Layer.merge(RepoHostMemory, ProjectDescriptionsMemory))
@@ -210,7 +229,7 @@ describe(withDescriptions, () => {
   );
 
   it.effect(
-    "lists a project whose README cannot be read, with no description",
+    "lists a project whose record cannot be reached, with no description and no count",
     () =>
       Effect.gen(function* () {
         const listed = yield* withDescriptions(
@@ -222,5 +241,44 @@ describe(withDescriptions, () => {
           listingOf(datekit, "2026-10-12T12:00:00Z"),
         ]);
       }).pipe(Effect.provide(RepoHostMemory))
+  );
+
+  it.effect(
+    "lists a project whose landings cannot be counted with neither, and keeps nothing",
+    () =>
+      Effect.gen(function* () {
+        const { landed, reads } = yield* withReadme(
+          datekit,
+          "# datekit\n\nDate helpers.\n"
+        );
+
+        const uncounted: LandedProject = {
+          ...landed,
+          landingCount: Effect.die("the record's storage is down"),
+        };
+
+        const first = yield* withDescriptions(
+          [listingOf(datekit, "2026-10-12T12:00:00Z")],
+          () => Effect.succeed(uncounted)
+        );
+
+        yield* withDescriptions(
+          [listingOf(datekit, "2026-10-12T12:00:00Z")],
+          () => Effect.succeed(uncounted)
+        );
+
+        expect(first).toStrictEqual([
+          listingOf(datekit, "2026-10-12T12:00:00Z"),
+        ]);
+        expect(yield* Ref.get(reads)).toBe(2);
+      }).pipe(
+        Effect.provide(
+          Layer.mergeAll(
+            RepoHostMemory,
+            ProjectDescriptionsMemory,
+            Logger.layer([])
+          )
+        )
+      )
   );
 });

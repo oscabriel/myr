@@ -12,7 +12,7 @@ import {
 } from "@repo/project/code";
 import type { CodeProject } from "@repo/project/code";
 import { envSchemaMethod } from "@repo/project/deciders";
-import { withDescriptions } from "@repo/project/description";
+import { landedProjectOf, withDescriptions } from "@repo/project/description";
 import { FrontPage } from "@repo/project/front-page";
 import { GatewayUrl } from "@repo/project/project";
 import type { ProjectApi } from "@repo/project/project";
@@ -280,7 +280,7 @@ export const Handlers: Layer.Layer<
           Effect.flatMap((listed) =>
             withDescriptions(listed, (project) =>
               Effect.map(projects.get(project), (api) =>
-                codeProjectOf(api, project)
+                landedProjectOf(api, project)
               )
             )
           ),

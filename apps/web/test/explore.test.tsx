@@ -7,7 +7,6 @@ import { ExploreView } from "../src/features/explore/explore-page.tsx";
 import { exploreGroups } from "../src/features/explore/groups.ts";
 import { LandingProjects } from "../src/features/landing/projects.ts";
 import { readEveryProject } from "../src/features/landing/read.ts";
-import { exploreHeaders, Route } from "../src/routes/explore.tsx";
 import { fixturesClient } from "./dev-client.ts";
 import { TEN_LISTED } from "./listings.ts";
 import { textIn } from "./markup.ts";
@@ -51,15 +50,15 @@ const explored = (projects: readonly ProjectListing[]) =>
 
 describe("Explore, read on the server", () => {
   it.live(
-    "lists datekit with its README's first paragraph as its description",
+    "lists datekit with its README's first paragraph as its description, and its count of landings",
     () =>
       Effect.gen(function* () {
-        const projects = listedIn(yield* readEveryProject);
+        const datekit = listedIn(yield* readEveryProject).find(
+          ({ project }) => project === "oscabriel/datekit"
+        );
 
-        expect(
-          projects.find(({ project }) => project === "oscabriel/datekit")
-            ?.description
-        ).toBe(DATEKIT_LINE);
+        expect(datekit?.description).toBe(DATEKIT_LINE);
+        expect(datekit?.landings).toBeGreaterThan(0);
       }).pipe(Effect.provide(fixturesClient()), Effect.scoped),
     60_000
   );
@@ -75,10 +74,17 @@ describe("Explore, read on the server", () => {
   );
 
   it("is one page for every reader, which the edge may keep", () => {
-    expect(Route.options.headers).toBe(exploreHeaders);
-    expect(exploreHeaders()).toStrictEqual({
-      "Cache-Control": "public, max-age=30, stale-while-revalidate=300",
-    });
+    // `branchPage`'s value is cache-headers.test.ts's to pin.
+    const routes: Readonly<Record<string, string>> = import.meta.glob(
+      "../src/routes/explore.tsx",
+      { eager: true, import: "default", query: "?raw" }
+    );
+
+    expect(
+      Object.values(routes).map((source) =>
+        source.replaceAll(/\s+/gu, " ").includes("headers: () => branchPage")
+      )
+    ).toStrictEqual([true]);
   });
 });
 
@@ -142,12 +148,13 @@ describe(ExploreView, () => {
   );
 
   it.effect(
-    "shows a card's full name, description, posture, open asks and last landing",
+    "shows a card's full name, description, posture, open asks, landings and last landing",
     () =>
       Effect.gen(function* () {
         const datekit = decodeListing({
           description: DATEKIT_LINE,
           landedAt: "2026-10-12T09:00:00.000Z",
+          landings: 12,
           openAsks: 3,
           posture: "openWithSealedEvidence",
           project: "oscabriel/datekit",
@@ -160,13 +167,16 @@ describe(ExploreView, () => {
         expect(textIn(card)).toContain("oscabriel/datekit");
         expect(textIn(card)).toContain(DATEKIT_LINE);
         expect(card).toContain('data-posture="openWithSealedEvidence"');
-        expect(textIn(card)).toContain("3 open asks");
-        expect(textIn(card)).toContain("Last landed Oct 12, 2026");
+        expect(
+          ["3 open asks", "12 landings", "Last landed Oct 12, 2026"].filter(
+            (fact) => !textIn(card).includes(fact)
+          )
+        ).toStrictEqual([]);
       })
   );
 
   it.effect(
-    "says when no project takes answers, and when a project has not landed",
+    "says when no project takes answers, and when a project has not landed, with no count of landings",
     () =>
       Effect.gen(function* () {
         const markup = yield* explored([
@@ -182,6 +192,7 @@ describe(ExploreView, () => {
         );
         expect(textIn(markup)).toContain("No open asks");
         expect(textIn(markup)).toContain("No landing yet");
+        expect(textIn(markup)).not.toMatch(/\d+ landings?/u);
       })
   );
 

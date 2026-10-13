@@ -31,6 +31,10 @@ const LastSeq = Schema.Tuple([Schema.Struct({ last: Schema.Int })]);
 
 const decodeLastSeq = Schema.decodeUnknownEffect(LastSeq);
 
+const Counted = Schema.Tuple([Schema.Struct({ count: Schema.Int })]);
+
+const decodeCounted = Schema.decodeUnknownEffect(Counted);
+
 const bodiesOf = <A>(table: Table<A>, statement: Statement<object>) =>
   statement.pipe(
     Effect.flatMap(decodeBodies),
@@ -150,6 +154,12 @@ export const ProjectStoreSqlite = Layer.effect(
           Tables.landings,
           sql`SELECT body FROM landings WHERE sha = ${sha}`
         ).pipe(Effect.map(Array.head), Effect.orDie),
+      landingCount: () =>
+        sql`SELECT COUNT(*) AS count FROM landings`.pipe(
+          Effect.flatMap(decodeCounted),
+          Effect.map(([row]) => row.count),
+          Effect.orDie
+        ),
       layerReadsSince: (seq, limit) =>
         bodiesOf(
           LayerReadTable,

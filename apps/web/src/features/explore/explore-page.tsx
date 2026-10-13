@@ -41,7 +41,7 @@ const LastLanded = ({ at }: { readonly at: DateTime.Utc | undefined }) =>
 
 /** A plain bordered surface: the name, its posture, one line, then its counts. */
 const ProjectCard = ({
-  listing: { description, landedAt, openAsks, posture, project },
+  listing: { description, landedAt, landings, openAsks, posture, project },
 }: {
   readonly listing: ProjectListing;
 }) => (
@@ -70,6 +70,9 @@ const ProjectCard = ({
           ? plural(openAsks, "open ask", "open asks")
           : "No open asks"}
       </span>
+      {landings === undefined ? null : (
+        <span>{plural(landings, "landing", "landings")}</span>
+      )}
       <LastLanded at={landedAt} />
     </p>
   </li>
@@ -137,7 +140,7 @@ const Listed = ({
         <Group
           group="rest"
           heading="Other projects"
-          note="Projects with no open ask, to read and to follow."
+          note="Projects with no open ask, to read and to watch."
         >
           <CardGrid projects={rest} />
         </Group>

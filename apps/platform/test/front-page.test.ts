@@ -256,6 +256,7 @@ describe("the project list and credits over the platform's /rpc", () => {
           projects.find(({ project: listed }) => listed === "alice/quietkit")
         ).toStrictEqual({
           landedAt: at(noon),
+          landings: 1,
           openAsks: 0,
           posture: "open",
           project: "alice/quietkit",
@@ -264,7 +265,7 @@ describe("the project list and credits over the platform's /rpc", () => {
   );
 
   it.effect(
-    "after a landing, lists the project from D1, asking it only its posture and its README, once each, and its people's credits without calling a project",
+    "after a landing, lists the project from D1, asking it only its posture and its README and count of landings, once each, and its people's credits without calling a project",
     () =>
       Effect.gen(function* () {
         yield* advanceTo(noon);
@@ -292,11 +293,18 @@ describe("the project list and credits over the platform's /rpc", () => {
               { area: "parser", count: 1, project, role: "Signed-off-by" },
             ],
           },
-          // One for its posture, one for its README's description.
+          // One for its posture, one for its README's description and its count of landings.
           calls: [`get ${project}`, `get ${project}`],
           listed: {
             projects: [
-              { landedAt: at(noon), openAsks: 1, posture: "open", project },
+              {
+                landedAt: at(noon),
+                // Its adoption, its two asks opened, and the answer.
+                landings: 4,
+                openAsks: 1,
+                posture: "open",
+                project,
+              },
             ],
           },
         });

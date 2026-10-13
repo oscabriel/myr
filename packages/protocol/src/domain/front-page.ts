@@ -3,6 +3,7 @@ import { Schema } from "effect";
 import { ProjectName } from "../ids.ts";
 import { Posture } from "../posture.ts";
 import { AskListing } from "./ask.ts";
+import { NoneOrMore } from "./common.ts";
 
 export const FrontPageEntry = Schema.Struct({
   ask: AskListing,
@@ -28,6 +29,8 @@ export type ProjectDescription = typeof ProjectDescription.Type;
 export const ProjectListing = Schema.Struct({
   description: Schema.optionalKey(ProjectDescription),
   landedAt: Schema.optionalKey(Schema.DateTimeUtcFromString),
+  /** How many landings the platform has made on the project's main; absent when not read. */
+  landings: Schema.optionalKey(NoneOrMore),
   openAsks: Schema.Int,
   posture: Posture,
   project: ProjectName,

@@ -2,6 +2,7 @@
 // a read of an earlier landing never replaces a row from a later one.
 // Lists go in as one JSON parameter (`json_each`) to stay under D1's limit on
 // bound parameters. Every failure is a miss, never the list's.
+import { NoneOrMore } from "@repo/protocol/domain/common";
 import { ProjectDescription } from "@repo/protocol/domain/front-page";
 import { keyOf, nameOfKey, ProjectKey } from "@repo/protocol/ids";
 import type { ProjectName } from "@repo/protocol/ids";
@@ -26,6 +27,7 @@ import type {
 const Row = Schema.Struct({
   description: Schema.NullOr(ProjectDescription),
   landed_at: Schema.DateTimeUtcFromString,
+  landings: NoneOrMore,
   project: ProjectKey,
 });
 
@@ -34,14 +36,18 @@ const decodeRow = Schema.decodeUnknownOption(Row);
 const rowOf = (project: ProjectName, entry: KeptDescription) => ({
   description: entry.description ?? null,
   landed_at: DateTime.formatIso(entry.landedAt),
+  landings: entry.landings,
   project: keyOf(project),
 });
 
 const entryOf = ({
   description,
   landed_at: landedAt,
+  landings,
 }: typeof Row.Type): KeptDescription =>
-  description === null ? { landedAt } : { description, landedAt };
+  description === null
+    ? { landedAt, landings }
+    : { description, landedAt, landings };
 
 const orMissed = <A>(
   statement: Effect.Effect<A, SqlError>,
@@ -71,7 +77,7 @@ export const ProjectDescriptionsD1 = Layer.effect(
           ? Effect.succeed(new Map())
           : Effect.map(
               orMissed(
-                sql`SELECT project, landed_at, description FROM project_descriptions
+                sql`SELECT project, landed_at, description, landings FROM project_descriptions
                   WHERE project IN (SELECT value FROM json_each(${JSON.stringify(projects.map(keyOf))}))`,
                 [],
                 "the kept descriptions were not read"
@@ -97,15 +103,17 @@ export const ProjectDescriptionsD1 = Layer.effect(
           ? Effect.void
           : Effect.asVoid(
               orMissed(
-                sql`INSERT INTO project_descriptions (project, landed_at, description)
+                sql`INSERT INTO project_descriptions (project, landed_at, description, landings)
                   SELECT json_extract(entry.value, '$.project'),
                     json_extract(entry.value, '$.landed_at'),
-                    json_extract(entry.value, '$.description')
+                    json_extract(entry.value, '$.description'),
+                    json_extract(entry.value, '$.landings')
                   FROM json_each(${JSON.stringify(rows)}) AS entry
                   WHERE true
                   ON CONFLICT (project) DO UPDATE SET
                     landed_at = excluded.landed_at,
-                    description = excluded.description
+                    description = excluded.description,
+                    landings = excluded.landings
                   WHERE excluded.landed_at >= project_descriptions.landed_at`,
                 [],
                 "the descriptions read were not kept"

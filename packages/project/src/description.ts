@@ -1,7 +1,8 @@
 /**
  * A project's one line, read from its README on main: the first paragraph of
  * prose, its markup dropped, cut to the cap. A project's config has no field
- * for it, so the README is the one source.
+ * for it, so the README is the one source. A list reads it with the count of
+ * landings the project's record keeps, and keeps both until the next landing.
  */
 import type { RepoHost, RepoNotFound } from "@repo/artifacts/repo-host";
 import {
@@ -21,9 +22,10 @@ import {
   Schema,
 } from "effect";
 
-import { treeOf } from "./code.ts";
+import { codeProjectOf, treeOf } from "./code.ts";
 import type { CodeProject } from "./code.ts";
 import { contentsOf } from "./code/file.ts";
+import type { ProjectApi } from "./project.ts";
 
 const FENCE = /^\s{0,3}(?:`{3,}|~{3,})/u;
 
@@ -130,6 +132,8 @@ const plainOf = (markup: string): string =>
     .replaceAll(/\s+/gu, " ")
     .trim();
 
+const graphemes = new Intl.Segmenter("en", { granularity: "grapheme" });
+
 /** At most the cap, cut at a word with an ellipsis when it runs over. */
 const capped = (line: string): string => {
   if (line.length <= PROJECT_DESCRIPTION_CAP) {
@@ -138,7 +142,12 @@ const capped = (line: string): string => {
 
   const room = line.slice(0, PROJECT_DESCRIPTION_CAP);
   const word = room.lastIndexOf(" ");
-  const cut = word > 0 ? room.slice(0, word) : room.slice(0, -1);
+
+  // With no space, drop the last character whole, never half of a surrogate pair or an emoji's sequence.
+  const cut =
+    word > 0
+      ? room.slice(0, word)
+      : room.slice(0, [...graphemes.segment(room)].at(-1)?.index ?? 0);
 
   return `${cut.replace(/[\s,;:.!?-]+$/u, "")}…`;
 };
@@ -158,11 +167,30 @@ export const descriptionOf = (
   return Option.none();
 };
 
-/** What a list read from a project's README, and the landing whose main it read. */
+/**
+ * What a list read of a landed project, and the landing it read at: the
+ * description from the README on main, and how many landings the project's
+ * record keeps. Both move only by a landing.
+ */
 export interface KeptDescription {
   readonly landedAt: DateTime.Utc;
+  readonly landings: number;
   readonly description?: ProjectDescription;
 }
+
+/** Where a list reads a landed project: its main, and its record's count of landings. */
+export interface LandedProject {
+  readonly code: CodeProject;
+  readonly landingCount: Effect.Effect<number>;
+}
+
+export const landedProjectOf = (
+  api: ProjectApi,
+  project: ProjectName
+): LandedProject => ({
+  code: codeProjectOf(api, project),
+  landingCount: api.landingCount(),
+});
 
 export interface ProjectDescriptionsApi {
   readonly get: (
@@ -226,21 +254,39 @@ const sameLanding = (
 
 const keptOf = (
   landedAt: DateTime.Utc,
+  landings: number,
   description: Option.Option<ProjectDescription>
 ): KeptDescription =>
   Option.match(description, {
-    onNone: () => ({ landedAt }),
-    onSome: (found) => ({ description: found, landedAt }),
+    onNone: () => ({ landedAt, landings }),
+    onSome: (found) => ({ description: found, landedAt, landings }),
   });
 
+const readLanded = (
+  { code, landingCount }: LandedProject,
+  landedAt: DateTime.Utc
+) =>
+  Effect.map(
+    Effect.all([readmeDescription(code), landingCount]),
+    ([description, landings]) => keptOf(landedAt, landings, description)
+  );
+
+const listedWith = (
+  listing: ProjectListing,
+  { description, landings }: KeptDescription
+): ProjectListing =>
+  description === undefined
+    ? { ...listing, landings }
+    : { ...listing, description, landings };
+
 /**
- * Main moves only by a landing, so a description read while a project's last
- * landing stands is kept until the next one. A project not yet landed has no
- * main to read.
+ * Main and the count of landings move only by a landing, so what a list read
+ * while a project's last landing stands is kept until the next one. A project
+ * not yet landed has no main to read.
  */
 export const withDescriptions = <E>(
   listed: readonly ProjectListing[],
-  codeOf: (project: ProjectName) => Effect.Effect<CodeProject, E>
+  landedOf: (project: ProjectName) => Effect.Effect<LandedProject, E>
 ): Effect.Effect<readonly ProjectListing[], never, RepoHost> =>
   Effect.gen(function* () {
     const landed = listed.flatMap(({ landedAt, project }) =>
@@ -271,14 +317,12 @@ export const withDescriptions = <E>(
       stale,
       ({ landedAt, project }) =>
         orWarn(
-          Effect.suspend(() => codeOf(project)).pipe(
-            Effect.flatMap(readmeDescription),
-            Effect.map((description) =>
-              Option.some([project, keptOf(landedAt, description)] as const)
-            )
+          Effect.suspend(() => landedOf(project)).pipe(
+            Effect.flatMap((source) => readLanded(source, landedAt)),
+            Effect.map((entry) => Option.some([project, entry] as const))
           ),
           Option.none(),
-          `${project}'s README was not read: it is listed with no description`
+          `${project} was not read: it is listed with no description and no count of landings`
         ),
       { concurrency: READS_AT_ONCE }
     );
@@ -296,9 +340,8 @@ export const withDescriptions = <E>(
     return listed.map((listing): ProjectListing => {
       const entry = found.get(listing.project) ?? kept.get(listing.project);
 
-      return entry?.description === undefined ||
-        !sameLanding(entry, listing.landedAt)
+      return entry === undefined || !sameLanding(entry, listing.landedAt)
         ? listing
-        : { ...listing, description: entry.description };
+        : listedWith(listing, entry);
     });
   });

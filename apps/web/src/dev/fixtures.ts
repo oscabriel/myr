@@ -296,6 +296,8 @@ const overlay: Layer.Layer<
             onSome: (landing) => Effect.succeed({ landing }),
           })
         ),
+      landingCount: () =>
+        Effect.map(current, ({ landings }) => landings.length),
       landings: (shas) =>
         Effect.map(current, ({ landings }) =>
           shas.flatMap((sha) =>

@@ -12,6 +12,7 @@ import type { Upstream } from "@repo/git/upstream";
 import { UpstreamRepoHost } from "@repo/git/upstream/repo-host";
 import { CodeStoreR2 } from "@repo/project/code-store/binding";
 import { CodeCacheLive } from "@repo/project/code/cache";
+import { ProjectDescriptionsMemory } from "@repo/project/description/memory";
 import type { FrontPage } from "@repo/project/front-page";
 import { FrontPageMemory } from "@repo/project/front-page/memory";
 import type { Lander } from "@repo/project/lander";
@@ -67,9 +68,10 @@ const plugIn = (
     ...plugged.map((cartridge) => cartridge(config).pipe(Layer.provide(ports)))
   );
 
-const memoryFrontPage = Layer.merge(
+const memoryFrontPage = Layer.mergeAll(
   FrontPageMemory.layer({ credits: [], entries: [], projects: [] }),
-  ProjectionMemory
+  ProjectionMemory,
+  ProjectDescriptionsMemory
 );
 
 const corePorts = (config: PlatformConfig): Layer.Layer<WorkerPorts> =>

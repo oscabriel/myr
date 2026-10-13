@@ -25,8 +25,6 @@ const exploreData = createServerFn({ method: "GET" }).handler(() =>
   )
 );
 
-export const exploreHeaders = () => branchPage;
-
 const Explore = () => {
   const loaded = Route.useLoaderData();
 
@@ -42,6 +40,6 @@ export const Route = createFileRoute("/explore")({
   staticData: { shell: "site" },
   loader: () => exploreData(),
   head: () => pageHead({ description: EXPLORE_LEDE, title: EXPLORE_TITLE }),
-  headers: exploreHeaders,
+  headers: () => branchPage,
   component: Explore,
 });
