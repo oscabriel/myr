@@ -44,6 +44,7 @@ export const unanswered = Contracts.toLayer({
   proposeAsk: uncalled,
   readFile: uncalled,
   readTree: uncalled,
+  recentLandings: uncalled,
   release: uncalled,
   setEnv: uncalled,
   showAsk: uncalled,
