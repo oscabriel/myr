@@ -22,7 +22,11 @@ import { AppLink } from "../src/features/shared/link.tsx";
 import { projectPath } from "../src/features/shared/paths.ts";
 import { RouteError } from "../src/features/shared/pending.tsx";
 import { AppShell } from "../src/features/shared/shell/app-shell.tsx";
-import { ProjectsSheetBody } from "../src/features/shared/shell/overlays.tsx";
+import {
+  MenuBody,
+  ProjectsSheetBody,
+} from "../src/features/shared/shell/overlays.tsx";
+import { SITE_LINKS } from "../src/features/shared/shell/top-bar.tsx";
 import { Workspace } from "../src/features/shared/shell/workspace.tsx";
 import { Route as projectRoute } from "../src/routes/$owner/$project/route.tsx";
 import { Route as docsRoute } from "../src/routes/docs/$page.tsx";
@@ -305,6 +309,29 @@ describe("the top bar", () => {
     })
   );
 
+  // The menu's button is `nav:hidden`, and the menu holds Keys; from `nav` up
+  // this button is the `?` key's pointer twin.
+  it.effect(
+    "gives the keys a button in the site, a project and the docs, shown from nav up",
+    () =>
+      Effect.gen(function* () {
+        const keys = [
+          topBarOf(yield* inShell(SITE)),
+          topBarOf(yield* inShell(PROJECT)),
+          topBarOf(yield* inShell(DOCS)),
+        ].map(
+          (bar) =>
+            /<span class="(?<wrap>[^"]*)"><button\b[^>]*>(?:(?!<\/button>)[\s\S])*?>Keys<\/span><\/button>/u
+              .exec(bar)
+              ?.groups?.wrap?.split(" ") ?? []
+        );
+
+        expect(
+          keys.map((classes) => classes.includes("nav:flex"))
+        ).toStrictEqual([true, true, true]);
+      })
+  );
+
   it.effect("marks the section being read as the current page", () =>
     Effect.gen(function* () {
       const bar = topBarOf(yield* inShell(DOCS));
@@ -449,6 +476,23 @@ describe("the search", () => {
           href: "/import",
           text: "Import a repo",
         });
+      })
+  );
+});
+
+describe("the menu", () => {
+  it.effect(
+    "folds the top bar's links below nav, in its order, and opens the keys",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* renderAt("/agents", <MenuBody />);
+
+        expect(
+          linksOf(markup).map(({ href, text }) => ({ href, text }))
+        ).toStrictEqual(
+          SITE_LINKS.map(({ label, to }) => ({ href: to, text: label }))
+        );
+        expect(markup).toMatch(/<button\b[^>]*>[\s\S]*?Keys<\/button>/u);
       })
   );
 });
