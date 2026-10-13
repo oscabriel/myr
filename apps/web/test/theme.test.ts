@@ -36,9 +36,9 @@ describe(readPreference, () => {
   });
 
   it("reads a value it never wrote, or storage the browser refuses, as the same", () => {
-    expect(readPreference(keptStorage({ [THEME_PREFERENCE_KEY]: "dark" }))).toBe(
-      "same"
-    );
+    expect(
+      readPreference(keptStorage({ [THEME_PREFERENCE_KEY]: "dark" }))
+    ).toBe("same");
     expect(readPreference(refusingStorage)).toBe("same");
   });
 
@@ -62,7 +62,10 @@ describe(readPreference, () => {
 });
 
 /** The head script as the browser runs it: its globals are the page's. */
-const runHeadScript = (page: ReturnType<typeof themePage>, storage: Storage) => {
+const runHeadScript = (
+  page: ReturnType<typeof themePage>,
+  storage: Storage
+) => {
   // oxlint-disable-next-line eslint/no-new-func, typescript/no-implied-eval, typescript/no-unsafe-call -- the test runs the inline head script's text as a browser does, with a fake page for its globals; the text is the module's own constant, and no DOM runs in these tests
   new Function(
     "document",
@@ -178,7 +181,9 @@ describe("the head script's CSP source", () => {
     );
 
     expect(
-      setting.filter((path) => sources[path]?.includes("THEME_SCRIPT_SOURCE") !== true)
+      setting.filter(
+        (path) => sources[path]?.includes("THEME_SCRIPT_SOURCE") !== true
+      )
     ).toStrictEqual([]);
   });
 });

@@ -6,10 +6,7 @@ import {
   PendingPage,
   RouteError,
 } from "../src/features/shared/pending.tsx";
-import {
-  THEME_SCRIPT,
-  themeColors,
-} from "../src/features/shared/theme.ts";
+import { THEME_SCRIPT, themeColors } from "../src/features/shared/theme.ts";
 import { getRouter } from "../src/router.tsx";
 import { rootHead, ThemeHead } from "../src/routes/__root.tsx";
 

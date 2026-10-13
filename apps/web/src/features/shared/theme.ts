@@ -61,7 +61,9 @@ export const writePreference = (
 /** As much of a document as the theme writes to. */
 export interface ThemeDocument {
   readonly documentElement: { readonly dataset: DOMStringMap };
-  readonly querySelectorAll: (selector: 'meta[name="theme-color"]') => Iterable<{
+  readonly querySelectorAll: (
+    selector: 'meta[name="theme-color"]'
+  ) => Iterable<{
     readonly setAttribute: (name: string, value: string) => void;
   }>;
 }

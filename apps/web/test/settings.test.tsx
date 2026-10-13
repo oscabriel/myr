@@ -11,16 +11,13 @@ import {
   readPreference,
   THEME_PREFERENCE_KEY,
 } from "../src/features/shared/theme.ts";
-import type {
-  Theme,
-  ThemePreference,
-} from "../src/features/shared/theme.ts";
+import type { Theme, ThemePreference } from "../src/features/shared/theme.ts";
 import { attributeOf, textIn } from "./markup.ts";
 import { renderAt } from "./render.tsx";
 import { keptStorage } from "./storage.ts";
 import { themePage } from "./theme-page.ts";
 
-const ignore = (_: ThemePreference) => undefined;
+const ignore = () => {};
 
 /** Each choice as its label reads, and the radio it holds. */
 const choicesIn = (markup: string) =>
@@ -37,10 +34,7 @@ const choicesIn = (markup: string) =>
     }
   );
 
-const appearanceAt = (
-  system: Theme | undefined,
-  preference: ThemePreference
-) =>
+const appearanceAt = (system: Theme | undefined, preference: ThemePreference) =>
   renderAt(
     "/settings",
     <AppearanceView onChoose={ignore} preference={preference} system={system} />
@@ -124,7 +118,11 @@ describe(choosePreference, () => {
     const page = themePage("dark");
     const storage = keptStorage({ [THEME_PREFERENCE_KEY]: "opposite" });
 
-    choosePreference("same", { document: page.document, storage, system: "dark" });
+    choosePreference("same", {
+      document: page.document,
+      storage,
+      system: "dark",
+    });
 
     expect(readPreference(storage)).toBe("same");
     expect(page.theme()).toBe("dark");

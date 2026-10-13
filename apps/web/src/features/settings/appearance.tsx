@@ -15,11 +15,7 @@ import {
   THEME_PREFERENCES,
   writePreference,
 } from "../shared/theme.ts";
-import type {
-  Theme,
-  ThemeDocument,
-  ThemePreference,
-} from "../shared/theme.ts";
+import type { Theme, ThemeDocument, ThemePreference } from "../shared/theme.ts";
 
 const CHOICE_LABELS: Readonly<Record<ThemePreference, string>> = {
   opposite: "Opposite of system",
@@ -128,11 +124,13 @@ export const Appearance = () => {
     systemNow,
     systemOnServer
   );
+
   const stored = useSyncExternalStore(
     subscribeToStorage,
     storedNow,
     storedOnServer
   );
+
   const [chosen, setChosen] = useState<ThemePreference>();
 
   const choose = useCallback((preference: ThemePreference) => {
