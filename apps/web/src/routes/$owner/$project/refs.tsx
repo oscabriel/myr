@@ -13,6 +13,7 @@ import { pageHead } from "../../../features/shared/head.ts";
 import { notFoundFor } from "../../../features/shared/refusals.ts";
 import { branchPage } from "../../../server/cache-headers.ts";
 import { serverClient } from "../../../server/client.ts";
+import { CodeColumn } from "./tree/-code-column.tsx";
 
 export const readRefsPage = (name: string) =>
   Effect.gen(function* () {
@@ -53,7 +54,7 @@ const RefsPage = () => {
 };
 
 export const Route = createFileRoute("/$owner/$project/refs")({
-  staticData: { shell: "project" },
+  staticData: { column: CodeColumn, shell: "project" },
   // The router writes back what this returns, dropping only `undefined`,
   // so the first page's address carries no `from`, and all the tags' no
   // `package`.

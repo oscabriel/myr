@@ -1,6 +1,5 @@
 import { useAtomValue } from "@effect/atom-react";
-import type { CommitView } from "@repo/protocol/domain/code";
-import { FileView, TreeListing } from "@repo/protocol/domain/code";
+import { CommitView, FileView, TreeListing } from "@repo/protocol/domain/code";
 import { ProjectName } from "@repo/protocol/ids";
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
@@ -9,7 +8,6 @@ import { DateTime, Effect, Option, Schema } from "effect";
 import { AsyncResult } from "effect/reactivity";
 
 import { CodeColumn } from "../-code-column.tsx";
-import { FilesButton } from "../-files-button.tsx";
 import { softLanding } from "../-soft-landing.ts";
 import { lastChangesAtom } from "../../../../../client/code.ts";
 import {
@@ -23,9 +21,11 @@ import { pageHead } from "../../../../../features/shared/head.ts";
 import { notFoundFor } from "../../../../../features/shared/refusals.ts";
 import { branchPage } from "../../../../../server/cache-headers.ts";
 import { serverClient } from "../../../../../server/client.ts";
+import { headField, readHead } from "../../../../../server/code-head.ts";
 import { readFolderWithReadme } from "../../../../../server/folder.ts";
 
 const TreePageData = Schema.Struct({
+  head: Schema.optionalKey(CommitView),
   listing: TreeListing,
   now: Schema.DateTimeUtcFromString,
   project: ProjectName,
@@ -45,11 +45,12 @@ export const readTreePage = (params: TreeParams) =>
     const rev = yield* Effect.fromOption(revisionOf(params.rev));
     const path = repoPathOf(params._splat);
 
-    const { listing, readme } = yield* readFolderWithReadme({
-      path,
-      project,
-      rev,
-    }).pipe(
+    // The folder and the revision's head commit at once: the entries'
+    // last changes are read by the browser after the page is up.
+    const [{ listing, readme }, head] = yield* Effect.all(
+      [readFolderWithReadme({ path, project, rev }), readHead(project, rev)],
+      { concurrency: 2 }
+    ).pipe(
       Effect.catchTags({
         UnknownPath: (refusal) => softLanding(refusal, project, rev),
         UnknownProject: notFoundFor,
@@ -58,6 +59,7 @@ export const readTreePage = (params: TreeParams) =>
     );
 
     return yield* Schema.encodeEffect(TreePageData)({
+      ...headField(head),
       listing,
       now: yield* DateTime.now,
       project,
@@ -94,7 +96,6 @@ const TreePage = () => {
 
   return (
     <TreeView
-      files={<FilesButton />}
       last={AsyncResult.match(last, {
         onFailure: () => NO_CHANGES,
         onInitial: () => NO_CHANGES,
@@ -118,7 +119,5 @@ export const Route = createFileRoute("/$owner/$project/tree/$rev/$")({
       title: `${_splat === undefined || _splat === "" ? project : _splat} at ${rev}`,
     }),
   component: TreePage,
-  notFoundComponent: ({ data }) => (
-    <CodeNotFound data={data} files={<FilesButton />} />
-  ),
+  notFoundComponent: CodeNotFound,
 });

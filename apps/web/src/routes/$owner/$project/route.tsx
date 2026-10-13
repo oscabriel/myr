@@ -23,6 +23,7 @@ import {
   ProjectHeaderData,
   readProjectHeader,
 } from "../../../server/project-page.ts";
+import { ProjectCodeBar } from "./-code-bar.tsx";
 
 /** The header for a project's page, or none when it cannot be read: the page under it says why. */
 export const headerOrNone = (name: string) =>
@@ -121,6 +122,7 @@ const ProjectLayout = () => {
           />
         )
       }
+      codeBar={<ProjectCodeBar platformUrl={platformUrl} />}
     >
       <Outlet />
     </ProjectFrame>

@@ -1,3 +1,8 @@
+/**
+ * The Code tab's file tree: the repository's paths at the page's revision, or
+ * a commit's changed files. It stands in the side column from `columns`, and
+ * in the code bar's Files sheet below it.
+ */
 import { useAtomValue } from "@effect/atom-react";
 import type { ChangedFile } from "@repo/protocol/domain/code";
 import { ProjectName } from "@repo/protocol/ids";
@@ -12,8 +17,10 @@ import { Option, Schema } from "effect";
 import { AsyncResult } from "effect/reactivity";
 import { useMemo } from "react";
 
-import { pathsAtom, refsAtom } from "../../../../client/code.ts";
+import { pathsAtom } from "../../../../client/code.ts";
 import { ClientTree } from "../../../../features/code/client-tree.tsx";
+import { codeAddressOf } from "../../../../features/code/code-address.ts";
+import { CommitPageData } from "../../../../features/code/commit-page-data.ts";
 import { drawnFiles, treeOrder } from "../../../../features/code/diff-model.ts";
 import { useCodeFileKeys } from "../../../../features/code/file-keys.ts";
 import { parseDiffHash } from "../../../../features/code/line-hash.ts";
@@ -24,8 +31,6 @@ import {
   treeHref,
   whyHref,
 } from "../../../../features/code/paths.ts";
-import { RefSwitcher } from "../../../../features/code/ref-switcher.tsx";
-import { CommitPageData } from "./-commit-files.ts";
 
 const isProject = Schema.is(ProjectName);
 
@@ -55,23 +60,22 @@ type Kind = "blob" | "tree" | "why";
 const useCodeAddress = () => {
   const params = useParams({ strict: false });
 
-  const kind = useLocation({
-    select: ({ pathname }): Kind => {
-      const second = pathname.split("/").at(2);
+  const pathname = useLocation({ select: (location) => location.pathname });
 
-      return second === "blob" || second === "why" ? second : "tree";
-    },
-  });
+  const address = useMemo(
+    () => Option.getOrUndefined(codeAddressOf(pathname)),
+    [pathname]
+  );
 
-  const project = isProject(params.project) ? params.project : undefined;
-  const rev = params.rev ?? "main";
+  const kind: Kind =
+    address?.page === "blob" || address?.page === "why" ? address.page : "tree";
 
-  const path =
-    params._splat === undefined || params._splat === ""
-      ? undefined
-      : params._splat;
-
-  return { kind, path, project, rev };
+  return {
+    kind,
+    path: address?.page === "commits" ? undefined : address?.path,
+    project: isProject(params.project) ? params.project : undefined,
+    rev: address?.page === "refs" ? "main" : (address?.rev ?? "main"),
+  };
 };
 
 const hrefFor = (
@@ -85,30 +89,6 @@ const hrefFor = (
   }
 
   return (kind === "why" ? whyHref : blobHref)(project, rev, path);
-};
-
-const RefLine = ({
-  kind,
-  path,
-  project,
-  rev,
-}: {
-  readonly kind: Kind;
-  readonly path: string | undefined;
-  readonly project: ProjectName;
-  readonly rev: string;
-}) => {
-  const refs = useAtomValue(refsAtom(project));
-
-  return (
-    <div className="border-rule flex h-12 shrink-0 items-center gap-2 border-b px-3">
-      <RefSwitcher
-        hrefAt={(at) => hrefFor(project, kind, at, path)}
-        refs={Option.getOrUndefined(AsyncResult.value(refs))}
-        rev={rev}
-      />
-    </div>
-  );
 };
 
 const ProjectTree = ({
@@ -164,8 +144,7 @@ export const CodeFiles = ({
 
   return project === undefined ? null : (
     <div className="flex min-h-0 flex-1 flex-col">
-      <RefLine kind={kind} path={path} project={project} rev={rev} />
-      <div className="min-h-0 flex-1 pt-1">
+      <div className="min-h-0 flex-1 pt-3">
         <ClientOnly fallback={null}>
           <ProjectTree
             kind={kind}
@@ -216,7 +195,7 @@ export const CommitFiles = ({
   useCodeFileKeys(paths, current, open);
 
   return always || wide ? (
-    <div className="min-h-0 flex-1 pt-1">
+    <div className="min-h-0 flex-1 pt-3">
       <ClientTree
         counts={counts}
         current={current}

@@ -27,6 +27,8 @@ export interface RowState {
 export interface RowProps {
   readonly id: string;
   readonly href: string;
+  /** A region of the page `href` opens, as a link's fragment. */
+  readonly hash?: string | undefined;
   readonly search?: Readonly<Record<string, string>> | undefined;
   readonly title: string;
   readonly meta?: ReactNode;
@@ -114,6 +116,7 @@ const StateEnd = ({
 export const Row = ({
   action,
   data,
+  hash,
   href,
   id,
   meta,
@@ -137,6 +140,7 @@ export const Row = ({
       search={search}
       title={title}
       to={href}
+      {...(hash === undefined ? {} : { hash })}
     >
       {title}
     </AppLink>

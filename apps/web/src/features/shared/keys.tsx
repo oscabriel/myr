@@ -94,6 +94,7 @@ const KEYS = [
   { does: "Next or previous row", keys: ["j", "k"] },
   { does: "Open the focused row", keys: ["Enter"] },
   { does: "Next or previous file", keys: ["J", "K"] },
+  { does: "Go to file, in the Code tab", keys: ["t"] },
   { does: "Copy the page's numbered command", keys: ["1", "…", "9"] },
   { does: "Close, or clear the selection", keys: ["Esc"] },
 ] as const;

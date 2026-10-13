@@ -7,6 +7,7 @@ import { useCallback, useMemo, useState } from "react";
 
 import { commitOf, projectOf } from "../../../../features/code/address.ts";
 import { ClientDiffs } from "../../../../features/code/client-code.tsx";
+import { CommitPageData } from "../../../../features/code/commit-page-data.ts";
 import { CommitView } from "../../../../features/code/commit-view.tsx";
 import { drawnFiles } from "../../../../features/code/diff-model.ts";
 import { PANE_SCROLLER } from "../../../../features/code/diff-pane.tsx";
@@ -19,8 +20,6 @@ import { notFoundFor } from "../../../../features/shared/refusals.ts";
 import { branchPage } from "../../../../server/cache-headers.ts";
 import { serverClient } from "../../../../server/client.ts";
 import { CommitColumn } from "../tree/-code-column.tsx";
-import { CommitPageData } from "../tree/-commit-files.ts";
-import { FilesButton } from "../tree/-files-button.tsx";
 
 // A commit never changes, but its page carries its landing, which the project records after main has moved,
 // and times reckoned from the read: a browser keeps it briefly, as a page at `main`.
@@ -164,7 +163,6 @@ const CommitPage = () => {
         )
       }
       drawn={drawn}
-      files={<FilesButton commit />}
       folded={folded}
       now={now}
       onFold={onFold}

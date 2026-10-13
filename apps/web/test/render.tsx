@@ -15,6 +15,8 @@ import { addressRewrite, projectParams } from "../src/server/addresses.ts";
 
 export interface RenderOptions {
   readonly column?: ComponentType;
+  /** What the page's own loader would return, for what the frame reads from it (the code bar's head commit). */
+  readonly loaderData?: unknown;
 }
 
 const routesFor = (view: ReactNode, options: RenderOptions) => {
@@ -51,13 +53,13 @@ const routesFor = (view: ReactNode, options: RenderOptions) => {
     ),
     project.addChildren([
       createRoute({ getParentRoute: () => project, path: "/" }),
-      options.column === undefined
-        ? createRoute({ getParentRoute: () => project, path: "$" })
-        : createRoute({
-            getParentRoute: () => project,
-            path: "$",
-            staticData: { column: options.column },
-          }),
+      createRoute({
+        getParentRoute: () => project,
+        loader: () => options.loaderData,
+        path: "$",
+        staticData:
+          options.column === undefined ? {} : { column: options.column },
+      }),
     ]),
   ]);
 };
