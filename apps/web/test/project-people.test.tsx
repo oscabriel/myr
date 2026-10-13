@@ -220,7 +220,9 @@ describe("a project's policy page", () => {
     const layers = elementWith(markup, "data-layers");
 
     expect(layers).toContain('data-layer="maintainers"');
-    expect(layers).toMatch(/<a\b[^>]*href="\/oscabriel\/datekit\/ledger"/u);
+    expect(layers).toMatch(
+      /<a\b[^>]*href="\/oscabriel\/datekit\/visibility#ledger"/u
+    );
     expect(plainText(layers)).toContain("sealed");
     expect(layers.slice(layers.indexOf(">") + 1)).not.toMatch(
       /<(?:p|div|ul|ol|li|dl)\b/u

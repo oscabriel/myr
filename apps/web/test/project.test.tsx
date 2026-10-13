@@ -406,7 +406,7 @@ describe(ProjectView, () => {
         expect(
           missingFrom(about, [
             'href="/oscabriel/datekit/people"',
-            'href="/oscabriel/datekit/ledger"',
+            'href="/oscabriel/datekit/visibility#ledger"',
             'href="/oscabriel/datekit/llms.txt"',
           ])
         ).toStrictEqual([]);

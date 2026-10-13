@@ -39,9 +39,26 @@ export const answerPath = (project: ProjectName, ask: AskId) =>
 /** A handle is URL-safe by its schema. */
 export const personPath = (handle: Handle) => `/people/${handle}`;
 
-export const ledgerPath = (project: ProjectName) => `/${project}/ledger`;
+/** A project's Visibility tab (ADR 0041), and the regions on it a link may open. */
+export const visibilityPath = (project: ProjectName) =>
+  `/${project}/visibility`;
 
-export const envPath = (project: ProjectName) => `/${project}/env`;
+export const LEDGER_ANCHOR = "ledger";
+
+export const ENVIRONMENT_ANCHOR = "environment";
+
+/** Each page of a project that folded into its Visibility tab, and the region it opens there. */
+export const MOVED_TO_VISIBILITY: ReadonlyMap<string, string> = new Map([
+  ["env", ENVIRONMENT_ANCHOR],
+  ["ledger", LEDGER_ANCHOR],
+]);
+
+/** Where an old page's address goes: the tab, the query as it was spelled, then the region. */
+export const visibilityHref = (
+  project: string,
+  anchor: string,
+  search: string
+) => `/${project}/visibility${search}#${anchor}`;
 
 export const decisionPath = (project: ProjectName, decision: DecisionId) =>
   `/${project}/decisions/${decision}`;

@@ -25,7 +25,7 @@ import { StateMarkIcon } from "./marks.tsx";
 import type { StateMark } from "./marks.tsx";
 import { stageStates } from "./outcome.tsx";
 import type { StageHolds, StageState } from "./outcome.tsx";
-import { ledgerPath } from "./paths.ts";
+import { LEDGER_ANCHOR, visibilityPath } from "./paths.ts";
 import { PostureBadge } from "./posture.tsx";
 import { MetaCode } from "./row.tsx";
 import {
@@ -309,7 +309,11 @@ export const PostureFacts = ({
   <FactBlock label="Posture">
     <PostureBadge label={label} posture={posture} />
     <p className="text-ui text-muted-foreground">{glosses[posture]}</p>
-    <AppLink className={`text-ui ${LINK}`} to={ledgerPath(project)}>
+    <AppLink
+      className={`text-ui ${LINK}`}
+      hash={LEDGER_ANCHOR}
+      to={visibilityPath(project)}
+    >
       The ledger of {project}
     </AppLink>
   </FactBlock>

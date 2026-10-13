@@ -538,7 +538,7 @@ describe(AppLink, () => {
   it.effect("leads to a path holding $ or braces as written", () =>
     Effect.gen(function* () {
       const markup = yield* renderAt(
-        "/oscabriel/datekit/ledger",
+        "/oscabriel/datekit/visibility",
         <p>
           <AppLink to="/oscabriel/datekit/blob/main/src/routes/$owner/$project/$.tsx">
             route

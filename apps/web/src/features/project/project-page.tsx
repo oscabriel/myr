@@ -26,6 +26,11 @@ import { CommandLine } from "../shared/command.tsx";
 import { EmptyState } from "../shared/empty.tsx";
 import { CommandSlotProvider } from "../shared/keys.tsx";
 import { AppLink } from "../shared/link.tsx";
+import {
+  ENVIRONMENT_ANCHOR,
+  LEDGER_ANCHOR,
+  visibilityPath,
+} from "../shared/paths.ts";
 import { ReadingRows, UnreachableNotice } from "../shared/pending.tsx";
 import { MetaCode, useRowSelection } from "../shared/row.tsx";
 import { GUTTER } from "../shared/shell/gutter.ts";
@@ -247,10 +252,18 @@ const VisibilitySummary = ({
     <AboutCard id="visibility" title="Visibility">
       {held}
       <p className="text-ui flex flex-wrap gap-x-4 gap-y-1">
-        <AppLink className={LINK} to={`/${project}/ledger`}>
+        <AppLink
+          className={LINK}
+          hash={LEDGER_ANCHOR}
+          to={visibilityPath(project)}
+        >
           Ledger
         </AppLink>
-        <AppLink className={LINK} to={`/${project}/env`}>
+        <AppLink
+          className={LINK}
+          hash={ENVIRONMENT_ANCHOR}
+          to={visibilityPath(project)}
+        >
           Environment
         </AppLink>
       </p>

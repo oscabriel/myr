@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
-import { Client, Contracts } from "@repo/protocol/contracts";
+import { Client, Contracts, EnvSchemaOf } from "@repo/protocol/contracts";
+import { EnvSchemaView } from "@repo/protocol/domain/env";
 import { ProjectListing } from "@repo/protocol/domain/front-page";
 import { Ledger, LedgerEntry } from "@repo/protocol/domain/visibility";
 import {
@@ -22,11 +23,15 @@ import { RpcTest } from "effect/rpc";
 import { keys } from "../src/client/keys.ts";
 import { ledgerAtom } from "../src/client/ledger.ts";
 import { areaSummaries } from "../src/features/ledger/areas.ts";
-import { LedgerView } from "../src/features/ledger/ledger-page.tsx";
 import { ProjectView } from "../src/features/project/project-page.tsx";
-import { readLedger } from "../src/routes/$owner/$project/ledger.tsx";
+import { VisibilityView } from "../src/features/visibility/visibility-page.tsx";
+import {
+  readVisibility,
+  VisibilityPageData,
+} from "../src/routes/$owner/$project/visibility.tsx";
 import { ContractsClient, webContracts } from "../src/surfaces.ts";
 import { inOrder, markupOf, plainText, textOf } from "./ask-fixtures.ts";
+import { fixturesClient } from "./dev-client.ts";
 import { textIn } from "./markup.ts";
 import { elementWith, factsOf, mainOf } from "./records.ts";
 import { renderAt } from "./render.tsx";
@@ -151,7 +156,36 @@ const open = decodeLedger({
   project: "burrow",
 });
 
-const page = <LedgerView ledger={datekit} now={now} />;
+const datekitEnv = Schema.decodeSync(EnvSchemaView)({
+  at: "9b1c3e5d7f9a1b3c5d7e9f1a3b5c7d9e1f3a5b7c",
+  file: ".env.schema",
+  imports: [],
+  items: [
+    {
+      key: "APP_ENV",
+      required: true,
+      sensitive: false,
+      tags: [],
+      type: "enum(development, test, production)",
+    },
+    {
+      key: "SENTRY_AUTH_TOKEN",
+      placeholder: "placeholder-sentry-auth-token",
+      required: "depends",
+      sensitive: true,
+      tags: ["release"],
+      value: { setAt: "2026-10-10T09:30:00.000Z", setBy: "ines-v" },
+    },
+  ],
+  project: "datekit",
+});
+
+/** The tab as a ledger test reads it: the environment unread, as before a first landing. */
+const tabWith = (ledger: Ledger, at: DateTime.Utc = now) => (
+  <VisibilityView env={undefined} ledger={ledger} now={at} />
+);
+
+const page = tabWith(datekit);
 
 const seqsOf = (markup: string) =>
   [...markup.matchAll(/data-seq="(?<seq>\d+)"/gu)].map((found) =>
@@ -177,10 +211,11 @@ const toneOf = (row: string) =>
   /text-sealed/u.test(elementWith(row, "data-entry-word")) ? "sealed" : "ink";
 
 describe("a project's ledger", () => {
-  it("is titled Ledger, and its status line says the posture and every sealed area in one sentence", () => {
+  it("is titled Visibility, its status line saying the posture and every sealed area in one sentence, and its history titled Ledger", () => {
     const markup = markupOf(page);
 
-    expect(markup).toMatch(/<h1\b[^>]*>Ledger<\/h1>/u);
+    expect(markup).toMatch(/<h1\b[^>]*>Visibility<\/h1>/u);
+    expect(markup).toMatch(/<h2\b[^>]*id="ledger"[^>]*>Ledger<\/h2>/u);
     expect(textIn(elementWith(markup, "data-ledger-head")).trim()).toBe(
       "Open with sealed evidence. export: 7 sealed checks by 3 people; parser: 4 sealed checks by 3 people."
     );
@@ -193,14 +228,14 @@ describe("a project's ledger", () => {
         "Open with sealed evidence · sealed checks in export, parser",
     };
 
-    const markup = markupOf(<LedgerView ledger={named} now={now} />);
+    const markup = markupOf(tabWith(named));
 
     expect(textIn(elementWith(markup, "data-ledger-head")).trim()).toBe(
       "Open with sealed evidence. export: 7 sealed checks by 3 people; parser: 4 sealed checks by 3 people."
     );
-    // The label itself is the platform's, whole, in the facts.
-    expect(plainText(factsOf(markup))).toContain(
-      "Open with sealed evidence · sealed checks in export, parser"
+    // The label itself is the platform's, whole, on the lead word.
+    expect(elementWith(markup, "data-posture=")).toContain(
+      'title="Open with sealed evidence · sealed checks in export, parser"'
     );
   });
 
@@ -212,12 +247,7 @@ describe("a project's ledger", () => {
     };
 
     expect(
-      textIn(
-        elementWith(
-          markupOf(<LedgerView ledger={core} now={now} />),
-          "data-ledger-head"
-        )
-      ).trim()
+      textIn(elementWith(markupOf(tabWith(core)), "data-ledger-head")).trim()
     ).toBe(
       "Open core · closed: maintainers. export: 7 sealed checks by 3 people; parser: 4 sealed checks by 3 people."
     );
@@ -235,7 +265,7 @@ describe("a project's ledger", () => {
 
     const layer = markup.slice(
       markup.indexOf('data-layer="maintainers"'),
-      markup.indexOf('id="sealed-areas"')
+      markup.indexOf('id="held-back"')
     );
 
     expect(elementWith(layer, "data-layer-name")).toMatch(
@@ -358,12 +388,7 @@ describe("a project's ledger", () => {
   it("never shows an entry as recorded in the future, though it arrived after the page was read", () => {
     // Served at 07:00; the release at 08:00 arrived while the page stayed open.
     const markup = mainOf(
-      markupOf(
-        <LedgerView
-          ledger={datekit}
-          now={DateTime.makeUnsafe("2026-10-12T07:00:00Z")}
-        />
-      )
+      markupOf(tabWith(datekit, DateTime.makeUnsafe("2026-10-12T07:00:00Z")))
     );
 
     expect(whenOf(markup, 'data-seq="8"')).toBe("now");
@@ -371,15 +396,17 @@ describe("a project's ledger", () => {
     expect(markup).not.toMatch(/>in \d+ (?:min|h|d)</u);
   });
 
-  it("puts the posture, what is held back, the CLI line and what each disclosure means in its facts", () => {
-    const facts = factsOf(markupOf(page));
+  it("puts what is held back, the CLI line and what each disclosure means in its facts, and says the posture in its status line, not again there", () => {
+    const markup = markupOf(page);
+    const facts = factsOf(markup);
     const text = plainText(facts);
 
-    expect(facts).toContain('data-posture="openWithSealedEvidence"');
+    expect(elementWith(markup, "data-ledger-head")).toContain(
+      'data-posture="openWithSealedEvidence"'
+    );
+    expect(facts).not.toContain("data-posture");
     expect(
       inOrder(text, [
-        "Posture",
-        "Open with sealed evidence",
         "Held back",
         "export",
         "7 sealed checks",
@@ -399,7 +426,7 @@ describe("a project's ledger", () => {
   });
 
   it("shows a project without layers as Open, with nothing held back", () => {
-    const view = <LedgerView ledger={open} now={now} />;
+    const view = tabWith(open);
     const markup = markupOf(view);
 
     expect(markup).toMatch(/data-posture="open"[^>]*>Open</u);
@@ -410,15 +437,15 @@ describe("a project's ledger", () => {
     expect(textOf(view)).not.toContain("sealed checks by");
   });
 
-  it.effect("sits under the project's crumbs: datekit, then Ledger", () =>
+  it.effect("sits under the project's crumbs: datekit, then Visibility", () =>
     Effect.gen(function* () {
-      const markup = yield* renderAt("/oscabriel/datekit/ledger", page);
+      const markup = yield* renderAt("/oscabriel/datekit/visibility", page);
       const crumbs = elementWith(markup, 'aria-label="Breadcrumb"');
 
       expect(crumbs).toMatch(
         /<a\b[^>]*href="\/oscabriel\/datekit"[^>]*>oscabriel\/datekit<\/a>/u
       );
-      expect(plainText(crumbs)).toContain("Ledger");
+      expect(plainText(crumbs)).toContain("Visibility");
     })
   );
 });
@@ -483,12 +510,23 @@ describe(areaSummaries, () => {
   });
 });
 
-const platformHandlers = (asked: Ref.Ref<number>) =>
+interface Asked {
+  readonly ledgers: number;
+  readonly schemas: number;
+}
+
+const nothingAsked: Asked = { ledgers: 0, schemas: 0 };
+
+// The env's schema is read from the landed main; before a first landing the platform answers `UnknownProject`.
+const platformHandlers = (asked: Ref.Ref<Asked>, { landed = true } = {}) =>
   Layer.mergeAll(
     unanswered,
     Contracts.toLayerHandler("ledger", ({ project }) =>
       Effect.gen(function* () {
-        yield* Ref.update(asked, (seen) => seen + 1);
+        yield* Ref.update(asked, (seen) => ({
+          ...seen,
+          ledgers: seen.ledgers + 1,
+        }));
 
         if (project !== datekit.project) {
           return yield* new UnknownProject({ project });
@@ -497,43 +535,78 @@ const platformHandlers = (asked: Ref.Ref<number>) =>
         return datekit;
       })
     ),
+    Contracts.toLayerHandler(EnvSchemaOf._tag, ({ project }) =>
+      Effect.gen(function* () {
+        yield* Ref.update(asked, (seen) => ({
+          ...seen,
+          schemas: seen.schemas + 1,
+        }));
+
+        if (!landed || project !== datekit.project) {
+          return yield* new UnknownProject({ project });
+        }
+
+        return datekitEnv;
+      })
+    ),
     asTester
   );
 
-const platformOf = (asked: Ref.Ref<number>) =>
+const platformOf = (asked: Ref.Ref<Asked>, where = {}) =>
   Layer.effect(Client, RpcTest.makeClient(Contracts)).pipe(
-    Layer.provide(platformHandlers(asked))
+    Layer.provide(platformHandlers(asked, where))
   );
 
-describe(readLedger, () => {
-  it.effect("reads the project's ledger, entries and all", () =>
-    Effect.gen(function* () {
-      const asked = yield* Ref.make(0);
+describe(readVisibility, () => {
+  it.effect(
+    "reads the project's ledger, entries and all, and its environment, each once",
+    () =>
+      Effect.gen(function* () {
+        const asked = yield* Ref.make(nothingAsked);
 
-      const read = yield* readLedger("datekit").pipe(
-        Effect.provide(platformOf(asked))
-      );
+        const read = yield* readVisibility("datekit").pipe(
+          Effect.provide(platformOf(asked))
+        );
 
-      expect(read.ledger.postureLabel).toBe("Open with sealed evidence");
-      expect(read.ledger.entries.map(({ seq }) => seq)).toStrictEqual([
-        1, 2, 3, 4, 5, 6, 7, 8, 9,
-      ]);
-      expect(yield* Ref.get(asked)).toBe(1);
-    })
+        expect(read.ledger.postureLabel).toBe("Open with sealed evidence");
+        expect(read.ledger.entries.map(({ seq }) => seq)).toStrictEqual([
+          1, 2, 3, 4, 5, 6, 7, 8, 9,
+        ]);
+        expect(read.env?.items.map(({ key }) => key)).toStrictEqual([
+          "APP_ENV",
+          "SENTRY_AUTH_TOKEN",
+        ]);
+        expect(yield* Ref.get(asked)).toStrictEqual({ ledgers: 1, schemas: 1 });
+      })
+  );
+
+  it.effect(
+    "reads no environment, and no 404, for a project whose main has not landed",
+    () =>
+      Effect.gen(function* () {
+        const asked = yield* Ref.make(nothingAsked);
+
+        const read = yield* readVisibility("datekit").pipe(
+          Effect.provide(platformOf(asked, { landed: false }))
+        );
+
+        expect(read.ledger.project).toBe("oscabriel/datekit");
+        expect(read.env).toBeUndefined();
+      })
   );
 
   it.effect("is a not-found for a project the platform does not know", () =>
     Effect.gen(function* () {
-      const asked = yield* Ref.make(0);
+      const asked = yield* Ref.make(nothingAsked);
 
       const failed = yield* Effect.flip(
-        readLedger("oscabriel/no-such-project").pipe(
+        readVisibility("oscabriel/no-such-project").pipe(
           Effect.provide(platformOf(asked))
         )
       );
 
       expect(isNotFound(failed)).toBeTruthy();
-      expect(yield* Ref.get(asked)).toBe(1);
+      expect((yield* Ref.get(asked)).ledgers).toBe(1);
     })
   );
 
@@ -541,14 +614,16 @@ describe(readLedger, () => {
     "is a not-found, asking nothing, for an address that names no project",
     () =>
       Effect.gen(function* () {
-        const asked = yield* Ref.make(0);
+        const asked = yield* Ref.make(nothingAsked);
 
         const failed = yield* Effect.flip(
-          readLedger("Not_A-Project").pipe(Effect.provide(platformOf(asked)))
+          readVisibility("Not_A-Project").pipe(
+            Effect.provide(platformOf(asked))
+          )
         );
 
         expect(isNotFound(failed)).toBeTruthy();
-        expect(yield* Ref.get(asked)).toBe(0);
+        expect(yield* Ref.get(asked)).toStrictEqual(nothingAsked);
       })
   );
 });
@@ -564,7 +639,7 @@ describe(ledgerAtom, () => {
     "reads the ledger again when the project's keys change, as the watch's poll changes them",
     () =>
       Effect.gen(function* () {
-        const asked = yield* Ref.make(0);
+        const asked = yield* Ref.make(nothingAsked);
 
         // One browser tab whose `ContractsClient` reaches the stub platform in process.
         const registry = yield* Effect.acquireRelease(
@@ -607,7 +682,9 @@ describe(ledgerAtom, () => {
         );
 
         expect(
-          yield* runUntil(Ref.get(asked).pipe(Effect.map((seen) => seen > 1)))
+          yield* runUntil(
+            Ref.get(asked).pipe(Effect.map((seen) => seen.ledgers > 1))
+          )
         ).toBeTruthy();
       })
   );
@@ -632,16 +709,16 @@ describe("the ledger's way in", () => {
     );
 
     expect(markup).toMatch(
-      /<a\b[^>]*href="\/oscabriel\/datekit\/ledger"[^>]*>Ledger<\/a>/u
+      /<a\b[^>]*href="\/oscabriel\/datekit\/visibility#ledger"[^>]*>Ledger<\/a>/u
     );
   });
 });
 
-describe("the ledger and env views", () => {
+describe("the Visibility tab's views", () => {
   // Views only: props in, markup out, and outside the visibility cartridge,
   // so the web reads only what the public contracts return.
   const sources: Readonly<Record<string, string>> = import.meta.glob(
-    "../src/features/{ledger,env}/**/*.{ts,tsx}",
+    "../src/features/{ledger,env,visibility}/**/*.{ts,tsx}",
     { eager: true, import: "default", query: "?raw" }
   );
 
@@ -649,7 +726,7 @@ describe("the ledger and env views", () => {
     /from\s+["'](?:@repo\/visibility[^"']*|@repo\/protocol\/contracts|effect\/(?:rpc|http|reactivity)|#backend|[./]+\/(?:surfaces|client\/[^"']*|server\/[^"']*)(?:\.tsx?)?)["']/u;
 
   it("import no transport and nothing from the visibility cartridge", () => {
-    expect(Object.keys(sources).length).toBeGreaterThanOrEqual(2);
+    expect(Object.keys(sources).length).toBeGreaterThanOrEqual(4);
 
     expect(
       Object.entries(sources).flatMap(([path, source]) =>
@@ -657,4 +734,81 @@ describe("the ledger and env views", () => {
       )
     ).toStrictEqual([]);
   });
+});
+
+const regionIdsOf = (markup: string) =>
+  [...mainOf(markup).matchAll(/<h2\b[^>]*\bid="(?<id>[^"]+)"/gu)].map(
+    (found) => found.groups?.id
+  );
+
+const attributesOf = (markup: string, attribute: string) =>
+  [
+    ...mainOf(markup).matchAll(
+      new RegExp(`${attribute}="(?<value>[^"]*)"`, "gu")
+    ),
+  ].map((found) => found.groups?.value);
+
+const tabOf = (markup: string) => ({
+  areas: attributesOf(markup, "data-area"),
+  entries: seqsOf(mainOf(markup)).length,
+  keys: attributesOf(markup, "data-env-key"),
+  layers: attributesOf(markup, "data-layer"),
+});
+
+/** A fresh dev world seeds itself first, which a full test run can slow past 5 s. */
+const seededWorld = { timeout: 30_000 };
+
+const decodeVisibility = Schema.decodeEffect(VisibilityPageData);
+
+describe("a project's Visibility tab", () => {
+  it.effect(
+    "shows, in one page, the layers, the held-back areas, the environment without a value, and the ledger",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* renderAt(
+          "/oscabriel/datekit/visibility",
+          <VisibilityView env={datekitEnv} ledger={datekit} now={now} />
+        );
+
+        expect(markup).toMatch(/<h1\b[^>]*>Visibility<\/h1>/u);
+        expect(regionIdsOf(markup)).toStrictEqual([
+          "layers",
+          "held-back",
+          "environment",
+          "ledger",
+        ]);
+        expect(tabOf(markup)).toStrictEqual({
+          areas: ["export", "parser"],
+          entries: 9,
+          keys: ["SENTRY_AUTH_TOKEN", "APP_ENV"],
+          layers: ["maintainers"],
+        });
+        expect(markup).not.toContain("placeholder-sentry-auth-token");
+      })
+  );
+
+  it.effect(
+    "reads the dev world's layered project whole: its maintainers layer, its export and parser areas, its env keys and its ledger",
+    () =>
+      Effect.gen(function* () {
+        const read = yield* readVisibility("oscabriel/vellum").pipe(
+          Effect.flatMap(decodeVisibility),
+          Effect.provide(fixturesClient())
+        );
+
+        const markup = yield* renderAt(
+          "/oscabriel/vellum/visibility",
+          <VisibilityView env={read.env} ledger={read.ledger} now={read.now} />
+        );
+
+        const tab = tabOf(markup);
+
+        expect(tab.layers).toStrictEqual(["maintainers"]);
+        expect(tab.areas).toStrictEqual(["export", "parser"]);
+        expect(tab.keys).toContain("SENTRY_AUTH_TOKEN");
+        expect(tab.entries).toBe(read.ledger.entries.length);
+        expect(markup).not.toMatch(/<(?:input|textarea|form|select)\b/u);
+      }),
+    seededWorld
+  );
 });
