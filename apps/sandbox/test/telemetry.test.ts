@@ -151,7 +151,7 @@ describe("a sandbox job", () => {
       expect(console.written()).toStrictEqual([
         {
           line: {
-            level: "WARN",
+            level: "warn",
             message: "git said: bad credentials <redacted>",
             sha,
           },

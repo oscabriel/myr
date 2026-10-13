@@ -32,6 +32,13 @@ export const scrubberOf = (secrets: readonly Redacted.Redacted[]): Scrub => {
   };
 };
 
+// Workers Logs names a line's level as its console method does, in lowercase
+// (`error`, `warn`, `info`), and a logged object's own `level` takes its
+// place: Effect's `ERROR` would read as no error where a query asks for
+// `level = 'error'`, as smoke and the alerts do. A fatal line is an error.
+const workersLevel = (level: string) =>
+  level === "FATAL" ? "error" : level.toLowerCase();
+
 export const jsonLogger = (scrub: Scrub): Logger.Logger<unknown, void> =>
   Logger.withLeveledConsole(
     Logger.map(
@@ -48,7 +55,7 @@ export const jsonLogger = (scrub: Scrub): Logger.Logger<unknown, void> =>
             "message",
             Array.isArray(message) ? message.map(scrubbed) : scrubbed(message),
           ],
-          ["level", level],
+          ["level", workersLevel(level)],
           ...(cause === undefined ? [] : [["cause", scrub(cause)] as const]),
           ...(Object.keys(spans).length === 0
             ? []

@@ -41,7 +41,7 @@ describe(jsonLogger, () => {
         expect(written).toStrictEqual([
           {
             line: {
-              level: "INFO",
+              level: "info",
               message: "a push reached custody",
               project: "alice/datekit",
               requestId: "push-1",
@@ -53,22 +53,24 @@ describe(jsonLogger, () => {
   );
 
   it.effect(
-    "writes each level through its own console method, so Issues hears what is logged at Error",
+    "writes each level through its own console method and names it as Workers Logs does, so Issues and a query of level = 'error' hear what is logged at Error",
     () =>
       Effect.gen(function* () {
         const written = yield* logged(
           Effect.all([
             Effect.logWarning("held"),
             Effect.logError("broke", Cause.die(new Error("the store is gone"))),
+            Effect.logFatal("gone"),
           ])
         );
 
-        expect(written.map(({ method }) => method)).toStrictEqual([
-          "warn",
-          "error",
+        expect(written).toMatchObject([
+          { line: { level: "warn" }, method: "warn" },
+          { line: { level: "error" }, method: "error" },
+          { line: { level: "error" }, method: "error" },
         ]);
         expect(written[1]?.line).toMatchObject({
-          level: "ERROR",
+          level: "error",
           message: "broke",
         });
         expect(written[1]?.line).toHaveProperty(
@@ -89,7 +91,7 @@ describe(jsonLogger, () => {
         );
 
         expect(written[0]?.line).toStrictEqual({
-          level: "INFO",
+          level: "info",
           message: "kept",
         });
       })

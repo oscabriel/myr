@@ -374,3 +374,6 @@
 {"at":"2026-10-11T03:16:04.995Z","by":"import","kind":"repo","name":"sinatra","namespace":"projects-demo","stage":"demo","note":"tags backfilled"}
 {"at":"2026-10-11T03:16:13.273Z","by":"import","kind":"repo","name":"nvm","namespace":"projects-demo","stage":"demo","note":"tags backfilled"}
 {"at":"2026-10-12T05:05:00.000Z","by":"import","kind":"repo","name":"github.com__juliangruber__isarray","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel","note":"imported by the user from the web, at the host-path offer /github.com/juliangruber/isarray (issue 1431); the time is when it was seen, not made; kept"}
+{"at":"2026-10-13T22:45:14.143Z","by":"smoke","kind":"project","name":"oscabriel__smoke-20261013-224510","stage":"dev-oscabriel"}
+{"at":"2026-10-13T22:45:14.144Z","by":"smoke","kind":"repo","name":"oscabriel__smoke-20261013-224510","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-13T22:46:08.425Z","by":"smoke","kind":"repo","name":"oscabriel__smoke-20261013-224510--parse-year--bram","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}

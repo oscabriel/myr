@@ -58,7 +58,7 @@ describe("a defect", () => {
 
         expect(errors).toHaveLength(1);
         expect(errors[0]).toMatchObject({
-          level: "ERROR",
+          level: "error",
           message: "Error: the store is gone",
           project: datekit,
           requestId: "push-1",
@@ -152,8 +152,8 @@ describe("a defect", () => {
         );
 
         expect(errors).toMatchObject([
-          { level: "ERROR", message: "TypeError: <withheld>" },
-          { level: "ERROR", message: "Error: <withheld>" },
+          { level: "error", message: "TypeError: <withheld>" },
+          { level: "error", message: "Error: <withheld>" },
         ]);
         expect(errors[0]).toHaveProperty(
           "cause",
