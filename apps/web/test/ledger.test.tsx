@@ -233,9 +233,9 @@ describe("a project's ledger", () => {
     expect(textIn(elementWith(markup, "data-ledger-head")).trim()).toBe(
       "Open with sealed evidence. export: 7 sealed checks by 3 people; parser: 4 sealed checks by 3 people."
     );
-    // The label itself is the platform's, whole, in the facts.
-    expect(plainText(factsOf(markup))).toContain(
-      "Open with sealed evidence · sealed checks in export, parser"
+    // The label itself is the platform's, whole, on the lead word.
+    expect(elementWith(markup, "data-posture=")).toContain(
+      'title="Open with sealed evidence · sealed checks in export, parser"'
     );
   });
 
@@ -396,15 +396,17 @@ describe("a project's ledger", () => {
     expect(markup).not.toMatch(/>in \d+ (?:min|h|d)</u);
   });
 
-  it("puts the posture, what is held back, the CLI line and what each disclosure means in its facts", () => {
-    const facts = factsOf(markupOf(page));
+  it("puts what is held back, the CLI line and what each disclosure means in its facts, and says the posture in its status line, not again there", () => {
+    const markup = markupOf(page);
+    const facts = factsOf(markup);
     const text = plainText(facts);
 
-    expect(facts).toContain('data-posture="openWithSealedEvidence"');
+    expect(elementWith(markup, "data-ledger-head")).toContain(
+      'data-posture="openWithSealedEvidence"'
+    );
+    expect(facts).not.toContain("data-posture");
     expect(
       inOrder(text, [
-        "Posture",
-        "Open with sealed evidence",
         "Held back",
         "export",
         "7 sealed checks",

@@ -20,12 +20,7 @@ import { CommandLine } from "../shared/command.tsx";
 import { CopyAction } from "../shared/copy-action.tsx";
 import { disclosureWords } from "../shared/disclosure.ts";
 import { EmptyState } from "../shared/empty.tsx";
-import {
-  CodeValue,
-  FactBlock,
-  HeldBackFacts,
-  PostureFacts,
-} from "../shared/facts.tsx";
+import { CodeValue, FactBlock, HeldBackFacts } from "../shared/facts.tsx";
 import { HandleLink } from "../shared/handle.tsx";
 import { AppLink } from "../shared/link.tsx";
 import { POSTURE_MARKS } from "../shared/mark-look.ts";
@@ -77,6 +72,7 @@ export const HeadSentence = ({ ledger }: { readonly ledger: Ledger }) => {
       <span
         className={`font-semibold ${postureTone[ledger.posture]}`}
         data-posture={ledger.posture}
+        title={ledger.postureLabel}
       >
         {lead}
       </span>
@@ -349,11 +345,6 @@ export const LedgerFacts = ({
   readonly ledger: Ledger;
 }) => (
   <>
-    <PostureFacts
-      label={ledger.postureLabel}
-      posture={ledger.posture}
-      project={ledger.project}
-    />
     <HeldBackFacts
       areas={areas.map((summary) => ({
         area: summary.area,

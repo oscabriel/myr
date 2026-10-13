@@ -18,7 +18,7 @@ import { Route as LedgerRoute } from "../src/routes/$owner/$project/ledger.tsx";
 import { canonicalAddress } from "../src/server/addresses.ts";
 import { inOrder, markupOf, plainText, textOf } from "./ask-fixtures.ts";
 import { textIn } from "./markup.ts";
-import { elementWith, factsOf, mainOf } from "./records.ts";
+import { elementWith, mainOf } from "./records.ts";
 import { renderAt } from "./render.tsx";
 
 const now = DateTime.makeUnsafe("2026-10-12T12:00:00Z");
@@ -155,6 +155,17 @@ describe("a project's environment", () => {
     ).toBeTruthy();
   });
 
+  it("says each item's sensitivity once: the lock on a sensitive item's line, a plain no on any other", () => {
+    const main = mainOf(markupOf(page));
+    const sensitive = plainText(itemOf(main, "SENTRY_AUTH_TOKEN"));
+
+    // Past its data-sensitive attribute, the word is said once in the row.
+    expect(sensitive.match(/(?<!-)\bsensitive\b/giu)).toHaveLength(1);
+    expect(plainText(itemOf(main, "APP_ENV"))).toContain(
+      "Sensitive No. The platform holds no value for it."
+    );
+  });
+
   it("never says a value was set in the future, though it was set after the page was read", () => {
     // Served at 09:00; ines-v set the value at 09:30 while the page stayed open.
     const item = itemOf(
@@ -228,7 +239,7 @@ describe("a project's environment", () => {
     );
   });
 
-  it("shows the posture the project's own ledger gives in its facts", () => {
+  it("shows the posture the project's own ledger gives in its status line", () => {
     const layered = markupOf(
       <VisibilityView
         env={datekit}
@@ -237,8 +248,12 @@ describe("a project's environment", () => {
       />
     );
 
-    expect(factsOf(layered)).toContain('data-posture="openCore"');
-    expect(factsOf(markupOf(page))).toContain('data-posture="open"');
+    expect(elementWith(layered, "data-ledger-head")).toContain(
+      'data-posture="openCore"'
+    );
+    expect(elementWith(markupOf(page), "data-ledger-head")).toContain(
+      'data-posture="open"'
+    );
   });
 
   it("says a sensitive item nobody set is not set", () => {

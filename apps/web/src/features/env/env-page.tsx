@@ -205,11 +205,11 @@ const ItemRow = ({
           <Code>{item.type}</Code>
         </Definition>
       )}
-      <Definition term="Sensitive">
-        {item.sensitive
-          ? "yes: its value is write-only"
-          : "no: the platform holds no value for it"}
-      </Definition>
+      {item.sensitive ? null : (
+        <Definition term="Sensitive">
+          No. The platform holds no value for it.
+        </Definition>
+      )}
       <Definition term="Required">{requiredWords(item.required)}</Definition>
       {item.proxy === undefined ? null : (
         <Definition term="Proxy">
