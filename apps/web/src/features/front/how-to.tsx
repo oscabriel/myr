@@ -88,6 +88,8 @@ const STEPS = [
 
 const LINK = "decoration-rule underline hover:decoration-current";
 
+// `llms.txt` is a server route, so its link is a plain anchor.
+
 export const HowToTake = ({
   onDismiss,
 }: {
@@ -131,7 +133,7 @@ export const HowToTake = ({
         <AppLink className={`text-foreground ${LINK}`} to={INSTALL_PATH}>
           Install the command line
         </AppLink>{" "}
-        first. For agents: {/* A server route, so a plain link. */}
+        first. For agents:{" "}
         <a
           className={`text-foreground text-mono font-mono ${LINK}`}
           href="/llms.txt"
