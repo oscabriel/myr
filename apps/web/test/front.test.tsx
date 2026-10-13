@@ -391,9 +391,7 @@ describe(FrontPageView, () => {
       Effect.gen(function* () {
         const markup = yield* front({});
 
-        const inspector = markup.slice(
-          markup.indexOf('data-facts="inspector"')
-        );
+        const inspector = markup.slice(markup.indexOf('data-facts="inline"'));
 
         const block =
           /<section aria-label="Projects"[\s\S]*?<\/section>/u.exec(
@@ -505,7 +503,7 @@ describe(FrontPageView, () => {
     () =>
       Effect.gen(function* () {
         const markup = yield* front({});
-        const facts = markup.slice(markup.indexOf('data-facts="inspector"'));
+        const facts = markup.slice(markup.indexOf('data-facts="inline"'));
         const text = textIn(facts);
 
         expect(
@@ -534,7 +532,7 @@ describe(FrontPageView, () => {
           <FrontPageView {...props({})} />
         );
 
-        const facts = markup.slice(markup.indexOf('data-facts="inspector"'));
+        const facts = markup.slice(markup.indexOf('data-facts="inline"'));
 
         expect(textIn(facts)).toContain("Selected ask");
         expect(textIn(facts)).toContain(

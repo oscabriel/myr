@@ -91,6 +91,7 @@ const Unknown = () => {
 };
 
 export const Route = createFileRoute("/$owner/$project/ledger")({
+  staticData: { shell: "project" },
   loader: ({ params }) => ledgerPage({ data: params.project }),
   headers: () => branchPage,
   head: ({ params: { project } }) =>

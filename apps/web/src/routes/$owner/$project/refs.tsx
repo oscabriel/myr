@@ -53,6 +53,7 @@ const RefsPage = () => {
 };
 
 export const Route = createFileRoute("/$owner/$project/refs")({
+  staticData: { shell: "project" },
   // The router writes back what this returns, dropping only `undefined`,
   // so the first page's address carries no `from`, and all the tags' no
   // `package`.

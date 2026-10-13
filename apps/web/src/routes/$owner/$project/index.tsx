@@ -285,6 +285,7 @@ const Unknown = () => {
 };
 
 export const Route = createFileRoute("/$owner/$project/")({
+  staticData: { shell: "project" },
   // TanStack infers each option from the ones before it.
   validateSearch: ({ ask }: { readonly ask?: unknown }) =>
     Predicate.isString(ask) ? { ask } : {},

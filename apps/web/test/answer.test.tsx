@@ -47,6 +47,7 @@ import {
   verdictOf,
 } from "./ask-fixtures.ts";
 import { textIn } from "./markup.ts";
+import { elementWith } from "./records.ts";
 
 const checksFailed = new ChecksFailed({
   lane: "unit",
@@ -99,8 +100,7 @@ const runOf = (markup: string) =>
 const mainOf = (markup: string) =>
   /<main\b[^>]*>(?<inner>.*)<\/main>/su.exec(markup)?.groups?.inner ?? "";
 
-const asideOf = (markup: string) =>
-  /<aside\b[^>]*>(?<inner>.*)<\/aside>/su.exec(markup)?.groups?.inner ?? "";
+const factsOf = (markup: string) => elementWith(markup, 'data-facts="inline"');
 
 const page = (
   props: Partial<Parameters<typeof AnswerView>[0]> & {
@@ -152,19 +152,15 @@ describe("the answer page", () => {
     );
   });
 
-  it("puts what was judged in the inspector, after the outcome and the gate", () => {
+  it("puts what was judged last in main, after the outcome and the gate, and only there", () => {
     const markup = markupOf(refusedPage);
-    const strip = markup.indexOf('data-stage="human"');
+    const main = mainOf(markup);
+    const strip = main.indexOf('data-stage="human"');
 
-    expect(strip).toBeGreaterThan(markup.indexOf('aria-label="Outcome"'));
-    expect(asideOf(markup)).toContain("Patch id");
-    expect(asideOf(markup)).toContain("Merged tree");
-
-    expect(markup.indexOf("<aside")).toBeGreaterThan(strip);
-    // Below the shell's width, where the facts sit above the run, it comes last in main.
-    expect(mainOf(markup).lastIndexOf("Patch id")).toBeGreaterThan(
-      mainOf(markup).indexOf('data-stage="human"')
-    );
+    expect(strip).toBeGreaterThan(main.indexOf('aria-label="Outcome"'));
+    expect(main.lastIndexOf("Patch id")).toBeGreaterThan(strip);
+    expect(main.lastIndexOf("Merged tree")).toBeGreaterThan(strip);
+    expect(factsOf(markup)).not.toContain("Patch id");
   });
 
   it("shows the stages the answer passed, the one that refused it, and the ones it never reached", () => {
@@ -300,7 +296,7 @@ describe("the answer page", () => {
     expect(bits).toContain(`title="${suite}"`);
   });
 
-  it("reads an answer's rounds first in main, newest first, the one on the page selected, and leaves them out of the inspector", () => {
+  it("reads an answer's rounds first in main, newest first, the one on the page selected, and leaves them out of its facts", () => {
     const states = askStates([
       claimedEvent(1, "okafor"),
       judgedEvent(2, refused.outcome, CommitSha.make("e".repeat(40))),
@@ -319,7 +315,7 @@ describe("the answer page", () => {
       inOrder(textIn(rounds), ["Round 2 of 2", "Round 1 of 2"])
     ).toBeTruthy();
     expect(rounds).toMatch(/data-selected="true"[^>]*>[\s\S]*?Round 2 of 2/u);
-    expect(textIn(asideOf(markup))).not.toContain("Rounds");
+    expect(textIn(factsOf(markup))).not.toContain("Rounds");
   });
 
   it("draws no rounds region for an answer's only round", () => {
@@ -500,8 +496,8 @@ describe("the answer page", () => {
       />
     );
 
-    expect(asideOf(markup)).toContain(`data-family="${family.parent.id}"`);
-    expect(asideOf(markup)).toMatch(
+    expect(factsOf(markup)).toContain(`data-family="${family.parent.id}"`);
+    expect(factsOf(markup)).toMatch(
       /aria-current="true"[^>]*title="retire-old-week-parse"|title="retire-old-week-parse"[^>]*aria-current="true"/u
     );
   });

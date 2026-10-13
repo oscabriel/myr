@@ -167,6 +167,7 @@ const Unknown = ({ data }: { readonly data?: unknown }) => (
 );
 
 export const Route = createFileRoute("/$owner/$project/proposals/$proposal")({
+  staticData: { shell: "project" },
   loader: ({ params }) => proposalPage({ data: params }),
   headers: () => personalPage,
   head: ({ loaderData, params: { project, proposal } }) =>

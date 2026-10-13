@@ -65,7 +65,7 @@ const LiveToday = ({
 }) => {
   const result = useAtomValue(todayAtom(project));
   const [decided, decide] = useAtom(decideAtom);
-  const { select, selected } = useSelection("decision");
+  const { selected } = useSelection("decision");
 
   const read = readFrom(result, data.read);
 
@@ -74,7 +74,6 @@ const LiveToday = ({
       decided={decided}
       now={data.now}
       onDecide={decide}
-      onSelect={select}
       read={read}
       selected={selected}
     />
@@ -100,6 +99,7 @@ const TodayPage = () => {
 };
 
 export const Route = createFileRoute("/today")({
+  staticData: { shell: "project" },
   validateSearch: (search: {
     readonly decision?: unknown;
     readonly project?: unknown;

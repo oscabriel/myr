@@ -113,6 +113,7 @@ const Unknown = () => {
 };
 
 export const Route = createFileRoute("/$owner/$project/people")({
+  staticData: { shell: "project" },
   loader: ({ params }) => peoplePage({ data: params.project }),
   headers: () => branchPage,
   head: ({ params: { project } }) =>

@@ -46,8 +46,6 @@ const MOVES = {
 
 const DIGIT = /^[1-9]$/u;
 
-const SHELL_WIDTH = "(min-width: 70rem)";
-
 export const intentOf = (
   press: KeyPress,
   on: boolean
@@ -175,7 +173,6 @@ interface ListRegistration {
   readonly focus: (id: string) => void;
   readonly read: () => {
     readonly ids: readonly string[];
-    readonly onSelect: (id: string) => void;
   };
   focused?: string;
 }
@@ -269,7 +266,7 @@ const copyNumbered = (command: string, shown: (copied?: string) => void) =>
   );
 
 const moveTo = (list: ListRegistration, step: 1 | -1) => {
-  const { ids, onSelect } = list.read();
+  const { ids } = list.read();
   const at = list.focused === undefined ? -1 : ids.indexOf(list.focused);
 
   const next =
@@ -292,10 +289,6 @@ const moveTo = (list: ListRegistration, step: 1 | -1) => {
   if (row instanceof HTMLElement) {
     row.focus({ preventScroll: true });
     row.scrollIntoView({ block: "nearest" });
-  }
-
-  if (globalThis.matchMedia(SHELL_WIDTH).matches) {
-    onSelect(next);
   }
 };
 
@@ -476,12 +469,11 @@ const useLatest = <A,>(value: A) => {
 };
 
 export const useListKeys = (
-  ids: readonly string[],
-  onSelect: (id: string) => void
+  ids: readonly string[]
 ): { readonly focused?: string } => {
   const registry = useContext(RegistryContext);
   const [focused, setFocused] = useState<string>();
-  const latest = useLatest({ ids, onSelect });
+  const latest = useLatest({ ids });
 
   useEffect(
     () =>

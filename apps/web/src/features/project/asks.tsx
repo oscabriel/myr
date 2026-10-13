@@ -28,7 +28,6 @@ export const openAsks = (listings: readonly AskListing[]) => {
 export const AskList = ({
   asks,
   now,
-  onSelect,
   parents,
   project,
   selected,
@@ -42,14 +41,12 @@ export const AskList = ({
   readonly states: ReadonlyMap<AskId, AskProgress>;
   readonly stamps: ReadonlySet<AskId>;
   readonly selected: string | undefined;
-  readonly onSelect: ((id: string) => void) | undefined;
 }) => {
   const row = (listing: AskListing, strip?: ReactNode) => (
     <AskRow
       key={listing.ask}
       listing={listing}
       now={now}
-      onSelect={onSelect}
       progress={states.get(listing.ask)}
       project={project}
       selected={selected === listing.ask}

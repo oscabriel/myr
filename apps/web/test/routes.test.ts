@@ -1,10 +1,38 @@
 // A project owned by one of the web's own first segments would be unreachable, so `ProjectName` refuses each such owner.
 import { describe, expect, it } from "@effect/vitest";
 import { ProjectName, reservedProjectNames } from "@repo/protocol/ids";
+import type { StaticDataRouteOption } from "@tanstack/react-router";
 import { Schema } from "effect";
 
 // Keys only: nothing here is loaded.
 const routes = Object.keys(import.meta.glob("../src/routes/**/*.{ts,tsx}"));
+
+// Every page module, loaded: a file whose name starts with `-` is a piece of a page, never a route.
+const pages: Readonly<
+  Record<
+    string,
+    {
+      readonly options: {
+        readonly component?: unknown;
+        readonly staticData?: StaticDataRouteOption;
+      };
+    }
+  >
+> = import.meta.glob(
+  [
+    "../src/routes/**/*.tsx",
+    "!../src/routes/**/-*.tsx",
+    "!../src/routes/__root.tsx",
+  ],
+  { eager: true, import: "Route" }
+);
+
+const SHELLS: ReadonlySet<string | undefined> = new Set([
+  "site",
+  "project",
+  "docs",
+  "focus",
+]);
 
 const publicFiles = Object.keys(
   import.meta.glob("../public/**/*", { query: "?url" })
@@ -40,6 +68,7 @@ describe("the web's own paths", () => {
       "assets",
       "auth",
       "docs",
+      "explore",
       "favicon.ico",
       "home",
       "icons",
@@ -67,5 +96,24 @@ describe("the web's own paths", () => {
     expect(
       segments.filter((segment) => /^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(segment))
     ).toStrictEqual([...reservedProjectNames]);
+  });
+});
+
+describe("the web's pages", () => {
+  it("are found: every route module that draws a page", () => {
+    expect(
+      Object.values(pages).filter(({ options }) => "component" in options)
+        .length
+    ).toBeGreaterThan(20);
+  });
+
+  it("each name one of the four shells, so none is drawn in a frame it did not choose", () => {
+    expect(
+      Object.entries(pages).flatMap(([file, { options }]) =>
+        "component" in options && !SHELLS.has(options.staticData?.shell)
+          ? [file]
+          : []
+      )
+    ).toStrictEqual([]);
   });
 });

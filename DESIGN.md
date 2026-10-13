@@ -124,8 +124,8 @@ spacing:
   column-docs-nav: "15rem"
   column-docs-toc: "13.75rem"
   measure: "72ch"
-  inspector: "20rem"
-  inspector-codefacts: "22rem"
+  top-bar: "3.5rem"
+  toolbar: "2.5rem"
   row-phone: "88px"
 components:
   top-bar:
@@ -381,6 +381,8 @@ Every route names exactly one shell in its `staticData` (`shell: "site" | "proje
 | `docs` | `/docs/**` | centred, `--container-site` (1360 px) | the site's top bar | nav tree `--column-docs-nav` (240 px), the article at `--measure` (72ch), "on this page" `--column-docs-toc` (220 px) |
 | `focus` | sign-in, MCP consent, new project, new proposal | a centred card, `--container-focus` (400 px) | the wordmark only | none |
 
+A shell sets its gutter once, on its frame, and every bar and page inside it reads it: 16 px on a phone, 20 px from `tablet`, and from `shell` (1120 px) `--gutter-site` in the site, the docs and a focused page, or `--gutter-project` in a project.
+
 From `columns` (1100 px, `--breakpoint-columns`) a side column stands beside its main column; below it, every side column stacks under its main column. From `nav` (900 px, `--breakpoint-nav`) the top bar shows its links; below it they fold into a menu. Phone width (360 px) is a first-class layout: nothing scrolls sideways.
 
 **The four rules (ADR 0041):**
@@ -390,12 +392,10 @@ From `columns` (1100 px, `--breakpoint-columns`) a side column stands beside its
 - **A command at most once per screen.** As content, a command sits in a popover, a single strip or a card. Never a column of code blocks.
 - **Prose stops at 72 to 80ch.** Lists and tables run to the container; prose, a README and a doc's article stop at `--measure` (72ch).
 
-**Until the shells land** (issue 02), pages still render through the old `Workspace`, whose inspector is `inspector` (20rem) and `inspector-codefacts` (22rem) wide; those two spacing values describe that code and retire with it.
-
 ### Inside a page
 
 1. **Top bar**, sticky (below).
-2. **Page header**: on a project, the project header and its tabs, sticky under the top bar; elsewhere the page's title and one line under it, not sticky.
+2. **Page header**: on a project, the project header and its tabs, sticky under the top bar; elsewhere the page's title and one line under it, not sticky. A page's facts follow its head inside the page; the only column beside a page is the about column on Overview or the file tree on Code (or, in the docs, the nav tree and "on this page").
 3. **Toolbar**, 40 px, sticky under the header on list and code pages.
 4. **Content**: rows under sticky group headers, a document of regions 32 px apart, cards in a grid where a page lists projects, or code.
 

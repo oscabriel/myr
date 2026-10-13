@@ -12,6 +12,18 @@ export const HOME_PATH = "/home";
 
 export const IMPORT_PATH = "/import";
 
+export const EXPLORE_PATH = "/explore";
+
+/** The setup page answers at `/agents` until it moves to `/install`. */
+export const INSTALL_PATH = "/agents";
+
+/** A reader's decisions and claims, the account's inbox. */
+export const INBOX_PATH = "/today";
+
+export const PRIVACY_PATH = "/privacy";
+
+export const TERMS_PATH = "/terms";
+
 export const docsPath = (page?: string) =>
   page === undefined ? "/docs" : `/docs/${page}`;
 

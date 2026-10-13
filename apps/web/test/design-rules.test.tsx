@@ -1,7 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import { ProjectName } from "@repo/protocol/ids";
 import { Effect } from "effect";
-import { renderToStaticMarkup } from "react-dom/server";
 
 import design from "../../../DESIGN.md?raw";
 import { PathTrail } from "../src/features/code/file-header.tsx";
@@ -10,7 +9,7 @@ import {
   STATE_MARKS,
 } from "../src/features/shared/marks.tsx";
 import { wordTone } from "../src/features/shared/row.tsx";
-import { Workspace } from "../src/features/shared/shell/workspace.tsx";
+import { AppShell } from "../src/features/shared/shell/app-shell.tsx";
 import { renderAt } from "./render.tsx";
 
 import styles from "../src/styles.css?raw";
@@ -134,42 +133,69 @@ const LAYOUT = [
   "gutter-site",
   "gutter-project",
   "measure",
+  "top-bar",
+  "toolbar",
 ] as const;
 
-const inspectorClasses = (code: boolean) => {
-  const markup = renderToStaticMarkup(
-    <Workspace
-      crumbs={[{ label: "Ledger" }]}
-      facts={<p>Posture: open</p>}
-      factsHeading="This ledger"
-      title="Ledger"
-      variant={code ? "code" : "document"}
-    >
-      <p>Entries</p>
-    </Workspace>
+/** Every class the shell draws at an address, the page itself left empty. */
+const shellClasses = (url: string) =>
+  renderAt(
+    url,
+    <AppShell>
+      <main id="main" />
+    </AppShell>,
+    { column: () => <p>Files</p> }
+  ).pipe(
+    Effect.map((markup) =>
+      [...markup.matchAll(/class="(?<classes>[^"]*)"/gu)].flatMap(
+        ({ groups }) => groups?.classes?.split(" ") ?? []
+      )
+    )
   );
 
-  const aside =
-    /<aside\b[^>]*data-facts="inspector"[^>]*>/u.exec(markup)?.[0] ?? "";
-
-  return (
-    /class="(?<classes>[^"]*)"/u.exec(aside)?.groups?.classes ?? ""
-  ).split(" ");
-};
-
 describe("DESIGN.md's named values", () => {
-  it("sizes the inspector as the spacing tokens say, wider from codefacts", () => {
-    const narrow = spacing("inspector");
-    const wide = spacing("inspector-codefacts");
+  it.effect(
+    "frames each shell at its own container and columns, read from the layout tokens",
+    () =>
+      Effect.gen(function* () {
+        const site = yield* shellClasses("/");
+        const project = yield* shellClasses("/oscabriel/datekit/tree/main");
+        const docs = yield* shellClasses("/docs/answer-an-ask");
+        const focus = yield* shellClasses("/import");
 
-    expect([narrow, wide]).toStrictEqual(["20rem", "22rem"]);
-    expect(inspectorClasses(false)).toStrictEqual(
-      expect.arrayContaining([`w-[${narrow}]`, `codefacts:w-[${wide}]`])
-    );
-    expect(inspectorClasses(true)).toStrictEqual(
-      expect.arrayContaining([`codefacts:w-[${wide}]`])
-    );
-  });
+        expect(site).toContain("max-w-site");
+        expect(project).toStrictEqual(
+          expect.arrayContaining(["max-w-project", "w-(--column-tree)"])
+        );
+        expect(docs).toStrictEqual(
+          expect.arrayContaining([
+            "max-w-site",
+            "columns:grid-cols-[var(--column-docs-nav)_minmax(0,1fr)]",
+          ])
+        );
+        expect(focus).toContain("max-w-focus");
+      })
+  );
+
+  it.effect(
+    "gives each shell its gutter from the layout tokens, which every bar and page inside it reads",
+    () =>
+      Effect.gen(function* () {
+        const site = yield* shellClasses("/");
+        const project = yield* shellClasses("/oscabriel/datekit/tree/main");
+        const docs = yield* shellClasses("/docs/answer-an-ask");
+
+        expect(site).toContain("[--shell-gutter:var(--gutter-site)]");
+        expect(docs).toContain("[--shell-gutter:var(--gutter-site)]");
+        expect(project).toContain("[--shell-gutter:var(--gutter-project)]");
+        expect(project).not.toContain("[--shell-gutter:var(--gutter-site)]");
+        expect(
+          [site, project, docs].map((classes) =>
+            classes.includes("shell:px-(--shell-gutter)")
+          )
+        ).toStrictEqual([true, true, true]);
+      })
+  );
 
   it("sets a row's state word in ink but for Refused and Landed, as the Mark Carries Rule says", () => {
     const coloured = STATE_MARK_NAMES.filter(

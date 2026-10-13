@@ -28,7 +28,7 @@ import { readLedger } from "../src/routes/$owner/$project/ledger.tsx";
 import { ContractsClient, webContracts } from "../src/surfaces.ts";
 import { inOrder, markupOf, plainText, textOf } from "./ask-fixtures.ts";
 import { textIn } from "./markup.ts";
-import { elementWith, inspectorOf, mainOf } from "./records.ts";
+import { elementWith, factsOf, mainOf } from "./records.ts";
 import { renderAt } from "./render.tsx";
 
 const now = DateTime.makeUnsafe("2026-10-12T12:00:00Z");
@@ -199,7 +199,7 @@ describe("a project's ledger", () => {
       "Open with sealed evidence. export: 7 sealed checks by 3 people; parser: 4 sealed checks by 3 people."
     );
     // The label itself is the platform's, whole, in the facts.
-    expect(plainText(inspectorOf(markup))).toContain(
+    expect(plainText(factsOf(markup))).toContain(
       "Open with sealed evidence · sealed checks in export, parser"
     );
   });
@@ -372,7 +372,7 @@ describe("a project's ledger", () => {
   });
 
   it("puts the posture, what is held back, the CLI line and what each disclosure means in its facts", () => {
-    const facts = inspectorOf(markupOf(page));
+    const facts = factsOf(markupOf(page));
     const text = plainText(facts);
 
     expect(facts).toContain('data-posture="openWithSealedEvidence"');

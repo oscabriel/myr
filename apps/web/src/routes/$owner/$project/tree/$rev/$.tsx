@@ -8,7 +8,7 @@ import { env } from "cloudflare:workers";
 import { DateTime, Effect, Option, Schema } from "effect";
 import { AsyncResult } from "effect/reactivity";
 
-import { CodeRail } from "../-code-rail.tsx";
+import { CodeColumn } from "../-code-column.tsx";
 import { FilesButton } from "../-files-button.tsx";
 import { softLanding } from "../-soft-landing.ts";
 import { lastChangesAtom } from "../../../../../client/code.ts";
@@ -110,7 +110,7 @@ const TreePage = () => {
 };
 
 export const Route = createFileRoute("/$owner/$project/tree/$rev/$")({
-  staticData: { rail: CodeRail },
+  staticData: { column: CodeColumn, shell: "project" },
   loader: ({ params }) => treePage({ data: params }),
   headers: () => branchPage,
   head: ({ params: { _splat, project, rev } }) =>

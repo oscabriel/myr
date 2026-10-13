@@ -390,7 +390,6 @@ const ProjectLine = ({
 const AsksSection = ({
   asks,
   now,
-  onSelect,
   parents,
   project,
   selected,
@@ -407,7 +406,6 @@ const AsksSection = ({
   readonly states: ReadonlyMap<AskId, AskProgress>;
   readonly stamps: ReadonlySet<AskId>;
   readonly selected: string | undefined;
-  readonly onSelect: ((id: string) => void) | undefined;
   readonly signedIn: boolean;
 }) => {
   let list: ReactNode;
@@ -426,7 +424,6 @@ const AsksSection = ({
       <AskList
         asks={asks}
         now={now}
-        onSelect={onSelect}
         parents={parents}
         project={project}
         selected={selected}
@@ -511,12 +508,10 @@ const countOf = (open: readonly AskListing[]) =>
 
 const ProjectPanes = ({
   props,
-  select,
   selected,
 }: {
   readonly props: ProjectViewProps;
   readonly selected: string | undefined;
-  readonly select: ((id: string) => void) | undefined;
 }) => {
   const { asks, code, listing } = props;
   const states = props.states ?? new Map<AskId, AskProgress>();
@@ -592,7 +587,6 @@ const ProjectPanes = ({
       <AsksSection
         asks={asks}
         now={props.now}
-        onSelect={select}
         parents={props.parents ?? []}
         project={project}
         selected={selected}
@@ -609,12 +603,12 @@ const ProjectPanes = ({
 };
 
 const Selectable = ({ props }: { readonly props: ProjectViewProps }) => {
-  const { select, selected } = useRowSelection(
+  const { selected } = useRowSelection(
     props.asks === undefined ? [] : askListIds(props.asks),
     "ask"
   );
 
-  return <ProjectPanes props={props} select={select} selected={selected} />;
+  return <ProjectPanes props={props} selected={selected} />;
 };
 
 export const ProjectView = (given: ProjectViewProps) => {
@@ -626,6 +620,6 @@ export const ProjectView = (given: ProjectViewProps) => {
   return Predicate.isNotNullish(useRouter({ warn: false })) ? (
     <Selectable props={props} />
   ) : (
-    <ProjectPanes props={props} select={undefined} selected={undefined} />
+    <ProjectPanes props={props} selected={undefined} />
   );
 };

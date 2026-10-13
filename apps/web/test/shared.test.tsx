@@ -4,10 +4,7 @@ import { Handle } from "@repo/protocol/ids";
 import { DateTime, Schema } from "effect";
 
 import { Definition, Definitions } from "../src/features/ask/fields.tsx";
-import {
-  CommandLine,
-  InspectorCommands,
-} from "../src/features/shared/command.tsx";
+import { CommandLine } from "../src/features/shared/command.tsx";
 import { CopyAction } from "../src/features/shared/copy-action.tsx";
 import { EmptyState } from "../src/features/shared/empty.tsx";
 import { HandleLink } from "../src/features/shared/handle.tsx";
@@ -185,28 +182,6 @@ describe(CommandLine, () => {
         `${Brand.cli} claim lint-heading-levels --project oscabriel/vellum \\\n  --json`
       )
     ).toStrictEqual([6, 2]);
-  });
-
-  it("takes the bleed form in the inspector: pane-wide, ruled above and below, hanging 2ch, an icon-only Copy", () => {
-    const command = `${Brand.cli} claim lint-heading-levels --project vellum`;
-
-    const markup = markupOf(
-      <InspectorCommands>
-        <CommandLine command={command} />
-      </InspectorCommands>
-    );
-
-    const box = /<div\b[^>]*data-form="bleed"[^>]*>/u.exec(markup)?.[0] ?? "";
-
-    expect(box).toMatch(/\bborder-y\b/u);
-    expect(box).not.toMatch(/\bborder\b(?!-)/u);
-    expect(markup).toMatch(/padding-left:2ch;text-indent:-2ch/u);
-    expect(markup).toMatch(
-      /<button\b[^>]*class="[^"]*\bsize-7\b[^"]*"[^>]*>.*<span class="sr-only">Copy<\/span><\/button>/u
-    );
-    expect(markupOf(<CommandLine command={command} />)).toMatch(
-      /data-form="box"/u
-    );
   });
 });
 

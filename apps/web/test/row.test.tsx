@@ -368,31 +368,22 @@ describe(Row, () => {
   );
 
   it.effect(
-    "keeps the whole row the link's to press when the list does not select, at every width",
+    "keeps the whole row the link's to press at every width, with nothing beside the list to select into",
     () =>
       Effect.gen(function* () {
-        const plain = yield* rowsAt(
+        const markup = yield* rowsAt(
           <Row
             href="/oscabriel/datekit/asks/a"
             id="a"
+            selected
             title="Format ordinals"
           />
         );
 
-        const selecting = yield* rowsAt(
-          <Row
-            href="/oscabriel/datekit/asks/a"
-            id="a"
-            onSelect={() => {}}
-            title="Format ordinals"
-          />
-        );
+        const [link] = tagsWith(markup, "data-list-key");
 
-        const [link] = tagsWith(plain, "data-list-key");
-        const [selectingLink] = tagsWith(selecting, "data-list-key");
-
-        expect(link).not.toContain("shell:after:pointer-events-none");
-        expect(selectingLink).toContain("shell:after:pointer-events-none");
+        expect(link).toContain("after:inset-0");
+        expect(link).not.toContain("pointer-events-none");
       })
   );
 

@@ -35,6 +35,7 @@ const PersonPage = () => {
 };
 
 export const Route = createFileRoute("/people/$handle")({
+  staticData: { shell: "project" },
   component: PersonPage,
   headers: () => branchPage,
   head: ({ params }) =>

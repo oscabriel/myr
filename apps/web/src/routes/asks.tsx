@@ -208,6 +208,7 @@ const readSearch = (search: {
 });
 
 export const Route = createFileRoute("/asks")({
+  staticData: { shell: "site" },
   // TanStack infers each option from the ones before it.
   validateSearch: readSearch,
   loader: () => frontPageData(),

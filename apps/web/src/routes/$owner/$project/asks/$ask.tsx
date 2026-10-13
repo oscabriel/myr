@@ -13,6 +13,7 @@ import { AsyncResult } from "effect/reactivity";
 import { verdictAtom } from "../../../../client/answer.ts";
 import { askAtom } from "../../../../client/ask.ts";
 import { askStates, projectEventsAtom } from "../../../../client/events.ts";
+import { useProjectList } from "../../../../client/front.ts";
 import { SeededAtoms, seedSuccess } from "../../../../client/seeded.ts";
 import { watchAtom } from "../../../../client/watch.ts";
 import { AskPageData, readAsk } from "../../../../features/answer/reads.ts";
@@ -24,7 +25,6 @@ import {
 import { NoSuchAsk } from "../../../../features/ask/refused.tsx";
 import { whoAtom } from "../../../../features/auth/who.ts";
 import { pageHead } from "../../../../features/shared/head.ts";
-import { useProjectList } from "../../../../features/shared/shell/context.ts";
 import { branchPage } from "../../../../server/cache-headers.ts";
 import { serverClient } from "../../../../server/client.ts";
 import { AskPath, askMarkdownHandler } from "./{$ask}[.]md.ts";
@@ -154,6 +154,7 @@ const AskNotFound = ({ data }: { readonly data?: unknown }) => {
 };
 
 export const Route = createFileRoute("/$owner/$project/asks/$ask")({
+  staticData: { shell: "project" },
   // TanStack infers each option from the ones before it: the loader comes
   // first, so `head` reads its data.
   loader: ({ params }) => askPage({ data: params }),

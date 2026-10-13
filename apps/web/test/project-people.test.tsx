@@ -15,7 +15,7 @@ import { PeopleView } from "../src/features/project-people/people-view.tsx";
 import { projectSections } from "../src/features/shared/shell/sections.ts";
 import { readPeople } from "../src/routes/$owner/$project/people.tsx";
 import { inOrder, markupOf, plainText, textOf } from "./ask-fixtures.ts";
-import { elementWith, elementsWith, inspectorOf, mainOf } from "./records.ts";
+import { elementWith, elementsWith, factsOf, mainOf } from "./records.ts";
 import { renderAt } from "./render.tsx";
 
 const datekit = ProjectName.make("oscabriel/datekit");
@@ -314,7 +314,7 @@ describe("a project's policy page", () => {
 
   it("offers no control, only how to change it: land a change to the config folder", () => {
     const markup = markupOf(page);
-    const facts = plainText(inspectorOf(markup));
+    const facts = plainText(factsOf(markup));
 
     for (const control of ["<input", "<textarea", "<form", "<select"]) {
       expect(markup).not.toContain(control);
@@ -326,7 +326,7 @@ describe("a project's policy page", () => {
   });
 
   it("puts each change command on lines of its own, numbered, never one wall", () => {
-    const facts = inspectorOf(markupOf(page));
+    const facts = factsOf(markupOf(page));
 
     const raw = [
       ...facts.matchAll(/<code\b[^>]*select-all[^>]*>(?<line>.*?)<\/code>/gsu),
@@ -346,7 +346,7 @@ describe("a project's policy page", () => {
   });
 
   it("shows each command whole: a real CLI command, with every flag its payload takes and --yes", () => {
-    const lines = commandsOf(inspectorOf(markupOf(page)));
+    const lines = commandsOf(factsOf(markupOf(page)));
 
     expect(lines.map((line) => commandOf(line)?.contract)).toStrictEqual([
       "openAsk",
@@ -468,7 +468,7 @@ describe("a project's policy page", () => {
 
     const lines = [
       ...commandsOf(mainOf(markup)),
-      ...commandsOf(inspectorOf(markup)),
+      ...commandsOf(factsOf(markup)),
     ];
 
     expect(lines.map((line) => commandOf(line)?.path.join(" "))).toStrictEqual([

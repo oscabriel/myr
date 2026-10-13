@@ -64,7 +64,7 @@ const addressOf = (pathname: string) => {
 export const projectOf = (pathname: string): string | undefined =>
   addressOf(pathname)?.spelled;
 
-export const sectionOf = (pathname: string): ProjectTab | undefined => {
+const sectionOf = (pathname: string): ProjectTab | undefined => {
   const address = addressOf(pathname);
 
   if (address === undefined) {

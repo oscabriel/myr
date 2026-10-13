@@ -24,16 +24,12 @@ export const signInHref = (here: string) =>
 const ACTION =
   "text-muted-foreground hover:text-foreground text-ui inline-flex cursor-pointer items-center gap-1.5 no-underline transition-colors duration-150";
 
-export type SessionLayout = "bar" | "rail";
-
 export const SessionView = ({
   handle,
   here,
-  layout = "bar",
 }: {
   readonly handle: Option.Option<Handle>;
   readonly here: string;
-  readonly layout?: SessionLayout;
 }) =>
   Option.match(handle, {
     onNone: () => (
@@ -43,13 +39,7 @@ export const SessionView = ({
       </a>
     ),
     onSome: (signedIn) => (
-      <div
-        className={
-          layout === "rail"
-            ? "flex min-w-0 flex-col gap-0.5"
-            : "flex min-w-0 items-center gap-3"
-        }
-      >
+      <div className="flex min-w-0 items-center gap-3">
         <p className="text-ui flex min-w-0 items-baseline gap-1">
           <span className="text-muted-foreground sr-only shrink-0">
             Signed in as
@@ -72,11 +62,7 @@ export const SessionView = ({
     ),
   });
 
-export const SessionSlot = ({
-  layout = "bar",
-}: {
-  readonly layout?: SessionLayout;
-}) => {
+export const SessionSlot = () => {
   const here = useLocation({ select: hereOf });
   const who = useAtomValue(whoAtom);
 
@@ -84,7 +70,6 @@ export const SessionSlot = ({
     <SessionView
       handle={AsyncResult.isSuccess(who) ? who.value : Option.none()}
       here={here}
-      layout={layout}
     />
   );
 };

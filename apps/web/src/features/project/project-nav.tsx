@@ -16,7 +16,7 @@ export const ProjectNav = ({
 }): ReactNode => (
   <nav
     aria-label={project}
-    className="border-rule shell:hidden -mt-2 flex [scrollbar-width:none] overflow-x-auto overscroll-x-contain border-b"
+    className="border-rule -mt-2 flex [scrollbar-width:none] overflow-x-auto overscroll-x-contain border-b"
   >
     {projectSections(project).map(({ label, tab, to }) => (
       <AppLink

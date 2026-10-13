@@ -1,5 +1,5 @@
 import { docEntry } from "@repo/agent-kit/docs/entries";
-import { docPage, docPages } from "@repo/agent-kit/docs/index";
+import { docPage } from "@repo/agent-kit/docs/index";
 import {
   createFileRoute,
   getRouteApi,
@@ -24,11 +24,12 @@ const DocsPage = () => {
 
   return Option.match(docPage(input, slug), {
     onNone: () => null,
-    onSome: (page) => <DocsPageView page={page} pages={docPages(input)} />,
+    onSome: (page) => <DocsPageView page={page} />,
   });
 };
 
 export const Route = createFileRoute("/docs/$page")({
+  staticData: { shell: "docs" },
   loader: ({ params }) =>
     Effect.runPromise(
       Option.isSome(docEntry(params.page))

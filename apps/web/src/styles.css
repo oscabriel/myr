@@ -330,11 +330,11 @@
 }
 
 /*
-  The shell's widths, by name: a phone below `tablet`; from `tablet` a top
-  bar with the rail as a sheet; from `diffsplit` a diff may go side by
-  side; from `shell` (1120 px, so the 110% zoom of a 1280 frame keeps it)
-  the rail and the inspector are columns; from `codefacts` code pages keep
-  the inspector open beside the code.
+  The widths a page changes at, by name: a phone below `tablet`; from
+  `diffsplit` a diff may go side by side; from `nav` the top bar shows its
+  links; from `columns` a side column stands beside its main column; from
+  `shell` (1120 px, so the 110% zoom of a 1280 frame keeps it) a page takes
+  its widest gutter and its wide-only tools.
 */
 @theme {
   --breakpoint-tablet: 40rem;
@@ -342,7 +342,6 @@
   --breakpoint-nav: 56.25rem;
   --breakpoint-columns: 68.75rem;
   --breakpoint-shell: 70rem;
-  --breakpoint-codefacts: 90rem;
 }
 
 /*
@@ -365,6 +364,10 @@
   From `columns` (1100 px) a side column stands beside its main column,
   and below it stacks under it; from `nav` (900 px) the top bar's links
   are shown, and below it they fold into a menu.
+
+  top-bar  the top bar's height (56 px), and the toolbar's (40 px) under
+           it; what sticks under them reads `--stick-bar` or
+           `--stick-toolbar`, each overlapping the hairline above it
 */
 @theme static {
   --container-site: 85rem;
@@ -377,6 +380,10 @@
   --gutter-site: 2rem;
   --gutter-project: 1.75rem;
   --measure: 72ch;
+  --top-bar: 3.5rem;
+  --toolbar: 2.5rem;
+  --stick-bar: calc(var(--top-bar) - 1px);
+  --stick-toolbar: calc(var(--top-bar) + var(--toolbar) - 1px);
 }
 
 @theme inline {

@@ -17,7 +17,8 @@ import { HandleLink } from "../shared/handle.tsx";
 import { AppLink } from "../shared/link.tsx";
 import { StateMarkIcon } from "../shared/marks.tsx";
 import { answerPath, askPath } from "../shared/paths.ts";
-import { GUTTER, MEASURE, Workspace } from "../shared/shell/workspace.tsx";
+import { GUTTER } from "../shared/shell/gutter.ts";
+import { MEASURE, Workspace } from "../shared/shell/workspace.tsx";
 import { When } from "../shared/time.tsx";
 import { askOf } from "../why/rows.ts";
 import { drawnFiles, statsOf } from "./diff-model.ts";
@@ -294,7 +295,7 @@ export const DiffToolbar = ({
 }) => (
   <>
     {files === undefined ? null : (
-      <div className="shell:hidden flex shrink-0">{files}</div>
+      <div className="columns:hidden flex shrink-0">{files}</div>
     )}
     <fieldset className="border-input diffsplit:flex m-0 hidden min-w-0 border p-0">
       <legend className="sr-only">Diff layout</legend>

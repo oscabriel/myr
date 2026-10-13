@@ -18,7 +18,7 @@ export const useMedia = (query: string): boolean =>
     () => false
   );
 
-export const SHELL_QUERY = "(min-width: 70rem)";
+export const COLUMNS_QUERY = "(min-width: 68.75rem)";
 
 export const SPLIT_QUERY = "(min-width: 48rem)";
 

@@ -106,7 +106,7 @@ describe("the For agents page", () => {
   it.effect("lists the five sections, as anchors, in its contents", () =>
     Effect.gen(function* () {
       const html = yield* page;
-      const inspector = html.slice(html.indexOf('data-facts="inspector"'));
+      const inspector = html.slice(html.indexOf('data-facts="inline"'));
 
       const anchors = [
         ...inspector.matchAll(/<a\b[^>]*href="#(?<id>[a-z]+)"/gu),

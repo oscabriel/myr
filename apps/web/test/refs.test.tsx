@@ -9,7 +9,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { packageParamOf } from "../src/features/code/refs-param.ts";
 import { RefsView, TAGS_PAGE } from "../src/features/code/refs-view.tsx";
 import { plainText } from "./ask-fixtures.ts";
-import { elementWith, inspectorOf, mainOf } from "./records.ts";
+import { elementWith, factsOf, mainOf } from "./records.ts";
 import { renderAt } from "./render.tsx";
 
 const markupOf = (element: ReactElement) => renderToStaticMarkup(element);
@@ -139,7 +139,7 @@ describe(RefsView, () => {
   });
 
   it("puts the clone command and what a claim fork is in its facts", () => {
-    const facts = inspectorOf(markupOf(page));
+    const facts = factsOf(markupOf(page));
 
     expect(plainText(facts)).toContain(
       `git clone ${platformUrl}/oscabriel/datekit.git`

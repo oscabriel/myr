@@ -1,13 +1,13 @@
-// A route's `staticData` loads with every page, so this module stays light: the browser loads the rail's body
-// (`-rail-body.tsx`) once the page is up.
+// A route's `staticData` loads with every page, so this module stays light: the browser loads the column's body
+// (`-column-body.tsx`) once the page is up.
 import { ClientOnly } from "@tanstack/react-router";
 import { lazy, Suspense } from "react";
 
-import { RailSlot } from "../../../../features/shared/shell/rail-slot.tsx";
+import { SideColumn } from "../../../../features/shared/shell/side-column.tsx";
 
 const Body = import.meta.env.SSR
   ? undefined
-  : lazy(() => import("./-rail-body.tsx"));
+  : lazy(() => import("./-column-body.tsx"));
 
 const Placeholder = () => (
   <div aria-hidden="true" className="border-rule h-12 shrink-0 border-b" />
@@ -24,14 +24,14 @@ const Later = ({ commit }: { readonly commit: boolean }) =>
     </ClientOnly>
   );
 
-export const CodeRail = () => (
-  <RailSlot label="Files">
+export const CodeColumn = () => (
+  <SideColumn label="Files">
     <Later commit={false} />
-  </RailSlot>
+  </SideColumn>
 );
 
-export const CommitRail = () => (
-  <RailSlot label="Changed files">
+export const CommitColumn = () => (
+  <SideColumn label="Changed files">
     <Later commit />
-  </RailSlot>
+  </SideColumn>
 );

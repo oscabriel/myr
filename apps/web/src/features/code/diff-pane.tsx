@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 
 const PANE =
-  "group/pane sticky top-[5.1875rem] h-[calc(100dvh-5.1875rem-3.5rem-env(safe-area-inset-bottom))] scroll-mt-[5.1875rem] tablet:top-[5.4375rem] tablet:h-[calc(100dvh-5.4375rem)] tablet:scroll-mt-[5.4375rem] shell:top-[5.1875rem] shell:h-[calc(100dvh-5.1875rem)] shell:scroll-mt-[5.1875rem] -mt-6 -mb-16 flex min-h-0 flex-col";
+  "group/pane sticky top-(--stick-toolbar) h-[calc(100dvh-var(--stick-toolbar))] scroll-mt-(--stick-toolbar) -mt-6 -mb-16 flex min-h-0 flex-col";
 
 export const PANE_SCROLLER =
   "min-h-0 flex-1 overflow-auto overscroll-y-auto group-data-[stuck=false]/pane:overflow-y-hidden";

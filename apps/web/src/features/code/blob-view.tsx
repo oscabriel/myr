@@ -5,7 +5,8 @@ import type { ReactNode } from "react";
 
 import { ReadmeSection } from "../project/readme-section.tsx";
 import { AppLink } from "../shared/link.tsx";
-import { GUTTER, MEASURE, Workspace } from "../shared/shell/workspace.tsx";
+import { GUTTER } from "../shared/shell/gutter.ts";
+import { MEASURE, Workspace } from "../shared/shell/workspace.tsx";
 import { FileFacts } from "./file-facts.tsx";
 import { FileHeader, PermalinkKey } from "./file-header.tsx";
 import { NumberedLines } from "./numbered-lines.tsx";

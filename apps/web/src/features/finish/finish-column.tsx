@@ -7,7 +7,7 @@ import { Option, Schema } from "effect";
 import { lazy, Suspense } from "react";
 
 import { AppLink } from "../shared/link.tsx";
-import { RailSlot } from "../shared/shell/rail-slot.tsx";
+import { SideColumn } from "../shared/shell/side-column.tsx";
 
 const FinishPageData = Schema.Struct({
   read: Schema.TaggedStruct("Found", {
@@ -24,13 +24,13 @@ const ROW =
 
 const Body = import.meta.env.SSR
   ? undefined
-  : lazy(() => import("./finish-rail-body.tsx"));
+  : lazy(() => import("./finish-column-body.tsx"));
 
 const Placeholder = () => (
   <div aria-hidden="true" className="border-rule h-10 shrink-0 border-b" />
 );
 
-export const FinishRail = () => {
+export const FinishColumn = () => {
   const data: unknown = useMatch({
     from: "/$owner/$project/decisions/$decision",
     select: (match) => match.loaderData,
@@ -45,7 +45,7 @@ export const FinishRail = () => {
 
   return Option.match(isFinishPage(data), {
     onNone: () => (
-      <RailSlot label="Decisions">
+      <SideColumn label="Decisions">
         <div className="flex flex-col py-2">
           <AppLink className={ROW} to="/today">
             Today
@@ -56,10 +56,10 @@ export const FinishRail = () => {
             </AppLink>
           )}
         </div>
-      </RailSlot>
+      </SideColumn>
     ),
     onSome: () => (
-      <RailSlot label="Changed files">
+      <SideColumn label="Changed files">
         {Body === undefined ? (
           <Placeholder />
         ) : (
@@ -69,7 +69,7 @@ export const FinishRail = () => {
             </Suspense>
           </ClientOnly>
         )}
-      </RailSlot>
+      </SideColumn>
     ),
   });
 };

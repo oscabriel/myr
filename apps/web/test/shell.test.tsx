@@ -1,4 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
+import { docEntries } from "@repo/agent-kit/docs/entries";
 import { Brand } from "@repo/brand";
 import { ProjectName } from "@repo/protocol/ids";
 import {
@@ -10,19 +11,24 @@ import {
   RouterProvider,
   useParams,
 } from "@tanstack/react-router";
+import type { StaticDataRouteOption } from "@tanstack/react-router";
 import { Effect } from "effect";
+import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
+import { useKeys } from "../src/features/shared/keys.tsx";
 import { PageShell } from "../src/features/shared/layout.tsx";
 import { AppLink } from "../src/features/shared/link.tsx";
 import { projectPath } from "../src/features/shared/paths.ts";
 import { RouteError } from "../src/features/shared/pending.tsx";
 import { AppShell } from "../src/features/shared/shell/app-shell.tsx";
-import { ShellReadsContext } from "../src/features/shared/shell/context.ts";
 import { ProjectsSheetBody } from "../src/features/shared/shell/overlays.tsx";
-import { RailSlot } from "../src/features/shared/shell/rail-slot.tsx";
 import { Workspace } from "../src/features/shared/shell/workspace.tsx";
-import { EIGHT_LEADING, TEN_LISTED } from "./listings.ts";
+import { Route as projectRoute } from "../src/routes/$owner/$project/route.tsx";
+import { Route as docsRoute } from "../src/routes/docs/$page.tsx";
+import { Route as importRoute } from "../src/routes/import.tsx";
+import { Route as landingRoute } from "../src/routes/index.tsx";
+import { TEN_LISTED } from "./listings.ts";
 import { renderAt } from "./render.tsx";
 
 const elementOf = (markup: string, tag: string, attribute: string) =>
@@ -53,298 +59,396 @@ const textOf = (markup: string) =>
     .replaceAll(/\s+/gu, " ")
     .trim();
 
-const ledgerPage = (facts: boolean) => (
-  <AppShell>
-    <Workspace
-      crumbs={[
-        { label: "oscabriel/datekit", to: "/oscabriel/datekit" },
-        { label: "Ledger" },
-      ]}
-      title="Ledger"
-      {...(facts
-        ? { facts: <p>Posture: open</p>, factsHeading: "This ledger" }
-        : {})}
-    >
-      <p>Entries</p>
-    </Workspace>
-  </AppShell>
+/** The opening tag of the first element carrying the attribute. */
+const tagWith = (markup: string, attribute: string) =>
+  new RegExp(`<[a-z]+\\b[^>]*${attribute}[^>]*>`, "u").exec(markup)?.[0] ?? "";
+
+const shellOf = (staticData: StaticDataRouteOption | undefined) =>
+  staticData?.shell;
+
+const staticOf = (route: {
+  readonly options: { readonly staticData?: StaticDataRouteOption };
+}): StaticDataRouteOption => route.options.staticData ?? {};
+
+/**
+ * One route per shell, each carrying the `staticData` its real route
+ * declares, so the frame drawn is the one the route names.
+ */
+const shellRoutes = (view: ReactNode) => {
+  const root = createRootRoute({
+    component: () => (
+      <AppShell>
+        <Outlet />
+      </AppShell>
+    ),
+  });
+
+  const page = () => view;
+
+  return root.addChildren([
+    createRoute({
+      component: page,
+      getParentRoute: () => root,
+      path: "/",
+      staticData: staticOf(landingRoute),
+    }),
+    createRoute({
+      component: page,
+      getParentRoute: () => root,
+      path: "$owner/$project",
+      staticData: staticOf(projectRoute),
+    }),
+    createRoute({
+      component: page,
+      getParentRoute: () => root,
+      path: "docs/$page",
+      staticData: staticOf(docsRoute),
+    }),
+    createRoute({
+      component: page,
+      getParentRoute: () => root,
+      path: "import",
+      staticData: staticOf(importRoute),
+    }),
+  ]);
+};
+
+const inShell = (
+  url: string,
+  view: ReactNode = (
+    <PageShell title="Page">
+      <p>Body</p>
+    </PageShell>
+  )
+) =>
+  Effect.gen(function* () {
+    const router = createRouter({
+      history: createMemoryHistory({ initialEntries: [url] }),
+      routeTree: shellRoutes(view),
+    });
+
+    yield* Effect.tryPromise(() => router.load());
+
+    return renderToStaticMarkup(<RouterProvider router={router} />);
+  });
+
+const SITE = "/";
+
+const PROJECT = "/oscabriel/datekit";
+
+const DOCS = "/docs/answer-an-ask";
+
+const FOCUS = "/import";
+
+const topBarOf = (markup: string) =>
+  elementOf(markup, "header", "data-top-bar");
+
+const KeysProbe = () => (
+  <p data-keys={useKeys() === undefined ? "missing" : "provided"}>Keys</p>
 );
 
-const Tree = () => (
-  <RailSlot>
-    <p>src/add.ts</p>
-  </RailSlot>
-);
+describe("the four shells", () => {
+  it("are what the real routes name", () => {
+    expect(
+      [landingRoute, projectRoute, docsRoute, importRoute].map(({ options }) =>
+        shellOf(options.staticData)
+      )
+    ).toStrictEqual(["site", "project", "docs", "focus"]);
+  });
 
-describe("the shell", () => {
   it.effect(
-    "names the site's sections in the rail, each a word, and the project's under it with the page being read current",
+    "draw the site with the framed top bar and the footer, and no side column",
     () =>
       Effect.gen(function* () {
-        const markup = yield* renderAt(
-          "/oscabriel/datekit/ledger",
-          ledgerPage(true)
+        const markup = yield* inShell(SITE);
+
+        expect(tagWith(markup, "data-shell=")).toContain('data-shell="site"');
+        expect(tagWith(markup, "data-top-bar")).toContain(
+          'data-top-bar="framed"'
         );
-
-        const rail = elementOf(markup, "nav", 'aria-label="Site"');
-        const links = linksOf(rail);
-
-        expect(rail).not.toBe("");
-        expect(
-          links.filter(({ href }) =>
-            ["/home", "/asks", "/today", "/docs", "/agents"].includes(
-              href ?? ""
-            )
-          )
-        ).toStrictEqual([
-          { active: false, current: false, href: "/home", text: "Home" },
-          { active: false, current: false, href: "/asks", text: "Asks" },
-          { active: false, current: false, href: "/today", text: "Today" },
-          { active: false, current: false, href: "/docs", text: "Docs" },
-          {
-            active: false,
-            current: false,
-            href: "/agents",
-            text: "For agents",
-          },
-        ]);
-        expect(
-          links
-            .filter(
-              ({ href }) =>
-                href?.startsWith("/oscabriel/datekit/") === true ||
-                href === "/oscabriel/datekit"
-            )
-            .map(({ href, text, current }) => ({ current, href, text }))
-            .filter(({ text }) => text !== "oscabriel/datekit")
-        ).toStrictEqual([
-          { current: false, href: "/oscabriel/datekit", text: "Asks" },
-          {
-            current: false,
-            href: "/oscabriel/datekit/tree/main",
-            text: "Code",
-          },
-          {
-            current: false,
-            href: "/oscabriel/datekit/commits/main",
-            text: "Landings",
-          },
-          { current: false, href: "/oscabriel/datekit/refs", text: "Refs" },
-          { current: false, href: "/oscabriel/datekit/people", text: "Policy" },
-          { current: true, href: "/oscabriel/datekit/ledger", text: "Ledger" },
-          { current: false, href: "/oscabriel/datekit/env", text: "Env shape" },
-        ]);
+        expect(elementOf(markup, "footer", "data-footer")).not.toBe("");
+        expect(markup).not.toContain("<aside");
+        expect(markup).not.toContain("data-column");
       })
   );
 
-  it.effect(
-    "names the current project in the rail at once, before the list of projects has arrived",
-    () =>
-      Effect.gen(function* () {
-        const rail = elementOf(
-          yield* renderAt("/oscabriel/datekit/ledger", ledgerPage(false)),
-          "nav",
-          'aria-label="Site"'
-        );
-
-        expect(textOf(rail)).toContain("Projects");
-        expect(linksOf(rail).map(({ text }) => text)).toContain(
-          "oscabriel/datekit"
-        );
-      })
-  );
-
-  it.effect(
-    "draws every link in the rail with the router's link, which marks the page it leads to",
-    () =>
-      Effect.gen(function* () {
-        const agents = linksOf(
-          elementOf(
-            yield* renderAt("/agents", ledgerPage(false)),
-            "nav",
-            'aria-label="Site"'
-          )
-        );
-
-        const ledger = linksOf(
-          elementOf(
-            yield* renderAt("/oscabriel/datekit/ledger", ledgerPage(false)),
-            "nav",
-            'aria-label="Site"'
-          )
-        );
-
-        expect(agents.filter(({ active }) => active)).toStrictEqual([
-          { active: true, current: true, href: "/agents", text: "For agents" },
-        ]);
-        expect(ledger.filter(({ active }) => active)).toStrictEqual([
-          {
-            active: true,
-            current: true,
-            href: "/oscabriel/datekit/ledger",
-            text: "Ledger",
-          },
-        ]);
-      })
-  );
-
-  it.effect(
-    "draws only the page on the landing, with no rail, bars or skip link, and the wordmark leads there",
-    () =>
-      Effect.gen(function* () {
-        const landing = yield* renderAt(
-          "/",
-          <AppShell>
-            <p>Landing</p>
-          </AppShell>
-        );
-
-        expect(landing).toBe("<p>Landing</p>");
-
-        const rail = elementOf(
-          yield* renderAt("/agents", ledgerPage(false)),
-          "nav",
-          'aria-label="Site"'
-        );
-
-        expect(linksOf(rail)[0]).toMatchObject({ href: "/", text: Brand.name });
-      })
-  );
-
-  it.effect("shows no project's sections on a page outside a project", () =>
+  it.effect("draw a project with the full-bleed top bar and no footer", () =>
     Effect.gen(function* () {
-      const rail = elementOf(
-        yield* renderAt("/agents", ledgerPage(false)),
-        "nav",
-        'aria-label="Site"'
-      );
+      const markup = yield* inShell(PROJECT);
 
-      expect(linksOf(rail).map(({ href }) => href)).not.toContain(
-        "/oscabriel/datekit/ledger"
+      expect(tagWith(markup, "data-shell=")).toContain('data-shell="project"');
+      expect(tagWith(markup, "data-top-bar")).toContain(
+        'data-top-bar="full-bleed"'
       );
+      expect(markup).not.toContain("<footer");
     })
   );
 
   it.effect(
-    "gives the page one main region, its context bar naming the project and the page",
+    "draw the docs with a nav tree of every page, the page being read current, and the footer",
     () =>
       Effect.gen(function* () {
-        const markup = yield* renderAt(
-          "/oscabriel/datekit/ledger",
-          ledgerPage(true)
+        const markup = yield* inShell(DOCS);
+        const tree = linksOf(elementOf(markup, "nav", 'aria-label="Docs"'));
+
+        expect(tagWith(markup, "data-shell=")).toContain('data-shell="docs"');
+        expect(tree.map(({ href }) => href)).toStrictEqual(
+          docEntries.map(({ slug }) => `/docs/${slug}`)
         );
-
-        const main = elementOf(markup, "main", 'id="main"');
-        const crumbs = elementOf(main, "nav", 'aria-label="Breadcrumb"');
-
-        expect(main).toContain("<p>Entries</p>");
-        expect(textOf(crumbs)).toBe("oscabriel/datekit / Ledger");
-        expect(linksOf(crumbs)).toStrictEqual([
-          {
-            active: false,
-            current: false,
-            href: "/oscabriel/datekit",
-            text: "oscabriel/datekit",
-          },
-        ]);
-        expect(main).toMatch(/<h1\b[^>]*>Ledger<\/h1>/u);
-      })
-  );
-
-  it.effect(
-    "names the page's project from the address when the page gives no crumbs of its own",
-    () =>
-      Effect.gen(function* () {
-        const markup = yield* renderAt(
-          "/oscabriel/datekit/env",
-          <AppShell>
-            <PageShell title="Env shape of datekit">
-              <p>Items</p>
-            </PageShell>
-          </AppShell>
-        );
-
         expect(
-          textOf(elementOf(markup, "nav", 'aria-label="Breadcrumb"'))
-        ).toBe("oscabriel/datekit / Env shape");
+          tree.filter(({ current }) => current).map(({ text }) => text)
+        ).toStrictEqual(["Answer an ask"]);
+        expect(elementOf(markup, "footer", "data-footer")).not.toBe("");
       })
   );
 
   it.effect(
-    "gives the facts an inspector named Facts when the page has some, and none when it has none",
+    "draw a focused page with the wordmark alone and no navigation",
     () =>
       Effect.gen(function* () {
-        const withFacts = yield* renderAt(
-          "/oscabriel/datekit/ledger",
-          ledgerPage(true)
-        );
+        const markup = yield* inShell(FOCUS);
 
-        const without = yield* renderAt(
-          "/oscabriel/datekit/ledger",
-          ledgerPage(false)
-        );
-
-        expect(elementOf(withFacts, "aside", 'aria-label="Facts"')).toContain(
-          "Posture: open"
-        );
-        expect(elementOf(withFacts, "aside", 'aria-label="Facts"')).toContain(
-          "This ledger"
-        );
-        expect(without).not.toContain("<aside");
+        expect(tagWith(markup, "data-shell=")).toContain('data-shell="focus"');
+        expect(linksOf(topBarOf(markup))).toStrictEqual([
+          { active: false, current: false, href: "/", text: Brand.name },
+        ]);
+        expect(markup).not.toContain("<nav");
+        expect(markup).not.toContain("<footer");
       })
   );
 
   it.effect(
-    "gives phones a bar of sections: Home, Asks, Today, Projects and More",
+    "draw no route with the old rail, its slot, the bottom bar or the inspector",
     () =>
       Effect.gen(function* () {
-        const bar = elementOf(
-          yield* renderAt("/oscabriel/datekit/ledger", ledgerPage(false)),
-          "nav",
-          'aria-label="Sections"'
+        const markups = [
+          yield* inShell(SITE),
+          yield* inShell(PROJECT),
+          yield* inShell(DOCS),
+          yield* inShell(FOCUS),
+        ].join("\n");
+
+        expect(markups).not.toMatch(/\bdata-rail(?:-slot)?\b/u);
+        expect(markups).not.toContain('aria-label="Site"');
+        expect(markups).not.toContain('aria-label="Sections"');
+        expect(markups).not.toContain('data-facts="inspector"');
+        expect(markups).not.toMatch(/>Menu</u);
+      })
+  );
+});
+
+describe("the top bar", () => {
+  const NAMED = [
+    { href: "/", text: Brand.name },
+    { href: "/explore", text: "Explore" },
+    { href: "/asks", text: "Asks" },
+    { href: "/docs", text: "Docs" },
+    { href: "/agents", text: "Install" },
+  ];
+
+  it.effect(
+    "is the same in the site, a project and the docs: the wordmark, Explore, Asks, Docs, Install, search and the account",
+    () =>
+      Effect.gen(function* () {
+        const bars = [
+          topBarOf(yield* inShell(SITE)),
+          topBarOf(yield* inShell(PROJECT)),
+          topBarOf(yield* inShell(DOCS)),
+        ];
+
+        const named = bars.map((bar) =>
+          linksOf(bar)
+            .filter(({ href }) => href?.startsWith("/auth/") !== true)
+            .map(({ href, text }) => ({ href, text }))
         );
 
-        expect(textOf(bar)).toBe("Home Asks Today Projects More");
-        expect(linksOf(bar).map(({ href }) => href)).toStrictEqual([
-          "/home",
-          "/asks",
-          "/today",
+        expect(named).toStrictEqual([NAMED, NAMED, NAMED]);
+        expect(
+          bars.map((bar) => /<button\b[^>]*>[\s\S]*?Search/u.test(bar))
+        ).toStrictEqual([true, true, true]);
+        expect(
+          bars.map((bar) =>
+            linksOf(bar).some(
+              ({ href, text }) =>
+                href?.startsWith("/auth/signin") === true && text === "Sign in"
+            )
+          )
+        ).toStrictEqual([true, true, true]);
+      })
+  );
+
+  it.effect("sets the wordmark as the name in text, with no mark", () =>
+    Effect.gen(function* () {
+      const bar = topBarOf(yield* inShell(SITE));
+      const wordmark = elementOf(bar, "a", 'href="/"');
+
+      expect(textOf(wordmark)).toBe(Brand.name);
+      expect(wordmark).not.toMatch(/<svg|<img/u);
+    })
+  );
+
+  // A colour given to a kit button must not cost it the UI size: the
+  // class merger reads an unknown `text-*` as a colour, so a colour class
+  // drops `text-ui` and the button falls back to the body's 16 px.
+  it.effect("sets every button in it at the UI size", () =>
+    Effect.gen(function* () {
+      const buttons = [
+        ...topBarOf(yield* inShell(PROJECT)).matchAll(
+          /<button\b[^>]*class="(?<classes>[^"]*)"/gu
+        ),
+      ].map(({ groups }) => groups?.classes?.split(" ") ?? []);
+
+      expect(buttons.length).toBeGreaterThanOrEqual(2);
+      expect(
+        buttons.filter((classes) => !classes.includes("text-ui"))
+      ).toStrictEqual([]);
+    })
+  );
+
+  it.effect("marks the section being read as the current page", () =>
+    Effect.gen(function* () {
+      const bar = topBarOf(yield* inShell(DOCS));
+
+      expect(
+        linksOf(bar)
+          .filter(({ active }) => active)
+          .map(({ href }) => href)
+      ).toStrictEqual(["/docs"]);
+    })
+  );
+});
+
+describe("the footer", () => {
+  it.effect(
+    "sets the brand's domain across the width, upper-cased by its style, under plain links",
+    () =>
+      Effect.gen(function* () {
+        const footer = elementOf(yield* inShell(SITE), "footer", "data-footer");
+        const domain = tagWith(footer, "data-domain");
+
+        expect(textOf(elementOf(footer, "p", "data-domain"))).toBe(
+          Brand.domain
+        );
+        expect(domain.split(/[\s"]/u)).toContain("uppercase");
+        expect(linksOf(footer).map(({ text }) => text)).toStrictEqual([
+          "Docs",
+          "Install",
+          "Privacy",
+          "Terms",
         ]);
       })
   );
+});
 
+describe("every shell", () => {
   it.effect("lets a keyboard skip to the page's content", () =>
     Effect.gen(function* () {
-      const markup = yield* renderAt("/today", ledgerPage(false));
+      const markups = [
+        yield* inShell(SITE),
+        yield* inShell(PROJECT),
+        yield* inShell(DOCS),
+        yield* inShell(FOCUS),
+      ];
 
-      expect(markup).toMatch(
-        /<a\b[^>]*href="#main"[^>]*>Skip to content<\/a>/u
-      );
-      expect(markup).toContain(Brand.name);
+      expect(
+        markups.map((markup) =>
+          /<a\b[^>]*href="#main"[^>]*>Skip to content<\/a>/u.test(markup)
+        )
+      ).toStrictEqual([true, true, true, true]);
     })
   );
 
   it.effect(
-    "keeps the rail's slot for a page that fills it, and none for a page that does not",
+    "keeps the keys, and `?` for their list, with no rail to hold them",
     () =>
       Effect.gen(function* () {
-        const code = yield* renderAt(
-          "/oscabriel/datekit/tree/main",
-          ledgerPage(false),
-          {
-            rail: Tree,
-          }
+        const probes = [
+          yield* inShell(SITE, <KeysProbe />),
+          yield* inShell(PROJECT, <KeysProbe />),
+          yield* inShell(DOCS, <KeysProbe />),
+          yield* inShell(FOCUS, <KeysProbe />),
+        ];
+
+        expect(
+          probes.map((markup) => /data-keys="(?<keys>\w+)"/u.exec(markup)?.[1])
+        ).toStrictEqual(["provided", "provided", "provided", "provided"]);
+      })
+  );
+
+  it.effect("gives the page one main region", () =>
+    Effect.gen(function* () {
+      const markups = [
+        yield* inShell(SITE),
+        yield* inShell(PROJECT),
+        yield* inShell(DOCS),
+        yield* inShell(FOCUS),
+      ];
+
+      expect(
+        markups.map((markup) => markup.split("<main").length - 1)
+      ).toStrictEqual([1, 1, 1, 1]);
+    })
+  );
+});
+
+describe("a page's facts", () => {
+  it.effect("sit in the page itself, never in a column beside it", () =>
+    Effect.gen(function* () {
+      const markup = yield* inShell(
+        PROJECT,
+        <Workspace
+          facts={<p>Posture: open</p>}
+          factsHeading="This ledger"
+          title="Ledger"
+        >
+          <p>Entries</p>
+        </Workspace>
+      );
+
+      const main = elementOf(markup, "main", 'id="main"');
+
+      expect(elementOf(main, "section", 'data-facts="inline"')).toContain(
+        "Posture: open"
+      );
+      expect(markup).not.toContain("<aside");
+    })
+  );
+
+  it.effect("name no breadcrumb in a focused page", () =>
+    Effect.gen(function* () {
+      const markup = yield* inShell(
+        FOCUS,
+        <Workspace crumbs={[{ label: "Import a repo" }]} title="Import a repo">
+          <p>Form</p>
+        </Workspace>
+      );
+
+      expect(markup).not.toContain('aria-label="Breadcrumb"');
+    })
+  );
+});
+
+describe("the search", () => {
+  it.effect(
+    "lists every project by its full name, and ends with the way to import a repo",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* renderAt(
+          "/agents",
+          <ProjectsSheetBody
+            input={{ current: null }}
+            listed={TEN_LISTED}
+            onChosen={() => {}}
+          />
         );
 
-        const ledger = yield* renderAt(
-          "/oscabriel/datekit/ledger",
-          ledgerPage(false)
-        );
-
-        expect(elementOf(code, "nav", 'aria-label="Site"')).toContain(
-          "<p>src/add.ts</p>"
-        );
-        expect(ledger).not.toContain("src/add.ts");
+        expect(
+          TEN_LISTED.filter(({ project }) => !markup.includes(`>${project}<`))
+        ).toStrictEqual([]);
+        expect(linksOf(markup).at(-1)).toMatchObject({
+          href: "/import",
+          text: "Import a repo",
+        });
       })
   );
 });
@@ -363,74 +467,6 @@ const ProjectParamsView = () => {
   );
 };
 
-const railProjectsOf = (markup: string) =>
-  [
-    ...elementOf(markup, "nav", 'aria-label="Site"').matchAll(
-      /<a\b[^>]*data-project="(?<project>[^"]+)"/gu
-    ),
-  ].map(({ groups }) => groups?.project);
-
-const listedAt = (url: string) =>
-  renderAt(
-    url,
-    <AppShell projects={TEN_LISTED}>
-      <Workspace title="Ledger">
-        <p>Entries</p>
-      </Workspace>
-    </AppShell>
-  );
-
-describe("the rail's projects", () => {
-  it.effect(
-    "are eight, the most open asks first and a tie by name, each by its full name",
-    () =>
-      Effect.gen(function* () {
-        expect(railProjectsOf(yield* listedAt("/agents"))).toStrictEqual(
-          EIGHT_LEADING
-        );
-      })
-  );
-
-  it.effect(
-    "pin the current project first, then the seven that lead among the others",
-    () =>
-      Effect.gen(function* () {
-        expect(
-          railProjectsOf(yield* listedAt("/oscabriel/yarrow/ledger"))
-        ).toStrictEqual(["oscabriel/yarrow", ...EIGHT_LEADING.slice(0, 7)]);
-        expect(
-          railProjectsOf(yield* listedAt("/oscabriel/datekit/ledger"))
-        ).toStrictEqual([
-          "oscabriel/datekit",
-          ...EIGHT_LEADING.filter((name) => name !== "oscabriel/datekit"),
-        ]);
-      })
-  );
-});
-
-describe("the project switcher", () => {
-  it.effect(
-    "lists every project by its full name, and ends with the way to import a repo",
-    () =>
-      Effect.gen(function* () {
-        const markup = yield* renderAt(
-          "/agents",
-          <ShellReadsContext value={{ projects: TEN_LISTED }}>
-            <ProjectsSheetBody input={{ current: null }} onChosen={() => {}} />
-          </ShellReadsContext>
-        );
-
-        expect(
-          TEN_LISTED.filter(({ project }) => !markup.includes(`>${project}<`))
-        ).toStrictEqual([]);
-        expect(linksOf(markup).at(-1)).toMatchObject({
-          href: "/import",
-          text: "Import a repo",
-        });
-      })
-  );
-});
-
 describe("a project at its source path", () => {
   it.effect(
     "reaches the project's pages with its owner in one param, and links back to the same address",
@@ -447,32 +483,6 @@ describe("a project at its source path", () => {
           "/github.com/pallets/click/tree/main",
         ]);
       })
-  );
-});
-
-describe("the shell's controls", () => {
-  // A colour given to a kit button must not cost it the UI size: the
-  // class merger reads an unknown `text-*` as a colour, so a colour class
-  // drops `text-ui` and the button falls back to the body's 16 px.
-  it.effect("set every button in the rail at the UI size", () =>
-    Effect.gen(function* () {
-      const rail = elementOf(
-        yield* renderAt("/oscabriel/datekit/tree/main", ledgerPage(false), {
-          rail: Tree,
-        }),
-        "nav",
-        'aria-label="Site"'
-      );
-
-      const buttons = [
-        ...rail.matchAll(/<button\b[^>]*class="(?<classes>[^"]*)"/gu),
-      ].map(({ groups }) => groups?.classes?.split(" ") ?? []);
-
-      expect(buttons.length).toBeGreaterThanOrEqual(2);
-      expect(
-        buttons.filter((classes) => !classes.includes("text-ui"))
-      ).toStrictEqual([]);
-    })
   );
 });
 
@@ -590,7 +600,7 @@ describe("a page whose read fails", () => {
       );
       expect(main).toMatch(/<button\b[^>]*>Reload<\/button>/u);
       expect(main).not.toContain("refused");
-      expect(markup).toContain('aria-label="Site"');
+      expect(markup).toContain("data-top-bar");
     })
   );
 });

@@ -17,7 +17,7 @@ import { ClientTree } from "../../../../features/code/client-tree.tsx";
 import { drawnFiles, treeOrder } from "../../../../features/code/diff-model.ts";
 import { useCodeFileKeys } from "../../../../features/code/file-keys.ts";
 import { parseDiffHash } from "../../../../features/code/line-hash.ts";
-import { SHELL_QUERY, useMedia } from "../../../../features/code/media.ts";
+import { COLUMNS_QUERY, useMedia } from "../../../../features/code/media.ts";
 import {
   blobHref,
   diffAnchor,
@@ -160,7 +160,7 @@ export const CodeFiles = ({
   readonly always?: boolean;
 }) => {
   const { kind, path, project, rev } = useCodeAddress();
-  const wide = useMedia(SHELL_QUERY);
+  const wide = useMedia(COLUMNS_QUERY);
 
   return project === undefined ? null : (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -186,7 +186,7 @@ export const CommitFiles = ({
   readonly always?: boolean;
 }) => {
   const router = useRouter();
-  const wide = useMedia(SHELL_QUERY);
+  const wide = useMedia(COLUMNS_QUERY);
   const files = useCommitFiles();
   const hash = useLocation({ select: (location) => location.hash });
 
@@ -230,8 +230,8 @@ export const CommitFiles = ({
   ) : null;
 };
 
-const RailBody = ({ commit }: { readonly commit: boolean }) =>
+const ColumnBody = ({ commit }: { readonly commit: boolean }) =>
   commit ? <CommitFiles /> : <CodeFiles />;
 
 // `React.lazy` takes a module's default export.
-export default RailBody;
+export default ColumnBody;

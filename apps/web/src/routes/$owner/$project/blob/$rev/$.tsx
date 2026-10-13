@@ -20,7 +20,7 @@ import { pageHead } from "../../../../../features/shared/head.ts";
 import { notFoundFor } from "../../../../../features/shared/refusals.ts";
 import { branchPage } from "../../../../../server/cache-headers.ts";
 import { serverClient } from "../../../../../server/client.ts";
-import { CodeRail } from "../../tree/-code-rail.tsx";
+import { CodeColumn } from "../../tree/-code-column.tsx";
 import { FilesButton } from "../../tree/-files-button.tsx";
 import { softLanding } from "../../tree/-soft-landing.ts";
 
@@ -119,7 +119,7 @@ const BlobPage = () => {
 };
 
 export const Route = createFileRoute("/$owner/$project/blob/$rev/$")({
-  staticData: { rail: CodeRail },
+  staticData: { column: CodeColumn, shell: "project" },
   // The router writes back what this returns, dropping only `undefined`,
   // so a rendered file's address carries no `plain`.
   validateSearch: ({ plain }: { readonly plain?: unknown }) => ({

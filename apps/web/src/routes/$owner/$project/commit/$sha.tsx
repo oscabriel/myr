@@ -18,7 +18,7 @@ import { pageHead } from "../../../../features/shared/head.ts";
 import { notFoundFor } from "../../../../features/shared/refusals.ts";
 import { branchPage } from "../../../../server/cache-headers.ts";
 import { serverClient } from "../../../../server/client.ts";
-import { CommitRail } from "../tree/-code-rail.tsx";
+import { CommitColumn } from "../tree/-code-column.tsx";
 import { CommitPageData } from "../tree/-commit-files.ts";
 import { FilesButton } from "../tree/-files-button.tsx";
 
@@ -178,7 +178,7 @@ const CommitPage = () => {
 };
 
 export const Route = createFileRoute("/$owner/$project/commit/$sha")({
-  staticData: { rail: CommitRail },
+  staticData: { column: CommitColumn, shell: "project" },
   // The router writes back what this returns, dropping only `undefined`,
   // so a unified diff's address carries no `style`.
   validateSearch: (search: { readonly style?: unknown }) => ({

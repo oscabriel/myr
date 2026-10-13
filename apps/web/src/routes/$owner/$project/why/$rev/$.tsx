@@ -22,7 +22,7 @@ import {
 } from "../../../../../features/why/why-view.tsx";
 import { branchPage } from "../../../../../server/cache-headers.ts";
 import { serverClient } from "../../../../../server/client.ts";
-import { CodeRail } from "../../tree/-code-rail.tsx";
+import { CodeColumn } from "../../tree/-code-column.tsx";
 import { FilesButton } from "../../tree/-files-button.tsx";
 import { softLanding } from "../../tree/-soft-landing.ts";
 
@@ -138,7 +138,7 @@ const WhyPage = () => {
 };
 
 export const Route = createFileRoute("/$owner/$project/why/$rev/$")({
-  staticData: { rail: CodeRail },
+  staticData: { column: CodeColumn, shell: "project" },
   headers: () => branchPage,
   loader: ({ params }) => whyPage({ data: params }),
   head: ({ params: { _splat, project, rev } }) =>

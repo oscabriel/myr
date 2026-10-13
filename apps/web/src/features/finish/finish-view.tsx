@@ -29,7 +29,8 @@ import { CommandLine } from "../shared/command.tsx";
 import { FactBlock, GateFacts } from "../shared/facts.tsx";
 import { AppLink } from "../shared/link.tsx";
 import { askPath } from "../shared/paths.ts";
-import { GUTTER, Workspace } from "../shared/shell/workspace.tsx";
+import { GUTTER } from "../shared/shell/gutter.ts";
+import { Workspace } from "../shared/shell/workspace.tsx";
 import { StatusLine } from "../shared/status-line.tsx";
 import type { PlacedRefusal } from "./annotation.tsx";
 import { RefusalNote } from "./annotation.tsx";
@@ -227,7 +228,7 @@ const DecisionBar = ({
 }) => (
   <section
     aria-label="Your choice"
-    className="border-rule bg-background codefacts:hidden flex shrink-0 flex-wrap items-start gap-x-6 gap-y-2 border-t px-4 py-3"
+    className="border-rule bg-background flex shrink-0 flex-wrap items-start gap-x-6 gap-y-2 border-t px-4 py-3"
     data-decision-bar=""
   >
     {decision.decided === undefined ? (
