@@ -560,6 +560,22 @@ export const describeProjectStore = (
     );
 
     it.effect(
+      "names the outbox entries an ack took, so of two acks of one entry only the first takes it",
+      () =>
+        Effect.gen(function* () {
+          const store = yield* ProjectStore;
+
+          yield* store.commit(everything);
+
+          expect([
+            yield* store.ackOutbox(["out-1", "out-unknown"]),
+            yield* store.ackOutbox(["out-1"]),
+            yield* store.ackOutbox([]),
+          ]).toStrictEqual([["out-1"], [], []]);
+        }).pipe(Effect.provide(layer))
+    );
+
+    it.effect(
       "loads landings newest first, the later write first on a tie",
       () =>
         Effect.gen(function* () {

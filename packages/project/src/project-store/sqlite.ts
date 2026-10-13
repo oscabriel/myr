@@ -27,6 +27,10 @@ const EventIds = Schema.Array(Schema.Struct({ event_id: Schema.String }));
 
 const decodeEventIds = Schema.decodeUnknownEffect(EventIds);
 
+const OutboxIds = Schema.Array(Schema.Struct({ id: Schema.String }));
+
+const decodeOutboxIds = Schema.decodeUnknownEffect(OutboxIds);
+
 const LastSeq = Schema.Tuple([Schema.Struct({ last: Schema.Int })]);
 
 const decodeLastSeq = Schema.decodeUnknownEffect(LastSeq);
@@ -124,11 +128,12 @@ export const ProjectStoreSqlite = Layer.effect(
     return ProjectStore.of({
       ackOutbox: (ids) =>
         Array.isReadonlyArrayNonEmpty(ids)
-          ? sql`DELETE FROM outbox WHERE ${sql.in("id", ids)}`.pipe(
-              Effect.asVoid,
+          ? sql`DELETE FROM outbox WHERE ${sql.in("id", ids)} RETURNING id`.pipe(
+              Effect.flatMap(decodeOutboxIds),
+              Effect.map(Array.map(({ id }) => id)),
               Effect.orDie
             )
-          : Effect.void,
+          : Effect.succeed([]),
       commit: (writes) =>
         sql
           .withTransaction(

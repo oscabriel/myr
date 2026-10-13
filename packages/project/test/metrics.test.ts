@@ -20,7 +20,16 @@ import { NotRedFirst } from "@repo/protocol/refusal";
 import { advanceTo } from "@repo/testkit/clock";
 import type { Files } from "@repo/testkit/git-client";
 import { aProject, withAsk, withVouches } from "@repo/testkit/scenarios";
-import { Array, Context, Effect, Layer, Option, Ref } from "effect";
+import {
+  Array,
+  Context,
+  Effect,
+  Fiber,
+  Latch,
+  Layer,
+  Option,
+  Ref,
+} from "effect";
 
 import { AnswerRuns } from "../src/answer-runs.ts";
 import type { AnswerQueue } from "../src/answer-runs.ts";
@@ -34,6 +43,8 @@ import type { DataPoint } from "../src/metrics/binding.ts";
 import { MetricsMemory, MetricsWritten } from "../src/metrics/memory.ts";
 import type { ProjectApi } from "../src/project.ts";
 import { projectService } from "../src/project.ts";
+import { Projection } from "../src/projection.ts";
+import { ProjectionMemory } from "../src/projection/memory.ts";
 import { CheckScript, composedAt, mergedAt, Pusher, worldOf } from "./world.ts";
 
 const datekit = ProjectName.make("alice/datekit");
@@ -674,6 +685,76 @@ describe("a project's metrics", () => {
 
         expect(tagged(yield* pointsSoFar)).toStrictEqual(tagged(points));
       }).pipe(Effect.provide(world))
+  );
+});
+
+class ReadModelGate extends Context.Service<
+  ReadModelGate,
+  {
+    /** Holds the read model's next apply until `open`. */
+    readonly hold: Effect.Effect<void>;
+    /** Done once the held apply has begun. */
+    readonly held: Effect.Effect<void>;
+    readonly open: Effect.Effect<void>;
+  }
+>()("test/ReadModelGate") {}
+
+/** A read model whose next apply waits, as a settle waits on D1's. */
+const gatedReadModel = Layer.effectContext(
+  Effect.gen(function* () {
+    const kept = yield* Layer.build(ProjectionMemory);
+    const projection = Context.get(kept, Projection);
+    const armed = yield* Ref.make(false);
+    const reached = yield* Latch.make();
+    const opened = yield* Latch.make();
+
+    const waited = reached.open.pipe(Effect.andThen(opened.await));
+
+    return kept.pipe(
+      Context.add(Projection, {
+        apply: (rows) =>
+          Effect.flatMap(Ref.getAndSet(armed, false), (hold) =>
+            Effect.andThen(hold ? waited : Effect.void, projection.apply(rows))
+          ),
+      }),
+      Context.add(ReadModelGate, {
+        held: reached.await,
+        hold: Ref.set(armed, true),
+        open: Effect.asVoid(opened.open),
+      })
+    );
+  })
+);
+
+describe("a project's metrics, settled by a call and by the alarm at once", () => {
+  it.effect(
+    "count a fact once when the alarm settles its row while the call that kept it waits on the read model",
+    () =>
+      Effect.gen(function* () {
+        yield* advanceTo("2026-10-07T12:00:00Z");
+
+        const api = yield* projectService(project);
+        const gate = yield* ReadModelGate;
+
+        yield* api.initProject(alice, {});
+
+        const first = yield* Pusher.use((pusher) =>
+          pusher.push(repo, Option.none(), start, "Start")
+        );
+
+        yield* gate.hold;
+
+        const call = yield* Effect.forkChild(api.recordFirstPush(alice, first));
+
+        yield* gate.held;
+        yield* api.onAlarm();
+        yield* gate.open;
+        yield* Fiber.join(call);
+
+        expect(yield* pointsSoFar).toStrictEqual([
+          MetricPoint.cases.Landed.make({ project }),
+        ]);
+      }).pipe(Effect.provide(Layer.mergeAll(world, gatedReadModel)))
   );
 });
 

@@ -192,7 +192,9 @@ const bySeq = Order.mapInput(Order.Number, ({ body }: Decoded) =>
 export const runOutbox = (
   rows: readonly OutboxRow[],
   queue: AnswerQueue,
-  now: DateTime.Utc
+  now: DateTime.Utc,
+  // Takes rows out of the store before they run, naming those it still held.
+  claim: (ids: readonly string[]) => Effect.Effect<readonly string[]>
 ): Effect.Effect<
   OutboxRun,
   never,
@@ -253,9 +255,18 @@ export const runOutbox = (
 
     const metrics = yield* Metrics;
 
-    // A point is never retried: the dataset takes it or drops it.
-    const measured = yield* Effect.forEach(of("Measured"), ({ body, row }) =>
-      Effect.as(metrics.write(body.points), ran(row, true, now))
+    // A point is written at most once, and never retried: the dataset adds
+    // every point it takes. Its row leaves the store first, so of a call's
+    // settle and the alarm's, both holding it, only the one that took it
+    // writes its points.
+    const taken = new Set(
+      yield* claim(of("Measured").map(({ row }) => row.id))
+    );
+
+    const measured = yield* Effect.forEach(
+      of("Measured").filter(({ row }) => taken.has(row.id)),
+      ({ body, row }) =>
+        Effect.as(metrics.write(body.points), ran(row, true, now))
     );
 
     const runs = yield* Effect.forEach(of("StartAnswer"), ({ body, row }) =>

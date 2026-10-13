@@ -2130,7 +2130,9 @@ export const projectService = (
         );
 
         if (Array.isReadonlyArrayNonEmpty(due)) {
-          const ran = yield* withPorts(runOutbox(due, queue, now)).pipe(
+          const ran = yield* withPorts(
+            runOutbox(due, queue, now, store.ackOutbox)
+          ).pipe(
             Effect.provideService(DraftRuns, draftRuns),
             Effect.provideService(Metrics, metrics)
           );
