@@ -1,4 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
+import { Brand } from "@repo/brand";
 import { FrontPageMemory } from "@repo/project/front-page/memory";
 import { Projects } from "@repo/project/projects";
 import { ProjectName } from "@repo/protocol/ids";
@@ -256,14 +257,32 @@ const channelsOf = (hex: string) => {
   );
 };
 
-const luminanceOf = (hex: string) => {
-  const [r = 0, g = 0, b = 0] = channelsOf(hex).map((channel) => {
+const linearOf = (hex: string) =>
+  channelsOf(hex).map((channel) => {
     const unit = channel / 255;
 
     return unit <= 0.04045 ? unit / 12.92 : ((unit + 0.055) / 1.055) ** 2.4;
   });
 
+const luminanceOf = (hex: string) => {
+  const [r = 0, g = 0, b = 0] = linearOf(hex);
+
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+
+// OKLCH's chroma and hue, by Björn Ottosson's published matrices.
+const chromaAndHueOf = (hex: string) => {
+  const [r = 0, g = 0, b = 0] = linearOf(hex);
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  const a = 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s;
+  const bee = 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s;
+
+  return {
+    chroma: Math.hypot(a, bee),
+    hue: ((Math.atan2(bee, a) * 180) / Math.PI + 360) % 360,
+  };
 };
 
 const contrast = (one: string, other: string) => {
@@ -290,9 +309,10 @@ const colour = (
 const holdsTheFloors = (
   rules: readonly Rule[],
   scheme: Scheme,
-  hasForm: boolean
+  hasForm: boolean,
+  ground = "body"
 ) => {
-  const paper = colour(rules, scheme, "body", "background-color");
+  const paper = colour(rules, scheme, ground, "background-color");
 
   const at = (selector: string, property = "color") =>
     contrast(colour(rules, scheme, selector, property), paper);
@@ -327,11 +347,12 @@ const holdsTheFloors = (
 describe("the platform's own pages", () => {
   const each = [
     ...Object.entries(PAGES).map(([name, html]) => ({
+      card: true,
       form: FORMS.has(name),
       html: Effect.succeed(html),
       name,
     })),
-    { form: false, html: home, name: "the platform's /" },
+    { card: false, form: false, html: home, name: "the platform's /" },
   ];
 
   describe.each(each)("$name", (page) => {
@@ -361,8 +382,10 @@ describe("the platform's own pages", () => {
       Effect.gen(function* () {
         const rules = rulesOf(styleOf(yield* page.html));
 
-        holdsTheFloors(rules, "light", page.form);
-        holdsTheFloors(rules, "dark", page.form);
+        for (const ground of page.card ? ["body", ".card"] : ["body"]) {
+          holdsTheFloors(rules, "light", page.form, ground);
+          holdsTheFloors(rules, "dark", page.form, ground);
+        }
       })
     );
 
@@ -389,7 +412,128 @@ describe("the platform's own pages", () => {
   });
 });
 
+const SIGN_IN_PAGES = Object.entries(PAGES).map(([name, html]) => ({
+  html,
+  name,
+}));
+
+const EDGES = /^(?:border-(?:top|right|bottom|left)|box-shadow|outline)/u;
+
+describe.each(SIGN_IN_PAGES)("$name, in the focus look", ({ html }) => {
+  it("shows the wordmark as text, then one card, and no navigation", () => {
+    const wordmark = html.indexOf(`<p class="wordmark">${Brand.name}</p>`);
+    const card = html.indexOf('class="card"');
+
+    expect(wordmark).toBeGreaterThan(html.indexOf("<body"));
+    expect(card).toBeGreaterThan(wordmark);
+    expect(html.indexOf("<h1")).toBeGreaterThan(card);
+    expect(html.match(/class="card"/gu)).toHaveLength(1);
+    expect(html).not.toMatch(/<nav\b|<svg[^>]*class="mark"/u);
+  });
+
+  it("sets the web's faces and paper", () => {
+    const rules = rulesOf(styleOf(html));
+
+    expect(resolve(rules, "light", "body", "font-family").value).toMatch(
+      /^"IBM Plex Sans",/u
+    );
+    expect(resolve(rules, "light", "code", "font-family").value).toMatch(
+      /^"IBM Plex Mono",/u
+    );
+    expect(colour(rules, "light", "body", "background-color")).toBe("#f8f7f4");
+    expect(colour(rules, "dark", "body", "background-color")).toBe("#0a0a0a");
+  });
+
+  it("draws every colour as a hex, and none orange, brown or amber", () => {
+    const css = styleOf(html);
+
+    const warm = [...css.matchAll(/#(?<digits>[\da-f]{6})/giu)].flatMap(
+      (found) => {
+        const hex = `#${found.groups?.digits ?? ""}`;
+        const { chroma, hue } = chromaAndHueOf(hex);
+
+        return chroma > 0.02 && hue >= 40 && hue <= 100 ? [hex] : [];
+      }
+    );
+
+    expect(css).not.toMatch(/\b(?:rgba?|hsla?|oklch|oklab|lab|lch)\(/u);
+    expect(warm).toStrictEqual([]);
+  });
+
+  it("keeps the card a plain bordered surface, with nothing on an edge", () => {
+    const rules = rulesOf(styleOf(html));
+
+    const card = rules.filter((rule) => rule.selectors.includes(".card"));
+
+    expect(card.flatMap((rule) => [...rule.declarations.keys()])).toContain(
+      "border"
+    );
+    expect(
+      card.flatMap((rule) =>
+        [...rule.declarations.keys()].filter((name) => EDGES.test(name))
+      )
+    ).toStrictEqual([]);
+    expect(
+      rules
+        .flatMap((rule) => rule.selectors)
+        .filter((at) => /::?(?:before|after)/u.test(at))
+    ).toStrictEqual([]);
+  });
+});
+
+const consentOf = (html: string) =>
+  /<section class="consent"[^>]*>(?<body>.*?)<\/section>/su.exec(html)?.groups
+    ?.body ?? "";
+
+const mayListOf = (html: string) =>
+  /<ul class="may">.*?<\/ul>/su.exec(consentOf(html))?.[0];
+
 describe("the sign-in page, as an MCP client's consent", () => {
+  it("names the client and lists what it may do as you", () => {
+    const consent = consentOf(PAGES["sign-in"]);
+
+    expect(consent).toContain(
+      "<strong>Claude</strong> (published by claude.ai)"
+    );
+    expect(consent.match(/<li>/gu)).toHaveLength(4);
+    expect(consent).toContain("<li>Claim, release and answer asks");
+    expect(consent).toContain("It never sees your password.");
+  });
+
+  it("lists the same on the sign-up page, where a newcomer allows it", () => {
+    expect(mayListOf(PAGES["sign-up"])).toBeDefined();
+    expect(mayListOf(PAGES["sign-up"])).toBe(mayListOf(PAGES["sign-in"]));
+  });
+
+  it("escapes every value a client supplies, on every page that names it", () => {
+    const hostile: Asker = {
+      clientDomain: `"><img src=x>`,
+      clientName: `<script>alert("x")</script>`,
+      redirectHost: "evil.example<b>",
+      redirectIsLoopback: true,
+    };
+
+    const named = [
+      signUpPage(hostile, form, "/authorize", {}),
+      profilePage(hostile, form, "/authorize", {}),
+      addEmailPage(hostile, form, "/authorize"),
+      resetPage(hostile, form, "/authorize"),
+      codePage(hostile, form, {
+        action: ACCOUNT_PATHS.signUpVerify,
+        intro: "We mailed a code.",
+        newPassword: false,
+        startOverHref: "/authorize",
+      }),
+    ];
+
+    for (const html of named) {
+      expect(html).not.toMatch(/<script|<img|<b>/u);
+      expect(html).toContain(
+        "&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;"
+      );
+    }
+  });
+
   it("says who asks and where access goes before Google and the form", () => {
     const html = PAGES["sign-in"];
     const asks = html.indexOf("asks to act as you");
