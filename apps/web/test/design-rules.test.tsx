@@ -130,6 +130,7 @@ const LAYOUT = [
   "column-tree",
   "column-docs-nav",
   "column-docs-toc",
+  "column-filters",
   "gutter-site",
   "gutter-project",
   "measure",

@@ -26,6 +26,10 @@ import {
 import type { FrontFilter } from "../src/features/front/filter.ts";
 import { FrontPageView } from "../src/features/front/front-page.tsx";
 import type { FrontPageProps } from "../src/features/front/front-page.tsx";
+import {
+  dismissHowTo,
+  readHowToDismissed,
+} from "../src/features/front/how-to.tsx";
 import { FrontPageData, readFrontPage } from "../src/server/front-page.ts";
 import { ask as parseIsoWeek } from "./ask-fixtures.ts";
 import { textIn } from "./markup.ts";
@@ -59,13 +63,15 @@ const headersIn = (markup: string) =>
   ].map((match) => [match.groups?.project, match.groups?.header] as const);
 
 const listIn = (markup: string) =>
-  markup.slice(markup.indexOf("data-toolbar"), markup.indexOf("</main>"));
+  markup.slice(markup.indexOf("data-board-list"), markup.indexOf("</main>"));
+
+const filtersIn = (markup: string) =>
+  /<nav aria-label="Filter the asks"[\s\S]*?<\/nav>/u.exec(markup)?.[0] ?? "";
+
+const stripIn = (markup: string) =>
+  /<section\b[^>]*data-how-to=""[\s\S]*?<\/section>/u.exec(markup)?.[0] ?? "";
 
 const now = DateTime.makeUnsafe("2026-10-07T12:00:00Z");
-
-const platformUrl = "https://platform-test.example.workers.dev";
-
-const webUrl = "https://web-test.example.workers.dev";
 
 const entries = Schema.decodeSync(Schema.Array(FrontPageEntry))([
   {
@@ -132,17 +138,12 @@ const props = (
   filter,
   now,
   parents: [],
-  platformUrl,
   projects,
-  webUrl,
   ...more,
 });
 
 const front = (filter: FrontFilter, more: Partial<FrontPageProps> = {}) =>
-  renderAt(
-    filter.kind === undefined ? "/asks" : frontPath(filter),
-    <FrontPageView {...props(filter, more)} />
-  );
+  renderAt(frontPath(filter), <FrontPageView {...props(filter, more)} />);
 
 describe(filterEntries, () => {
   it("puts the asks the viewer may take first, keeping the order given", () => {
@@ -386,24 +387,6 @@ describe(FrontPageView, () => {
   );
 
   it.effect(
-    "lists the projects in the inspector by their counts, leaving the posture to the group headers",
-    () =>
-      Effect.gen(function* () {
-        const markup = yield* front({});
-
-        const inspector = markup.slice(markup.indexOf('data-facts="inline"'));
-
-        const block =
-          /<section aria-label="Projects"[\s\S]*?<\/section>/u.exec(
-            inspector
-          )?.[0] ?? "";
-
-        expect(textIn(block)).toContain("open ask");
-        expect(block).not.toContain("data-posture=");
-      })
-  );
-
-  it.effect(
     "draws its rows when the list of projects has not arrived, with no posture yet",
     () =>
       Effect.gen(function* () {
@@ -471,7 +454,7 @@ describe(FrontPageView, () => {
       Effect.gen(function* () {
         const markup = yield* front({ kind: kind("migrate") });
         const all = yield* front({});
-        const toolbar = all.slice(all.indexOf("data-toolbar"));
+        const toolbar = filtersIn(all);
 
         expect(rowsIn(markup)).toStrictEqual(["split-format"]);
         expect(
@@ -499,50 +482,112 @@ describe(FrontPageView, () => {
   );
 
   it.effect(
-    "with nothing selected, says where to start and lists every project with its open asks",
+    "draws the filters as a landmark beside the list, and no inspector",
     () =>
       Effect.gen(function* () {
         const markup = yield* front({});
-        const facts = markup.slice(markup.indexOf('data-facts="inline"'));
-        const text = textIn(facts);
+        const board = markup.slice(markup.indexOf("data-board="));
 
         expect(
-          [
-            "Start here",
-            `curl -fsSL ${webUrl}/install.sh | sh`,
-            `${Brand.cli} claim <ask> --project <owner>/<name>`,
-          ].filter((words) => !text.includes(words))
+          board.indexOf('<nav aria-label="Filter the asks"')
+        ).toBeGreaterThan(-1);
+        const list = board.indexOf("data-board-list");
+
+        expect([
+          board.indexOf("</nav>") < list,
+          list < board.indexOf('data-ask="'),
+        ]).toStrictEqual([true, true]);
+        expect(
+          ["data-facts", "Start here", "Selected ask", "data-toolbar"].filter(
+            (words) => markup.includes(words)
+          )
         ).toStrictEqual([]);
-        expect(facts).toContain('href="/llms.txt"');
-        expect(facts).toMatch(
-          /href="\/oscabriel\/burrow"[\s\S]*?1 open ask\b/u
-        );
-        expect(facts).toMatch(
-          /href="\/oscabriel\/datekit"[\s\S]*?2 open asks/u
-        );
       })
   );
 
   it.effect(
-    "with an ask selected, shows its state, the claim numbered first, and a link to it",
+    "offers each kind, each state and each project in the filters, with counts, and a reset once one is set",
     () =>
       Effect.gen(function* () {
-        const markup = yield* renderAt(
-          "/asks?ask=fix-week-start",
-          <FrontPageView {...props({})} />
-        );
+        const filters = filtersIn(yield* front({ kind: kind("bug") }));
 
-        const facts = markup.slice(markup.indexOf('data-facts="inline"'));
-
-        expect(textIn(facts)).toContain("Selected ask");
-        expect(textIn(facts)).toContain(
-          `${Brand.cli} claim fix-week-start --project oscabriel/datekit`
+        expect(
+          [...filters.matchAll(/<h2\b[^>]*>(?<head>[^<]+)<\/h2>/gu)].map(
+            ({ groups }) => groups?.head
+          )
+        ).toStrictEqual(["Kind", "State", "Project"]);
+        expect(textIn(filters)).toMatch(
+          /All\s*3[\s\S]*bug\s*2[\s\S]*migrate\s*1[\s\S]*Open to take\s*1[\s\S]*Held for newcomers\s*1/u
         );
-        expect(facts).toContain(
-          'href="/oscabriel/datekit/asks/fix-week-start"'
+        expect(filters).toMatch(
+          /<a\b[^>]*aria-current="page"[^>]*href="\/asks\?kind=bug"|<a\b[^>]*href="\/asks\?kind=bug"[^>]*aria-current="page"/u
         );
-        expect(textIn(facts)).toContain("Open the ask");
+        expect(filters).toMatch(
+          /<a\b[^>]*href="\/asks"[^>]*>Reset filters<\/a>/u
+        );
+        expect(filtersIn(yield* front({}))).not.toContain("Reset filters");
       })
+  );
+
+  it.effect(
+    "keeps the filter in the address, so /asks?kind=bug&take=open shows the bugs open to take and every option keeps the rest",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* front(readFilter({ kind: "bug", take: "open" }));
+
+        const filters = filtersIn(markup);
+
+        expect(rowsIn(markup)).toStrictEqual(["fix-week-start"]);
+        expect(
+          [
+            'href="/asks?kind=bug&amp;reserved=newcomers"',
+            'href="/asks?take=open"',
+            'href="/asks?kind=migrate&amp;take=open"',
+            'href="/asks?kind=bug&amp;take=open&amp;project=oscabriel%2Fdatekit"',
+          ].filter((href) => !filters.includes(href))
+        ).toStrictEqual([]);
+      })
+  );
+
+  it.effect(
+    "puts one strip of three steps above the list, each a command, with a control that dismisses it",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* front({});
+        const strip = stripIn(markup);
+
+        expect([
+          ...strip.matchAll(/<code\b[^>]*select-all[^>]*>/gu),
+        ]).toHaveLength(3);
+        expect(
+          [
+            `${Brand.cli} claim <ask> --project <owner>/<name>`,
+            `${Brand.cli} check`,
+            `git push ${Brand.slug} HEAD:main`,
+          ].filter((command) => !textIn(strip).includes(command))
+        ).toStrictEqual([]);
+        expect(strip).toMatch(
+          /<button\b[^>]*aria-label="Dismiss how to take an ask"/u
+        );
+        expect(markup.indexOf("data-how-to")).toBeLessThan(
+          markup.indexOf("data-board=")
+        );
+        expect(strip).toContain('href="/llms.txt"');
+      })
+  );
+
+  it.effect("with an ask selected, marks its row and opens no inspector", () =>
+    Effect.gen(function* () {
+      const markup = yield* renderAt(
+        "/asks?ask=fix-week-start",
+        <FrontPageView {...props({})} />
+      );
+
+      expect(markup).toMatch(
+        /<li\b[^>]*data-selected="true"[^>]*data-ask="fix-week-start"/u
+      );
+      expect(markup).not.toContain("data-facts");
+    })
   );
 
   it.effect("never uses the words a forge's lists use", () =>
@@ -629,9 +674,7 @@ const sentFrom = (data: FrontPageData, filter: FrontFilter = {}) =>
       filter={filter}
       now={data.now}
       parents={data.parents}
-      platformUrl={platformUrl}
       projects={undefined}
-      webUrl={webUrl}
     />
   );
 
@@ -692,6 +735,63 @@ describe("the front page as the server sends it", () => {
   );
 });
 
+/** A browser's storage held in a map, so a test reads back what was kept. */
+const memoryStorage = (): Storage => {
+  const kept = new Map<string, string>();
+
+  return {
+    clear: () => {
+      kept.clear();
+    },
+    getItem: (key) => kept.get(key) ?? null,
+    key: (index) => [...kept.keys()][index] ?? null,
+    get length() {
+      return kept.size;
+    },
+    removeItem: (key) => {
+      kept.delete(key);
+    },
+    setItem: (key, value) => {
+      kept.set(key, value);
+    },
+  };
+};
+
+const blocked = () => {
+  throw new Error("blocked");
+};
+
+/** Storage a private window or a blocked site refuses. */
+const refusingStorage = (): Storage => ({
+  clear: blocked,
+  getItem: blocked,
+  key: blocked,
+  length: 0,
+  removeItem: blocked,
+  setItem: blocked,
+});
+
+describe("the strip's dismissal", () => {
+  it("is remembered in the storage it is given, and is not until then", () => {
+    const storage = memoryStorage();
+
+    expect(readHowToDismissed(storage)).toBeFalsy();
+
+    dismissHowTo(storage);
+
+    expect(readHowToDismissed(storage)).toBeTruthy();
+    expect(storage).toHaveLength(1);
+  });
+
+  it("shows the strip when there is no storage, or the storage refuses", () => {
+    expect(readHowToDismissed()).toBeFalsy();
+    expect(readHowToDismissed(refusingStorage())).toBeFalsy();
+    expect(() => {
+      dismissHowTo(refusingStorage());
+    }).not.toThrow();
+  });
+});
+
 describe("the front page's views", () => {
   const sources: Readonly<Record<string, string>> = import.meta.glob(
     "../src/features/front/**/*.{ts,tsx}",
@@ -701,5 +801,16 @@ describe("the front page's views", () => {
   it("import no transport", () => {
     expect(Object.keys(sources).length).toBeGreaterThanOrEqual(1);
     expect(reachingTransport(sources)).toStrictEqual([]);
+  });
+
+  it("never write a cookie: the strip's dismissal is kept in localStorage", () => {
+    expect(
+      Object.entries(sources).flatMap(([path, source]) =>
+        /document\.cookie|cookieStore|set-cookie/iu.test(source) ? [path] : []
+      )
+    ).toStrictEqual([]);
+    expect(sources["../src/features/front/how-to.tsx"]).toContain(
+      "localStorage"
+    );
   });
 });
