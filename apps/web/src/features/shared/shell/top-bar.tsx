@@ -7,8 +7,8 @@ import { AppLink } from "../link.tsx";
 import { ASKS_PATH, docsPath, EXPLORE_PATH, INSTALL_PATH } from "../paths.ts";
 import { Account } from "./account.tsx";
 import { useShell } from "./context.ts";
+import { GUTTER } from "./gutter.ts";
 import type { ShellName } from "./shells.ts";
-import { GUTTER } from "./workspace.tsx";
 
 const EXACT = { exact: true, includeSearch: false } as const;
 

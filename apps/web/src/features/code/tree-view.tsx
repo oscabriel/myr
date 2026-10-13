@@ -13,7 +13,8 @@ import type { ReactNode } from "react";
 
 import { ReadmeSection } from "../project/readme-section.tsx";
 import { AppLink } from "../shared/link.tsx";
-import { GUTTER, MEASURE, Workspace } from "../shared/shell/workspace.tsx";
+import { GUTTER } from "../shared/shell/gutter.ts";
+import { MEASURE, Workspace } from "../shared/shell/workspace.tsx";
 import { When } from "../shared/time.tsx";
 import { askOf } from "../why/rows.ts";
 import { FileHeader } from "./file-header.tsx";

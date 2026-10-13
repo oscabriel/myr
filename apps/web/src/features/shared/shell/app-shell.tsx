@@ -8,12 +8,12 @@ import { ShellContext, ShellReadsContext } from "./context.ts";
 import type { Overlay, ShellReads } from "./context.ts";
 import { DocsNav } from "./docs-nav.tsx";
 import { Footer } from "./footer.tsx";
+import { GUTTER } from "./gutter.ts";
 import { LazyOverlays } from "./lazy-overlays.ts";
 import { ShellNameContext, useShellName } from "./shells.ts";
 import type { ShellName } from "./shells.ts";
 import { SideColumnOutlet, useSideColumn } from "./side-column.tsx";
 import { TopBar } from "./top-bar.tsx";
-import { GUTTER } from "./workspace.tsx";
 
 /** A project page's side column, beside its main column from `columns` and gone below it. */
 const ProjectFrame = ({ children }: { readonly children: ReactNode }) => {
@@ -63,6 +63,18 @@ const FRAMES = {
   (props: { readonly children: ReactNode }) => ReactNode
 >;
 
+/**
+ * Each shell's gutter, from DESIGN.md's shell table, as the variable every
+ * `GUTTER` inside it reads: the site's for the site, the docs and a focused
+ * page, the project's for a project.
+ */
+export const SHELL_GUTTERS = {
+  docs: "[--shell-gutter:var(--gutter-site)]",
+  focus: "[--shell-gutter:var(--gutter-site)]",
+  project: "[--shell-gutter:var(--gutter-project)]",
+  site: "[--shell-gutter:var(--gutter-site)]",
+} as const satisfies Record<ShellName, string>;
+
 const FOOTED: ReadonlySet<ShellName> = new Set(["docs", "site"]);
 
 const NO_READS: ShellReads = {};
@@ -111,7 +123,10 @@ export const AppShell = ({
         <ShellNameContext value={shell}>
           <KeysProvider openDialog={openDialog}>
             <SkipLink />
-            <div className="flex min-h-dvh flex-col" data-shell={shell}>
+            <div
+              className={`flex min-h-dvh flex-col ${SHELL_GUTTERS[shell]}`}
+              data-shell={shell}
+            >
               <TopBar shell={shell} />
               <Frame>{children}</Frame>
               {FOOTED.has(shell) ? <Footer /> : null}

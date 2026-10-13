@@ -36,6 +36,7 @@ const routesFor = (view: ReactNode, options: RenderOptions) => {
     ...(
       [
         ["asks", "site"],
+        ["explore", "site"],
         ["home", "project"],
         ["import", "focus"],
         ["today", "project"],

@@ -5,6 +5,7 @@ import { Button } from "../../../components/ui/button.tsx";
 import { useCopy } from "../copy-action.tsx";
 import { useNumberedCommand } from "../keys.tsx";
 import { AppLink } from "../link.tsx";
+import { GUTTER } from "./gutter.ts";
 import type { Crumb } from "./sections.ts";
 
 export const Breadcrumb = ({
@@ -95,7 +96,9 @@ export const ContextBar = ({
   readonly primaryCommand?: string | undefined;
   readonly state?: ReactNode;
 }) => (
-  <div className="border-rule bg-background tablet:px-5 shell:px-6 flex h-11 shrink-0 items-center gap-3 border-b px-4">
+  <div
+    className={`border-rule bg-background flex h-11 shrink-0 items-center gap-3 border-b ${GUTTER}`}
+  >
     <Breadcrumb crumbs={crumbs} />
     <div className="ml-auto flex shrink-0 items-center gap-3">
       {count === undefined ? null : (

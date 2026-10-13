@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 
 import { CommandSlotProvider } from "../keys.tsx";
 import { ContextBar } from "./context-bar.tsx";
+import { GUTTER } from "./gutter.ts";
 import { crumbsFor } from "./sections.ts";
 import type { Crumb } from "./sections.ts";
 import { useShellFrame } from "./shells.ts";
@@ -26,8 +27,6 @@ export interface WorkspaceProps {
   readonly variant?: "code" | "document" | "list";
   readonly children: ReactNode;
 }
-
-export const GUTTER = "px-4 tablet:px-5 shell:px-6";
 
 export const MEASURE = "max-w-[56rem]";
 

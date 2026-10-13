@@ -68,6 +68,7 @@ describe("the web's own paths", () => {
       "assets",
       "auth",
       "docs",
+      "explore",
       "favicon.ico",
       "home",
       "icons",

@@ -186,6 +186,7 @@ export const reservedProjectNames = [
   "assets",
   "auth",
   "docs",
+  "explore",
   "home",
   "icons",
   "import",

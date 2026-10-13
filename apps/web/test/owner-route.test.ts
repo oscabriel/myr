@@ -8,6 +8,7 @@ import {
   ownerLoader,
   Route as OwnerRoute,
 } from "../src/routes/$owner/index.tsx";
+import { Route as ExploreRoute } from "../src/routes/explore.tsx";
 import { Route as ImportRoute } from "../src/routes/import.tsx";
 
 interface Outcome {
@@ -74,4 +75,13 @@ describe("the app's router", () => {
     expect(routeAt("/oscabriel")).toBe(OwnerRoute);
     expect(routeAt("/import")).toBe(ImportRoute);
   });
+
+  it.effect(
+    "reaches its own page for the top bar's /explore, never a person's",
+    () =>
+      Effect.gen(function* () {
+        expect(routeAt("/explore")).toBe(ExploreRoute);
+        expect(yield* outcomeFor("explore")).toStrictEqual({ notFound: true });
+      })
+  );
 });

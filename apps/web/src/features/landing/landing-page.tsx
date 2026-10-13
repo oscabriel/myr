@@ -3,14 +3,12 @@ import { Brand } from "@repo/brand";
 import type { ReactNode } from "react";
 
 import { buttonVariants } from "../../components/ui/button.tsx";
-import { postureLabel } from "../project/posture-label.ts";
 import { ID, LINK } from "../shared/classes.ts";
 import { CommandLine } from "../shared/command.tsx";
 import { AppLink } from "../shared/link.tsx";
-import { ASKS_PATH, IMPORT_PATH, projectPath } from "../shared/paths.ts";
-import { UnreachableNotice } from "../shared/pending.tsx";
-import { PostureBadge } from "../shared/posture.tsx";
-import { LandingProjects } from "./projects.ts";
+import { ASKS_PATH, IMPORT_PATH } from "../shared/paths.ts";
+import { ProjectList } from "./project-list.tsx";
+import type { LandingProjects } from "./projects.ts";
 import { pushTranscript } from "./transcript.ts";
 import { LEDE, WHAT_IT_IS } from "./words.ts";
 
@@ -215,30 +213,6 @@ const Transcript = ({ platformUrl }: { readonly platformUrl: string }) => {
   );
 };
 
-const Projects = ({ projects }: { readonly projects: LandingProjects }) =>
-  LandingProjects.match(projects, {
-    Listed: ({ projects: listed }) => (
-      <ul className="flex flex-col">
-        {listed.map(({ posture, project }) => (
-          <li
-            className="border-rule flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b py-2.5"
-            data-project={project}
-            key={project}
-          >
-            <AppLink
-              className="text-want font-medium no-underline hover:underline"
-              to={projectPath(project)}
-            >
-              {project}
-            </AppLink>
-            <PostureBadge label={postureLabel(posture)} posture={posture} />
-          </li>
-        ))}
-      </ul>
-    ),
-    Unreachable: () => <UnreachableNotice />,
-  });
-
 export const LandingView = ({
   platformUrl,
   projects,
@@ -314,7 +288,7 @@ export const LandingView = ({
           Code, asks, credit and the ledger of what a project holds back are
           public to everyone.
         </p>
-        <Projects projects={projects} />
+        <ProjectList projects={projects} />
         <p className="text-ui flex flex-wrap gap-x-4 gap-y-1">
           <AppLink className={LINK} to={ASKS_PATH}>
             All asks

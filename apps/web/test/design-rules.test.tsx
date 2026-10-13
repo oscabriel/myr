@@ -175,6 +175,26 @@ describe("DESIGN.md's named values", () => {
       })
   );
 
+  it.effect(
+    "gives each shell its gutter from the layout tokens, which every bar and page inside it reads",
+    () =>
+      Effect.gen(function* () {
+        const site = yield* shellClasses("/");
+        const project = yield* shellClasses("/oscabriel/datekit/tree/main");
+        const docs = yield* shellClasses("/docs/answer-an-ask");
+
+        expect(site).toContain("[--shell-gutter:var(--gutter-site)]");
+        expect(docs).toContain("[--shell-gutter:var(--gutter-site)]");
+        expect(project).toContain("[--shell-gutter:var(--gutter-project)]");
+        expect(project).not.toContain("[--shell-gutter:var(--gutter-site)]");
+        expect(
+          [site, project, docs].map((classes) =>
+            classes.includes("shell:px-(--shell-gutter)")
+          )
+        ).toStrictEqual([true, true, true]);
+      })
+  );
+
   it("sets a row's state word in ink but for Refused and Landed, as the Mark Carries Rule says", () => {
     const coloured = STATE_MARK_NAMES.filter(
       (mark) => wordTone(mark) !== "text-foreground"

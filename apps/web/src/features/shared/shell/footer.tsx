@@ -2,7 +2,7 @@ import { Brand } from "@repo/brand";
 
 import { AppLink } from "../link.tsx";
 import { docsPath, INSTALL_PATH, PRIVACY_PATH, TERMS_PATH } from "../paths.ts";
-import { GUTTER } from "./workspace.tsx";
+import { GUTTER } from "./gutter.ts";
 
 const LINKS = [
   { label: "Docs", to: docsPath() },

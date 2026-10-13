@@ -8,7 +8,8 @@ import { FileHeader, PermalinkKey } from "../code/file-header.tsx";
 import { NumberedLines } from "../code/numbered-lines.tsx";
 import { blobHref, commitHref, shortSha, whyHref } from "../code/paths.ts";
 import { AppLink } from "../shared/link.tsx";
-import { GUTTER, MEASURE, Workspace } from "../shared/shell/workspace.tsx";
+import { GUTTER } from "../shared/shell/gutter.ts";
+import { MEASURE, Workspace } from "../shared/shell/workspace.tsx";
 import { WhyBand } from "./range-summary.tsx";
 import { groupsOf } from "./rows.ts";
 

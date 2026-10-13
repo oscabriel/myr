@@ -10,9 +10,11 @@ export const LandingProjects = Schema.TaggedUnion({
 
 export type LandingProjects = typeof LandingProjects.Type;
 
+/** The projects taking the most answers first, the first `shown` of them. */
 export const listedProjects = (
-  projects: readonly ProjectListing[]
+  projects: readonly ProjectListing[],
+  shown: number = PROJECTS_SHOWN
 ): LandingProjects =>
   LandingProjects.cases.Listed.make({
-    projects: leadingProjects(projects, PROJECTS_SHOWN),
+    projects: leadingProjects(projects, shown),
   });
