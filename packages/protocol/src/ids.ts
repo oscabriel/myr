@@ -179,7 +179,7 @@ export type RepoPath = typeof RepoPath.Type;
 
 // The web serves its own pages at these first path segments, so a project
 // owned by one would be unreachable. `apps/web/test/routes.test.ts` holds
-// this list to the web's routes.
+// this list to the web's routes and the few reserved ahead of their page.
 export const reservedProjectNames = [
   "agents",
   "asks",
@@ -190,10 +190,13 @@ export const reservedProjectNames = [
   "home",
   "icons",
   "import",
+  "inbox",
+  "install",
   "people",
   "privacy",
   "releases",
   "rpc",
+  "settings",
   "terms",
   "today",
 ] as const;

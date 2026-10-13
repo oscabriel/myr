@@ -3,9 +3,10 @@ import { AnswerView } from "@repo/protocol/domain/answer";
 import { ClaimView } from "@repo/protocol/domain/claim";
 import { Today } from "@repo/protocol/domain/decision";
 import { FrontPageEntry } from "@repo/protocol/domain/front-page";
+import { Outcome, StageName } from "@repo/protocol/domain/outcome";
 import { Handle } from "@repo/protocol/ids";
 import type { ProjectName } from "@repo/protocol/ids";
-import { NotDecider } from "@repo/protocol/refusal";
+import { NotDecider, Refusal } from "@repo/protocol/refusal";
 import {
   Array as Arr,
   Cause,
@@ -17,7 +18,7 @@ import {
   Schema,
 } from "effect";
 
-import { isSignedOut } from "../today/read.ts";
+import { isSignedOut } from "./decisions.ts";
 
 const ASKS_SHOWN = 8;
 
@@ -28,6 +29,8 @@ const AT_ONCE = 4;
 export const Work = Schema.Struct({
   answer: Schema.optionalKey(AnswerView),
   claim: ClaimView,
+  /** The gate stage the answer reached, from its verdict; absent while it has none. */
+  stage: Schema.optionalKey(StageName),
   want: Schema.optionalKey(Schema.NonEmptyString),
 });
 
@@ -48,7 +51,7 @@ export const Takeable = Schema.TaggedUnion({
 
 export type Takeable = typeof Takeable.Type;
 
-export const HomeRead = Schema.TaggedUnion({
+export const InboxRead = Schema.TaggedUnion({
   Read: {
     asks: Takeable,
     decisions: Decisions,
@@ -57,18 +60,45 @@ export const HomeRead = Schema.TaggedUnion({
     running: Schema.Int,
     work: Schema.Array(Work),
   },
+  Refused: { refusal: Refusal },
   SignedOut: {},
   Unreachable: {},
 });
 
-export type HomeRead = typeof HomeRead.Type;
+export type InboxRead = typeof InboxRead.Type;
 
-export const HomePageData = Schema.Struct({
+export const InboxPageData = Schema.Struct({
   now: Schema.DateTimeUtcFromString,
-  read: HomeRead,
+  read: InboxRead,
 });
 
-export type HomePageData = typeof HomePageData.Type;
+export type InboxPageData = typeof InboxPageData.Type;
+
+/** The decisions the read carries, when the reader decides somewhere and they came. */
+export const todayOf = (read: InboxRead): Option.Option<Today> =>
+  InboxRead.match(read, {
+    Read: ({ decisions }) =>
+      Decisions.match(decisions, {
+        Decides: ({ today }) => Option.some(today),
+        NotDecider: () => Option.none(),
+        Unreachable: () => Option.none(),
+      }),
+    Refused: () => Option.none(),
+    SignedOut: () => Option.none(),
+    Unreachable: () => Option.none(),
+  });
+
+/** The decisions read again after a choice take the loaded ones' place; the rest stays as it was read. */
+export const withToday = (read: InboxRead, today: Today): InboxRead =>
+  InboxRead.match(read, {
+    Read: (signed) =>
+      Option.isSome(todayOf(read))
+        ? { ...signed, decisions: Decisions.cases.Decides.make({ today }) }
+        : read,
+    Refused: () => read,
+    SignedOut: () => read,
+    Unreachable: () => read,
+  });
 
 export const isRunning = (claim: ClaimView) =>
   claim.state === "live" || claim.state === "warned";
@@ -89,6 +119,8 @@ const answerOrder = Order.mapInput(
 );
 
 const isNotDecider = Schema.is(NotDecider);
+
+const isRefusal = Schema.is(Refusal);
 
 export const askKey = ({ ask, project }: ClaimView) => `${project}/${ask}`;
 
@@ -186,6 +218,33 @@ export const pairWork = ({
   }));
 };
 
+// A verdict names the stage an answer reached; a check still running names it in its outcome.
+const stageOf = (work: Work) =>
+  Effect.gen(function* () {
+    const client = yield* Client;
+    const { answer, claim } = work;
+
+    if (answer === undefined) {
+      return work;
+    }
+
+    const { verdict } = yield* client
+      .verdict({ ask: claim.ask, head: answer.head, project: claim.project })
+      .pipe(Effect.orElseSucceed(() => ({ verdict: undefined })));
+
+    const stage = Option.firstSomeOf([
+      Option.map(Option.fromUndefinedOr(verdict), ({ stage: at }) => at),
+      Outcome.isAnyOf(["Checking"])(answer.outcome)
+        ? Option.some(answer.outcome.stage)
+        : Option.none(),
+    ]);
+
+    return Option.match(stage, {
+      onNone: () => work,
+      onSome: (at): Work => ({ ...work, stage: at }),
+    });
+  });
+
 const workOf = (claims: readonly ClaimView[], answers: readonly AnswerView[]) =>
   Effect.gen(function* () {
     const shown = shownOf(claims);
@@ -205,61 +264,81 @@ const workOf = (claims: readonly ClaimView[], answers: readonly AnswerView[]) =>
       { concurrency: "unbounded" }
     );
 
-    return pairWork({ again, answers, claims, wants });
+    return yield* Effect.forEach(
+      pairWork({ again, answers, claims, wants }),
+      stageOf,
+      { concurrency: AT_ONCE }
+    );
   });
 
-export const readHome = Effect.gen(function* () {
-  const client = yield* Client;
+const failedRead = (cause: Cause.Cause<unknown>): InboxRead => {
+  const error = Cause.findErrorOption(cause);
 
-  const [status, today, front] = yield* Effect.all(
-    [
-      Effect.exit(client.status({})),
-      Effect.exit(client.today({})),
-      Effect.option(client.frontPage({})),
-    ],
-    { concurrency: "unbounded" }
-  );
+  if (Option.isSome(error) && isRefusal(error.value)) {
+    return InboxRead.cases.Refused.make({ refusal: error.value });
+  }
 
-  const decisions = Exit.match(today, {
-    onFailure: (cause) =>
-      Option.exists(Cause.findErrorOption(cause), isNotDecider)
-        ? Decisions.cases.NotDecider.make({})
-        : Decisions.cases.Unreachable.make({}),
-    onSuccess: (read) => Decisions.cases.Decides.make({ today: read }),
+  return isSignedOut(cause)
+    ? InboxRead.cases.SignedOut.make({})
+    : InboxRead.cases.Unreachable.make({});
+};
+
+/** `project` narrows the inbox to one project: its decisions, the reader's claims in it and its asks. */
+export const readInbox = ({ project }: { readonly project?: ProjectName }) =>
+  Effect.gen(function* () {
+    const client = yield* Client;
+    const scope = project === undefined ? {} : { project };
+
+    const [status, today, front] = yield* Effect.all(
+      [
+        Effect.exit(client.status(scope)),
+        Effect.exit(client.today(scope)),
+        Effect.option(client.frontPage({})),
+      ],
+      { concurrency: "unbounded" }
+    );
+
+    const decisions = Exit.match(today, {
+      onFailure: (cause) =>
+        Option.exists(Cause.findErrorOption(cause), isNotDecider)
+          ? Decisions.cases.NotDecider.make({})
+          : Decisions.cases.Unreachable.make({}),
+      onSuccess: (read) => Decisions.cases.Decides.make({ today: read }),
+    });
+
+    const asks = Option.match(front, {
+      onNone: () => Takeable.cases.Unreachable.make({}),
+      onSome: ({ entries }) =>
+        Takeable.cases.Listed.make({
+          asks: entries
+            .filter(
+              (entry) =>
+                entry.takeable &&
+                (project === undefined || entry.project === project)
+            )
+            .slice(0, ASKS_SHOWN),
+        }),
+    });
+
+    const read = yield* Exit.match(status, {
+      onFailure: (cause) => Effect.succeed(failedRead(cause)),
+      onSuccess: ({ answers, claims, handle }) =>
+        workOf(claims, answers).pipe(
+          Effect.map((work) =>
+            InboxRead.cases.Read.make({
+              asks,
+              decisions,
+              handle,
+              held: claims.length,
+              running: claims.filter(isRunning).length,
+              work,
+            })
+          )
+        ),
+    });
+
+    return yield* Schema.encodeEffect(InboxPageData)({
+      now: yield* DateTime.now,
+      read,
+    });
   });
-
-  const asks = Option.match(front, {
-    onNone: () => Takeable.cases.Unreachable.make({}),
-    onSome: ({ entries }) =>
-      Takeable.cases.Listed.make({
-        asks: entries.filter(({ takeable }) => takeable).slice(0, ASKS_SHOWN),
-      }),
-  });
-
-  const read = yield* Exit.match(status, {
-    onFailure: (cause) =>
-      Effect.succeed(
-        isSignedOut(cause)
-          ? HomeRead.cases.SignedOut.make({})
-          : HomeRead.cases.Unreachable.make({})
-      ),
-    onSuccess: ({ answers, claims, handle }) =>
-      workOf(claims, answers).pipe(
-        Effect.map((work) =>
-          HomeRead.cases.Read.make({
-            asks,
-            decisions,
-            handle,
-            held: claims.length,
-            running: claims.filter(isRunning).length,
-            work,
-          })
-        )
-      ),
-  });
-
-  return yield* Schema.encodeEffect(HomePageData)({
-    now: yield* DateTime.now,
-    read,
-  });
-});

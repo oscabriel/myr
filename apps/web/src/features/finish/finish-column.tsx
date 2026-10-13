@@ -7,6 +7,7 @@ import { Option, Schema } from "effect";
 import { lazy, Suspense } from "react";
 
 import { AppLink } from "../shared/link.tsx";
+import { INBOX_PATH } from "../shared/paths.ts";
 import { SideColumn } from "../shared/shell/side-column.tsx";
 
 const FinishPageData = Schema.Struct({
@@ -47,8 +48,8 @@ export const FinishColumn = () => {
     onNone: () => (
       <SideColumn label="Decisions">
         <div className="flex flex-col py-2">
-          <AppLink className={ROW} to="/today">
-            Today
+          <AppLink className={ROW} to={INBOX_PATH}>
+            Inbox
           </AppLink>
           {project === undefined ? null : (
             <AppLink className={ROW} to={`/${project}/people`}>

@@ -80,6 +80,26 @@ describe("an old or miscased project address", () => {
   });
 });
 
+describe("a page that moved", () => {
+  // ADR 0041: Home and Today fold into the inbox; a bookmark keeps its filter and its selection.
+  it("is a 301 from /home and /today to /inbox, the query kept as it was", () => {
+    expect(movedTo("/home")).toStrictEqual(Option.some([301, "/inbox"]));
+    expect(movedTo("/today?project=oscabriel/datekit")).toStrictEqual(
+      Option.some([301, "/inbox?project=oscabriel/datekit"])
+    );
+    expect(
+      movedTo("/today?project=oscabriel/datekit&decision=dec-000001")
+    ).toStrictEqual(
+      Option.some([301, "/inbox?project=oscabriel/datekit&decision=dec-000001"])
+    );
+  });
+
+  it("moves only the page itself, never a path below it or the inbox", () => {
+    expect(movedTo("/today/extra")).toStrictEqual(Option.none());
+    expect(movedTo("/inbox")).toStrictEqual(Option.none());
+  });
+});
+
 const onWww = (path: string, method = "GET") =>
   Option.map(
     canonicalAddress(

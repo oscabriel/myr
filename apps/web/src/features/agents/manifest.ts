@@ -4,6 +4,7 @@
  */
 import { Brand } from "@repo/brand";
 
+import { INBOX_PATH } from "../shared/paths.ts";
 import { themeColors } from "../shared/theme.ts";
 
 const rasters = [192, 512] as const;
@@ -29,15 +30,16 @@ export const MANIFEST_PATH = "/manifest.webmanifest";
 
 export const webManifest = () => ({
   background_color: themeColors.light,
-  description: `Open asks, answers and a maintainer's Today on ${Brand.name}.`,
+  description: `Open asks, answers and your inbox on ${Brand.name}.`,
   display: "standalone",
   icons,
+  // The installed app's identity, kept from when it opened Today: a new id would install it again.
   id: "/today",
   lang: "en",
   name: Brand.name,
   scope: "/",
   short_name: Brand.name,
-  start_url: "/today",
+  start_url: INBOX_PATH,
   theme_color: themeColors.light,
 });
 

@@ -40,8 +40,8 @@ const VISITS: readonly Visit[] = [
   { name: "landing", path: "/" },
   { name: "front", path: "/asks" },
   { name: "front, signed in", path: "/asks", signedIn: true },
-  { name: "today", path: "/today", signedIn: true },
-  { name: "today, signed out", path: "/today" },
+  { name: "inbox", path: "/inbox", signedIn: true },
+  { name: "inbox, signed out", path: "/inbox" },
   { name: "project home", path: `/${project}` },
   { name: "project home, examples", path: "/oscabriel/burrow" },
   { name: "project home, no open asks", path: "/lin-h/mossgate" },
@@ -498,7 +498,7 @@ test.describe("the keyboard", () => {
       Effect.gen(function* () {
         for (const [path, param, signedIn] of [
           ["/asks", "ask", false],
-          ["/today", "decision", true],
+          ["/inbox", "decision", true],
         ] as const) {
           const { context, page } = yield* keyboardPage(
             browser,

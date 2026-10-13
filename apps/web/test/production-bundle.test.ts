@@ -236,7 +236,7 @@ layer(Layer.effect(Built, productionBuild), { timeout: BUILD })(
   "the web's production build",
   (it) => {
     it.effect(
-      "carries the web app manifest, which opens Today, and every icon it names",
+      "carries the web app manifest, which opens the inbox, and every icon it names",
       () =>
         Effect.gen(function* () {
           const output = yield* Built;
@@ -249,7 +249,7 @@ layer(Layer.effect(Built, productionBuild), { timeout: BUILD })(
           expect(installs).toStrictEqual({
             display: "standalone",
             name: Brand.name,
-            start_url: "/today",
+            start_url: "/inbox",
           });
           expect(icons.length).toBeGreaterThan(0);
           expect(
