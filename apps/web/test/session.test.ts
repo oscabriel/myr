@@ -429,7 +429,7 @@ describe("sign-in", () => {
     () =>
       Effect.gen(function* () {
         const { location, response } = yield* signIn(
-          "/auth/signin?return=/today"
+          "/auth/signin?return=/inbox"
         );
 
         expect(response.status).toBe(302);
@@ -476,7 +476,7 @@ describe("the callback", () => {
     () =>
       Effect.gen(function* () {
         const { location, seen } = yield* signInAndBack(
-          "/auth/signin?return=/today",
+          "/auth/signin?return=/inbox",
           "c0de"
         );
 
@@ -524,7 +524,7 @@ describe("the callback", () => {
     () =>
       Effect.gen(function* () {
         const { response, state } = yield* signInAndBack(
-          "/auth/signin?return=/today",
+          "/auth/signin?return=/inbox",
           "c0de"
         );
 
@@ -535,7 +535,7 @@ describe("the callback", () => {
         expect([
           response.status,
           response.headers.get("location"),
-        ]).toStrictEqual([302, "/today"]);
+        ]).toStrictEqual([302, "/inbox"]);
         expect(
           credentialFrom(get("/rpc", { cookie: session?.pair ?? "" }))
         ).toStrictEqual(Option.some(TOKEN_ANSWER.access_token));
@@ -917,14 +917,14 @@ describe("the web's OAuth client", () => {
 describe("the dev sign-in", () => {
   it("sets the session to the dev backend's token for a handle", () => {
     const response = devSignIn({
-      request: get("/auth/dev?handle=ines-v&return=/today"),
+      request: get("/auth/dev?handle=ines-v&return=/inbox"),
     });
 
     const [session] = cookiesOf(response);
 
     expect([response.status, response.headers.get("location")]).toStrictEqual([
       302,
-      "/today",
+      "/inbox",
     ]);
     expect(lockedDown(session?.attributes)).toBeTruthy();
     expect(
@@ -947,7 +947,7 @@ describe("the header's session slot", () => {
 
   it("names the person signed in, with a way to sign out", () => {
     const markup = renderToStaticMarkup(
-      createElement(SessionView, { handle: Option.some(ines), here: "/today" })
+      createElement(SessionView, { handle: Option.some(ines), here: "/inbox" })
     );
 
     expect(markup).toContain(">ines-v<");
@@ -960,10 +960,10 @@ describe("the header's session slot", () => {
 
   it("offers sign-in, coming back to the page it was on", () => {
     const markup = renderToStaticMarkup(
-      createElement(SessionView, { handle: Option.none(), here: "/today" })
+      createElement(SessionView, { handle: Option.none(), here: "/inbox" })
     );
 
-    expect(markup).toContain('href="/auth/signin?return=%2Ftoday"');
+    expect(markup).toContain('href="/auth/signin?return=%2Finbox"');
     expect(markup).toContain(">Sign in<");
     expect(markup).not.toContain("/auth/signout");
   });

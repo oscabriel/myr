@@ -594,14 +594,14 @@ describe(PageShell, () => {
   it.effect("gives a page one main region headed by its title", () =>
     Effect.gen(function* () {
       const markup = yield* renderAt(
-        "/today",
-        <PageShell title="Today">
+        "/inbox",
+        <PageShell title="Inbox">
           <p>Decisions 2 of 5</p>
         </PageShell>
       );
 
       expect(elementOf(markup, "main", 'id="main"')).toMatch(
-        /<h1\b[^>]*>Today<\/h1>[\s\S]*<p>Decisions 2 of 5<\/p>/u
+        /<h1\b[^>]*>Inbox<\/h1>[\s\S]*<p>Decisions 2 of 5<\/p>/u
       );
     })
   );

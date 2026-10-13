@@ -21,7 +21,7 @@ interface Budget {
 export const budgets = {
   "apps/platform": { entry: 1_900_000, javascript: 1_900_000 },
   "apps/sandbox": { entry: 656_000, javascript: 656_000 },
-  "apps/web": { entry: 356_000, javascript: 3_191_000 },
+  "apps/web": { entry: 355_000, javascript: 3_191_000 },
 } as const satisfies Record<string, Budget>;
 
 export const workers: readonly Worker[] = [

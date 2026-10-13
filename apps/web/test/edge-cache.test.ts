@@ -141,7 +141,7 @@ describe("an answer to a request with no cookie", () => {
   });
 
   it("keeps a page about its reader nowhere, as the route says", () => {
-    expect(kept(forTheEdge(get("/today"), answer(personalPage)))).toStrictEqual(
+    expect(kept(forTheEdge(get("/inbox"), answer(personalPage)))).toStrictEqual(
       {
         cacheControl: personalPage["Cache-Control"],
         vary: null,

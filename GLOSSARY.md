@@ -137,8 +137,12 @@ One choice put to a project's maintainers, with its evidence and a safe default 
 _Avoid_: approval, vote, review request, quorum
 
 **Today**:
-A maintainer's daily page of open decisions, ordered by expiry and held to their budget; the overflow waits for a later day.
-_Avoid_: inbox, queue, dashboard
+A maintainer's daily list of open decisions, ordered by expiry and held to their budget; the overflow waits for a later day. The CLI prints it as `today`; the web shows it in the inbox.
+_Avoid_: queue, dashboard
+
+**Inbox**:
+A person's own page on the web: the decisions waiting for them (their Today), the asks they hold with where each answer stands in the gate, and the asks they may take next. It is read with their session and kept by no cache.
+_Avoid_: home, notifications, dashboard
 
 **Budget**:
 The number of decisions a maintainer takes per day; a decision past it waits, and one that expires undecided takes its default.
@@ -160,8 +164,12 @@ The trailers on a landing (Asked-by, Signed-off-by, Decided-by, Mentored-by, Fin
 _Avoid_: co-author (for agents), attribution
 
 **Front page**:
-The cross-project list of open asks a viewer may take.
-_Avoid_: explore, trending, network
+The cross-project list of open asks a viewer may take, at `/asks`.
+_Avoid_: trending, network, explore (that lists projects)
+
+**Explore**:
+The web's list of every public project, each with its posture, the projects taking answers first.
+_Avoid_: trending, discover, front page (that lists asks)
 
 ## Visibility
 
@@ -193,8 +201,12 @@ _Avoid_: licence (they are different things)
 **Ledger**:
 The public, append-only record of a project's layers, counts, commitments, releases and posture changes; the one record a clone does not yet carry.
 
+**Visibility tab**:
+A project's one page for what it holds back and what it shows: its posture, layers, held-back checks, Environment and ledger.
+_Avoid_: privacy page, settings
+
 **Env shape**:
-The public schema of a project's environment variables: its committed .env.schema file, in the @env-spec format that varlock reads, which the platform parses from the landed SHA and never resolves.
+The public schema of a project's environment variables: its committed .env.schema file, in the @env-spec format that varlock reads, which the platform parses from the landed SHA and never resolves. The web shows it as Environment, on the Visibility tab.
 _Avoid_: env.ts, .env.example, secrets file
 
 **Write-only value**:
