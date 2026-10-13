@@ -135,9 +135,11 @@ const secretsOf = (config: PlatformConfig): readonly Redacted.Redacted[] => [
 ];
 
 // The JSON logger, defect reporting and spans of every runtime the Worker
-// starts: its routers, each Project DO and each Workflow instance.
+// starts: its routers, each Project DO and each Workflow instance. A defect
+// is kept by its name and frames alone: the visibility cartridge runs here,
+// and a defect's text may name a layer's repo or quote a sealed path.
 export const telemetryOf = (config: PlatformConfig): Layer.Layer<never> =>
-  Telemetry({ secrets: secretsOf(config), tracing });
+  Telemetry({ defects: "name", secrets: secretsOf(config), tracing });
 
 export const draftPorts = (config: PlatformConfig): Layer.Layer<Drafter> =>
   Layer.merge(

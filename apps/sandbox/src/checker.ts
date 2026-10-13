@@ -32,8 +32,8 @@ export const checkJob: Job<
   VerifierBlocked,
   typeof CheckExit.Encoded
 > = {
-  // A defect may quote a sealed file's path: the platform's report of it is
-  // the one place its text goes.
+  // A defect may quote a sealed file's path: its span keeps its name alone,
+  // and the platform's report of it its name and frames.
   defects: "name",
   exit: CheckExit,
   ids: ({ job }) => ({

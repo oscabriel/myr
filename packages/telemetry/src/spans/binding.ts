@@ -6,6 +6,7 @@
 // the nesting; the trace shows each span's name, timing, ids and failures.
 import { Cause, Exit, Layer, Predicate, Tracer } from "effect";
 
+import type { DefectKeeping } from "../defects.ts";
 import type { Scrub } from "../logger.ts";
 import { INVOCATION_KEYS, InvocationSpan, SPAN_KEYS } from "../spans.ts";
 import type {
@@ -25,9 +26,9 @@ export interface Keeping {
   readonly scrub: Scrub;
   /**
    * All of a defect, scrubbed, or its name alone where its text may quote
-   * what no trace may hold (a held-back check's path).
+   * what no trace may hold (a layer's repo, a held-back check's path).
    */
-  readonly defects: "whole" | "name";
+  readonly defects: DefectKeeping;
 }
 
 // A typed failure is a refusal or a port's error: its tag says what it was.

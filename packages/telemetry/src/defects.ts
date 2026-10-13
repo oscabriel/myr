@@ -1,7 +1,8 @@
 // Crash reporting. A defect is the platform's own fault, so it is logged at
 // Error, with its cause and stack, where Issues groups it. A typed failure is
 // never reported: a refusal is the product working (AGENTS.md principle 3),
-// and a port's error is handled where it is typed.
+// and a port's error is handled where it is typed. Where a defect's text may
+// quote what no log may hold, it is kept by its name and frames alone.
 import {
   Array,
   Cause,
@@ -20,10 +21,47 @@ class ReportedElsewhere extends Context.Service<ReportedElsewhere, true>()(
 ) {}
 
 /**
+ * What a report keeps of a defect: all of it, scrubbed, or its name and the
+ * frames of its stack alone, where its text may quote what no log may hold
+ * (a layer's repo, a held-back check's path).
+ */
+export type DefectKeeping = "whole" | "name";
+
+const WITHHELD = "<withheld>";
+
+const FRAME = /^\s+at /u;
+
+const withheld = (reason: Cause.Die): Cause.Die => {
+  const [error] = Cause.prettyErrors(Cause.fromReasons([reason]));
+  const name = error?.name ?? "Error";
+  const kept = new Error(WITHHELD);
+
+  kept.name = name;
+  // The frames Effect adds for its spans included; the message, and any
+  // cause the defect carries, left out.
+  kept.stack = [
+    `${name}: ${WITHHELD}`,
+    ...(error?.stack ?? "").split("\n").filter((line) => FRAME.test(line)),
+  ].join("\n");
+
+  return Cause.makeDieReason(kept);
+};
+
+/** `cause` with each defect kept by its name and stack frames alone. */
+export const unquoted = <E>(cause: Cause.Cause<E>): Cause.Cause<E> =>
+  Cause.fromReasons(
+    cause.reasons.map((reason) =>
+      Cause.isDieReason(reason) ? withheld(reason) : reason
+    )
+  );
+
+/**
  * Reports each defect once, through the reporting fiber's own loggers and
  * annotations, however many boundaries it crosses.
  */
-export const defectReporter = (): ErrorReporter.ErrorReporter => {
+export const defectReporter = (
+  keeping: DefectKeeping = "whole"
+): ErrorReporter.ErrorReporter => {
   const seen = new WeakSet<object>();
 
   const unreported = <E>(reason: Cause.Reason<E>): readonly Cause.Die[] => {
@@ -58,7 +96,8 @@ export const defectReporter = (): ErrorReporter.ErrorReporter => {
         return;
       }
 
-      const reported = Cause.fromReasons(defects);
+      const whole = Cause.fromReasons(defects);
+      const reported = keeping === "name" ? unquoted(whole) : whole;
       const [first] = Cause.prettyErrors(reported);
 
       const date = DateTime.toDateUtc(

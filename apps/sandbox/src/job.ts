@@ -27,7 +27,8 @@ export type JobTelemetry = (
 ) => Layer.Layer<never>;
 
 // A defect is no report of the sandbox's own: it crosses in the job's Exit,
-// and the platform reports it there, once, with the job's tokens scrubbed.
+// and the platform reports it there, once, by its name and frames, with the
+// job's tokens scrubbed.
 export const answered =
   <W, WI, A, E, X>(
     job: Job<W, WI, A, E, X>,

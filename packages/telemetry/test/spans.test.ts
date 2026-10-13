@@ -222,6 +222,33 @@ describe("the spans bridge", () => {
   );
 });
 
+describe(recordingTracing, () => {
+  it("traces a span no more once it ends, as workerd does, so what it is handed then is lost", () => {
+    const recording = recordingTracing();
+    const span = recording.tracing.startSpan("Checker.Run");
+
+    span.setAttribute("sha", "7");
+
+    const before = span.isTraced;
+
+    span.end();
+    span.setAttribute("lane", "lint");
+    span.recordException({ name: "TypeError" });
+
+    expect([before, span.isTraced, recording.spans()[1]]).toStrictEqual([
+      true,
+      false,
+      {
+        attributes: new Map([["sha", "7"]]),
+        ended: true,
+        exceptions: [],
+        name: "Checker.Run",
+        parent: ROOT,
+      },
+    ]);
+  });
+});
+
 describe(annotateInvocation, () => {
   it.effect(
     "sets the ids on the invocation's root span, where Issues reads them",

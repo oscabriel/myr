@@ -4,6 +4,7 @@ import { UnknownProject, VerifierBlocked } from "@repo/protocol/refusal";
 import { Cause, Effect, Layer, Redacted } from "effect";
 
 import { reportDefects, reportedElsewhere } from "../src/defects.ts";
+import type { DefectKeeping } from "../src/defects.ts";
 import { recordingConsole } from "../src/logger/memory.ts";
 import { recordingTracing } from "../src/spans/memory.ts";
 import { Telemetry } from "../src/telemetry.ts";
@@ -15,7 +16,8 @@ const boundary = Effect.withErrorReporting;
 
 const reported = <A, E>(
   body: Effect.Effect<A, E>,
-  secrets: readonly Redacted.Redacted[] = []
+  secrets: readonly Redacted.Redacted[] = [],
+  defects: DefectKeeping = "whole"
 ) =>
   Effect.gen(function* () {
     const console = recordingConsole();
@@ -25,7 +27,7 @@ const reported = <A, E>(
       Effect.withSpan("Project.claim"),
       Effect.provide(
         Layer.merge(
-          Telemetry({ secrets, tracing: recording.tracing }),
+          Telemetry({ defects, secrets, tracing: recording.tracing }),
           console.layer
         )
       ),
@@ -126,6 +128,42 @@ describe("a defect", () => {
         );
 
         expect(errors).toStrictEqual([]);
+      })
+  );
+
+  it.effect(
+    "is reported by its name and frames alone where its text may quote what no log may hold",
+    () =>
+      Effect.gen(function* () {
+        const repo = "alice--datekit--private";
+
+        const { errors } = yield* reported(
+          Effect.forEach(
+            [
+              new TypeError(`the layer repo ${repo} has no commit`, {
+                cause: new Error(`no tree in ${repo}`),
+              }),
+              `the layer repo ${repo} lost a blob its tree names`,
+            ],
+            (defect) => Effect.die(defect).pipe(boundary, Effect.exit)
+          ),
+          [],
+          "name"
+        );
+
+        expect(errors).toMatchObject([
+          { level: "ERROR", message: "TypeError: <withheld>" },
+          { level: "ERROR", message: "Error: <withheld>" },
+        ]);
+        expect(errors[0]).toHaveProperty(
+          "cause",
+          expect.stringMatching(/^TypeError: <withheld>\n\s+at /u)
+        );
+        expect(errors[1]).toHaveProperty(
+          "cause",
+          expect.stringMatching(/^Error: <withheld>\n\s+at /u)
+        );
+        expect(JSON.stringify(errors)).not.toContain(repo);
       })
   );
 });

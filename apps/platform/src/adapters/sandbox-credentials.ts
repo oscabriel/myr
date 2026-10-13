@@ -6,6 +6,7 @@ import type {
 } from "@repo/artifacts/repo-host";
 import type { Remote } from "@repo/checks/check-runner/wire";
 import { VerifierBlocked } from "@repo/protocol/refusal";
+import { unquoted } from "@repo/telemetry/defects";
 import {
   Cause,
   Data,
@@ -115,6 +116,8 @@ export interface SandboxJob<W, WI, A, E, X> {
   readonly send: (encoded: WI) => Promise<X>;
 }
 
+// A job's defect is logged by its name and frames alone: a Checker's may
+// quote a sealed file's path.
 const settle = <A, E>(
   method: SandboxMethod,
   remotes: readonly Remote[],
@@ -125,7 +128,7 @@ const settle = <A, E>(
     : Option.match(Cause.findErrorOption(exit.cause), {
         onNone: () =>
           blocked(method, {
-            detail: scrub(Cause.pretty(exit.cause), remotes),
+            detail: scrub(Cause.pretty(unquoted(exit.cause)), remotes),
             failure: "defect",
           }),
         onSome: (refusal): Effect.Effect<never, E> => Effect.fail(refusal),

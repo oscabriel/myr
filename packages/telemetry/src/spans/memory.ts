@@ -54,18 +54,23 @@ export const recordingTracing = (traced = true): RecordingTracing => {
 
     opened.push(span);
 
+    // As in workerd, an ended span is traced no more: what it is handed then is lost.
+    const tracing = () => traced && !span.ended;
+
     return {
       end: () => {
         span.ended = true;
       },
-      isTraced: traced,
+      get isTraced() {
+        return tracing();
+      },
       recordException: (exception) => {
-        if (traced) {
+        if (tracing()) {
           span.exceptions.push(exception);
         }
       },
       setAttribute: (key, value) => {
-        if (traced) {
+        if (tracing()) {
           span.attributes.set(key, value);
         }
       },

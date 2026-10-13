@@ -1,4 +1,4 @@
-import { Context, Effect, Layer, Option, Ref, Schema } from "effect";
+import { Cause, Context, Effect, Layer, Option, Ref, Schema } from "effect";
 
 export interface WorkflowStepRetries {
   readonly limit: number;
@@ -65,10 +65,16 @@ const durableStep =
       const json = Schema.toCodecJson(schema);
       const context = yield* Effect.context<R>();
       const failed = yield* Ref.make(Option.none<E>());
+      // The engine hands back only what the body threw: a defect's cause, as
+      // it died, keeps the mark that another side (a Project DO) reported it.
+      const died = yield* Ref.make(Option.none<Cause.Cause<E>>());
 
       // Spanned inside the engine's step, so a replay that reads a kept value opens none.
       const run = effect.pipe(
         Effect.tapError((failure) => Ref.set(failed, Option.some(failure))),
+        Effect.tapCauseIf(Cause.hasDies, (cause) =>
+          Ref.set(died, Option.some(cause))
+        ),
         Effect.flatMap((value) =>
           Effect.orDie(Schema.encodeEffect(json)(value))
         ),
@@ -81,12 +87,19 @@ const durableStep =
         )
       ).pipe(
         Effect.catch((error) =>
-          Effect.flatMap(Ref.get(failed), (last) =>
-            Option.match(last, {
-              // What the engine threw, so a defect is reported by its own name.
-              onNone: () => Effect.die(error.cause),
-              onSome: (failure) => Effect.fail(failure),
-            })
+          Effect.flatMap(
+            Effect.all([Ref.get(failed), Ref.get(died)]),
+            ([last, defect]) =>
+              Option.match(last, {
+                onNone: () =>
+                  Option.match(defect, {
+                    // What the engine threw (a replay's, or its own), so a
+                    // defect is reported by its own name.
+                    onNone: () => Effect.die(error.cause),
+                    onSome: Effect.failCause,
+                  }),
+                onSome: (failure) => Effect.fail(failure),
+              })
           )
         )
       );

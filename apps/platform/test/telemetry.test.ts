@@ -11,7 +11,7 @@ import { recordingConsole } from "@repo/telemetry/logger/memory";
 import { recordingTracing, ROOT } from "@repo/telemetry/spans/memory";
 import { Telemetry } from "@repo/telemetry/telemetry";
 import { untouchable } from "@repo/testkit/untouchable";
-import { Effect, Layer, Redacted, Schema } from "effect";
+import { Effect, Exit, Layer, Redacted, Schema } from "effect";
 import { HttpRouter } from "effect/http";
 
 import { DoProjects } from "../src/adapters/do-projects.ts";
@@ -19,6 +19,8 @@ import { PlatformEnv } from "../src/platform.ts";
 import { telemetryOf } from "../src/ports.ts";
 import { buildHandler } from "../src/router-build.ts";
 import { runWorkflow } from "../src/workflows/answer.ts";
+import { instance, invocation } from "../src/workflows/instance.ts";
+import { StepRunner, workflowSteps } from "../src/workflows/step.ts";
 import { fakeEnv } from "./fake-env.ts";
 import {
   alice,
@@ -84,17 +86,21 @@ describe("a platform router", () => {
   );
 });
 
+const platformConfig = (env: Readonly<Record<string, string>> = {}) =>
+  Schema.decodeUnknownEffect(PlatformEnv)({ ...fakeEnv(), ...env }).pipe(
+    Effect.orDie
+  );
+
 describe("the Worker's telemetry", () => {
   it.effect(
-    "takes every secret the env holds out of a defect's report, each session token included",
+    "takes every secret the env holds out of each line it logs, each session token included",
     () =>
       Effect.gen(function* () {
         const session = "session-token-0123456789abcdef0123456789";
 
-        const config = yield* Schema.decodeUnknownEffect(PlatformEnv)({
-          ...fakeEnv(),
+        const config = yield* platformConfig({
           SESSION_TOKENS: JSON.stringify({ [session]: "alice" }),
-        }).pipe(Effect.orDie);
+        });
 
         const secrets = [
           config.COOKIE_KEY,
@@ -103,6 +109,7 @@ describe("the Worker's telemetry", () => {
           config.PASSWORD_PEPPER,
         ].map((secret) => Redacted.value(secret));
 
+        const held = `held ${[...secrets, session].join(" ")}`;
         const console = recordingConsole();
 
         const { dispose, handler } = buildHandler(
@@ -110,7 +117,9 @@ describe("the Worker's telemetry", () => {
             router.add(
               "GET",
               "/dies",
-              Effect.die(new Error(`held ${[...secrets, session].join(" ")}`))
+              Effect.logWarning(held).pipe(
+                Effect.andThen(Effect.die(new Error(held)))
+              )
             )
           ),
           Layer.merge(telemetryOf(config), console.layer)
@@ -119,14 +128,73 @@ describe("the Worker's telemetry", () => {
         yield* Effect.promise(() => handler(new Request(`${origin}/dies`)));
         yield* Effect.promise(dispose);
 
-        const reported = JSON.stringify(console.errors());
+        const logged = JSON.stringify(console.written());
 
         expect(console.errors()).toHaveLength(1);
         expect(
-          [...secrets, session].filter((secret) => reported.includes(secret))
+          [...secrets, session].filter((secret) => logged.includes(secret))
         ).toStrictEqual([]);
-        expect(reported).toContain("held <redacted> <redacted>");
+        expect(logged).toContain("held <redacted> <redacted>");
       })
+  );
+
+  it.effect(
+    "keeps a defect by its name and frames alone, a route's and a Project DO's, since its text may name a layer's repo",
+    () =>
+      Effect.gen(function* () {
+        const config = yield* platformConfig();
+        const repo = "alice--datekit--private";
+        const console = recordingConsole();
+        const layer = Layer.merge(telemetryOf(config), console.layer);
+
+        const { dispose, handler } = buildHandler(
+          HttpRouter.use((router) =>
+            router.add(
+              "GET",
+              "/dies",
+              Effect.die(new Error(`the layer repo ${repo} has no commit`))
+            )
+          ),
+          layer
+        );
+
+        yield* Effect.promise(() => handler(new Request(`${origin}/dies`)));
+        yield* Effect.promise(dispose);
+
+        const { namespace } = yield* namespaceOf.pipe(Effect.provide(layer));
+
+        yield* Effect.gen(function* () {
+          const made = yield* (yield* Projects).create(project);
+
+          yield* made.initProject(alice, {});
+          yield* Effect.exit(
+            made.advanceAnswer(
+              requestId,
+              LandingCommand.Start({ main: LandedSha.make("a".repeat(40)) })
+            )
+          );
+        }).pipe(Effect.provide(DoProjects(namespace)));
+
+        const logged = JSON.stringify(console.written());
+
+        const withheld = /^Error: <withheld>\n\s+at /u;
+
+        expect(console.errors()).toMatchObject([
+          { message: "Error: <withheld>" },
+          { message: "Error: <withheld>", project },
+        ]);
+        expect(console.errors()[0]).toHaveProperty(
+          "cause",
+          expect.stringMatching(withheld)
+        );
+        expect(console.errors()[1]).toHaveProperty(
+          "cause",
+          expect.stringMatching(withheld)
+        );
+        expect(
+          [repo, requestId].filter((text) => logged.includes(text))
+        ).toStrictEqual([]);
+      }).pipe(Effect.provide(world))
   );
 });
 
@@ -185,6 +253,54 @@ describe("a Project DO call", () => {
 });
 
 describe("a Workflow instance", () => {
+  it.effect(
+    "reports a Project DO's defect, met inside a step, no more: the DO reported it",
+    () =>
+      Effect.gen(function* () {
+        const durable = telemetry();
+        const caller = telemetry();
+
+        const { namespace } = yield* namespaceOf.pipe(
+          Effect.provide(durable.layer)
+        );
+
+        // An engine whose step rejects as the body did, as a step past its retries does.
+        const engine = workflowSteps({ do: (_name, _config, body) => body() });
+
+        const exit = yield* Effect.gen(function* () {
+          const made = yield* (yield* Projects).create(project);
+
+          yield* made.initProject(alice, {});
+
+          return yield* StepRunner.use(({ step }) =>
+            step(
+              "advance",
+              Schema.Null,
+              made
+                .advanceAnswer(
+                  requestId,
+                  LandingCommand.Start({ main: LandedSha.make("a".repeat(40)) })
+                )
+                .pipe(Effect.as(null))
+            )
+          );
+        }).pipe(
+          invocation({ project, requestId }),
+          instance("Answer.run"),
+          Effect.provide(
+            Layer.mergeAll(DoProjects(namespace), engine, caller.layer)
+          ),
+          Effect.exit
+        );
+
+        expect(Exit.isFailure(exit)).toBeTruthy();
+        expect(caller.console.errors()).toStrictEqual([]);
+        expect(durable.console.errors()).toMatchObject([
+          { message: "Error: no answer request req-none0001", project },
+        ]);
+      }).pipe(Effect.provide(world))
+  );
+
   it.effect(
     "reports its defect once, by its project and request, and still rejects",
     () =>
