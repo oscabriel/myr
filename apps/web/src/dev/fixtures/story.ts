@@ -142,6 +142,7 @@ export const storyOf = (input: {
     const proposals = new Map<ProposalId, HeldProposal>();
     const logs = new Map<string, KeptLog>();
     const firstClaims = new Map<Handle, DateTime.Utc>();
+    const forked = new Set<RepoName>();
 
     const nextSeq = () => events.length + 1;
 
@@ -726,6 +727,13 @@ export const storyOf = (input: {
           ({ ask, each }) =>
             Effect.gen(function* () {
               const fork = claimForkName(project, ask, each.claimant);
+
+              if (forked.has(fork)) {
+                return;
+              }
+
+              forked.add(fork);
+
               const made = yield* Effect.option(host.fork(repo, fork));
 
               if (Option.isNone(made) || head === each.base) {

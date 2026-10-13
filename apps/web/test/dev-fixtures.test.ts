@@ -624,31 +624,29 @@ describe("the dev world's fixtures", seededWorlds, () => {
       )
   );
 
-  it.live(
-    "give every answer fork vellum lists a tree at its address, at the main its claim began from",
-    () =>
-      inWorld(withFixtures, (as) =>
-        Effect.gen(function* () {
-          const anyone = yield* as();
-          const { forks } = yield* anyone.listRefs({ project: vellum });
+  it.live("give every answer fork vellum lists a tree at its address", () =>
+    inWorld(withFixtures, (as) =>
+      Effect.gen(function* () {
+        const anyone = yield* as();
+        const { forks } = yield* anyone.listRefs({ project: vellum });
 
-          const answers = forks.flatMap((fork) =>
-            fork.kind === "claim" && fork.ask !== undefined
-              ? [forkRev({ ask: fork.ask, handle: fork.handle })]
-              : []
-          );
+        const answers = forks.flatMap((fork) =>
+          fork.kind === "claim" && fork.ask !== undefined
+            ? [forkRev({ ask: fork.ask, handle: fork.handle })]
+            : []
+        );
 
-          const read = yield* Effect.forEach(answers, (at) =>
-            Effect.map(
-              Effect.exit(anyone.readTree({ at, project: vellum })),
-              (exit) => [at, Exit.isSuccess(exit)] as const
-            )
-          );
+        const read = yield* Effect.forEach(answers, (at) =>
+          Effect.map(
+            Effect.exit(anyone.readTree({ at, project: vellum })),
+            (exit) => [at, Exit.isSuccess(exit)] as const
+          )
+        );
 
-          expect(answers.length).toBeGreaterThan(3);
-          expect(read.filter(([, listed]) => !listed)).toStrictEqual([]);
-        })
-      )
+        expect(answers.length).toBeGreaterThan(3);
+        expect(read.filter(([, listed]) => !listed)).toStrictEqual([]);
+      })
+    )
   );
 
   it.live("draft proposals into every state a draft settles in", () =>

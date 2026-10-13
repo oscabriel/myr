@@ -1893,8 +1893,6 @@ export const tellVellum = (base: LandedSha) =>
       working: [people.ines, people.okonkwo],
     };
 
-    yield* story.forkClaims();
-
     return { story, told: () => story.told(apart) };
   });
 
