@@ -14,8 +14,8 @@ export const IMPORT_PATH = "/import";
 
 export const EXPLORE_PATH = "/explore";
 
-/** The setup page answers at `/agents` until it moves to `/install`. */
-export const INSTALL_PATH = "/agents";
+/** Every way to reach the platform; the old `/agents` redirects here. */
+export const INSTALL_PATH = "/install";
 
 /** A reader's decisions and claims, the account's inbox. */
 export const INBOX_PATH = "/today";

@@ -190,6 +190,7 @@ export const reservedProjectNames = [
   "home",
   "icons",
   "import",
+  "install",
   "people",
   "privacy",
   "releases",

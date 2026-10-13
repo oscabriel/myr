@@ -105,7 +105,7 @@ const VISITS: readonly Visit[] = [
   },
   { name: "propose, signed out", path: `/${project}/proposals/new` },
   { name: "person", path: `/people/${DECIDER}` },
-  { name: "for agents", path: "/agents" },
+  { name: "install", path: "/install" },
   { name: "unknown project", path: "/no-such-project", status: 404 },
   {
     name: "unknown ask",

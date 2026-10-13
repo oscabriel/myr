@@ -42,7 +42,7 @@ const routesFor = (view: ReactNode, options: RenderOptions) => {
         ["today", "project"],
         ["docs", "docs"],
         ["docs/$page", "docs"],
-        ["agents", "site"],
+        ["install", "site"],
         ["people/$handle", "project"],
       ] as const
     ).map(([path, shell]) =>

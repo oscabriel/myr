@@ -68,7 +68,7 @@ const mcpTools = () =>
 
 export const mcpPage: DocSource = {
   body: ({ platformUrl }) => [
-    `The platform serves its contracts as MCP tools at ${code(`${platformUrl}/mcp`)} over streamable HTTP, signed in with its own OAuth; ${code(`${Brand.cli} mcp`)} serves the same tools over stdio. A refusal comes back as the tool's error, its \`_tag\` intact. [For agents](/agents) has each client's setup.`,
+    `The platform serves its contracts as MCP tools at ${code(`${platformUrl}/mcp`)} over streamable HTTP, signed in with its own OAuth; ${code(`${Brand.cli} mcp`)} serves the same tools over stdio. A refusal comes back as the tool's error, its \`_tag\` intact. [Install](/install) has each client's setup.`,
     "",
     ...table(["Tool", "What it does", "Only reads"], mcpTools()),
     "",

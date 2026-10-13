@@ -128,6 +128,21 @@ describe("a page of the docs in the docs shell", () => {
   );
 });
 
+describe("the docs' links to setup", () => {
+  it("send a reader to /install, never the old /agents", () => {
+    expect(
+      pages.flatMap(({ markdown, slug }) =>
+        /\]\(\/agents[)#]/u.test(markdown) ? [slug] : []
+      )
+    ).toStrictEqual([]);
+    expect(
+      ["connect-an-agent", "mcp"].filter(
+        (slug) => !pageNamed(slug).markdown.includes("](/install)")
+      )
+    ).toStrictEqual([]);
+  });
+});
+
 describe("a page of the docs", () => {
   it.effect(
     "lists its article's h2s under On this page, in order, each linking its heading's id",

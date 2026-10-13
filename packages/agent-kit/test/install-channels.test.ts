@@ -89,9 +89,9 @@ describe("the Install page's channels", () => {
       webUrl,
     });
 
-    expect(channel("mcp", without).snippets.map(({ name }) => name)).toStrictEqual(
-      ["Claude Code", "Cursor", "VS Code"]
-    );
+    expect(
+      channel("mcp", without).snippets.map(({ name }) => name)
+    ).toStrictEqual(["Claude Code", "Cursor", "VS Code"]);
   });
 
   it("point any agent at llms.txt, llms-full.txt and Markdown by Accept", () => {

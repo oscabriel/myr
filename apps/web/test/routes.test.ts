@@ -73,6 +73,7 @@ describe("the web's own paths", () => {
       "home",
       "icons",
       "import",
+      "install",
       "install.sh",
       "llms-full.txt",
       "llms.txt",

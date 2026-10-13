@@ -150,6 +150,7 @@ const web = () =>
   channel({
     audience: "Browser",
     id: "web",
+    links: [{ label: "Sign in", page: false, path: "/auth/signin" }],
     summary:
       "Sign in to read your inbox, take a maintainer's decisions and propose asks. A list of the CLI sessions you have signed in and the agents you have connected is planned.",
     title: "The web",

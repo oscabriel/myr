@@ -120,7 +120,6 @@ const pathCrumbs = (project: string, path: string): readonly Crumb[] =>
     : [...projectCrumbs(project, "code", true), { label: path, mono: true }];
 
 const SITE_CRUMBS = {
-  agents: () => [{ label: "For agents" }],
   asks: () => [{ label: "Asks" }],
   docs: (page: string | undefined) =>
     page === undefined

@@ -546,6 +546,12 @@ The platform's own label, never rewritten, through the state badge: a lock and t
 - **Hero:** one primary action (the open asks) and the install command, then a two-panel comparison as inline SVG: on the left the usual flow by its mechanism (issue, branch, pull request, review comments, merge button) under an X mark; on the right an ask, an answer and the gate under a check mark. Two cards side by side, stacked on a phone; no product is named. It honours `prefers-reduced-motion`.
 - **Below:** the seven-stage gate with a refused and a landed output beside it, the four words, landings as they happen, and every way in (linking `/install`). Its evidence is real output, set in mono as a terminal prints it.
 
+### Install
+
+- **Where:** `/install`, in the site shell; the old `/agents` is a 301 to it, and `/agents.md`, `/llms.txt` and `/llms-full.txt` keep answering.
+- **Shape:** the title and one line under it, then one card per way in, two across from `columns` and stacked below: the CLI (the install script, npm, signing in), the MCP server (Claude Code, Cursor, VS Code and stdio as tabs, every panel in the HTML), skills, text for agents (`llms.txt`, `llms-full.txt`, Markdown by `Accept`), git over HTTPS with the CLI as its credential helper (no SSH keys), the web (signing in), and the pi extension, planned, on a dashed border with no command. Each card says who it is for after its title, never above it.
+- **Source:** every card, snippet and link is `installChannels` in `@repo/agent-kit` (`apps/web/test/agents.test.tsx`); the page draws no command of its own. The command synopsis lives at Docs › Commands.
+
 ### Theme preference
 
 Light and dark follow the system by default. On `/settings` (Appearance) a reader may choose "Same as system" or "Opposite of system", each shown with what it resolves to now ("Light", "Dark"). It lives in `localStorage`, never a cookie (a cookie would take every page out of the edge cache), and one inline script in the head sets `data-theme` before first paint (ADR 0042).

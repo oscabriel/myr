@@ -247,7 +247,7 @@ describe("the top bar", () => {
     { href: "/explore", text: "Explore" },
     { href: "/asks", text: "Asks" },
     { href: "/docs", text: "Docs" },
-    { href: "/agents", text: "Install" },
+    { href: "/install", text: "Install" },
   ];
 
   it.effect(
@@ -461,7 +461,7 @@ describe("the search", () => {
     () =>
       Effect.gen(function* () {
         const markup = yield* renderAt(
-          "/agents",
+          "/install",
           <ProjectsSheetBody
             input={{ current: null }}
             listed={TEN_LISTED}

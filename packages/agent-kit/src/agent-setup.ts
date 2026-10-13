@@ -38,21 +38,21 @@ const json = (value: Parameters<typeof printJson>[0]) =>
 export const remoteMcp = ({ platformUrl }: SetupInput): SetupChannel => ({
   snippets: [
     {
-      name: "Claude Code",
       label: "Claude Code, then /mcp in a session to sign in",
       language: "sh",
+      name: "Claude Code",
       text: `claude mcp add --transport http ${Brand.slug} ${platformUrl}/mcp`,
     },
     {
-      name: "Cursor",
       label: "Cursor, in .cursor/mcp.json",
       language: "json",
+      name: "Cursor",
       text: json({ mcpServers: mcpServersFor(platformUrl, "cursor") }),
     },
     {
-      name: "VS Code",
       label: "VS Code, in .vscode/mcp.json",
       language: "json",
+      name: "VS Code",
       text: json({ servers: mcpServersFor(platformUrl, "claude") }),
     },
   ],
@@ -63,9 +63,9 @@ export const remoteMcp = ({ platformUrl }: SetupInput): SetupChannel => ({
 export const stdioMcp = (): SetupChannel => ({
   snippets: [
     {
-      name: "stdio",
       label: "The server's command, once you have signed in with the CLI",
       language: "sh",
+      name: "stdio",
       text: `${Brand.cli} mcp`,
     },
   ],
@@ -80,17 +80,17 @@ export const theCli = ({
 }: SetupInput): SetupChannel => ({
   snippets: [
     {
-      name: "Install script",
       label: "Install",
       language: "sh",
+      name: "Install script",
       text: installCommand(webUrl),
     },
     ...(hasCommand(commands, "login")
       ? [
           {
-            name: "Sign in",
             label: "Sign in once; git pushes with your token from then on",
             language: "sh" as const,
+            name: "Sign in",
             text: `${Brand.cli} login --url ${platformUrl}`,
           },
         ]
@@ -103,9 +103,9 @@ export const theCli = ({
 export const anyAgent = ({ webUrl }: SetupInput): SetupChannel => ({
   snippets: [
     {
-      name: "Prompt",
       label: "Paste into the agent's prompt",
       language: "text",
+      name: "Prompt",
       text: `Use ${webUrl}/llms.txt as the source of truth for ${Brand.name}: it says how to take an ask and lists every command and project. Each ask reads as Markdown at ${webUrl}/<owner>/<name>/asks/<ask>.md.`,
     },
   ],
@@ -117,9 +117,9 @@ export const anyAgent = ({ webUrl }: SetupInput): SetupChannel => ({
 export const skills = ({ webUrl }: SetupInput): SetupChannel => ({
   snippets: [
     {
-      name: "Skills",
       label: "Add every project's contribute skill",
       language: "sh",
+      name: "Skills",
       text: `npx skills add ${webUrl}`,
     },
   ],
