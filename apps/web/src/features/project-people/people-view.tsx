@@ -14,7 +14,7 @@ import { EmptyState } from "../shared/empty.tsx";
 import { FactBlock } from "../shared/facts.tsx";
 import { HandleLink } from "../shared/handle.tsx";
 import { AppLink } from "../shared/link.tsx";
-import { ledgerPath } from "../shared/paths.ts";
+import { LEDGER_ANCHOR, visibilityPath } from "../shared/paths.ts";
 import { Workspace } from "../shared/shell/workspace.tsx";
 
 type Vouches = PublicPolicy["vouches"];
@@ -282,7 +282,11 @@ const LayersLine = ({
         </Fragment>
       ))}
       {". Who reads and writes each, and its history, are on "}
-      <AppLink className={LINK} to={ledgerPath(project)}>
+      <AppLink
+        className={LINK}
+        hash={LEDGER_ANCHOR}
+        to={visibilityPath(project)}
+      >
         the ledger
       </AppLink>
       .

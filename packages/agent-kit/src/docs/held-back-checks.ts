@@ -46,7 +46,7 @@ export const heldBackChecks: DocSource = {
     "",
     "## The env shape and write-only values",
     "",
-    `A project's environment is described by its committed ${code(".env.schema")}, in the format varlock reads. The platform parses it from the landed commit and never resolves it; the project's Env shape page and ${cli("env shape --project <owner>/<name>")} show it, and who set each value, never a value.`,
+    `A project's environment is described by its committed ${code(".env.schema")}, in the format varlock reads. The platform parses it from the landed commit and never resolves it; the Environment on the project's Visibility tab and ${cli("env shape --project <owner>/<name>")} show it, and who set each value, never a value.`,
     "",
     `A maintainer sets a value for a \`@sensitive\` item from stdin: ${cli("env set <key> --project <owner>/<name>")}. Nobody can read it back. An answer's code sees a placeholder; for a \`@proxy\` item the platform swaps the placeholder for the real value on matching outbound HTTPS requests.`,
     "",

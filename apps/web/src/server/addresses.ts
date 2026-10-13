@@ -9,7 +9,12 @@ import {
 import type { LocationRewrite } from "@tanstack/react-router";
 import { Option, Schema } from "effect";
 
-import { INBOX_PATH, segmentsOf } from "../features/shared/paths.ts";
+import {
+  INBOX_PATH,
+  MOVED_TO_VISIBILITY,
+  segmentsOf,
+  visibilityHref,
+} from "../features/shared/paths.ts";
 import { KEPT_NOWHERE } from "./edge-cache.ts";
 
 const isSourceHost = (segment: string) =>
@@ -120,6 +125,21 @@ const movedPage = (
       );
 };
 
+// A project's old ledger and env pages folded into its Visibility tab (ADR 0041): one move from an old or miscased name too.
+const movedProjectPage = (
+  name: string,
+  rest: readonly string[],
+  search: string
+): Option.Option<Response> => {
+  const [page, ...below] = rest;
+
+  return page === undefined || below.length > 0
+    ? Option.none()
+    : Option.map(Option.fromUndefinedOr(MOVED_TO_VISIBILITY.get(page)), (anchor) =>
+        movedTo(visibilityHref(name, anchor, search))
+      );
+};
+
 export const canonicalAddress = (request: Request): Option.Option<Response> => {
   const url = new URL(request.url);
   const isRead = request.method === "GET" || request.method === "HEAD";
@@ -139,17 +159,19 @@ export const canonicalAddress = (request: Request): Option.Option<Response> => {
 
   return Option.flatMap(projectAddressOf(segments), (address) =>
     Option.flatMap(decodeName(withoutGit(address.spelled)), (name) =>
-      name === address.spelled
-        ? Option.none()
-        : Option.some(
-            movedTo(
-              [
-                "",
-                name,
-                ...address.rest.map((segment) => encodeURIComponent(segment)),
-              ].join("/") + url.search
+      Option.orElse(movedProjectPage(name, address.rest, url.search), () =>
+        name === address.spelled
+          ? Option.none()
+          : Option.some(
+              movedTo(
+                [
+                  "",
+                  name,
+                  ...address.rest.map((segment) => encodeURIComponent(segment)),
+                ].join("/") + url.search
+              )
             )
-          )
+      )
     )
   );
 };

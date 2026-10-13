@@ -25,7 +25,7 @@ export interface Section {
 /**
  * Each tab opens a page inside the project's frame that exists today: Asks,
  * Proposals and People open their regions of Overview, Policy the policy at
- * the address it has always had, and Visibility the ledger. Starting a
+ * the address it has always had, and Visibility its own page. Starting a
  * proposal is a focused page of its own, so it is Contribute's, not a tab's.
  */
 export const projectSections = (project: string): readonly Section[] => [
@@ -41,7 +41,7 @@ export const projectSections = (project: string): readonly Section[] => [
   },
   { hash: "who-decides", label: "People", tab: "people", to: `/${project}` },
   { label: "Policy", tab: "policy", to: `/${project}/people` },
-  { label: "Visibility", tab: "visibility", to: `/${project}/ledger` },
+  { label: "Visibility", tab: "visibility", to: `/${project}/visibility` },
 ];
 
 /** The tab each page of a project sits under, by its first segment. */
@@ -52,35 +52,32 @@ const TAB_OF = {
   commit: "landings",
   commits: "landings",
   decisions: "asks",
-  env: "visibility",
-  ledger: "visibility",
   people: "policy",
   proposals: "proposals",
   raw: "code",
   refs: "code",
   tree: "code",
+  visibility: "visibility",
   why: "code",
 } as const satisfies Record<string, ProjectTab>;
 
 /** A crumb names the page itself, which may be narrower than its tab. */
 type PageSection =
   | "code"
-  | "env"
   | "landings"
-  | "ledger"
   | "overview"
   | "people"
-  | "refs";
+  | "refs"
+  | "visibility";
 
 const PAGE_TO = (project: string) =>
   ({
     code: `/${project}/tree/main`,
-    env: `/${project}/env`,
     landings: `/${project}/commits/main`,
-    ledger: `/${project}/ledger`,
     overview: `/${project}`,
     people: `/${project}/people`,
     refs: `/${project}/refs`,
+    visibility: `/${project}/visibility`,
   }) as const satisfies Record<PageSection, string>;
 
 const SECTION_OF = {
@@ -89,11 +86,10 @@ const SECTION_OF = {
   blob: "code",
   commit: "landings",
   commits: "landings",
-  env: "env",
-  ledger: "ledger",
   people: "people",
   refs: "refs",
   tree: "code",
+  visibility: "visibility",
   why: "code",
 } as const satisfies Record<string, PageSection>;
 
@@ -168,12 +164,11 @@ export interface Crumb {
 
 const SECTION_LABEL = {
   code: "Code",
-  env: "Env shape",
   landings: "Landings",
-  ledger: "Ledger",
   overview: "Asks",
   people: "Policy",
   refs: "Refs",
+  visibility: "Visibility",
 } as const satisfies Record<PageSection, string>;
 
 const sectionCrumb = (

@@ -1,7 +1,8 @@
 /**
- * The ledger carries no path, no check name and no file name, and nothing here
+ * The Visibility tab's posture, layers, held-back checks and ledger. The
+ * ledger carries no path, no check name and no file name, and nothing here
  * adds one; the layer read log is maintainers' data and never reaches the
- * public ledger.
+ * public ledger. A layer's files are never browsed here (principle 7).
  */
 import { Brand } from "@repo/brand";
 import { LedgerEntry } from "@repo/protocol/domain/visibility";
@@ -29,15 +30,15 @@ import { HandleLink } from "../shared/handle.tsx";
 import { AppLink } from "../shared/link.tsx";
 import { POSTURE_MARKS } from "../shared/mark-look.ts";
 import { Mark } from "../shared/marks.tsx";
-import { Workspace } from "../shared/shell/workspace.tsx";
 import { When } from "../shared/time.tsx";
-import { areaHeadline, areaSummaries, ledgerHead, plural } from "./areas.ts";
+import { areaHeadline, ledgerHead, plural } from "./areas.ts";
 import type { AreaSummary } from "./areas.ts";
 
 const dayOf = (at: DateTime.Utc) =>
   DateTime.formatUtc(at, { day: "numeric", locale: "en-US", month: "short" });
 
-const readAt = (ledger: Ledger, now: DateTime.Utc) => {
+/** The page's clock, never behind an entry that arrived after it was read. */
+export const ledgerReadAt = (ledger: Ledger, now: DateTime.Utc) => {
   let latest = now;
 
   for (const entry of ledger.entries) {
@@ -64,7 +65,7 @@ const postureTone = {
   sourceAvailable: "text-foreground",
 } as const satisfies Record<Ledger["posture"], string>;
 
-const HeadSentence = ({ ledger }: { readonly ledger: Ledger }) => {
+export const HeadSentence = ({ ledger }: { readonly ledger: Ledger }) => {
   const { lead, rest } = ledgerHead(ledger);
 
   return (
@@ -340,7 +341,7 @@ const Disclosures = () => (
   </FactBlock>
 );
 
-const Facts = ({
+export const LedgerFacts = ({
   areas,
   ledger,
 }: {
@@ -369,55 +370,66 @@ const Facts = ({
   </>
 );
 
-export const LedgerView = ({
+export const LayersRegion = ({ ledger }: { readonly ledger: Ledger }) => (
+  <Region id="layers" title="Layers">
+    {ledger.layers.length === 0 ? (
+      <EmptyState
+        title={`Nothing is held back: ${ledger.project} declares no layers, so every file it ships and every check that judges an answer is in its public repo.`}
+      />
+    ) : (
+      <>
+        <p className="text-ui text-muted-foreground max-w-[70ch]">
+          Everything on main is public. A layer&apos;s readers clone it with
+          git, and none of its files is shown here.
+        </p>
+        <ul className="flex flex-col gap-6">
+          {ledger.layers.map((layer) => (
+            <LayerBlock key={layer.name} layer={layer} />
+          ))}
+        </ul>
+      </>
+    )}
+  </Region>
+);
+
+export const HeldBackRegion = ({
+  areas,
+  now,
+}: {
+  readonly areas: readonly AreaSummary[];
+  readonly now: DateTime.Utc;
+}) => (
+  <Region id="held-back" title="Held-back checks">
+    {areas.length === 0 ? (
+      <EmptyState title="No held-back checks: every check that judges an answer is in the public repo." />
+    ) : (
+      <>
+        <p className="text-ui text-muted-foreground max-w-[70ch]">
+          Held-back checks judge every answer in their area, unseen. A landing
+          they judged names each area&apos;s root in its{" "}
+          <Code>Held-back:</Code> trailer.
+        </p>
+        <ul className="flex flex-col gap-6">
+          {areas.map((summary) => (
+            <AreaBlock key={summary.area} now={now} summary={summary} />
+          ))}
+        </ul>
+      </>
+    )}
+  </Region>
+);
+
+export const LedgerRegion = ({
   ledger,
   now,
 }: {
   readonly ledger: Ledger;
   readonly now: DateTime.Utc;
-}) => {
-  const { layers, project } = ledger;
-  const areas = areaSummaries(ledger);
-  const seen = readAt(ledger, now);
-
-  return (
-    <Workspace
-      facts={<Facts areas={areas} ledger={ledger} />}
-      factsHeading="This ledger"
-      meta={`Public and append-only · ${plural(layers.length, "layer", "layers")} · ${plural(ledger.entries.length, "entry", "entries")}`}
-      status={<HeadSentence ledger={ledger} />}
-      title="Ledger"
-    >
-      <Region id="layers" title="Layers">
-        {layers.length === 0 ? (
-          <EmptyState
-            title={`Nothing is held back: ${project} declares no layers, so every file it ships and every check that judges an answer is in its public repo.`}
-          />
-        ) : (
-          <ul className="flex flex-col gap-6">
-            {layers.map((layer) => (
-              <LayerBlock key={layer.name} layer={layer} />
-            ))}
-          </ul>
-        )}
-      </Region>
-      {areas.length === 0 ? null : (
-        <Region id="sealed-areas" title="Sealed areas">
-          <p className="text-ui text-muted-foreground max-w-[70ch]">
-            Held-back checks judge every answer in their area, unseen. A landing
-            they judged names each area&apos;s root in its{" "}
-            <Code>Held-back:</Code> trailer.
-          </p>
-          <ul className="flex flex-col gap-6">
-            {areas.map((summary) => (
-              <AreaBlock key={summary.area} now={seen} summary={summary} />
-            ))}
-          </ul>
-        </Region>
-      )}
-      <Region id="history" title="History">
-        <History ledger={ledger} now={seen} />
-      </Region>
-    </Workspace>
-  );
-};
+}) => (
+  <Region id="ledger" title="Ledger">
+    <p className="text-ui text-muted-foreground max-w-[70ch]">
+      {`Public and append-only · ${plural(ledger.entries.length, "entry", "entries")}`}
+    </p>
+    <History ledger={ledger} now={now} />
+  </Region>
+);
