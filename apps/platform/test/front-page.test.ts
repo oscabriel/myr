@@ -315,4 +315,46 @@ describe("the project list and credits over the platform's /rpc", () => {
         expect(yield* world.calls).toStrictEqual([]);
       }).pipe(Effect.scoped)
   );
+
+  it.effect(
+    "lists the latest landings across projects from D1, the answer's landing first with its ask's want, asking no project",
+    () =>
+      Effect.gen(function* () {
+        yield* advanceTo(noon);
+
+        const world = yield* frontPageWorld;
+
+        yield* world.landAnswer;
+        yield* world.forget;
+
+        const { landings } = yield* world.anyone.recentLandings({});
+
+        expect(landings.map(({ _tag }) => _tag)).toStrictEqual([
+          "Landed",
+          "Landed",
+          "Landed",
+          "Landed",
+        ]);
+        expect(landings).toMatchObject([
+          {
+            answered: parseIso,
+            at: at(noon),
+            project,
+            want: "parse-iso: its check passes in packages/parser",
+          },
+          {
+            opened: AskId.make("trim-input"),
+            project,
+            want: "trim-input: its check passes in packages/trim",
+          },
+          {
+            opened: parseIso,
+            project,
+            want: "parse-iso: its check passes in packages/parser",
+          },
+          { project },
+        ]);
+        expect(yield* world.calls).toStrictEqual([]);
+      }).pipe(Effect.scoped)
+  );
 });

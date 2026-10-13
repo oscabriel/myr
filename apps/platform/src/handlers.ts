@@ -321,6 +321,9 @@ export const Handlers: Layer.Layer<
         code(project, (of) =>
           treeOf(of, Option.fromUndefinedOr(at), Option.fromUndefinedOr(path))
         ),
+      // Read as nobody: the list ignores the caller, so every caller's read is the same.
+      recentLandings: () =>
+        Effect.map(frontPage.recentLandings(), (landings) => ({ landings })),
       release: ({ ask, project }) =>
         Effect.flatMap(person, (who) =>
           on(project, (api) => api.release(who, ask))

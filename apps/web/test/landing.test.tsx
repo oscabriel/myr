@@ -3,9 +3,9 @@ import { installCommand } from "@repo/agent-kit/install";
 import { Brand } from "@repo/brand";
 import { authorLine } from "@repo/git/trailers";
 import { Contracts } from "@repo/protocol/contracts";
-import { ProjectListing } from "@repo/protocol/domain/front-page";
-import { Handle } from "@repo/protocol/ids";
-import { DateTime, Effect, Schema } from "effect";
+import { RecentLanding } from "@repo/protocol/domain/recent-landing";
+import { AskId, Handle, LandedSha, ProjectName } from "@repo/protocol/ids";
+import { DateTime, Effect } from "effect";
 
 import glossary from "../../../GLOSSARY.md?raw";
 import { LandingNow } from "../src/features/landing/landing-now.ts";
@@ -23,22 +23,40 @@ const WEB = "https://web.example.workers.dev";
 
 const NOW = DateTime.makeUnsafe("2026-10-12T12:00:00Z");
 
+const DATEKIT_SHA = "4444444444444444444444444444444444444444";
+
+const BURROW_SHA = "5555555555555555555555555555555555555555";
+
+const datekit = ProjectName.make("oscabriel/datekit");
+
+const burrow = ProjectName.make("oscabriel/burrow");
+
 const landed = LandingNow.cases.Listed.make({
+  landings: [
+    RecentLanding.cases.Landed.make({
+      answered: AskId.make("iso-week"),
+      at: DateTime.makeUnsafe("2026-10-12T11:58:00Z"),
+      project: datekit,
+      sha: LandedSha.make(DATEKIT_SHA),
+      want: "parseISO accepts ISO week dates such as 2026-W41-3.",
+    }),
+    RecentLanding.cases.Refused.make({
+      ask: AskId.make("drop-legacy-fetch-kit"),
+      at: DateTime.makeUnsafe("2026-10-12T11:00:00Z"),
+      project: burrow,
+      refusals: [
+        { area: "parser", tag: "HeldBackFailed" },
+        { tag: "OutOfScope" },
+      ],
+      want: "@burrow/kit: move every caller of legacyFetch to http.get",
+    }),
+    RecentLanding.cases.Landed.make({
+      at: DateTime.makeUnsafe("2026-10-12T09:00:00Z"),
+      project: burrow,
+      sha: LandedSha.make(BURROW_SHA),
+    }),
+  ],
   now: NOW,
-  projects: Schema.decodeSync(Schema.Array(ProjectListing))([
-    {
-      landedAt: "2026-10-12T11:58:00Z",
-      openAsks: 2,
-      posture: "openWithSealedEvidence",
-      project: "oscabriel/datekit",
-    },
-    {
-      landedAt: "2026-10-12T09:00:00Z",
-      openAsks: 6,
-      posture: "open",
-      project: "oscabriel/burrow",
-    },
-  ]),
 });
 
 const pageWith = (landings: LandingNow) =>
@@ -61,65 +79,27 @@ const hrefsOf = (markup: string) =>
     (found) => found.groups?.href
   );
 
-/** A "landing now" row, by its project. */
-const rowOf = (markup: string, project: string) =>
-  new RegExp(`<li\\b[^>]*data-project="${project}"[\\s\\S]*?</li>`, "u").exec(
-    markup
-  )?.[0] ?? "";
+/** The "landing now" rows, in order. */
+const rowsOf = (markup: string) =>
+  [...markup.matchAll(/<li\b[^>]*data-outcome="[^"]+"[\s\S]*?<\/li>/gu)].map(
+    ([row]) => row
+  );
 
-/** Eight that have landed, out of order, and two that never have. */
-const EIGHT_LANDED = Schema.decodeSync(Schema.Array(ProjectListing))([
-  {
-    landedAt: "2026-10-10T08:00:00Z",
-    openAsks: 1,
-    posture: "open",
-    project: "oscabriel/alpha",
-  },
-  {
-    landedAt: "2026-10-12T11:00:00Z",
-    openAsks: 5,
-    posture: "open",
-    project: "oscabriel/datekit",
-  },
-  { openAsks: 0, posture: "open", project: "oscabriel/zeta" },
-  {
-    landedAt: "2026-10-11T09:00:00Z",
-    openAsks: 9,
-    posture: "open",
-    project: "oscabriel/burrow",
-  },
-  {
-    landedAt: "2026-10-12T11:30:00Z",
-    openAsks: 3,
-    posture: "open",
-    project: "oscabriel/kite",
-  },
-  {
-    landedAt: "2026-10-11T20:00:00Z",
-    openAsks: 5,
-    posture: "open",
-    project: "github.com/pallets/click",
-  },
-  { openAsks: 0, posture: "open", project: "oscabriel/yarrow" },
-  {
-    landedAt: "2026-10-01T00:00:00Z",
-    openAsks: 2,
-    posture: "open",
-    project: "github.com/sindresorhus/ky",
-  },
-  {
-    landedAt: "2026-10-09T00:00:00Z",
-    openAsks: 3,
-    posture: "open",
-    project: "oscabriel/hearth",
-  },
-  {
-    landedAt: "2026-10-12T10:00:00Z",
-    openAsks: 7,
-    posture: "open",
-    project: "oscabriel/ember",
-  },
-]);
+/** A row's outcome and project, as its attributes say. */
+const outcomeOf = (row: string) =>
+  [
+    /data-outcome="(?<outcome>[^"]+)"/u.exec(row)?.groups?.outcome,
+    /data-project="(?<project>[^"]+)"/u.exec(row)?.groups?.project,
+  ].join(" ");
+
+/** Eight landings, the latest first, as the platform lists them. */
+const EIGHT_LANDINGS = Array.from({ length: 8 }, (_, index) =>
+  RecentLanding.cases.Landed.make({
+    at: DateTime.makeUnsafe(`2026-10-12T1${9 - index}:00:00Z`),
+    project: ProjectName.make(`oscabriel/kit-${index}`),
+    sha: LandedSha.make(String(index).repeat(40)),
+  })
+);
 
 /** One of the hero's two panels, by its flow. */
 const panelOf = (markup: string, flow: string) =>
@@ -360,25 +340,75 @@ describe(LandingView, () => {
   );
 
   it.effect(
-    "lists landings as they happen, the latest first, each project linking its home with its posture",
+    "lists landings and refused answers as they happen, the latest first, each with its project and when",
     () =>
       Effect.gen(function* () {
-        const markup = yield* pageWith(landed);
-        const datekit = rowOf(markup, "oscabriel/datekit");
+        const rows = rowsOf(yield* pageWith(landed));
+
+        expect(rows.map(outcomeOf)).toStrictEqual([
+          "landed oscabriel/datekit",
+          "refused oscabriel/burrow",
+          "landed oscabriel/burrow",
+        ]);
+        expect(rows.map((row) => hrefsOf(row)[0])).toStrictEqual([
+          "/oscabriel/datekit",
+          "/oscabriel/burrow",
+          "/oscabriel/burrow",
+        ]);
+        expect(textIn(rows[0] ?? "")).toContain("Landed 2 min ago");
+        expect(textIn(rows[1] ?? "")).toContain("Refused 1 h ago");
+      })
+  );
+
+  it.effect(
+    "names each by its ask's want, linking the landed commit or the refused ask, and a landing with no ask by its commit",
+    () =>
+      Effect.gen(function* () {
+        const [answered = "", refused = "", unasked = ""] = rowsOf(
+          yield* pageWith(landed)
+        );
+
+        expect(textIn(answered)).toContain(
+          "parseISO accepts ISO week dates such as 2026-W41-3."
+        );
+        expect(hrefsOf(answered)).toContain(
+          `/oscabriel/datekit/commit/${DATEKIT_SHA}`
+        );
+        expect(hrefsOf(refused)).toContain(
+          "/oscabriel/burrow/asks/drop-legacy-fetch-kit"
+        );
+        // A commit is code, set in mono; only a want is sentence text.
+        expect(unasked).toContain(
+          `<span class="text-mono font-mono">${BURROW_SHA.slice(0, 7)}</span>`
+        );
+        expect(hrefsOf(unasked)).toContain(
+          `/oscabriel/burrow/commit/${BURROW_SHA}`
+        );
+      })
+  );
+
+  it.effect(
+    "names a refusal by its tag and its area alone, under the refused mark",
+    () =>
+      Effect.gen(function* () {
+        const [, refused = ""] = rowsOf(yield* pageWith(landed));
 
         expect(
+          [...refused.matchAll(/data-refusal="(?<refusal>[^"]+)"/gu)].map(
+            (found) => found.groups?.refusal
+          )
+        ).toStrictEqual(["HeldBackFailed", "OutOfScope"]);
+        expect(textIn(refused)).toContain("HeldBackFailed · parser");
+        expect(refused).toContain("lucide-octagon-x");
+        // Public facts alone: the project, the want, each tag and area, and when; never a check's name, suite, lane, path or log.
+        expect(textIn(refused)).toBe(
           [
-            ...markup.matchAll(/<li\b[^>]*data-project="(?<project>[^"]+)"/gu),
-          ].map((found) => found.groups?.project)
-        ).toStrictEqual(["oscabriel/datekit", "oscabriel/burrow"]);
-        expect(hrefsOf(datekit)).toContain("/oscabriel/datekit");
-        // The posture badge, with its mark, not the word alone.
-        expect(datekit).toMatch(
-          /<\/svg><span\b[^>]*><span data-posture="openWithSealedEvidence"/u
-        );
-        expect(textIn(datekit)).toContain("Landed 2 min ago");
-        expect(textIn(rowOf(markup, "oscabriel/burrow"))).toContain(
-          "6 open asks"
+            "oscabriel/burrow",
+            "@burrow/kit: move every caller of legacyFetch to http.get",
+            "HeldBackFailed · parser",
+            "OutOfScope",
+            "Refused 1 h ago",
+          ].join("")
         );
       })
   );
@@ -388,7 +418,7 @@ describe(LandingView, () => {
     () =>
       Effect.gen(function* () {
         const none = yield* pageWith(
-          LandingNow.cases.Listed.make({ now: NOW, projects: [] })
+          LandingNow.cases.Listed.make({ landings: [], now: NOW })
         );
 
         const unreachable = yield* pageWith(
@@ -411,33 +441,28 @@ describe(LandingView, () => {
   });
 });
 
-const listing = (projects: readonly ProjectListing[]) =>
+const listing = (landings: readonly RecentLanding[]) =>
   platformWith(
-    Contracts.toLayerHandler("listProjects", () => Effect.succeed({ projects }))
+    Contracts.toLayerHandler("recentLandings", () =>
+      Effect.succeed({ landings })
+    )
   );
 
 describe("the landing's landings, read on the server", () => {
   it.effect(
-    "names the projects that have landed, the latest landing first, at most six",
+    "reads the platform's one list of landings, as it orders them, and shows the first six",
     () =>
       Effect.gen(function* () {
         const read = yield* readLandingNow.pipe(
-          Effect.provide(listing(EIGHT_LANDED))
+          Effect.provide(listing(EIGHT_LANDINGS))
         );
 
         expect(
           LandingNow.match(read, {
-            Listed: ({ projects }) => projects.map(({ project }) => project),
+            Listed: ({ landings }) => landings,
             Unreachable: () => [],
           })
-        ).toStrictEqual([
-          "oscabriel/kite",
-          "oscabriel/datekit",
-          "oscabriel/ember",
-          "github.com/pallets/click",
-          "oscabriel/burrow",
-          "oscabriel/alpha",
-        ]);
+        ).toStrictEqual(EIGHT_LANDINGS.slice(0, 6));
       })
   );
 

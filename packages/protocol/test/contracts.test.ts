@@ -46,6 +46,14 @@ const table = [
   },
   {
     audience: "public",
+    cli: "none",
+    errors: [],
+    flags: "RI",
+    on: "RMW",
+    tag: "recentLandings",
+  },
+  {
+    audience: "public",
     cli: "front",
     errors: [],
     flags: "RI",
@@ -615,7 +623,7 @@ describe("the group a surface serves", () => {
       Exclude<Contract["_tag"], UncappedRead | "evidence" | "setEnv" | "watch">
     >();
     expectTypeOf<TagOn<"cli">>().toEqualTypeOf<
-      Exclude<Contract["_tag"], CodeRead | "watch">
+      Exclude<Contract["_tag"], CodeRead | "recentLandings" | "watch">
     >();
   });
 

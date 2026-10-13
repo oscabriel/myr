@@ -379,6 +379,43 @@
         ]
       }
     },
+    "recentLandings": {
+      "payload": {},
+      "success": {
+        "landings": [
+          {
+            "_tag": "Landed",
+            "answered": "iso-week",
+            "at": "2026-10-07T12:00:00.000Z",
+            "project": "oscabriel/datekit",
+            "sha": "4444444444444444444444444444444444444444",
+            "want": "Parse ISO week dates"
+          },
+          {
+            "_tag": "Refused",
+            "ask": "trim-input",
+            "at": "2026-10-07T11:00:00.000Z",
+            "project": "oscabriel/datekit",
+            "refusals": [
+              {
+                "area": "parse",
+                "tag": "HeldBackFailed"
+              },
+              {
+                "tag": "OutOfScope"
+              }
+            ],
+            "want": "Trim input before parsing"
+          },
+          {
+            "_tag": "Landed",
+            "at": "2026-10-07T10:00:00.000Z",
+            "project": "oscabriel/widgets",
+            "sha": "5555555555555555555555555555555555555555"
+          }
+        ]
+      }
+    },
     "listRefs": {
       "payload": {
         "project": "oscabriel/datekit"
