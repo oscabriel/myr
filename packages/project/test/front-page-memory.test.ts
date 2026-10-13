@@ -1,7 +1,15 @@
 import { describe, expect, it } from "@effect/vitest";
 import type { FrontPageEntry } from "@repo/protocol/domain/front-page";
-import { AskId, Handle, KindName, ProjectName } from "@repo/protocol/ids";
-import { Effect } from "effect";
+import { RECENT_LANDINGS_CAP } from "@repo/protocol/domain/recent-landing";
+import type { RecentLanding } from "@repo/protocol/domain/recent-landing";
+import {
+  AskId,
+  Handle,
+  KindName,
+  LandedSha,
+  ProjectName,
+} from "@repo/protocol/ids";
+import { DateTime, Effect } from "effect";
 
 import { FrontPage } from "../src/front-page.ts";
 import { FrontPageMemory } from "../src/front-page/memory.ts";
@@ -80,5 +88,38 @@ describe("FrontPage in memory", () => {
         { openAsks: 3, posture: "open", project: datekit },
       ]);
     }).pipe(Effect.provide(seeded))
+  );
+
+  it.effect(
+    `lists the landings it was seeded with, at most ${RECENT_LANDINGS_CAP}`,
+    () =>
+      Effect.gen(function* () {
+        const landings = Array.from(
+          { length: RECENT_LANDINGS_CAP + 1 },
+          (_, index): RecentLanding => ({
+            _tag: "Landed",
+            at: DateTime.makeUnsafe(
+              `2026-10-08T09:${String(59 - index).padStart(2, "0")}:00Z`
+            ),
+            project: datekit,
+            sha: LandedSha.make(String(index).padStart(40, "0")),
+          })
+        );
+
+        const front = yield* FrontPage.pipe(
+          Effect.provide(
+            FrontPageMemory.layer({
+              credits: [],
+              entries: [],
+              landings,
+              projects: [],
+            })
+          )
+        );
+
+        expect(yield* front.recentLandings()).toStrictEqual(
+          landings.slice(0, RECENT_LANDINGS_CAP)
+        );
+      })
   );
 });

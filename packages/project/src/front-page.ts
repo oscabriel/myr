@@ -3,6 +3,7 @@ import type {
   FrontPageEntry,
   ProjectListing,
 } from "@repo/protocol/domain/front-page";
+import type { RecentLanding } from "@repo/protocol/domain/recent-landing";
 import type { CreditSummary } from "@repo/protocol/domain/record";
 import type { Handle, KindName } from "@repo/protocol/ids";
 import { Context } from "effect";
@@ -24,5 +25,7 @@ export class FrontPage extends Context.Service<
     readonly credits: (
       handle: Handle
     ) => Effect.Effect<readonly CreditSummary[]>;
+    /** The latest landings and refused answers across projects, the latest first, at most `RECENT_LANDINGS_CAP`: read from what is kept, never by replaying a project. */
+    readonly recentLandings: () => Effect.Effect<readonly RecentLanding[]>;
   }
 >()("project/FrontPage") {}
