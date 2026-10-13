@@ -172,6 +172,37 @@ const listedWithLedgers = inFreshWorld((as) =>
   })
 );
 
+const recentWithLast = inFreshWorld((as) =>
+  Effect.gen(function* () {
+    const anyone = yield* clientOf(as());
+    const { landings } = yield* anyone.recentLandings({});
+    const { projects } = yield* anyone.listProjects({});
+
+    const [latest] = projects.toSorted((one, other) =>
+      DateTime.Order(
+        other.landedAt ?? DateTime.makeUnsafe(0),
+        one.landedAt ?? DateTime.makeUnsafe(0)
+      )
+    );
+
+    const { project } = yield* Effect.orDie(Effect.fromNullishOr(latest));
+
+    const sha = yield* Effect.orDie(
+      Effect.fromNullishOr((yield* anyone.listRefs({ project })).landed)
+    );
+
+    const { landing } = yield* anyone.landing({ project, sha });
+
+    const named = yield* Effect.orDie(
+      Effect.fromNullishOr(landing.ask ?? landing.opened)
+    );
+
+    const { ask } = yield* anyone.showAsk({ ask: named, project });
+
+    return { landing, landings, want: ask.brief.want };
+  })
+);
+
 // Each test seeds whole worlds while turbo runs every package's tests at once: near vitest's 5 s default.
 const seededWorlds = { timeout: 30_000 };
 
@@ -274,6 +305,29 @@ describe("the dev seed", seededWorlds, () => {
         landing.credits.map(({ handle, role }) => `${role}: ${handle}`)
       ).toStrictEqual(["Asked-by: ines-v", "Signed-off-by: bram"]);
     })
+  );
+
+  it.live(
+    "lists the latest landings across projects, the dev world's last landing first with its ask's want",
+    () =>
+      Effect.gen(function* () {
+        const { landing, landings, want } = yield* recentWithLast;
+
+        expect(landings[0]).toMatchObject({
+          _tag: "Landed",
+          at: landing.landedAt,
+          project: landing.project,
+          sha: landing.sha,
+          want,
+        });
+        expect(
+          landings.map(({ at }) => DateTime.toEpochMillis(at))
+        ).toStrictEqual(
+          landings
+            .map(({ at }) => DateTime.toEpochMillis(at))
+            .toSorted((a, b) => b - a)
+        );
+      })
   );
 
   it.live(
