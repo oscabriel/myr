@@ -5,9 +5,9 @@ import type {
 } from "@repo/protocol/domain/front-page";
 import {
   RECENT_LANDINGS_CAP,
+  RecentLanding,
   ShownRefusal,
 } from "@repo/protocol/domain/recent-landing";
-import type { RecentLanding } from "@repo/protocol/domain/recent-landing";
 import { CreditSummary } from "@repo/protocol/domain/record";
 import {
   AskId,
@@ -18,7 +18,7 @@ import {
 } from "@repo/protocol/ids";
 import type { Handle } from "@repo/protocol/ids";
 import { Posture } from "@repo/protocol/posture";
-import { Array as Arr, Effect, Layer, Option, Schema } from "effect";
+import { Array as Arr, Effect, Layer, Option, Record, Schema } from "effect";
 import { SqlClient } from "effect/sql/SqlClient";
 
 import { FrontPage } from "../front-page.ts";
@@ -105,29 +105,35 @@ type RecentRow = typeof RecentRow.Type;
 
 const decodeRecent = Schema.decodeUnknownEffect(Schema.Array(RecentRow));
 
-const recentOf = (row: RecentRow): Option.Option<RecentLanding> =>
-  Option.map(nameOfKey(row.project), (project): RecentLanding => {
-    const want = row.want === null ? {} : { want: row.want };
+/** A key and its value when the row holds one, else nothing: no key set to null. */
+const field = <K extends string, A>(
+  key: K,
+  value: A | null
+): Partial<Record<K, A>> =>
+  Option.match(Option.fromNullishOr(value), {
+    onNone: () => ({}),
+    onSome: (present) => Record.singleton(key, present),
+  });
 
-    return row.outcome === "landed"
-      ? {
-          _tag: "Landed",
+const recentOf = (row: RecentRow): Option.Option<RecentLanding> =>
+  Option.map(nameOfKey(row.project), (project) =>
+    row.outcome === "landed"
+      ? RecentLanding.cases.Landed.make({
           at: row.at,
           project,
           sha: row.sha,
-          ...(row.ask === null ? {} : { answered: row.ask }),
-          ...(row.opened === null ? {} : { opened: row.opened }),
-          ...want,
-        }
-      : {
-          _tag: "Refused",
+          ...field("answered", row.ask),
+          ...field("opened", row.opened),
+          ...field("want", row.want),
+        })
+      : RecentLanding.cases.Refused.make({
           ask: row.ask,
           at: row.at,
           project,
           refusals: row.refusals,
-          ...want,
-        };
-  });
+          ...field("want", row.want),
+        })
+  );
 
 const entryOf = (row: EntryRow): Option.Option<FrontPageEntry> => {
   const blockedBy = row.blocked_by.filter((ask) =>

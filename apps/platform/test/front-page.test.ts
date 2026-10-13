@@ -329,27 +329,30 @@ describe("the project list and credits over the platform's /rpc", () => {
 
         const { landings } = yield* world.anyone.recentLandings({});
 
+        expect(landings.map(({ _tag }) => _tag)).toStrictEqual([
+          "Landed",
+          "Landed",
+          "Landed",
+          "Landed",
+        ]);
         expect(landings).toMatchObject([
           {
-            _tag: "Landed",
             answered: parseIso,
             at: at(noon),
             project,
             want: "parse-iso: its check passes in packages/parser",
           },
           {
-            _tag: "Landed",
             opened: AskId.make("trim-input"),
             project,
             want: "trim-input: its check passes in packages/trim",
           },
           {
-            _tag: "Landed",
             opened: parseIso,
             project,
             want: "parse-iso: its check passes in packages/parser",
           },
-          { _tag: "Landed", project },
+          { project },
         ]);
         expect(yield* world.calls).toStrictEqual([]);
       }).pipe(Effect.scoped)

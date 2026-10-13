@@ -11,13 +11,13 @@ import type {
 import { Outcome } from "@repo/protocol/domain/outcome";
 import {
   RECENT_LANDINGS_CAP,
+  RecentLanding,
   shownRefusal,
 } from "@repo/protocol/domain/recent-landing";
-import type { RecentLanding } from "@repo/protocol/domain/recent-landing";
 import { LedgerEntry } from "@repo/protocol/domain/visibility";
 import type { ProjectName } from "@repo/protocol/ids";
 import type { Posture } from "@repo/protocol/posture";
-import { Array, DateTime, Effect, Layer, Order } from "effect";
+import { Array, DateTime, Effect, Layer, Option, Order, Record } from "effect";
 
 import { DevProjected } from "./projection.ts";
 
@@ -185,6 +185,16 @@ const latestFirst = Order.combineAll([
   Order.flip(Order.mapInput(Order.Number, ({ seq }: Recent) => seq)),
 ]);
 
+/** A key and its value when there is one, else nothing. */
+const field = <K extends string, A>(
+  key: K,
+  value: A | undefined
+): Partial<Record<K, A>> =>
+  Option.match(Option.fromUndefinedOr(value), {
+    onNone: () => ({}),
+    onSome: (present) => Record.singleton(key, present),
+  });
+
 const wantsOf = (events: readonly ProjectedEvent[]) =>
   new Map(
     events.flatMap(({ event, project }) =>
@@ -200,11 +210,11 @@ const recentOf = (
 ): readonly RecentLanding[] => {
   const wants = wantsOf(events);
 
-  const wantFor = (project: ProjectName, ask: string | undefined) => {
-    const want = ask === undefined ? undefined : wants.get(keyOf(project, ask));
-
-    return want === undefined ? {} : { want };
-  };
+  const wantFor = (project: ProjectName, ask: string | undefined) =>
+    field(
+      "want",
+      ask === undefined ? undefined : wants.get(keyOf(project, ask))
+    );
 
   const rows = events.flatMap(({ event, project }): readonly Recent[] => {
     if (ProjectEvent.guards.Landed(event)) {
@@ -212,15 +222,14 @@ const recentOf = (
 
       return [
         {
-          landing: {
-            _tag: "Landed",
+          landing: RecentLanding.cases.Landed.make({
             at: landing.landedAt,
             project,
             sha: landing.sha,
-            ...(landing.ask === undefined ? {} : { answered: landing.ask }),
-            ...(landing.opened === undefined ? {} : { opened: landing.opened }),
+            ...field("answered", landing.ask),
+            ...field("opened", landing.opened),
             ...wantFor(project, landing.ask ?? landing.opened),
-          },
+          }),
           seq: event.seq,
         },
       ];
@@ -232,14 +241,13 @@ const recentOf = (
     ) {
       return [
         {
-          landing: {
-            _tag: "Refused",
+          landing: RecentLanding.cases.Refused.make({
             ask: event.ask,
             at: event.at,
             project,
             refusals: Array.map(event.outcome.refusals, shownRefusal),
             ...wantFor(project, event.ask),
-          },
+          }),
           seq: event.seq,
         },
       ];

@@ -52,9 +52,7 @@
             "choice": "accept",
             "note": "Worth it."
           },
-          "deciders": [
-            "alice"
-          ],
+          "deciders": ["alice"],
           "default": "decline",
           "evidence": [
             {
@@ -112,9 +110,7 @@
             "key": "PAYMENTS_KEY",
             "required": true,
             "sensitive": true,
-            "tags": [
-              "payments"
-            ],
+            "tags": ["payments"],
             "value": {
               "setAt": "2026-10-07T12:00:00.000Z",
               "setBy": "alice"
@@ -164,9 +160,7 @@
       "success": {
         "proposal": {
           "expiresAt": "2026-10-21T12:00:00.000Z",
-          "files": [
-            "config/asks/iso-week.ask.ts"
-          ],
+          "files": ["config/asks/iso-week.ask.ts"],
           "id": "prop-000001",
           "openedAt": "2026-10-07T12:00:00.000Z",
           "project": "oscabriel/datekit",
@@ -197,9 +191,7 @@
           {
             "ask": {
               "ask": "iso-week",
-              "blockedBy": [
-                "drop-moment"
-              ],
+              "blockedBy": ["drop-moment"],
               "claimed": false,
               "kind": "fix",
               "reserve": "newcomers",
@@ -348,9 +340,7 @@
         "asks": [
           {
             "ask": "iso-week",
-            "blockedBy": [
-              "drop-moment"
-            ],
+            "blockedBy": ["drop-moment"],
             "claimed": false,
             "kind": "fix",
             "reserve": "newcomers",
@@ -367,10 +357,7 @@
       },
       "success": {
         "at": "1111111111111111111111111111111111111111",
-        "paths": [
-          "README.md",
-          "src/parse/iso.ts"
-        ],
+        "paths": ["README.md", "src/parse/iso.ts"],
         "truncated": false
       }
     },
@@ -546,9 +533,7 @@
                 "verifier": "platform"
               }
             },
-            "parents": [
-              "1111111111111111111111111111111111111111"
-            ],
+            "parents": ["1111111111111111111111111111111111111111"],
             "sha": "4444444444444444444444444444444444444444",
             "subject": "Parse ISO week dates",
             "trailers": [
@@ -583,16 +568,10 @@
           "askedBy": "alice",
           "blockedBy": [],
           "brief": {
-            "context": [
-              "ISO 8601 weeks start on Monday."
-            ],
+            "context": ["ISO 8601 weeks start on Monday."],
             "current": "Week 1 of 2027 parses as week 53 of 2026.",
-            "outOfScope": [
-              "Locale-specific weeks"
-            ],
-            "terms": [
-              "ISO week"
-            ],
+            "outOfScope": ["Locale-specific weeks"],
+            "terms": ["ISO week"],
             "want": "An ISO week date parses to the Monday of that week."
           },
           "check": {
@@ -610,12 +589,8 @@
           "state": "open",
           "territory": {
             "module": "@datekit/parse",
-            "paths": [
-              "packages/parse/**"
-            ],
-            "publicFiles": [
-              "packages/parse/src/index.ts"
-            ]
+            "paths": ["packages/parse/**"],
+            "publicFiles": ["packages/parse/src/index.ts"]
           }
         },
         "landed": "4444444444444444444444444444444444444444"
@@ -643,20 +618,13 @@
           },
           "deciders": [
             {
-              "handles": [
-                "alice"
-              ],
+              "handles": ["alice"],
               "paths": "**"
             }
           ],
           "judge": {
-            "paths": [
-              "config/**",
-              ".env.schema"
-            ],
-            "pointers": [
-              "package.json#/scripts"
-            ]
+            "paths": ["config/**", ".env.schema"],
+            "pointers": ["package.json#/scripts"]
           },
           "kinds": [
             {
@@ -666,23 +634,15 @@
               "name": "fix",
               "oneWay": false,
               "race": 1,
-              "requires": [
-                "want",
-                "check",
-                "territory"
-              ],
+              "requires": ["want", "check", "territory"],
               "strength": "assertion"
             }
           ],
           "modules": [
             {
               "module": "@datekit/parse",
-              "paths": [
-                "packages/parse/**"
-              ],
-              "publicFiles": [
-                "packages/parse/src/index.ts"
-              ]
+              "paths": ["packages/parse/**"],
+              "publicFiles": ["packages/parse/src/index.ts"]
             }
           ],
           "ratchets": [
@@ -708,9 +668,7 @@
             "doctor": "bun run doctor",
             "image": "checker:default",
             "setup": "bun install --frozen-lockfile --ignore-scripts",
-            "setupEgress": [
-              "registry.npmjs.org"
-            ],
+            "setupEgress": ["registry.npmjs.org"],
             "test": "bun test {path}"
           },
           "source": "config",
@@ -730,10 +688,7 @@
             }
           ],
           "weakening": {
-            "markers": [
-              ".skip(",
-              "@ts-ignore"
-            ]
+            "markers": [".skip(", "@ts-ignore"]
           }
         }
       }
@@ -756,9 +711,7 @@
       "success": {
         "proposal": {
           "expiresAt": "2026-10-21T12:00:00.000Z",
-          "files": [
-            "config/asks/iso-week.ask.ts"
-          ],
+          "files": ["config/asks/iso-week.ask.ts"],
           "id": "prop-000001",
           "openedAt": "2026-10-07T12:00:00.000Z",
           "project": "oscabriel/datekit",
@@ -852,16 +805,10 @@
           "askedBy": "alice",
           "blockedBy": [],
           "brief": {
-            "context": [
-              "ISO 8601 weeks start on Monday."
-            ],
+            "context": ["ISO 8601 weeks start on Monday."],
             "current": "Week 1 of 2027 parses as week 53 of 2026.",
-            "outOfScope": [
-              "Locale-specific weeks"
-            ],
-            "terms": [
-              "ISO week"
-            ],
+            "outOfScope": ["Locale-specific weeks"],
+            "terms": ["ISO week"],
             "want": "An ISO week date parses to the Monday of that week."
           },
           "check": {
@@ -879,12 +826,8 @@
           "state": "open",
           "territory": {
             "module": "@datekit/parse",
-            "paths": [
-              "packages/parse/**"
-            ],
-            "publicFiles": [
-              "packages/parse/src/index.ts"
-            ]
+            "paths": ["packages/parse/**"],
+            "publicFiles": ["packages/parse/src/index.ts"]
           }
         },
         "brief": "# iso-week\n\nAn ISO week date parses to the Monday of that week.\n"
@@ -974,9 +917,7 @@
               "verifier": "platform"
             }
           },
-          "parents": [
-            "1111111111111111111111111111111111111111"
-          ],
+          "parents": ["1111111111111111111111111111111111111111"],
           "sha": "4444444444444444444444444444444444444444",
           "subject": "Parse ISO week dates",
           "trailers": [
@@ -1019,9 +960,7 @@
         ],
         "proposal": {
           "expiresAt": "2026-10-21T12:00:00.000Z",
-          "files": [
-            "config/asks/iso-week.ask.ts"
-          ],
+          "files": ["config/asks/iso-week.ask.ts"],
           "id": "prop-000001",
           "openedAt": "2026-10-07T12:00:00.000Z",
           "project": "oscabriel/datekit",
@@ -1102,9 +1041,7 @@
               "choice": "accept",
               "note": "Worth it."
             },
-            "deciders": [
-              "alice"
-            ],
+            "deciders": ["alice"],
             "default": "decline",
             "evidence": [
               {
@@ -1123,12 +1060,8 @@
             }
           }
         ],
-        "expiringSoon": [
-          "dec-000001"
-        ],
-        "newcomers": [
-          "dave"
-        ],
+        "expiringSoon": ["dec-000001"],
+        "newcomers": ["dave"],
         "overflow": 0,
         "unattended": [
           {
@@ -1268,9 +1201,7 @@
         "_tag": "AskOpened",
         "ask": {
           "ask": "iso-week",
-          "blockedBy": [
-            "drop-moment"
-          ],
+          "blockedBy": ["drop-moment"],
           "claimed": false,
           "kind": "fix",
           "reserve": "newcomers",
@@ -1302,9 +1233,7 @@
               "email": "carol@example.com",
               "name": "Carol"
             },
-            "parents": [
-              "1111111111111111111111111111111111111111"
-            ],
+            "parents": ["1111111111111111111111111111111111111111"],
             "sha": "4444444444444444444444444444444444444444",
             "subject": "Parse ISO week dates",
             "trailers": [

@@ -313,8 +313,8 @@ describe("the dev seed", seededWorlds, () => {
       Effect.gen(function* () {
         const { landing, landings, want } = yield* recentWithLast;
 
+        expect(landings[0]?._tag).toBe("Landed");
         expect(landings[0]).toMatchObject({
-          _tag: "Landed",
           at: landing.landedAt,
           project: landing.project,
           sha: landing.sha,

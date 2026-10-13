@@ -66,10 +66,11 @@ const Row = ({
 );
 
 const keyOf = (landing: RecentLanding) =>
-  `${landing.project}:${DateTime.formatIso(landing.at)}:${RecentLanding.match(
-    landing,
-    { Landed: ({ sha }) => sha, Refused: ({ ask }) => ask }
-  )}`;
+  [
+    landing.project,
+    DateTime.formatIso(landing.at),
+    RecentLanding.guards.Landed(landing) ? landing.sha : landing.ask,
+  ].join(":");
 
 const rowOf = (landing: RecentLanding, now: DateTime.Utc) =>
   RecentLanding.match(landing, {

@@ -1,7 +1,9 @@
 import { describe, expect, it } from "@effect/vitest";
 import type { FrontPageEntry } from "@repo/protocol/domain/front-page";
-import { RECENT_LANDINGS_CAP } from "@repo/protocol/domain/recent-landing";
-import type { RecentLanding } from "@repo/protocol/domain/recent-landing";
+import {
+  RECENT_LANDINGS_CAP,
+  RecentLanding,
+} from "@repo/protocol/domain/recent-landing";
 import {
   AskId,
   Handle,
@@ -96,14 +98,14 @@ describe("FrontPage in memory", () => {
       Effect.gen(function* () {
         const landings = Array.from(
           { length: RECENT_LANDINGS_CAP + 1 },
-          (_, index): RecentLanding => ({
-            _tag: "Landed",
-            at: DateTime.makeUnsafe(
-              `2026-10-08T09:${String(59 - index).padStart(2, "0")}:00Z`
-            ),
-            project: datekit,
-            sha: LandedSha.make(String(index).padStart(40, "0")),
-          })
+          (_, index) =>
+            RecentLanding.cases.Landed.make({
+              at: DateTime.makeUnsafe(
+                `2026-10-08T09:${String(59 - index).padStart(2, "0")}:00Z`
+              ),
+              project: datekit,
+              sha: LandedSha.make(String(index).padStart(40, "0")),
+            })
         );
 
         const front = yield* FrontPage.pipe(

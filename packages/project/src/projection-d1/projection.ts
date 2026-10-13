@@ -99,10 +99,7 @@ export const ProjectionD1: Layer.Layer<Projection, never, SqlClient> =
       const isNext = (project: ProjectName, seq: number) =>
         sql`(SELECT COALESCE(MAX(seq), 0) FROM cursor WHERE project = ${keyOf(project)}) = ${seq - 1}`;
 
-      const writes = (
-        { event, project }: ProjectedEvent,
-        kept: Kept
-      ) => {
+      const writes = ({ event, project }: ProjectedEvent, kept: Kept) => {
         const next = isNext(project, event.seq);
 
         // Every row keeps the project's key, never its name.

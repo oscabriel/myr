@@ -1,10 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Schema } from "effect";
 
-import {
-  RecentLanding,
-  shownRefusal,
-} from "../src/domain/recent-landing.ts";
+import { ShownRefusal, shownRefusal } from "../src/domain/recent-landing.ts";
 import { RepoPath } from "../src/ids.ts";
 import {
   ChecksFailed,
@@ -28,7 +25,9 @@ describe(shownRefusal, () => {
         new ChecksFailed({ lane: "unit", logRef: "logs/7", next: "bun test" })
       ),
       shownRefusal(new OutOfScope({ paths: [RepoPath.make("src/secret.ts")] })),
-      shownRefusal(new SecretInOutput({ item: "PAYMENTS_KEY", where: "output" })),
+      shownRefusal(
+        new SecretInOutput({ item: "PAYMENTS_KEY", where: "output" })
+      ),
     ]).toStrictEqual([
       { tag: "ChecksFailed" },
       { tag: "OutOfScope" },
@@ -46,13 +45,7 @@ describe(shownRefusal, () => {
 
   it("refuses a tag the union does not have", () => {
     expect(
-      Schema.decodeOption(RecentLanding)({
-        _tag: "Refused",
-        ask: "parse-iso",
-        at: "2026-10-07T12:00:00.000Z",
-        project: "oscabriel/datekit",
-        refusals: [{ tag: "SomethingElse" }],
-      })._tag
+      Schema.decodeOption(ShownRefusal)({ tag: "SomethingElse" })._tag
     ).toBe("None");
   });
 });

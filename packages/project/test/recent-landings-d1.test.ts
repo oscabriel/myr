@@ -2,8 +2,10 @@ import { describe, expect, it } from "@effect/vitest";
 import type { AskListing } from "@repo/protocol/domain/ask";
 import { ProjectEvent } from "@repo/protocol/domain/event";
 import { Outcome } from "@repo/protocol/domain/outcome";
-import { RECENT_LANDINGS_CAP } from "@repo/protocol/domain/recent-landing";
-import type { RecentLanding } from "@repo/protocol/domain/recent-landing";
+import {
+  RECENT_LANDINGS_CAP,
+  RecentLanding,
+} from "@repo/protocol/domain/recent-landing";
 import {
   AskId,
   CommitSha,
@@ -122,7 +124,11 @@ const refused =
       outcome: Outcome.cases.Refused.make({
         refusals: [
           new HeldBackFailed({ area: "parser", suite: "edge-cases" }),
-          new ChecksFailed({ lane: "unit", logRef: "logs/7", next: "bun test" }),
+          new ChecksFailed({
+            lane: "unit",
+            logRef: "logs/7",
+            next: "bun test",
+          }),
           new OutOfScope({ paths: [RepoPath.make("src/secret.ts")] }),
         ],
       }),
@@ -172,17 +178,15 @@ const datekitStory = [
   closed(parseIso, 5),
 ];
 
-const parseIsoLanded: RecentLanding = {
-  _tag: "Landed",
+const parseIsoLanded = RecentLanding.cases.Landed.make({
   answered: parseIso,
   at: at(5),
   project: datekit,
   sha: shaOf(5),
   want: "Parse ISO week dates",
-};
+});
 
-const trimInputRefused: RecentLanding = {
-  _tag: "Refused",
+const trimInputRefused = RecentLanding.cases.Refused.make({
   ask: trimInput,
   at: at(4),
   project: datekit,
@@ -192,14 +196,12 @@ const trimInputRefused: RecentLanding = {
     { tag: "OutOfScope" },
   ],
   want: "Trim input before parsing",
-};
+});
 
 describe("the recent landings' D1 projection", () => {
   it.effect("reads the migration the platform's D1 applies", () =>
     Effect.gen(function* () {
-      expect(yield* migration(recentLandingsMigration)).toBe(
-        RecentLandingsDdl
-      );
+      expect(yield* migration(recentLandingsMigration)).toBe(RecentLandingsDdl);
     })
   );
 
@@ -213,7 +215,11 @@ describe("the recent landings' D1 projection", () => {
         expect(yield* recent).toStrictEqual([
           parseIsoLanded,
           trimInputRefused,
-          { _tag: "Landed", at: at(3), project: burrow, sha: shaOf(3) },
+          RecentLanding.cases.Landed.make({
+            at: at(3),
+            project: burrow,
+            sha: shaOf(3),
+          }),
         ]);
       }).pipe(Effect.provide(world))
   );
@@ -226,14 +232,13 @@ describe("the recent landings' D1 projection", () => {
       ]);
 
       expect(yield* recent).toStrictEqual([
-        {
-          _tag: "Landed",
+        RecentLanding.cases.Landed.make({
           at: at(1),
           opened: parseIso,
           project: datekit,
           sha: shaOf(1),
           want: "Parse ISO week dates",
-        },
+        }),
       ]);
     }).pipe(Effect.provide(world))
   );

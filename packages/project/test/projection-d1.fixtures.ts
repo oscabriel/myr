@@ -39,4 +39,5 @@ export const migrated = (files: readonly string[]) =>
     Layer.provideMerge(SqliteClient.layer({ filename: ":memory:" })),
     Layer.orDie
   );
+
 export const recentLandingsMigration = "0008_recent_landings.sql";

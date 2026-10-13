@@ -4,8 +4,8 @@ import { Brand } from "@repo/brand";
 import { authorLine } from "@repo/git/trailers";
 import { Contracts } from "@repo/protocol/contracts";
 import { RecentLanding } from "@repo/protocol/domain/recent-landing";
-import { Handle } from "@repo/protocol/ids";
-import { DateTime, Effect, Schema } from "effect";
+import { AskId, Handle, LandedSha, ProjectName } from "@repo/protocol/ids";
+import { DateTime, Effect } from "effect";
 
 import glossary from "../../../GLOSSARY.md?raw";
 import { LandingNow } from "../src/features/landing/landing-now.ts";
@@ -27,33 +27,35 @@ const DATEKIT_SHA = "4444444444444444444444444444444444444444";
 
 const BURROW_SHA = "5555555555555555555555555555555555555555";
 
-const decodeLandings = Schema.decodeSync(Schema.Array(RecentLanding));
+const datekit = ProjectName.make("oscabriel/datekit");
+
+const burrow = ProjectName.make("oscabriel/burrow");
 
 const landed = LandingNow.cases.Listed.make({
-  landings: decodeLandings([
-    {
-      _tag: "Landed",
-      answered: "iso-week",
-      at: "2026-10-12T11:58:00Z",
-      project: "oscabriel/datekit",
-      sha: DATEKIT_SHA,
+  landings: [
+    RecentLanding.cases.Landed.make({
+      answered: AskId.make("iso-week"),
+      at: DateTime.makeUnsafe("2026-10-12T11:58:00Z"),
+      project: datekit,
+      sha: LandedSha.make(DATEKIT_SHA),
       want: "parseISO accepts ISO week dates such as 2026-W41-3.",
-    },
-    {
-      _tag: "Refused",
-      ask: "drop-legacy-fetch-kit",
-      at: "2026-10-12T11:00:00Z",
-      project: "oscabriel/burrow",
-      refusals: [{ area: "parser", tag: "HeldBackFailed" }, { tag: "OutOfScope" }],
+    }),
+    RecentLanding.cases.Refused.make({
+      ask: AskId.make("drop-legacy-fetch-kit"),
+      at: DateTime.makeUnsafe("2026-10-12T11:00:00Z"),
+      project: burrow,
+      refusals: [
+        { area: "parser", tag: "HeldBackFailed" },
+        { tag: "OutOfScope" },
+      ],
       want: "@burrow/kit: move every caller of legacyFetch to http.get",
-    },
-    {
-      _tag: "Landed",
-      at: "2026-10-12T09:00:00Z",
-      project: "oscabriel/burrow",
-      sha: BURROW_SHA,
-    },
-  ]),
+    }),
+    RecentLanding.cases.Landed.make({
+      at: DateTime.makeUnsafe("2026-10-12T09:00:00Z"),
+      project: burrow,
+      sha: LandedSha.make(BURROW_SHA),
+    }),
+  ],
   now: NOW,
 });
 
@@ -91,13 +93,12 @@ const outcomeOf = (row: string) =>
   ].join(" ");
 
 /** Eight landings, the latest first, as the platform lists them. */
-const EIGHT_LANDINGS = decodeLandings(
-  Array.from({ length: 8 }, (_, index) => ({
-    _tag: "Landed",
-    at: `2026-10-12T1${String(9 - index).slice(-1)}:00:00Z`,
-    project: `oscabriel/kit-${index}`,
-    sha: String(index).repeat(40),
-  }))
+const EIGHT_LANDINGS = Array.from({ length: 8 }, (_, index) =>
+  RecentLanding.cases.Landed.make({
+    at: DateTime.makeUnsafe(`2026-10-12T1${9 - index}:00:00Z`),
+    project: ProjectName.make(`oscabriel/kit-${index}`),
+    sha: LandedSha.make(String(index).repeat(40)),
+  })
 );
 
 /** One of the hero's two panels, by its flow. */
@@ -363,21 +364,21 @@ describe(LandingView, () => {
     "names each by its ask's want, linking the landed commit or the refused ask, and a landing with no ask by its commit",
     () =>
       Effect.gen(function* () {
-        const [datekit = "", refused = "", burrow = ""] = rowsOf(
+        const [answered = "", refused = "", unasked = ""] = rowsOf(
           yield* pageWith(landed)
         );
 
-        expect(textIn(datekit)).toContain(
+        expect(textIn(answered)).toContain(
           "parseISO accepts ISO week dates such as 2026-W41-3."
         );
-        expect(hrefsOf(datekit)).toContain(
+        expect(hrefsOf(answered)).toContain(
           `/oscabriel/datekit/commit/${DATEKIT_SHA}`
         );
         expect(hrefsOf(refused)).toContain(
           "/oscabriel/burrow/asks/drop-legacy-fetch-kit"
         );
-        expect(textIn(burrow)).toContain(BURROW_SHA.slice(0, 7));
-        expect(hrefsOf(burrow)).toContain(
+        expect(textIn(unasked)).toContain(BURROW_SHA.slice(0, 7));
+        expect(hrefsOf(unasked)).toContain(
           `/oscabriel/burrow/commit/${BURROW_SHA}`
         );
       })
