@@ -372,3 +372,77 @@ describe("the type scale", () => {
     expect(theme.get("leading-code")).toBe("20px");
   });
 });
+
+/** Each `@font-face` rule in the stylesheet, as its family and its sources. */
+const faces = [...css.matchAll(/@font-face\s*\{(?<body>[^}]*)\}/gu)].map(
+  ({ groups }) => {
+    const body = groups?.body ?? "";
+
+    return {
+      family: /font-family:\s*"(?<family>[^"]+)"/u.exec(body)?.groups?.family,
+      sources: [...body.matchAll(/url\("(?<url>[^"]+)"\)/gu)].map(
+        (match) => match.groups?.url ?? ""
+      ),
+      weight: /font-weight:\s*(?<weight>[^;]+);/u.exec(body)?.groups?.weight,
+    };
+  }
+);
+
+const weightsOf = (family: string) =>
+  faces.flatMap((face) => (face.family === family ? [face.weight ?? ""] : []));
+
+const SANS_FILES = "@fontsource-variable/ibm-plex-sans/files/";
+
+const MONO_FILES = "@fontsource/ibm-plex-mono/files/";
+
+describe("the faces", () => {
+  const theme = declarations(blockOf("@theme inline"));
+
+  it("set the UI in IBM Plex Sans and code in IBM Plex Mono, each over its metric fallback", () => {
+    expect(theme.get("font-sans")?.split(", ").slice(0, 2)).toStrictEqual([
+      '"IBM Plex Sans Variable"',
+      '"IBM Plex Sans Fallback"',
+    ]);
+    expect(theme.get("font-mono")?.split(", ").slice(0, 2)).toStrictEqual([
+      '"IBM Plex Mono"',
+      '"IBM Plex Mono Fallback"',
+    ]);
+    expect(theme.has("font-serif")).toBeFalsy();
+  });
+
+  it("load each face from fontsource, latin and latin-ext only", () => {
+    const files = faces.flatMap(({ sources }) => sources);
+
+    expect(files.length).toBeGreaterThan(0);
+    expect(
+      files.filter(
+        (file) =>
+          !(file.startsWith(SANS_FILES) || file.startsWith(MONO_FILES)) ||
+          !/-latin-(?:ext-)?(?:wght|\d00)-normal\.woff2$/u.test(file)
+      )
+    ).toStrictEqual([]);
+  });
+
+  it("load the variable sans once per subset, and mono at the three weights the UI sets", () => {
+    expect(weightsOf("IBM Plex Sans Variable")).toStrictEqual([
+      "100 700",
+      "100 700",
+    ]);
+    expect(weightsOf("IBM Plex Mono").toSorted()).toStrictEqual([
+      "400",
+      "400",
+      "500",
+      "500",
+      "600",
+      "600",
+    ]);
+  });
+
+  it("keep no vendored font file in the web's sources", () => {
+    const vendored = import.meta.glob("../src/assets/fonts/*", {
+      query: "?url",
+    });
+
+    expect(Object.keys(vendored)).toStrictEqual([]);
+  });
+});

@@ -32,41 +32,50 @@
 @custom-variant dark (@media (prefers-color-scheme: dark));
 
 /*
+  The faces: IBM Plex Sans (variable, 100 to 700) for the UI and IBM Plex
+  Mono for what a terminal prints, both from fontsource, latin and
+  latin-ext only, with fontsource's own unicode ranges, so a page fetches
+  the latin file alone unless it sets an accented letter. Mono comes at the
+  three weights the UI sets it in (400, 500, 600).
+
   Until a face arrives (font-display: swap), text is drawn in a local face
   scaled to its metrics, so the swap moves nothing: Arial (or its metric
-  twin Liberation Sans) for Public Sans, Courier New (or Liberation Mono)
-  for JetBrains Mono. Measured in Chromium from the latin files: Public Sans
-  sets 103.89% wider than Arial, ascent 0.95 em and descent 0.225 em;
-  JetBrains Mono sets as wide as Courier New, ascent 1.02 em and descent
-  0.3 em. Each override is the face's metric over its size-adjust.
+  twin Liberation Sans) for Plex Sans, Courier New (or Liberation Mono) for
+  Plex Mono. Measured in headless Chromium on 2026-10-12 from the latin
+  files at 400, with canvas measureText over a 240-character English
+  sample at 1000 px: Plex Sans sets 100.41% as wide as Liberation Sans,
+  ascent 1.025 em and descent 0.275 em; Plex Mono sets 99.98% as wide as
+  Liberation Mono, ascent 1.025 em and descent 0.275 em. Each override is
+  the face's metric over its size-adjust.
 */
 @font-face {
-  font-family: "Public Sans Fallback";
+  font-family: "IBM Plex Sans Fallback";
   src:
     local("Arial"), local("ArialMT"), local("Liberation Sans"), local("Arimo");
-  size-adjust: 103.89%;
-  ascent-override: 91.45%;
-  descent-override: 21.66%;
+  size-adjust: 100.41%;
+  ascent-override: 102.08%;
+  descent-override: 27.39%;
   line-gap-override: 0%;
 }
 
 @font-face {
-  font-family: "JetBrains Mono Fallback";
+  font-family: "IBM Plex Mono Fallback";
   src:
     local("Courier New"), local("CourierNewPSMT"), local("Liberation Mono"),
     local("Cousine");
   size-adjust: 99.98%;
-  ascent-override: 102.02%;
-  descent-override: 30%;
+  ascent-override: 102.52%;
+  descent-override: 27.5%;
   line-gap-override: 0%;
 }
 
 @font-face {
-  font-family: "Public Sans";
+  font-family: "IBM Plex Sans Variable";
   font-style: normal;
-  font-weight: 100 900;
+  font-weight: 100 700;
   font-display: swap;
-  src: url("./assets/fonts/public-sans-latin.woff2") format("woff2");
+  src: url("@fontsource-variable/ibm-plex-sans/files/ibm-plex-sans-latin-wght-normal.woff2")
+    format("woff2-variations");
   unicode-range:
     U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
     U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
@@ -74,23 +83,25 @@
 }
 
 @font-face {
-  font-family: "Public Sans";
+  font-family: "IBM Plex Sans Variable";
   font-style: normal;
-  font-weight: 100 900;
+  font-weight: 100 700;
   font-display: swap;
-  src: url("./assets/fonts/public-sans-latin-ext.woff2") format("woff2");
+  src: url("@fontsource-variable/ibm-plex-sans/files/ibm-plex-sans-latin-ext-wght-normal.woff2")
+    format("woff2-variations");
   unicode-range:
     U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
     U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
-    U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+    U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 
 @font-face {
-  font-family: "JetBrains Mono";
+  font-family: "IBM Plex Mono";
   font-style: normal;
-  font-weight: 100 800;
+  font-weight: 400;
   font-display: swap;
-  src: url("./assets/fonts/jetbrains-mono-latin.woff2") format("woff2");
+  src: url("@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-400-normal.woff2")
+    format("woff2");
   unicode-range:
     U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
     U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
@@ -98,15 +109,68 @@
 }
 
 @font-face {
-  font-family: "JetBrains Mono";
+  font-family: "IBM Plex Mono";
   font-style: normal;
-  font-weight: 100 800;
+  font-weight: 400;
   font-display: swap;
-  src: url("./assets/fonts/jetbrains-mono-latin-ext.woff2") format("woff2");
+  src: url("@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-ext-400-normal.woff2")
+    format("woff2");
   unicode-range:
     U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
     U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
-    U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+    U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-500-normal.woff2")
+    format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-ext-500-normal.woff2")
+    format("woff2");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+    U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
+    U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-600-normal.woff2")
+    format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-ext-600-normal.woff2")
+    format("woff2");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+    U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
+    U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 
 :root {
@@ -255,10 +319,10 @@
 
 @theme inline {
   --font-sans:
-    "Public Sans", "Public Sans Fallback", ui-sans-serif, system-ui,
-    -apple-system, "Segoe UI", sans-serif;
+    "IBM Plex Sans Variable", "IBM Plex Sans Fallback", ui-sans-serif,
+    system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono:
-    "JetBrains Mono", "JetBrains Mono Fallback", ui-monospace, "SFMono-Regular",
+    "IBM Plex Mono", "IBM Plex Mono Fallback", ui-monospace, "SFMono-Regular",
     "Cascadia Mono", Menlo, monospace;
 
   /*

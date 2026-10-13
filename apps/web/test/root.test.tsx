@@ -60,14 +60,14 @@ describe("the document's head", () => {
       {
         as: "font",
         crossOrigin: "anonymous",
-        file: "public-sans-latin.woff2",
+        file: "ibm-plex-sans-latin-wght-normal.woff2",
         rel: "preload",
         type: "font/woff2",
       },
       {
         as: "font",
         crossOrigin: "anonymous",
-        file: "jetbrains-mono-latin.woff2",
+        file: "ibm-plex-mono-latin-400-normal.woff2",
         rel: "preload",
         type: "font/woff2",
       },
