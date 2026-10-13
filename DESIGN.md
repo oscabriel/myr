@@ -545,7 +545,7 @@ Light and dark follow the system by default. On `/settings` (Appearance) a reade
 
 ### The platform's own pages
 
-Sign-in (with the MCP consent), sign-up, the Google handle page, the problem page and the platform's `/` load nothing (no script, no web font), so they carry the palette as hex literals in their inline style: paper and ink for both schemes, rule, muted, the 3:1 control border, refused only for a refusal, an olive-marked "Warning" line for the loopback case; `color-scheme: light dark`; the system sans at 16 px. Their look becomes the focus shell's (issue 16).
+Sign-in (with the MCP consent), sign-up, the Google handle page, the code, add-email and reset pages, the problem page and the platform's `/` load nothing (no script, no web font), so they carry the sage garden palette as hex literals in their inline style, copied from `apps/web/src/styles.css` for both schemes: paper, card, ink, surface, muted, rule, the 3:1 control border, primary with its on-primary text, refused only for a refusal, and waiting for the marked "Warning" line in the loopback case; `color-scheme: light dark`. Their faces are named as the web's are, IBM Plex Sans then the system sans at 16 px and IBM Plex Mono then the system mono, so Plex shows only where the reader has it installed. Every page but `/` is the focus shell: the wordmark as text from `@repo/brand` above one card with a hairline border and a 2 px radius, no edge accent, no navigation and no eyebrow, its h1 first. The consent names the client, its publisher when known, and the host that receives access; on sign-in and sign-up it also lists what the client may do as the person, and says it never sees the password. The platform's `/` keeps a plain document frame.
 
 ### shadcn
 
