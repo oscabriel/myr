@@ -123,12 +123,12 @@ describe("a project's tabs", () => {
       })
   );
 
-  it("sticks under the top bar and scrolls sideways inside itself, never wrapping", () => {
+  // The tabs stick with the header, in the project's frame (project.test.tsx).
+  it("scrolls sideways inside itself, never wrapping", () => {
     const markup = renderToStaticMarkup(
       <ProjectTabs current="code" project={datekit} />
     );
 
-    expect(markup).toMatch(/^<nav\b[^>]*class="[^"]*sticky top-\(--top-bar\)/u);
     expect(markup).toContain("overflow-x-auto");
     expect(markup).not.toContain("flex-wrap");
   });

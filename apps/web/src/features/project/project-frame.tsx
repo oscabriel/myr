@@ -11,13 +11,45 @@ import {
 } from "../shared/shell/side-column.tsx";
 
 /**
- * The tabs stick under the top bar, so what sticks inside the frame sits
- * under both: `--stick-bar` and `--stick-toolbar` move down by the tabs.
+ * The header and its tabs stick under the top bar together, so what sticks
+ * inside the frame sits under both: `--stick-bar`, `--stick-toolbar` and
+ * `--stick-column` move down by `--project-head`, the height the header is
+ * drawn at. Until the browser has measured it (the server's HTML, before any
+ * scroll), a header with a lede, a facts row and its tabs stands in.
  */
-const UNDER_TABS =
-  "[--stick-bar:calc(var(--top-bar)_+_var(--tabs)_-_1px)] [--stick-toolbar:calc(var(--top-bar)_+_var(--tabs)_+_var(--toolbar)_-_1px)] [--stick-column:calc(var(--top-bar)_+_var(--tabs))]";
+const UNDER_HEAD =
+  "[--stick-bar:calc(var(--top-bar)_+_var(--project-head,11.25rem)_-_1px)] [--stick-toolbar:calc(var(--top-bar)_+_var(--project-head,11.25rem)_+_var(--toolbar)_-_1px)] [--stick-column:calc(var(--top-bar)_+_var(--project-head,11.25rem))]";
 
 const UNDER_BAR = "[--stick-column:var(--top-bar)]";
+
+const HEAD_HEIGHT = "--project-head";
+
+/** The frame keeps its header's drawn height, so what sticks below clears it. */
+const keepHeight = ([entry]: readonly ResizeObserverEntry[]) => {
+  const frame = entry?.target.parentElement;
+  const height = entry?.borderBoxSize[0]?.blockSize;
+
+  if (frame !== null && frame !== undefined && height !== undefined) {
+    frame.style.setProperty(HEAD_HEIGHT, `${height}px`);
+  }
+};
+
+/**
+ * The header's height is read, never assumed: it wraps on a narrow screen
+ * and has no lede on a project with no README.
+ */
+const measureHead = (head: HTMLDivElement | null) => {
+  const observer = new ResizeObserver(keepHeight);
+
+  if (head !== null) {
+    observer.observe(head);
+  }
+
+  return () => {
+    observer.disconnect();
+    head?.parentElement?.style.removeProperty(HEAD_HEIGHT);
+  };
+};
 
 /**
  * From `columns` the side column stands beside the page. Below it the column
@@ -35,10 +67,18 @@ export const ProjectFrame = ({
 
   return (
     <div
-      className={`flex w-full min-w-0 flex-1 flex-col ${header === undefined ? UNDER_BAR : UNDER_TABS}`}
+      className={`flex w-full min-w-0 flex-1 flex-col ${header === undefined ? UNDER_BAR : UNDER_HEAD}`}
       data-project-frame=""
     >
-      {header}
+      {header === undefined ? null : (
+        <div
+          className="bg-background sticky top-(--top-bar) z-20"
+          data-project-head=""
+          ref={measureHead}
+        >
+          {header}
+        </div>
+      )}
       <div className="flex w-full min-w-0 flex-1">
         {column ? (
           <div className="border-rule columns:flex sticky top-(--stick-column) hidden h-[calc(100dvh-var(--stick-column))] w-(--column-tree) shrink-0 flex-col border-r">

@@ -12,7 +12,10 @@ import { useMemo, useState } from "react";
 
 import { ProjectFrame } from "../../../features/project/project-frame.tsx";
 import { ProjectHeader } from "../../../features/project/project-header.tsx";
-import { projectTabOf } from "../../../features/shared/shell/sections.ts";
+import {
+  inProjectFrame,
+  projectTabOf,
+} from "../../../features/shared/shell/sections.ts";
 import { useShellName } from "../../../features/shared/shell/shells.ts";
 import { projectParams } from "../../../server/addresses.ts";
 import { serverClient } from "../../../server/client.ts";
@@ -21,18 +24,20 @@ import {
   readProjectHeader,
 } from "../../../server/project-page.ts";
 
+/** The header for a project's page, or none when it cannot be read: the page under it says why. */
+export const headerOrNone = (name: string) =>
+  readProjectHeader(name).pipe(
+    Effect.map(Option.some),
+    Effect.orElseSucceed(() => Option.none()),
+    Effect.map(Option.getOrUndefined)
+  );
+
 // Read beside each page's own loader, never before it: TanStack runs a layout's loader and its child's at once.
-// A project it cannot read has no header, and the page under it says why.
 const projectHeader = createServerFn({ method: "GET" })
   .validator((name: string) => name)
   .handler(({ data }) =>
     Effect.runPromise(
-      readProjectHeader(data).pipe(
-        Effect.map(Option.some),
-        Effect.orElseSucceed(() => Option.none()),
-        Effect.map(Option.getOrUndefined),
-        Effect.provide(serverClient(env))
-      )
+      headerOrNone(data).pipe(Effect.provide(serverClient(env)))
     )
   );
 
@@ -40,8 +45,28 @@ const root = getRouteApi("__root__");
 
 const decodeHeader = Schema.decodeSync(ProjectHeaderData);
 
-/** Overview reads its header with its own reads, so the layout reads none there. */
-const onOverview = (pathname: string) => projectTabOf(pathname) === "overview";
+/**
+ * The layout reads the header for every page drawn under it, but Overview,
+ * which reads its header with its own reads, and a focused page (a new
+ * proposal), which draws none.
+ */
+export const headerLoader =
+  (
+    read: (
+      project: string
+    ) => Promise<typeof ProjectHeaderData.Encoded | undefined>
+  ) =>
+  ({
+    location,
+    params,
+  }: {
+    readonly location: { readonly pathname: string };
+    readonly params: { readonly project: string };
+  }) =>
+    inProjectFrame(location.pathname) &&
+    projectTabOf(location.pathname) !== "overview"
+      ? read(params.project)
+      : undefined;
 
 /**
  * Overview's header when Overview is open, else the layout's own. The last
@@ -107,9 +132,6 @@ const ProjectLayout = () => {
 export const Route = createFileRoute("/$owner/$project")({
   staticData: { shell: "project" },
   params: projectParams,
-  loader: ({ location, params }) =>
-    onOverview(location.pathname)
-      ? undefined
-      : projectHeader({ data: params.project }),
+  loader: headerLoader((project) => projectHeader({ data: project })),
   component: ProjectLayout,
 });

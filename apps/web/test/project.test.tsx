@@ -60,9 +60,16 @@ import type { ProjectViewProps } from "../src/features/project/project-page.tsx"
 import { UnknownProjectView } from "../src/features/project/unknown-project.tsx";
 import { askStates } from "../src/features/shared/ask-progress.ts";
 import {
+  inProjectFrame,
   projectSections,
   projectTabOf,
 } from "../src/features/shared/shell/sections.ts";
+import { getRouter } from "../src/router.tsx";
+import {
+  headerLoader,
+  headerOrNone,
+  Route as ProjectLayout,
+} from "../src/routes/$owner/$project/route.tsx";
 import {
   ProjectHeaderData,
   ProjectPageData,
@@ -1057,6 +1064,33 @@ describe("a project's page in its frame", () => {
       })
   );
 
+  it.effect(
+    "sticks the header and its tabs under the top bar together, and moves what sticks below by their height",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* framed(
+          "/oscabriel/datekit/tree/main",
+          headerFacts,
+          null
+        );
+
+        const head = elementWith(markup, 'data-project-head=""');
+
+        expect(head).toMatch(
+          /^<div\b[^>]*class="[^"]*sticky top-\(--top-bar\)/u
+        );
+        expect(
+          missingFrom(head, ['data-project-header=""', 'data-project-tabs=""'])
+        ).toStrictEqual([]);
+        expect(elementWith(head, 'data-project-tabs=""')).not.toContain(
+          "sticky"
+        );
+        expect(markup).toContain(
+          "[--stick-toolbar:calc(var(--top-bar)_+_var(--project-head,11.25rem)_+_var(--toolbar)_-_1px)]"
+        );
+      })
+  );
+
   it("says the commands its popovers give whole, each a real CLI command with its project", () => {
     const steps = textOf(
       <>
@@ -1172,6 +1206,103 @@ describe("the project's header as the server sends it", () => {
       }),
     seededWorld
   );
+});
+
+const datekitAt = (rest: string) => `/oscabriel/datekit${rest}`;
+
+/** What the project's layout loads at `pathname`, its header read through the world it runs in. */
+const layoutLoadAt = (pathname: string) =>
+  Effect.gen(function* () {
+    const services = yield* Effect.context<Client>();
+
+    const load = headerLoader((project) =>
+      Effect.runPromiseWith(services)(headerOrNone(project))
+    );
+
+    const loaded = load({
+      location: { pathname },
+      params: { project: "oscabriel/datekit" },
+    });
+
+    return yield* Effect.promise(() => Promise.resolve(loaded));
+  });
+
+const decodeLoaded = Schema.decodeUnknownEffect(ProjectHeaderData);
+
+const routeSources: Readonly<Record<string, string>> = import.meta.glob(
+  "../src/routes/$owner/$project/**/*.{ts,tsx}",
+  { eager: true, import: "default", query: "?raw" }
+);
+
+const LAYOUT_DIR = "../src/routes/$owner/$project";
+
+/** A route file's address, each param filled in, as the router's file naming spells it. */
+const addressOfFile = (file: string) =>
+  file
+    .replace(LAYOUT_DIR, "/oscabriel/datekit")
+    .replace(/\.tsx?$/u, "")
+    .replace(/\/(?:index|route)$/u, "")
+    .replaceAll("[.]", ".")
+    .replaceAll(/\{?\$\w*\}?/gu, "x");
+
+/** Every page under a project's layout at a concrete address, with the shell its route names. */
+const pagesUnderLayout = () =>
+  Object.entries(routeSources)
+    .filter(([file]) => !file.split("/").some((part) => part.startsWith("-")))
+    .map(([file, source]) => ({
+      path: addressOfFile(file),
+      shell:
+        /shell:\s*"(?<shell>\w+)"/u.exec(source)?.groups?.shell ?? "project",
+    }));
+
+describe("the project's layout route", () => {
+  it.effect(
+    "reads the header for a tree page, and nothing on Overview, which reads its own, or on a new proposal, which draws none",
+    () =>
+      Effect.gen(function* () {
+        const seen = yield* Ref.make<readonly string[]>([]);
+
+        const { made, quiet, tree } = yield* Effect.gen(function* () {
+          const skipped = yield* Effect.forEach(
+            [datekitAt(""), datekitAt("/proposals/new")],
+            layoutLoadAt
+          );
+
+          const before = yield* Ref.get(seen);
+
+          const read = yield* layoutLoadAt(datekitAt("/tree/main")).pipe(
+            Effect.flatMap(decodeLoaded)
+          );
+
+          return { made: before, quiet: skipped, tree: read };
+        }).pipe(Effect.provide(countingWorld(seen)));
+
+        expect(quiet).toStrictEqual([undefined, undefined]);
+        expect(made).toStrictEqual([]);
+        expect(tree.project).toBe("oscabriel/datekit");
+        expect(tree.open?.asks).toBeGreaterThan(0);
+      }),
+    seededWorld
+  );
+
+  it("is matched for every page of a project, and leaves out of its frame exactly the pages that name another shell", () => {
+    const pages = pagesUnderLayout();
+
+    expect(
+      pages.filter(
+        ({ path }) =>
+          !getRouter().getMatchedRoutes(path)[0].includes(ProjectLayout)
+      )
+    ).toStrictEqual([]);
+    expect(
+      pages.filter(({ path }) => !inProjectFrame(path)).map(({ path }) => path)
+    ).toStrictEqual(
+      pages.filter(({ shell }) => shell !== "project").map(({ path }) => path)
+    );
+    expect(pages.map(({ path }) => path)).toContain(
+      datekitAt("/proposals/new")
+    );
+  });
 });
 
 const vellum = ProjectName.make("oscabriel/vellum");

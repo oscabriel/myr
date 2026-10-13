@@ -102,6 +102,13 @@ type HeaderRead = {
   readonly [K in keyof HeaderReads]: Effect.Success<HeaderReads[K]>;
 };
 
+/**
+ * Newest by name, not by date: a tag carries only its name and commit. Its
+ * numbers sort as numbers (`v0.10.0` is newer than `v0.9.0`), but a
+ * pre-release such as `v2.0.0-beta` reads as newer than `v2.0.0`, and a tag
+ * of no version shape wins or loses by its letters. Once a tag is read with
+ * its time, the header can say the newest in time.
+ */
 const byNewest = (a: TagName, b: TagName) =>
   b.localeCompare(a, "en", { numeric: true });
 

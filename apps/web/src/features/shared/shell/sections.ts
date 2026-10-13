@@ -134,6 +134,26 @@ export const projectTabOf = (pathname: string): ProjectTab | undefined => {
     : Object.entries(TAB_OF).find(([segment]) => segment === page)?.[1];
 };
 
+/**
+ * The pages under a project that its route draws in another shell: starting
+ * a proposal is focused (`staticData.shell` is `focus`), so it has no header.
+ */
+const OUTSIDE_FRAME: readonly (readonly string[])[] = [["proposals", "new"]];
+
+/** Whether a path is a project's page drawn in the project's frame, under its header. */
+export const inProjectFrame = (pathname: string): boolean => {
+  const address = addressOf(pathname);
+
+  return (
+    address !== undefined &&
+    !OUTSIDE_FRAME.some(
+      (page) =>
+        page.length === address.rest.length &&
+        page.every((segment, at) => address.rest[at] === segment)
+    )
+  );
+};
+
 const sectionOf = (pathname: string): PageSection | undefined => {
   const address = addressOf(pathname);
 

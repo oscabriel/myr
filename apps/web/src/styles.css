@@ -368,9 +368,11 @@
   top-bar  the top bar's height (56 px), and the toolbar's (40 px) under
            it; what sticks under them reads `--stick-bar` or
            `--stick-toolbar`, each overlapping the hairline above it
-  tabs     a project's tab strip (44 px), which sticks under the top bar;
-           inside a project's frame `--stick-bar` and `--stick-toolbar`
-           are moved down by it, so what sticks there clears the tabs
+  tabs     a project's tab strip (44 px), under its header; the header
+           and tabs stick under the top bar together, and inside a
+           project's frame `--stick-bar` and `--stick-toolbar` are moved
+           down by the height they are drawn at (`--project-head`), so what
+           sticks there clears them
 */
 @theme static {
   --container-site: 85rem;

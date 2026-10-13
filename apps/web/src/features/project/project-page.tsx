@@ -252,7 +252,7 @@ const VisibilitySummary = ({
           Ledger
         </AppLink>
         <AppLink className={LINK} to={`/${project}/env`}>
-          Env shape
+          Environment
         </AppLink>
       </p>
     </AboutCard>

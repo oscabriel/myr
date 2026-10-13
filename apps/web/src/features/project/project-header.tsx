@@ -270,7 +270,7 @@ export const ProjectTabs = ({
 }) => (
   <nav
     aria-label={`${project} tabs`}
-    className={`border-rule bg-background sticky top-(--top-bar) z-20 border-b ${GUTTER}`}
+    className={`border-rule bg-background border-b ${GUTTER}`}
     data-project-tabs=""
   >
     <div className="flex [scrollbar-width:none] overflow-x-auto overscroll-x-contain">
@@ -311,8 +311,8 @@ export const ProjectHeader = ({
   const Name = current === "overview" ? "h1" : "p";
 
   return (
-    // No box of its own, so the tabs stick for the whole page, not only past the header.
-    <div className="contents" data-project-header="">
+    // The project's frame sticks the header and its tabs under the top bar together.
+    <div data-project-header="">
       <div
         className={`nav:flex-row nav:items-start nav:justify-between flex flex-col gap-4 pt-6 pb-5 ${GUTTER}`}
       >

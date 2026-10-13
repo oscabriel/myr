@@ -321,7 +321,7 @@ describe("the env shape's way in", () => {
     );
 
     expect(markup).toMatch(
-      /<a\b[^>]*href="\/oscabriel\/datekit\/env"[^>]*>Env shape<\/a>/u
+      /<a\b[^>]*href="\/oscabriel\/datekit\/env"[^>]*>Environment<\/a>/u
     );
   });
 });
