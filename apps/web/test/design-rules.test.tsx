@@ -13,6 +13,8 @@ import { wordTone } from "../src/features/shared/row.tsx";
 import { Workspace } from "../src/features/shared/shell/workspace.tsx";
 import { renderAt } from "./render.tsx";
 
+import styles from "../src/styles.css?raw";
+
 const sources: Readonly<Record<string, string>> = import.meta.glob(
   "../src/**/*.{ts,tsx,css}",
   { eager: true, import: "default", query: "?raw" }
@@ -72,6 +74,40 @@ const fingernailsIn = (source: string) => {
 const spacing = (name: string) =>
   new RegExp(`^ {2}${name}: "(?<value>[^"]+)"$`, "mu").exec(design)?.groups
     ?.value;
+
+/** A section of DESIGN.md by its heading, up to the next heading of its level or above. */
+const section = (heading: string) => {
+  const found = new RegExp(`^(?<level>#{2,3}) ${heading}$`, "mu").exec(design);
+  const level = found?.groups?.level ?? "";
+
+  if (found === null) {
+    return "";
+  }
+
+  const rest = design.slice(found.index + found[0].length);
+  const next = new RegExp(`^#{2,${level.length}} `, "mu").exec(rest);
+
+  return rest.slice(0, next?.index);
+};
+
+/** A layout token's value in styles.css's `@theme static` block. */
+const layoutToken = (name: string) =>
+  new RegExp(`@theme static \\{[^}]*--${name}: (?<value>[^;]+);`, "u").exec(
+    styles
+  )?.groups?.value;
+
+const LAYOUT = [
+  "container-site",
+  "container-project",
+  "container-focus",
+  "column-about",
+  "column-tree",
+  "column-docs-nav",
+  "column-docs-toc",
+  "gutter-site",
+  "gutter-project",
+  "measure",
+] as const;
 
 const inspectorClasses = (code: boolean) => {
   const markup = renderToStaticMarkup(
@@ -193,5 +229,46 @@ describe("the overrides' two Don'ts", () => {
         '"border-b-2 border-rule-strong" "border-t border-t-refused" "border-l-2 border-rule"'
       )
     ).toStrictEqual([]);
+  });
+});
+
+describe("DESIGN.md's shells", () => {
+  it.each(LAYOUT)("names --%s as styles.css does", (name) => {
+    expect(layoutToken(name)).toBeDefined();
+    expect(spacing(name)).toBe(layoutToken(name));
+  });
+
+  it("tabulates the four shells, each with its container, header and side columns", () => {
+    const rows = [
+      ...section("Shells").matchAll(/^\| `(?<shell>\w+)` \|/gmu),
+    ].map(({ groups }) => groups?.shell);
+
+    expect(rows).toStrictEqual(["site", "project", "docs", "focus"]);
+  });
+
+  it("states ADR 0041's four rules", () => {
+    const shells = section("Shells");
+
+    expect(shells).toContain("**No global left rail.**");
+    expect(shells).toContain("**No generic right rail.**");
+    expect(shells).toContain("**A command at most once per screen.**");
+    expect(shells).toContain("**Prose stops at 72 to 80ch.**");
+  });
+
+  it("drops the old shell's rail, inspector and bottom bar sections", () => {
+    expect(design).not.toMatch(
+      /^### (?:Rail|Inspector|Top bar and bottom bar)\b/mu
+    );
+    expect(design).not.toContain("The gate's control room");
+  });
+
+  it("keeps the overrides' Don'ts: no fingernail, no eyebrow, the footer's wordmark", () => {
+    const rules = section("Do's and Don'ts");
+
+    expect(rules).toContain(
+      "**Don't** put a coloured strip, bar, notch or tab on any edge or corner of a card, row or panel"
+    );
+    expect(rules).toContain("**Don't** set an eyebrow");
+    expect(rules).toContain("`Brand.domain`");
   });
 });
