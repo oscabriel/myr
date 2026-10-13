@@ -50,7 +50,11 @@ const lightTokens = declarations(blockOf(":root"));
 const darkTokens = new Map([
   ...lightTokens,
   ...declarations(
-    blockOf(":root", css.indexOf("@media (prefers-color-scheme: dark)"))
+    blockOf(
+      ":root",
+      // The block, not the `dark` variant's own mention of the query.
+      css.indexOf("@media (prefers-color-scheme: dark) {")
+    )
   ),
 ]);
 
@@ -236,6 +240,153 @@ describe.each(["light", "dark"] as const)("the %s scheme", (scheme) => {
     "diff-del-emphasis",
   ])("declares --%s", (tint) => {
     expect(valueOf(scheme, tint)).not.toBe("");
+  });
+});
+
+/** sRGB's transfer curve, for writing a colour out as the hex a meta repeats. */
+const encoded = (channel: number) =>
+  channel <= 0.0031308 ? 12.92 * channel : 1.055 * channel ** (1 / 2.4) - 0.055;
+
+const hexOfOklch = (colour: Oklch) =>
+  `#${linearOfOklch(colour)
+    .map((channel) =>
+      Math.round(encoded(channel) * 255)
+        .toString(16)
+        .padStart(2, "0")
+    )
+    .join("")}`;
+
+const oklchOfText = (value: string): Oklch => {
+  const [lightness, chroma, hue] = value.split(" ").map(Number);
+
+  return { chroma: chroma ?? 0, hue: hue ?? 0, lightness: lightness ?? 0 };
+};
+
+/**
+ * The maintainer's "sage garden" palette as pasted (2026-10-12), by the web's
+ * token each value fills: shadcn's `muted` is the web's field surface and its
+ * `border` the hairline. Copied here as the test's own source of truth.
+ */
+const SAGE_GARDEN = {
+  dark: {
+    accent: "0.3709 0.0248 153.9823",
+    card: "0.1822 0 0",
+    foreground: "0.9702 0 0",
+    popover: "0.1822 0 0",
+    primary: "0.6333 0.0309 154.9039",
+    rule: "0.2850 0 0",
+    secondary: "0.2178 0 0",
+    surface: "0.2178 0 0",
+  },
+  light: {
+    accent: "0.8242 0.0221 136.6092",
+    card: "1.0000 0 0",
+    foreground: "0.2417 0.0298 269.8827",
+    popover: "1.0000 0 0",
+    rule: "0.9251 0.0071 88.6450",
+    secondary: "0.8596 0.0291 119.9919",
+    surface: "0.9251 0.0071 88.6450",
+  },
+} as const;
+
+const SAGE_PAPER = {
+  dark: "0.1448 0 0",
+  light: "0.9761 0.0041 91.4461",
+} as const;
+
+/** Values the palette gave that failed a pair below, nudged in lightness alone. */
+const SAGE_NUDGED = {
+  dark: { refused: "0.6368 0.2078 25.3313" },
+  light: {
+    muted: "0.5510 0.0234 264.3637",
+    primary: "0.6333 0.0309 154.9039",
+    refused: "0.5624 0.1743 26.1433",
+  },
+} as const;
+
+const sameColour = (one: Oklch, other: Oklch) =>
+  [
+    one.lightness - other.lightness,
+    one.chroma - other.chroma,
+    hueDistance(one.hue, other.hue),
+  ].every((apart) => Math.abs(apart) < 0.0001);
+
+/** Every token in a scheme declared as an oklch(), by name. */
+const oklchTokens = (scheme: Scheme) =>
+  [...tokensOf(scheme).keys()].flatMap((name) =>
+    valueOf(scheme, name).startsWith("oklch(")
+      ? [[name, oklchOf(scheme, name)] as const]
+      : []
+  );
+
+/** Orange, amber and brown, which no colour on the web may be. */
+const ORANGE_HUES = { from: 40, to: 100 } as const;
+
+describe.each(["light", "dark"] as const)("the %s sage garden", (scheme) => {
+  it("lays the paper in the palette's background, as hex", () => {
+    expect(valueOf(scheme, "background")).toBe(
+      hexOfOklch(oklchOfText(SAGE_PAPER[scheme]))
+    );
+  });
+
+  it.each(Object.entries(SAGE_GARDEN[scheme]))(
+    "takes --%s from the palette unchanged",
+    (token, value) => {
+      expect(
+        sameColour(oklchOf(scheme, token), oklchOfText(value))
+      ).toBeTruthy();
+    }
+  );
+
+  it.each(Object.entries(SAGE_NUDGED[scheme]))(
+    "moves --%s from the palette in lightness alone",
+    (token, value) => {
+      const { lightness, ...colour } = oklchOf(scheme, token);
+      const pasted = oklchOfText(value);
+
+      expect(lightness).not.toBe(pasted.lightness);
+      expect(
+        sameColour({ ...colour, lightness }, { ...pasted, lightness })
+      ).toBeTruthy();
+    }
+  );
+
+  it("spends no orange, amber or brown, state roles included", () => {
+    const orange = oklchTokens(scheme).flatMap(([name, { chroma, hue }]) =>
+      chroma >= NEUTRAL_CHROMA &&
+      hue >= ORANGE_HUES.from &&
+      hue <= ORANGE_HUES.to
+        ? [name]
+        : []
+    );
+
+    expect(orange).toStrictEqual([]);
+  });
+
+  it("keeps --waiting's hue 30° from every other state's", () => {
+    const { hue } = oklchOf(scheme, "waiting");
+
+    expect(
+      STATES.filter(
+        (state) =>
+          state !== "waiting" &&
+          hueDistance(hue, oklchOf(scheme, state).hue) < 30
+      )
+    ).toStrictEqual([]);
+  });
+
+  it.each(["primary", "secondary", "accent"])(
+    "sets the word on --%s at 4.5:1",
+    (fill) => {
+      expect(
+        contrast(scheme, `${fill}-foreground`, fill)
+      ).toBeGreaterThanOrEqual(4.5);
+    }
+  );
+
+  it("draws the focus ring at 3:1 on paper and on the surface", () => {
+    expect(contrast(scheme, "ring", "background")).toBeGreaterThanOrEqual(3);
+    expect(contrast(scheme, "ring", "surface")).toBeGreaterThanOrEqual(3);
   });
 });
 

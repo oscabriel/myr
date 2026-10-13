@@ -8,23 +8,40 @@
 /*
   The web's tokens (DESIGN.md names each one and when to use it).
 
-  The world is a test certificate: every page is a report sheet on cool
-  bond paper, ruled in one-pixel hairlines, with fields, a results row, and
-  signatories (credit) kept apart from the instruments used (agents). Colour
-  carries state and nothing else, always beside a word and a mark:
+  The palette is the maintainer's "sage garden" (2026-10-12): warm paper,
+  navy ink, a sage primary for the one main action and the focus ring, and
+  soft sage fills for shadcn's secondary and accent. Its values sit on the
+  web's own token names, so no component changed its classes: shadcn's
+  `muted` is the web's --surface, its `border` the web's --rule, its
+  `muted-foreground` the web's --muted, its `destructive` the web's
+  --refused. Not taken from it: --spacing (it rescales every utility),
+  --font-serif (no serif), its shadows (the web is flat) and its 0.35rem
+  radius (shapes stay square, which colour and type do not touch).
 
-  --landed    the change is on main (a certified result)
+  Nudged, in lightness alone, where a pasted value failed a pair that
+  test/tokens.test.ts holds: --muted 0.551 to 0.5 (4.5:1 on the surface),
+  --primary 0.6333 to 0.56 in light (white on it at 4.5:1), --refused
+  0.5624 to 0.49 in light and 0.6368 to 0.68 in dark (5:1 on the pressed
+  surface). --surface-2, --input and --skeleton are new steps in the
+  palette's own hues, measured the same way.
+
+  Colour carries state and nothing else, always beside a word and a mark:
+
+  --landed    the change is on main
   --checking  the gate is running a stage now
   --waiting   passed or paused, waiting on a person or a parent ask
-  --refused   a refusal (nonconformance); the one rubric colour
+  --refused   a refusal; the one rubric colour
   --sealed    held-back checks, layers and sealed evidence
   --muted     not reached, not needed, secondary text
 
-  Everything else is neutral: controls are ruled in --input, placeholders
-  in --skeleton, code is drawn in the low-chroma --syntax-* colours, and a
-  diff's added and removed lines in teal and rose (--diff-*), a family of
-  their own, so a deletion never reads as a refusal or an addition as a
-  landing. test/tokens.test.ts measures every pair that must hold.
+  No colour is orange, amber or brown (no hue from 40 to 100 above chroma
+  0.02): waiting is olive (hue 120), 35 degrees from landed's green.
+  Checking sits at hue 238, 30 degrees from the ink's blue cast, so code
+  drawn in ink never reads as a running stage. Everything else is neutral:
+  controls are ruled in --input, placeholders in --skeleton, code is drawn
+  in the low-chroma --syntax-* colours, and a diff's added and removed
+  lines in teal and rose (--diff-*), a family of their own, so a deletion
+  never reads as a refusal or an addition as a landing.
 
   Light and dark follow the system setting (no toggle, no script, no flash):
   shadcn's `dark:` variant is the media query, not a class.
@@ -178,36 +195,36 @@
 
   /* Paper, ink and rules. The paper is hex: the theme-color meta and the
      manifest repeat it (src/features/shared/theme.ts, held by a test). */
-  --background: #f5f8fa;
-  --foreground: oklch(0.21 0.015 258);
-  --surface: oklch(0.955 0.005 245);
+  --background: #f8f7f4;
+  --foreground: oklch(0.2417 0.0298 269.8827);
+  --surface: oklch(0.9251 0.0071 88.645);
   /* One step past the surface, for a selected thing under the pointer only
      (DESIGN.md "Pressed Surface"); every state role keeps 5:1 on it. */
-  --surface-2: oklch(0.935 0.006 250);
-  --muted: oklch(0.48 0.012 258);
-  --rule: oklch(0.86 0.007 255);
-  --rule-strong: oklch(0.21 0.015 258);
+  --surface-2: oklch(0.91 0.0071 88.645);
+  --muted: oklch(0.5 0.0234 264.3637);
+  --rule: oklch(0.9251 0.0071 88.645);
+  --rule-strong: var(--foreground);
 
   /* State roles: text-safe on paper, on surface and on surface-2 (at least 5:1). */
-  --landed: oklch(0.47 0.11 155);
-  --checking: oklch(0.48 0.13 252);
-  --waiting: oklch(0.5 0.1 70);
-  --refused: oklch(0.5 0.18 27);
+  --landed: oklch(0.46 0.11 155);
+  --checking: oklch(0.47 0.1 238);
+  --waiting: oklch(0.46 0.1 120);
+  --refused: oklch(0.49 0.1743 26.1433);
   --sealed: oklch(0.46 0.13 305);
 
   /* A control's border at 3:1 on paper (WCAG 2.2 SC 1.4.11), and the
      stroke of a placeholder that holds a row's place. */
-  --input: oklch(0.62 0.01 258);
-  --skeleton: oklch(0.8 0.008 255);
+  --input: oklch(0.6 0.0234 264.3637);
+  --skeleton: oklch(0.82 0.0071 88.645);
 
   /* Code: ink carries keywords, names and calls; strings lean teal and
-     constants olive, both too grey to be mistaken for a state. Each keeps
+     constants plum, both too grey to be mistaken for a state. Each keeps
      4.5:1 on a changed word's tint as well as on the paper. */
   --syntax-keyword: var(--foreground);
   --syntax-function: var(--foreground);
   --syntax-parameter: var(--foreground);
   --syntax-string: oklch(0.42 0.035 200);
-  --syntax-constant: oklch(0.42 0.035 110);
+  --syntax-constant: oklch(0.42 0.035 340);
   /* A step darker than muted: a changed word's tint sits under these, and
      they keep 4.5:1 on it too. */
   --syntax-comment: oklch(0.42 0.012 258);
@@ -235,44 +252,43 @@
   );
 
   /* shadcn's names, mapped onto the roles above. */
-  --card: var(--background);
+  --card: oklch(1 0 0);
   --card-foreground: var(--foreground);
-  --popover: oklch(0.995 0.002 240);
+  --popover: oklch(1 0 0);
   --popover-foreground: var(--foreground);
-  --primary: var(--foreground);
-  --primary-foreground: var(--background);
-  --secondary: var(--surface);
+  --primary: oklch(0.56 0.0309 154.9039);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.8596 0.0291 119.9919);
   --secondary-foreground: var(--foreground);
   --muted-foreground: var(--muted);
-  --accent: var(--surface);
+  --accent: oklch(0.8242 0.0221 136.6092);
   --accent-foreground: var(--foreground);
   --destructive: var(--refused);
   --border: var(--rule);
-  --ring: var(--foreground);
+  --ring: var(--primary);
   --radius: 0.125rem;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0e1114;
-    --foreground: oklch(0.94 0.005 258);
-    --surface: oklch(0.215 0.009 258);
-    --surface-2: oklch(0.25 0.01 258);
-    --muted: oklch(0.72 0.01 258);
-    --rule: oklch(0.33 0.01 258);
-    --rule-strong: oklch(0.94 0.005 258);
+    --background: #0a0a0a;
+    --foreground: oklch(0.9702 0 0);
+    --surface: oklch(0.2178 0 0);
+    --surface-2: oklch(0.245 0 0);
+    --muted: oklch(0.7058 0 0);
+    --rule: oklch(0.285 0 0);
 
     --landed: oklch(0.78 0.13 155);
-    --checking: oklch(0.76 0.11 250);
-    --waiting: oklch(0.82 0.12 78);
-    --refused: oklch(0.73 0.15 25);
+    --checking: oklch(0.76 0.11 238);
+    --waiting: oklch(0.82 0.12 120);
+    --refused: oklch(0.68 0.2078 25.3313);
     --sealed: oklch(0.76 0.11 305);
 
-    --input: oklch(0.55 0.01 258);
-    --skeleton: oklch(0.36 0.01 258);
+    --input: oklch(0.52 0 0);
+    --skeleton: oklch(0.36 0 0);
 
     --syntax-string: oklch(0.8 0.035 200);
-    --syntax-constant: oklch(0.82 0.035 110);
+    --syntax-constant: oklch(0.82 0.035 340);
     --syntax-comment: var(--muted);
     --syntax-punctuation: var(--muted);
 
@@ -299,7 +315,12 @@
       transparent
     );
 
-    --popover: oklch(0.235 0.009 258);
+    --card: oklch(0.1822 0 0);
+    --popover: oklch(0.1822 0 0);
+    --primary: oklch(0.6333 0.0309 154.9039);
+    --primary-foreground: oklch(0 0 0);
+    --secondary: oklch(0.2178 0 0);
+    --accent: oklch(0.3709 0.0248 153.9823);
   }
 }
 

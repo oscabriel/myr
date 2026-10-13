@@ -46,7 +46,7 @@ const SHELL_WIDTH = "(min-width: 70rem)";
 
 /**
  * Ink, the role's colour left to the mark, so a list of waiting asks is not an
- * ochre stripe; a refusal keeps red and a landing green.
+ * olive stripe; a refusal keeps red and a landing green.
  */
 export const wordTone = (mark: StateMark) => {
   if (mark === "refused" || mark === "retry") {

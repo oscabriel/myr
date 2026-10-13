@@ -44,8 +44,8 @@ export const escapeHtml = (text: string) =>
 
 // The system's sans, since no font may load here.
 const STYLE = `
-:root{color-scheme:light dark;--paper:#f5f8fa;--ink:#14191f;--surface:#edf0f3;--muted:#595e65;--rule:#ced1d6;--input:#82868c;--refused:#b32322;--waiting:#875814;--selection:#175fa438}
-@media (prefers-color-scheme:dark){:root{--paper:#0e1114;--ink:#e9ebee;--surface:#171a1e;--muted:#a1a5ab;--rule:#32363b;--input:#6e7278;--refused:#f87e77;--waiting:#efba64;--selection:#79b6f438}}
+:root{color-scheme:light dark;--paper:#f8f7f4;--ink:#1a1f2e;--surface:#e8e6e1;--muted:#5d6371;--rule:#e8e6e1;--input:#79808f;--refused:#ae2325;--waiting:#516012;--selection:#0c628c38}
+@media (prefers-color-scheme:dark){:root{--paper:#0a0a0a;--ink:#f5f5f5;--surface:#1a1a1a;--muted:#a0a0a0;--rule:#2a2a2a;--input:#696969;--refused:#ff5451;--waiting:#bad074;--selection:#68bbef38}}
 *{box-sizing:border-box}
 body{margin:0;background-color:var(--paper);color:var(--ink);caret-color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:16px;line-height:1.5;-webkit-text-size-adjust:100%;text-size-adjust:100%}
 ::selection{background-color:var(--selection);color:var(--ink)}
