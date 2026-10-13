@@ -485,7 +485,7 @@ describe("the menu", () => {
     "folds the top bar's links below nav, in its order, and opens the keys",
     () =>
       Effect.gen(function* () {
-        const markup = yield* renderAt("/agents", <MenuBody />);
+        const markup = yield* renderAt("/install", <MenuBody />);
 
         expect(
           linksOf(markup).map(({ href, text }) => ({ href, text }))

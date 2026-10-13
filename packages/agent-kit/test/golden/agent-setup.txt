@@ -98,13 +98,13 @@ npx skills add https://web-test.example.workers.dev
 
 | Address | What it is |
 | --- | --- |
-| `https://web-test.example.workers.dev/llms.txt` | The index: how to take an ask, every command and every project. |
-| `https://web-test.example.workers.dev/llms-full.txt` | The rest in one file: every refusal, git here, how a landing happens, the events a watcher hears. |
+| [`https://web-test.example.workers.dev/llms.txt`](https://web-test.example.workers.dev/llms.txt) | The index: how to take an ask, every command and every project. |
+| [`https://web-test.example.workers.dev/llms-full.txt`](https://web-test.example.workers.dev/llms-full.txt) | The rest in one file: every refusal, git here, how a landing happens, the events a watcher hears. |
 | `https://web-test.example.workers.dev/<owner>/<name>/llms.txt` | One project: its posture, how to clone it and its open asks. |
 | `https://web-test.example.workers.dev/<owner>/<name>/asks/<ask>.md` | One ask's brief as Markdown. |
-| `https://web-test.example.workers.dev/agents.md` | Setup, the endpoints, the limits and the refusals as one Markdown file. |
-| `https://web-test.example.workers.dev/.well-known/mcp.json` | The MCP server's card: its endpoint, transport and protocol, and how to sign in. |
-| `https://web-test.example.workers.dev/.well-known/agent-skills/index.json` | Every project's contribute skill, with its digest. |
+| [`https://web-test.example.workers.dev/agents.md`](https://web-test.example.workers.dev/agents.md) | Setup, the endpoints, the limits and the refusals as one Markdown file. |
+| [`https://web-test.example.workers.dev/.well-known/mcp.json`](https://web-test.example.workers.dev/.well-known/mcp.json) | The MCP server's card: its endpoint, transport and protocol, and how to sign in. |
+| [`https://web-test.example.workers.dev/.well-known/agent-skills/index.json`](https://web-test.example.workers.dev/.well-known/agent-skills/index.json) | Every project's contribute skill, with its digest. |
 | `https://platform-test.example.workers.dev/mcp` | MCP over streamable HTTP, signed in over OAuth. |
 | `https://platform-test.example.workers.dev/<repo>.git` | Git over smart HTTP: clone a project, push an answer to your fork. |
 

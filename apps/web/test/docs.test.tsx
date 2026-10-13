@@ -263,7 +263,7 @@ describe("a page of the docs", () => {
   );
 
   it.effect(
-    "draws every limit and endpoint agent-kit gives on the Limits and endpoints page",
+    "draws every limit and endpoint agent-kit gives on the Limits and endpoints page, each endpoint a reader can open as a link",
     () =>
       Effect.gen(function* () {
         const markup = yield* renderAt(
@@ -279,6 +279,14 @@ describe("a page of the docs", () => {
             ...agentLimits().flatMap(({ limit, value }) => [limit, value]),
             ...agentEndpoints(input).flatMap(({ url, what }) => [url, what]),
           ].filter((words) => !text.includes(words))
+        ).toStrictEqual([]);
+        expect(
+          agentEndpoints(input)
+            .filter(
+              ({ readable, url }) =>
+                markup.includes(`href="${url}"`) !== readable
+            )
+            .map(({ url }) => url)
         ).toStrictEqual([]);
       })
   );

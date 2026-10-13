@@ -70,23 +70,26 @@ const snippetCount = channels.reduce(
 );
 
 describe("the Install page", () => {
-  it.effect("is titled Install, every heading in sentence case", () =>
-    Effect.gen(function* () {
-      const html = yield* page;
+  it.effect(
+    "is titled Install, every heading in sentence case and never mono",
+    () =>
+      Effect.gen(function* () {
+        const html = yield* page;
 
-      expect(html).toMatch(/<h1\b[^>]*>Install<\/h1>/u);
+        expect(html).toMatch(/<h1\b[^>]*>Install<\/h1>/u);
 
-      for (const { groups: found } of html.matchAll(
-        /<h(?<level>[1-4])\b(?<attributes>[^>]*)>(?<text>.*?)<\/h\k<level>>/gu
-      )) {
-        const words = textOf(found?.text ?? "");
+        for (const { groups: found } of html.matchAll(
+          /<h(?<level>[1-4])\b(?<attributes>[^>]*)>(?<text>.*?)<\/h\k<level>>/gu
+        )) {
+          const words = textOf(found?.text ?? "");
 
-        expect(found?.attributes).not.toContain("uppercase");
-        expect(
-          words === words.toUpperCase() && /[A-Z]/u.test(words)
-        ).toBeFalsy();
-      }
-    })
+          expect(found?.attributes).not.toContain("uppercase");
+          expect(found?.attributes).not.toContain("font-mono");
+          expect(
+            words === words.toUpperCase() && /[A-Z]/u.test(words)
+          ).toBeFalsy();
+        }
+      })
   );
 
   it.effect(

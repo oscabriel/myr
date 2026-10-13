@@ -216,7 +216,7 @@ describe("the reference", () => {
     ).toStrictEqual([]);
   });
 
-  it("names every limit and endpoint agent-kit gives, each with its value or what it is", () => {
+  it("names every limit and endpoint agent-kit gives, each with its value or what it is, and links each endpoint a reader can open", () => {
     const markdown = markdownOf("limits");
 
     expect(agentLimits().length).toBeGreaterThan(4);
@@ -230,7 +230,12 @@ describe("the reference", () => {
     expect(
       agentEndpoints(input)
         .filter(
-          ({ url, what }) => !markdown.includes(`| \`${url}\` | ${what} |`)
+          ({ readable, url, what }) =>
+            !markdown.includes(
+              readable
+                ? `| [\`${url}\`](${url}) | ${what} |`
+                : `| \`${url}\` | ${what} |`
+            )
         )
         .map(({ url }) => url)
     ).toStrictEqual([]);

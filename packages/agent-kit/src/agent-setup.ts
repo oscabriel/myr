@@ -73,29 +73,34 @@ export const stdioMcp = (): SetupChannel => ({
   useWhen: `Your client starts its MCP servers as local commands, or cannot sign in over OAuth: the CLI serves the same tools over stdio, with the token the CLI stored when you signed in.`,
 });
 
-export const theCli = ({
+/** The install script's snippet, the CLI's first step on `/agents.md` and the Install page alike. */
+export const installScript = ({
+  webUrl,
+}: Pick<SetupInput, "webUrl">): SetupSnippet => ({
+  label: "Install",
+  language: "sh",
+  name: "Install script",
+  text: installCommand(webUrl),
+});
+
+/** Signing in with the CLI, once its commands have `login`; none otherwise. */
+export const signIn = ({
   commands,
   platformUrl,
-  webUrl,
-}: SetupInput): SetupChannel => ({
-  snippets: [
-    {
-      label: "Install",
-      language: "sh",
-      name: "Install script",
-      text: installCommand(webUrl),
-    },
-    ...(hasCommand(commands, "login")
-      ? [
-          {
-            label: "Sign in once; git pushes with your token from then on",
-            language: "sh" as const,
-            name: "Sign in",
-            text: `${Brand.cli} login --url ${platformUrl}`,
-          },
-        ]
-      : []),
-  ],
+}: Pick<SetupInput, "commands" | "platformUrl">): readonly SetupSnippet[] =>
+  hasCommand(commands, "login")
+    ? [
+        {
+          label: "Sign in once; git pushes with your token from then on",
+          language: "sh",
+          name: "Sign in",
+          text: `${Brand.cli} login --url ${platformUrl}`,
+        },
+      ]
+    : [];
+
+export const theCli = (input: SetupInput): SetupChannel => ({
+  snippets: [installScript(input), ...signIn(input)],
   title: "The CLI",
   useWhen: `Your agent has a shell: it finds and claims asks, checks an answer before it pushes and reads verdicts with the CLI, and pushes with git.`,
 });
@@ -291,7 +296,7 @@ const synopsisLines = (commands: readonly CommandDoc[]) => [
   "",
 ];
 
-/** The endpoints as a section, for `/agents.md` and the docs' Limits and endpoints page alike. */
+/** The endpoints as a section, for `/agents.md` and the docs' Limits and endpoints page alike: one a reader can open is a link, a template or a protocol's address is not. */
 export const endpointLines = (
   input: Pick<SetupInput, "platformUrl" | "webUrl">
 ) => [
@@ -299,7 +304,10 @@ export const endpointLines = (
   "",
   ...table(
     ["Address", "What it is"],
-    agentEndpoints(input).map(({ url, what }) => [code(url), what])
+    agentEndpoints(input).map(({ readable, url, what }) => [
+      readable ? `[${code(url)}](${url})` : code(url),
+      what,
+    ])
   ),
   "",
 ];

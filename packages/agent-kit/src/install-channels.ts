@@ -5,10 +5,11 @@ import { Brand } from "@repo/brand";
 import {
   anyAgent,
   hasCommand,
+  installScript,
   remoteMcp,
+  signIn,
   skills,
   stdioMcp,
-  theCli,
 } from "./agent-setup.ts";
 import type { SetupInput, SetupSnippet } from "./agent-setup.ts";
 
@@ -58,17 +59,14 @@ const cli = (input: SetupInput) =>
     audience: "Terminal",
     id: "cli",
     links: [{ label: "Every command", page: true, path: "/docs/commands" }],
-    snippets: theCli(input).snippets.flatMap((snippet) =>
-      snippet.name === "Install script"
-        ? [
-            {
-              ...snippet,
-              label: "The script, for Linux on x64 and macOS on Apple silicon",
-            },
-            npm,
-          ]
-        : [snippet]
-    ),
+    snippets: [
+      {
+        ...installScript(input),
+        label: "The script, for Linux on x64 and macOS on Apple silicon",
+      },
+      npm,
+      ...signIn(input),
+    ],
     summary:
       "Find and claim asks, check an answer on your machine with the gate's first stage before you push, and read verdicts. You push with plain git.",
     title: "The CLI",
