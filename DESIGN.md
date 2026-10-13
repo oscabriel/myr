@@ -124,8 +124,6 @@ spacing:
   column-docs-nav: "15rem"
   column-docs-toc: "13.75rem"
   measure: "72ch"
-  inspector: "20rem"
-  inspector-codefacts: "22rem"
   row-phone: "88px"
 components:
   top-bar:
@@ -390,12 +388,10 @@ From `columns` (1100 px, `--breakpoint-columns`) a side column stands beside its
 - **A command at most once per screen.** As content, a command sits in a popover, a single strip or a card. Never a column of code blocks.
 - **Prose stops at 72 to 80ch.** Lists and tables run to the container; prose, a README and a doc's article stop at `--measure` (72ch).
 
-**Until the shells land** (issue 02), pages still render through the old `Workspace`, whose inspector is `inspector` (20rem) and `inspector-codefacts` (22rem) wide; those two spacing values describe that code and retire with it.
-
 ### Inside a page
 
 1. **Top bar**, sticky (below).
-2. **Page header**: on a project, the project header and its tabs, sticky under the top bar; elsewhere the page's title and one line under it, not sticky.
+2. **Page header**: on a project, the project header and its tabs, sticky under the top bar; elsewhere the page's title and one line under it, not sticky. A page's facts follow its head inside the page, never in a column beside it.
 3. **Toolbar**, 40 px, sticky under the header on list and code pages.
 4. **Content**: rows under sticky group headers, a document of regions 32 px apart, cards in a grid where a page lists projects, or code.
 

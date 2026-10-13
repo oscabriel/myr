@@ -83,7 +83,7 @@ const Landing = () => {
 };
 
 export const Route = createFileRoute("/")({
-  staticData: { shell: "bare" },
+  staticData: { shell: "site" },
   loader: () => landingData(),
   head: landingHead,
   headers: landingHeaders,

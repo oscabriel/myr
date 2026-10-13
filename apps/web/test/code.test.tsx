@@ -52,6 +52,7 @@ import {
   Route as TreeRoute,
 } from "../src/routes/$owner/$project/tree/$rev/$.tsx";
 import { Route as WhyRoute } from "../src/routes/$owner/$project/why/$rev/$.tsx";
+import { elementWith } from "./records.ts";
 import { renderAt } from "./render.tsx";
 import { reachingTransport } from "./transport.ts";
 
@@ -291,12 +292,15 @@ const diff = decodeDiff({
   truncated: false,
 });
 
-const mainOf = (markup: string) =>
-  /<main\b[\s\S]*?<\/main>/u.exec(markup)?.[0] ?? "";
+const factsOf = (markup: string) => elementWith(markup, 'data-facts="inline"');
 
-const inspectorOf = (markup: string) =>
-  /<aside\b[^>]*data-facts="inspector"[\s\S]*?<\/aside>/u.exec(markup)?.[0] ??
-  "";
+/** The main region without its facts, which sit inside it. */
+const mainOf = (markup: string) => {
+  const main = /<main\b[\s\S]*?<\/main>/u.exec(markup)?.[0] ?? "";
+  const facts = factsOf(main);
+
+  return facts === "" ? main : main.replace(facts, "");
+};
 
 const countIn = (text: string, part: string) => text.split(part).length - 1;
 
@@ -533,13 +537,13 @@ describe(BlobView, () => {
       `/oscabriel/datekit/raw/${AT}/src/format/parse.ts`,
       `/oscabriel/datekit/blob/${AT}/src/format/parse.ts`,
     ]);
-    expect(hrefsOf(inspectorOf(markup))).toContain(
+    expect(hrefsOf(factsOf(markup))).toContain(
       "/oscabriel/datekit/commits/main?path=src%2Fformat%2Fparse.ts"
     );
   });
 
   it("names the last landing's ask in This file, before its SHA", () => {
-    const facts = inspectorOf(markupOf(page));
+    const facts = factsOf(markupOf(page));
     const text = facts.replaceAll(/<[^>]+>/gu, "");
 
     expect(facts).toContain("This file");
@@ -1092,7 +1096,7 @@ describe(CommitView, () => {
   });
 
   it("counts the diff in the inspector: files, additions and deletions, split by path", () => {
-    const facts = inspectorOf(
+    const facts = factsOf(
       markupOf(
         <CommitView
           diff={long}

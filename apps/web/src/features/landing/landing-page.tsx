@@ -3,19 +3,11 @@ import { Brand } from "@repo/brand";
 import type { ReactNode } from "react";
 
 import { buttonVariants } from "../../components/ui/button.tsx";
-import { signInHref } from "../auth/session-slot.tsx";
 import { postureLabel } from "../project/posture-label.ts";
 import { ID, LINK } from "../shared/classes.ts";
 import { CommandLine } from "../shared/command.tsx";
-import { SkipLink } from "../shared/layout.tsx";
 import { AppLink } from "../shared/link.tsx";
-import {
-  ASKS_PATH,
-  IMPORT_PATH,
-  docsPath,
-  HOME_PATH,
-  projectPath,
-} from "../shared/paths.ts";
+import { ASKS_PATH, IMPORT_PATH, projectPath } from "../shared/paths.ts";
 import { UnreachableNotice } from "../shared/pending.tsx";
 import { PostureBadge } from "../shared/posture.tsx";
 import { LandingProjects } from "./projects.ts";
@@ -25,8 +17,6 @@ import { LEDE, WHAT_IT_IS } from "./words.ts";
 const ROW_LINK = "no-underline hover:underline";
 
 const PRIMARY = buttonVariants({ className: "no-underline" });
-
-const AGENTS_PATH = "/agents";
 
 const Code = ({ children }: { readonly children: ReactNode }) => (
   <code className={ID}>{children}</code>
@@ -170,28 +160,6 @@ const POWERS: readonly Power[] = [
   },
 ];
 
-const Top = () => (
-  <header className="border-rule flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b py-4">
-    <AppLink className="text-want font-semibold no-underline" to="/">
-      {Brand.name}
-    </AppLink>
-    <nav aria-label="Site" className="text-ui flex flex-wrap gap-x-5 gap-y-1">
-      <AppLink className={ROW_LINK} to={ASKS_PATH}>
-        Asks
-      </AppLink>
-      <AppLink className={ROW_LINK} to={docsPath()}>
-        Docs
-      </AppLink>
-      <AppLink className={ROW_LINK} to={AGENTS_PATH}>
-        For agents
-      </AppLink>
-      <a className={ROW_LINK} href={signInHref(HOME_PATH)}>
-        Sign in
-      </a>
-    </nav>
-  </header>
-);
-
 const Printed = ({
   tag,
   text,
@@ -280,9 +248,7 @@ export const LandingView = ({
   readonly projects: LandingProjects;
   readonly webUrl: string;
 }) => (
-  <div className="tablet:px-8 mx-auto flex min-h-dvh max-w-3xl flex-col px-4">
-    <SkipLink />
-    <Top />
+  <div className="tablet:px-8 mx-auto flex w-full max-w-3xl flex-1 flex-col px-4">
     <main
       className="flex flex-1 flex-col gap-12 py-12 outline-none"
       id="main"
@@ -357,21 +323,15 @@ export const LandingView = ({
             Import a repo
           </AppLink>
         </p>
+        <p className="text-ui flex flex-wrap gap-x-5 gap-y-2">
+          <a className={`${ROW_LINK} ${ID}`} href="/llms.txt">
+            /llms.txt
+          </a>
+          <a className={`${ROW_LINK} ${ID}`} href={platformUrl}>
+            {platformUrl.replace(/^https?:\/\//u, "")}
+          </a>
+        </p>
       </Part>
     </main>
-    <footer className="border-rule text-ui flex flex-wrap gap-x-5 gap-y-2 border-t py-6">
-      <AppLink className={ROW_LINK} to={docsPath()}>
-        Docs
-      </AppLink>
-      <AppLink className={ROW_LINK} to={AGENTS_PATH}>
-        For agents
-      </AppLink>
-      <a className={`${ROW_LINK} ${ID}`} href="/llms.txt">
-        /llms.txt
-      </a>
-      <a className={`${ROW_LINK} ${ID}`} href={platformUrl}>
-        {platformUrl.replace(/^https?:\/\//u, "")}
-      </a>
-    </footer>
   </div>
 );

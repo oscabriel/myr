@@ -227,7 +227,7 @@ const DecisionBar = ({
 }) => (
   <section
     aria-label="Your choice"
-    className="border-rule bg-background codefacts:hidden flex shrink-0 flex-wrap items-start gap-x-6 gap-y-2 border-t px-4 py-3"
+    className="border-rule bg-background flex shrink-0 flex-wrap items-start gap-x-6 gap-y-2 border-t px-4 py-3"
     data-decision-bar=""
   >
     {decision.decided === undefined ? (

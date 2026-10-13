@@ -272,7 +272,6 @@ const ProjectGroup = ({
   group,
   listing,
   now,
-  onSelect,
   parents,
   selected,
   stamps,
@@ -282,7 +281,6 @@ const ProjectGroup = ({
   readonly now: DateTime.Utc;
   readonly parents: readonly Ask[];
   readonly selected: string | undefined;
-  readonly onSelect: (id: string) => void;
   readonly stamps: ReadonlySet<AskId>;
 }) => {
   const { entries, items, project, states } = group;
@@ -293,7 +291,6 @@ const ProjectGroup = ({
       key={listingOf.ask}
       listing={listingOf}
       now={now}
-      onSelect={onSelect}
       progress={states.get(listingOf.ask)}
       project={project}
       selected={selected === listingOf.ask}
@@ -439,7 +436,7 @@ export const FrontPageView = ({
     })
   );
 
-  const { select, selected } = useRowSelection(rowIds(groups), "ask");
+  const { selected } = useRowSelection(rowIds(groups), "ask");
   const picked = entries.find(({ ask }) => ask.ask === selected);
 
   return (
@@ -507,7 +504,6 @@ export const FrontPageView = ({
                 ({ project }) => project === group.project
               )}
               now={now}
-              onSelect={select}
               parents={parents}
               selected={selected}
               stamps={stampsOf?.(group.project) ?? new Set()}

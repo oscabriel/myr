@@ -87,17 +87,15 @@ export const CopyCommand = ({ command }: { readonly command: string }) => {
 export const ContextBar = ({
   count,
   crumbs,
-  end,
   primaryCommand,
   state,
 }: {
   readonly count?: string | undefined;
   readonly crumbs: readonly Crumb[];
-  readonly end?: ReactNode;
   readonly primaryCommand?: string | undefined;
   readonly state?: ReactNode;
 }) => (
-  <div className="border-rule bg-background tablet:px-5 shell:sticky shell:top-0 shell:px-6 z-20 flex h-11 shrink-0 items-center gap-3 border-b px-4">
+  <div className="border-rule bg-background tablet:px-5 shell:px-6 flex h-11 shrink-0 items-center gap-3 border-b px-4">
     <Breadcrumb crumbs={crumbs} />
     <div className="ml-auto flex shrink-0 items-center gap-3">
       {count === undefined ? null : (
@@ -111,7 +109,6 @@ export const ContextBar = ({
       {primaryCommand === undefined ? null : (
         <CopyCommand command={primaryCommand} />
       )}
-      {end}
     </div>
   </div>
 );

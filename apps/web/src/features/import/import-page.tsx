@@ -46,7 +46,7 @@ export const ImportView = ({
         here={here}
         prefill={url === "" ? undefined : { url }}
       />
-      <div className="shell:hidden border-rule flex flex-col border-t pt-4">
+      <div className="border-rule flex flex-col border-t pt-4">
         <ImportFacts />
       </div>
     </Workspace>

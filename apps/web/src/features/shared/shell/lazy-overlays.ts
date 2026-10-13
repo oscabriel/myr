@@ -7,7 +7,3 @@ import { lazy } from "react";
 export const LazyOverlays = import.meta.env.SSR
   ? undefined
   : lazy(() => import("./overlays.tsx"));
-
-export const LazyFactsSheet = import.meta.env.SSR
-  ? undefined
-  : lazy(() => import("./facts-sheet.tsx"));

@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 
 import { TABLET_QUERY, useMedia } from "../../../../features/code/media.ts";
-import { CodeFiles, CommitFiles } from "./-rail-body.tsx";
+import { CodeFiles, CommitFiles } from "./-column-body.tsx";
 
 const FilesSheet = ({
   commit,

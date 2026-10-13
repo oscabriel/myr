@@ -326,7 +326,7 @@ export const ProposeView = ({
       >
         {children}
       </ProposeBody>
-      <div className="shell:hidden border-rule flex flex-col border-t pt-4">
+      <div className="border-rule flex flex-col border-t pt-4">
         <GoodWant />
       </div>
     </Workspace>

@@ -24,6 +24,7 @@ const DocsIndex = () => {
 };
 
 export const Route = createFileRoute("/docs/")({
+  staticData: { shell: "docs" },
   component: DocsIndex,
   headers: () => branchPage,
   head: docsIndexHead,

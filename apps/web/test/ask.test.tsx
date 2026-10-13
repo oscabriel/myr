@@ -55,9 +55,6 @@ const inPre = (markup: string) =>
 const mainOf = (markup: string) =>
   /<main\b[^>]*>(?<inner>.*)<\/main>/su.exec(markup)?.groups?.inner ?? "";
 
-const asideOf = (markup: string) =>
-  /<aside\b[^>]*>(?<inner>.*)<\/aside>/su.exec(markup)?.groups?.inner ?? "";
-
 const trailOf = (markup: string) =>
   /<nav aria-label="Breadcrumb"[^>]*>(?<inner>.*?)<\/nav>/su.exec(markup)
     ?.groups?.inner ?? "";
@@ -335,7 +332,7 @@ describe(AskView, () => {
     expect(text).toContain("Open to take");
     expect(text).not.toContain("Waits on");
     expect(text).not.toContain("to land first");
-    expect(asideOf(markup)).toContain(`data-family="${parent.id}"`);
+    expect(mainOf(markup)).toContain(`data-family="${parent.id}"`);
   });
 
   it("says a family's parent waits for its family in the family's terms, never as a list of ids", () => {

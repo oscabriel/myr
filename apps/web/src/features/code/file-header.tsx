@@ -279,12 +279,12 @@ export const FileHeader = ({
 }) => (
   <>
     {files === undefined ? null : (
-      <div className="shell:hidden flex shrink-0">{files}</div>
+      <div className="columns:hidden flex shrink-0">{files}</div>
     )}
     <div className="flex min-w-0 flex-1 items-center gap-3">
       <PathTrail path={path} project={project} rev={rev} />
       {file === undefined ? null : (
-        <p className="text-ui text-muted-foreground diffsplit:block codefacts:hidden hidden min-w-0 truncate tabular-nums">
+        <p className="text-ui text-muted-foreground diffsplit:block hidden min-w-0 truncate tabular-nums">
           {fileWords(file).join(" · ")}
         </p>
       )}

@@ -1,7 +1,7 @@
 import { Option } from "effect";
 
 import { Sheet, SheetContent } from "../../components/ui/sheet.tsx";
-import { FinishFiles, useFinish } from "./finish-rail-body.tsx";
+import { FinishFiles, useFinish } from "./finish-column-body.tsx";
 
 const FinishFilesSheet = ({
   onOpenChange,

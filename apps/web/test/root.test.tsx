@@ -10,6 +10,15 @@ import { themeColors } from "../src/features/shared/theme.ts";
 import { getRouter } from "../src/router.tsx";
 import { rootHead, ThemeColors } from "../src/routes/__root.tsx";
 
+// The source as text: what the root imports, read without running it.
+const [rootSource = ""] = Object.values(
+  import.meta.glob<string>("../src/routes/__root.tsx", {
+    eager: true,
+    import: "default",
+    query: "?raw",
+  })
+);
+
 describe("the document's head", () => {
   it("gives each meta a name of its own, since TanStack keeps one per name", () => {
     const names = rootHead().meta.flatMap((meta) =>
@@ -102,5 +111,23 @@ describe("the router", () => {
   it("scrolls each new page's main pane back to its top", () => {
     expect(options.scrollRestoration).toBeTruthy();
     expect(options.scrollToTopSelectors).toContain("#main");
+  });
+});
+
+describe("the root's reads", () => {
+  // The rail's Today count loaded with every page; the account's inbox count
+  // is fetched, with its read, only once a signed-in reader's page is up.
+  it("reach the inbox's count only through a lazy import", () => {
+    expect(rootSource).not.toMatch(/^import\b[^;]*client\/today/mu);
+    expect(rootSource).toContain(
+      'lazy(() => import("../features/account/inbox-count.tsx"))'
+    );
+  });
+
+  it("read the project list only in the reader the search mounts", () => {
+    expect(rootSource).not.toContain("projectsAtom");
+    expect(rootSource).toMatch(
+      /const ReadProjects[^=]*= \(\{ children \}\) =>\s*children\(useProjectList\(\)\)/u
+    );
   });
 });

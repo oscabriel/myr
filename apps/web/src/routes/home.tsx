@@ -26,6 +26,7 @@ const HomePage = () => {
 };
 
 export const Route = createFileRoute("/home")({
+  staticData: { shell: "project" },
   loader: () => homePage(),
   shouldReload: reloadOnEnter,
   headers: homeHeaders,

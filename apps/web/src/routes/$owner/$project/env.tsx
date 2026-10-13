@@ -13,11 +13,11 @@ import { DateTime, Effect, Option, Schema } from "effect";
 import { AsyncResult, Atom } from "effect/reactivity";
 
 import { envSchemaAtom } from "../../../client/env.ts";
+import { useProjectList } from "../../../client/front.ts";
 import { watchAtom } from "../../../client/watch.ts";
 import { EnvView, NothingLanded } from "../../../features/env/env-page.tsx";
 import { UnknownProjectView } from "../../../features/project/unknown-project.tsx";
 import { pageHead } from "../../../features/shared/head.ts";
-import { useProjectList } from "../../../features/shared/shell/context.ts";
 import { branchPage } from "../../../server/cache-headers.ts";
 import { serverClient } from "../../../server/client.ts";
 
@@ -113,6 +113,7 @@ const Unknown = () => {
 };
 
 export const Route = createFileRoute("/$owner/$project/env")({
+  staticData: { shell: "project" },
   loader: ({ params }) => envPage({ data: params.project }),
   headers: () => branchPage,
   head: ({ params: { project } }) =>

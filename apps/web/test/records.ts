@@ -1,4 +1,4 @@
-// A page's facts render twice, inline for narrow screens and in the inspector, so a test reads one pane at a time.
+// A page's facts sit in the page above its content, so a test reads them apart from the rest of the main region.
 
 const balancedAt = (markup: string, start: number) => {
   const tag = /^<(?<name>[a-z0-9]+)/u.exec(markup.slice(start))?.groups?.name;
@@ -48,5 +48,5 @@ export const mainOf = (markup: string) => {
   return inline === "" ? main : main.replace(inline, "");
 };
 
-export const inspectorOf = (markup: string) =>
-  elementWith(markup, 'data-facts="inspector"');
+export const factsOf = (markup: string) =>
+  elementWith(markup, 'data-facts="inline"');

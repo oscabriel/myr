@@ -3,7 +3,6 @@ import type { Decision, Today } from "@repo/protocol/domain/decision";
 import type { LandingView } from "@repo/protocol/domain/landing";
 import { Array as Arr, Option, Order } from "effect";
 import type { DateTime } from "effect";
-import { constVoid } from "effect/Function";
 import { AsyncResult } from "effect/reactivity";
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
@@ -83,7 +82,7 @@ const OpenHere = ({
     aria-controls={`here-${decisionKey(decision).replace("/", "-")}`}
     aria-expanded={open}
     aria-label={`${open ? "Close" : "Decide"} here: ${describeSubject(decision.subject)}`}
-    className="text-muted-foreground hover:text-foreground hover:bg-surface shell:hidden relative z-10 inline-flex size-11 shrink-0 items-center justify-center transition-colors duration-[120ms]"
+    className="text-muted-foreground hover:text-foreground hover:bg-surface relative z-10 inline-flex size-11 shrink-0 items-center justify-center transition-colors duration-[120ms]"
     onClick={onToggle}
     type="button"
   >
@@ -99,7 +98,6 @@ interface RowsProps {
   readonly busy: boolean;
   readonly now: DateTime.Utc;
   readonly onDecide: (input: DecideInput) => void;
-  readonly onSelect: ((key: string) => void) | undefined;
   readonly open: string | undefined;
   readonly onOpen: (key: string | undefined) => void;
   readonly selected: string | undefined;
@@ -163,13 +161,12 @@ const DecisionRow = ({
           consequenceOf(decision.subject, choice)
         )
       }
-      onSelect={props.onSelect}
       selected={props.selected === key}
       state={state}
       strip={
         choice === undefined ? (
           <div
-            className={`shell:hidden pr-2 ${isOpen ? "animate-in fade-in-0 slide-in-from-top-1 pb-1 duration-[180ms]" : "hidden"}`}
+            className={`pr-2 ${isOpen ? "animate-in fade-in-0 slide-in-from-top-1 pb-1 duration-[180ms]" : "hidden"}`}
             id={`here-${key.replace("/", "-")}`}
           >
             <DecisionCard
@@ -466,7 +463,6 @@ const ListedToday = ({
   decided,
   now,
   onDecide,
-  onSelect,
   selected,
   today,
 }: {
@@ -478,7 +474,6 @@ const ListedToday = ({
     unknown
   >;
   readonly selected: string | undefined;
-  readonly onSelect: ((key: string) => void) | undefined;
 }) => {
   const [kept, setKept] = useState<ReadonlyMap<string, Listed>>(new Map());
   const [open, setOpen] = useState<string>();
@@ -500,9 +495,7 @@ const ListedToday = ({
 
   const listed = listedOf(today, taken);
   const keys = listed.map(({ decision }) => decisionKey(decision));
-  const select = onSelect ?? constVoid;
-
-  useListKeys(keys, select);
+  useListKeys(keys);
 
   const shown =
     listed.find(({ decision }) => decisionKey(decision) === selected) ??
@@ -527,7 +520,6 @@ const ListedToday = ({
     now,
     onDecide,
     onOpen: setOpen,
-    onSelect,
     open,
     selected,
     stamped,
@@ -587,7 +579,6 @@ export const TodayView = ({
   decided = AsyncResult.initial(),
   now,
   onDecide,
-  onSelect,
   read,
   selected,
 }: {
@@ -599,7 +590,6 @@ export const TodayView = ({
     unknown
   >;
   readonly selected?: string | undefined;
-  readonly onSelect?: ((key: string) => void) | undefined;
 }) =>
   TodayRead.match(read, {
     Read: ({ today }) => (
@@ -607,7 +597,6 @@ export const TodayView = ({
         decided={decided}
         now={now}
         onDecide={onDecide}
-        onSelect={onSelect}
         selected={selected}
         today={today}
       />

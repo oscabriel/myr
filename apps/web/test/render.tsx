@@ -14,7 +14,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { addressRewrite, projectParams } from "../src/server/addresses.ts";
 
 export interface RenderOptions {
-  readonly rail?: ComponentType;
+  readonly column?: ComponentType;
 }
 
 const routesFor = (view: ReactNode, options: RenderOptions) => {
@@ -24,30 +24,37 @@ const routesFor = (view: ReactNode, options: RenderOptions) => {
     getParentRoute: () => root,
     params: projectParams,
     path: "$owner/$project",
+    staticData: { shell: "project" },
   });
 
   return root.addChildren([
     createRoute({
       getParentRoute: () => root,
       path: "/",
-      staticData: { shell: "bare" },
+      staticData: { shell: "site" },
     }),
-    createRoute({ getParentRoute: () => root, path: "asks" }),
-    createRoute({ getParentRoute: () => root, path: "home" }),
-    createRoute({ getParentRoute: () => root, path: "import" }),
-    createRoute({ getParentRoute: () => root, path: "today" }),
-    createRoute({ getParentRoute: () => root, path: "docs" }),
-    createRoute({ getParentRoute: () => root, path: "docs/$page" }),
-    createRoute({ getParentRoute: () => root, path: "agents" }),
-    createRoute({ getParentRoute: () => root, path: "people/$handle" }),
+    ...(
+      [
+        ["asks", "site"],
+        ["home", "project"],
+        ["import", "focus"],
+        ["today", "project"],
+        ["docs", "docs"],
+        ["docs/$page", "docs"],
+        ["agents", "site"],
+        ["people/$handle", "project"],
+      ] as const
+    ).map(([path, shell]) =>
+      createRoute({ getParentRoute: () => root, path, staticData: { shell } })
+    ),
     project.addChildren([
       createRoute({ getParentRoute: () => project, path: "/" }),
-      options.rail === undefined
+      options.column === undefined
         ? createRoute({ getParentRoute: () => project, path: "$" })
         : createRoute({
             getParentRoute: () => project,
             path: "$",
-            staticData: { rail: options.rail },
+            staticData: { column: options.column },
           }),
     ]),
   ]);

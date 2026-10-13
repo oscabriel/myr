@@ -294,7 +294,7 @@ export const DiffToolbar = ({
 }) => (
   <>
     {files === undefined ? null : (
-      <div className="shell:hidden flex shrink-0">{files}</div>
+      <div className="columns:hidden flex shrink-0">{files}</div>
     )}
     <fieldset className="border-input diffsplit:flex m-0 hidden min-w-0 border p-0">
       <legend className="sr-only">Diff layout</legend>

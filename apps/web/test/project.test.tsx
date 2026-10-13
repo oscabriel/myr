@@ -42,6 +42,7 @@ import { stampStep } from "../src/features/front/stamps.ts";
 import { ImportOffer, offerFor } from "../src/features/import/import-offer.tsx";
 import { recentShown } from "../src/features/project/landings.tsx";
 import { postureWord } from "../src/features/project/posture-label.ts";
+import { PostureMark } from "../src/features/project/posture-mark.tsx";
 import {
   ProjectView,
   heldBackOf,
@@ -50,7 +51,6 @@ import {
 import type { ProjectViewProps } from "../src/features/project/project-page.tsx";
 import { UnknownProjectView } from "../src/features/project/unknown-project.tsx";
 import { askStates } from "../src/features/shared/ask-progress.ts";
-import { PostureMark } from "../src/features/shared/shell/rail.tsx";
 import {
   ProjectPageData,
   readProjectPage,
@@ -81,8 +81,8 @@ const foundIn = (text: string, parts: readonly string[]) =>
 const mainOf = (markup: string) =>
   markup.slice(markup.indexOf("<main"), markup.indexOf("</main>"));
 
-const inspectorOf = (markup: string) =>
-  markup.slice(markup.indexOf('data-facts="inspector"'));
+const factsOf = (markup: string) =>
+  markup.slice(markup.indexOf('data-facts="inline"'));
 
 const now = DateTime.makeUnsafe("2026-10-07T12:00:00Z");
 
@@ -384,7 +384,7 @@ describe(ProjectView, () => {
           "Gate: 7 stages · maintainers set for 1 path · 7 sealed checks in 1 area · last landed 1 d ago"
         );
         expect(rule).toContain('href="/oscabriel/datekit/ledger"');
-        expect(inspectorOf(markup)).not.toContain("data-posture=");
+        expect(factsOf(markup)).not.toContain("data-posture=");
       })
   );
 
@@ -392,7 +392,7 @@ describe(ProjectView, () => {
     "says how a change lands here: the gate, who decides, what is held back",
     () =>
       Effect.gen(function* () {
-        const facts = inspectorOf(
+        const facts = factsOf(
           yield* page({
             deciders: [
               {
@@ -427,7 +427,7 @@ describe(ProjectView, () => {
     "names where an imported project came from, with its branch, as a copy read-only here; and nothing for one that started empty",
     () =>
       Effect.gen(function* () {
-        const facts = inspectorOf(
+        const facts = factsOf(
           yield* page({
             importedFrom: {
               branch: "master",
@@ -449,9 +449,7 @@ describe(ProjectView, () => {
         expect(facts).toMatch(
           /<a[^>]*href="https:\/\/github\.com\/dtolnay\/anyhow"[^>]*rel="noreferrer"/u
         );
-        expect(textIn(inspectorOf(yield* page()))).not.toContain(
-          "Imported from"
-        );
+        expect(textIn(factsOf(yield* page()))).not.toContain("Imported from");
       })
   );
 
@@ -459,7 +457,7 @@ describe(ProjectView, () => {
     "gives the four commands that take part, numbered, and the last three landings as one-line credits",
     () =>
       Effect.gen(function* () {
-        const facts = inspectorOf(yield* page());
+        const facts = factsOf(yield* page());
         const text = textIn(facts);
 
         const steps = [
@@ -720,7 +718,7 @@ describe("the project's home as the server sends it", () => {
           ])
         ).toStrictEqual([]);
 
-        const facts = inspectorOf(markup);
+        const facts = factsOf(markup);
 
         expect(textIn(facts)).toContain("How a change lands here");
         expect(
@@ -781,7 +779,7 @@ describe("the project's home as the server sends it", () => {
 
         expect({
           badges: markup.match(/data-posture="/gu)?.length ?? 0,
-          open: textIn(inspectorOf(markup)).includes("Everything it ships"),
+          open: textIn(factsOf(markup)).includes("Everything it ships"),
         }).toStrictEqual({ badges: 0, open: false });
       }),
     seededWorld

@@ -143,6 +143,7 @@ const AnswerNotFound = ({ data }: { readonly data?: unknown }) => {
 };
 
 export const Route = createFileRoute("/$owner/$project/answers/$ask")({
+  staticData: { shell: "project" },
   // TanStack infers each option from the ones before it, so the search comes
   // before the loader that reads it.
   validateSearch: ({ head }: { readonly head?: unknown }) =>

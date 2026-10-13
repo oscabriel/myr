@@ -14,8 +14,6 @@ const PARTS = [
 const LINK =
   "decoration-rule hover:decoration-foreground underline underline-offset-4";
 
-const EXACT = { exact: true, includeSearch: false } as const;
-
 export const DocsIndexView = ({
   pages,
 }: {
@@ -47,45 +45,12 @@ export const DocsIndexView = ({
   </Workspace>
 );
 
-const Contents = ({ pages }: { readonly pages: readonly DocPage[] }) => (
-  <nav aria-label="Docs">
-    {PARTS.map(({ part, title }) => (
-      <div className="mb-3" key={part}>
-        <h3 className="text-label text-muted-foreground pb-1">{title}</h3>
-        <ul className="flex flex-col gap-px">
-          {pages
-            .filter((page) => page.part === part)
-            .map(({ slug, title: pageTitle }) => (
-              <li key={slug}>
-                <AppLink
-                  activeOptions={EXACT}
-                  className="text-ui hover:bg-surface [&[aria-current]]:bg-surface flex min-h-8 items-center px-2 no-underline [&[aria-current]]:font-semibold"
-                  to={docsPath(slug)}
-                >
-                  {pageTitle}
-                </AppLink>
-              </li>
-            ))}
-        </ul>
-      </div>
-    ))}
-  </nav>
-);
-
 const bodyOf = ({ markdown, summary, title }: DocPage) =>
   markdown.slice(`# ${title}\n\n${summary}\n\n`.length);
 
-export const DocsPageView = ({
-  page,
-  pages,
-}: {
-  readonly page: DocPage;
-  readonly pages: readonly DocPage[];
-}) => (
+export const DocsPageView = ({ page }: { readonly page: DocPage }) => (
   <Workspace
     crumbs={[{ label: "Docs", to: docsPath() }, { label: page.title }]}
-    facts={<Contents pages={pages} />}
-    factsHeading="Docs"
     meta={
       <>
         {page.summary} As Markdown:{" "}

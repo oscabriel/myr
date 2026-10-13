@@ -89,11 +89,11 @@ export const FinishFiles = ({ finish }: { readonly finish: Finish }) => {
   );
 };
 
-export const FinishRailFiles = () =>
+export const FinishColumnFiles = () =>
   Option.match(useFinish(), {
     onNone: () => null,
     onSome: (found) => <FinishFiles finish={found} />,
   });
 
 // `React.lazy` takes a module's default export.
-export default FinishRailFiles;
+export default FinishColumnFiles;

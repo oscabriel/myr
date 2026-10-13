@@ -21,6 +21,7 @@ const AgentsPage = () => {
 };
 
 export const Route = createFileRoute("/agents")({
+  staticData: { shell: "site" },
   component: AgentsPage,
   headers: () => branchPage,
   head: () =>

@@ -62,7 +62,7 @@ describe("a page of the docs", () => {
 
         const markup = yield* renderAt(
           "/docs/answer-an-ask",
-          <DocsPageView page={page} pages={pages} />
+          <DocsPageView page={page} />
         );
 
         expect(markup.match(/<h1\b[^>]*>[^<]*<\/h1>/gu)).toStrictEqual([
@@ -87,7 +87,7 @@ describe("a page of the docs", () => {
     Effect.gen(function* () {
       const markup = yield* renderAt(
         "/docs/refusals",
-        <DocsPageView page={pageNamed("refusals")} pages={pages} />
+        <DocsPageView page={pageNamed("refusals")} />
       );
 
       expect(markup).toContain("<table");

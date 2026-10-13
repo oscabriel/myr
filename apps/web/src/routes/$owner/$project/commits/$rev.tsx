@@ -98,6 +98,7 @@ const LogPage = () => {
 };
 
 export const Route = createFileRoute("/$owner/$project/commits/$rev")({
+  staticData: { shell: "project" },
   validateSearch: (search: {
     readonly from?: unknown;
     readonly path?: unknown;

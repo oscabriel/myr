@@ -3,7 +3,7 @@ import type { ClaimState } from "@repo/protocol/domain/claim";
 import { Outcome } from "@repo/protocol/domain/outcome";
 import type { ProjectName } from "@repo/protocol/ids";
 import type { DateTime } from "effect";
-import type { MouseEvent, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Fragment } from "react";
 
 import type { AskProgress } from "./ask-progress.ts";
@@ -38,11 +38,8 @@ export interface RowProps {
   >;
   readonly size?: "two-line" | "one-line";
   readonly selected?: boolean | undefined;
-  readonly onSelect?: ((id: string) => void) | undefined;
   readonly mono?: boolean;
 }
-
-const SHELL_WIDTH = "(min-width: 70rem)";
 
 /**
  * Ink, the role's colour left to the mark, so a list of waiting asks is not an
@@ -55,10 +52,6 @@ export const wordTone = (mark: StateMark) => {
 
   return mark === "landed" ? STATE_MARKS.landed.tone : "text-foreground";
 };
-
-const onControl = (target: EventTarget) =>
-  target instanceof Element &&
-  target.closest("a, button, summary, input, select, textarea") !== null;
 
 export const MetaLine = ({
   parts,
@@ -89,20 +82,6 @@ export const territoryPart = (territory: string) =>
 
 const LINK =
   "text-foreground no-underline outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-ring focus-visible:after:outline-solid";
-
-const SELECTS = "shell:after:pointer-events-none";
-
-const selectOnPress =
-  (id: string, onSelect: ((id: string) => void) | undefined) =>
-  (event: MouseEvent<HTMLLIElement>) => {
-    if (
-      onSelect !== undefined &&
-      !onControl(event.target) &&
-      globalThis.matchMedia(SHELL_WIDTH).matches
-    ) {
-      onSelect(id);
-    }
-  };
 
 const StateEnd = ({
   state,
@@ -139,7 +118,6 @@ export const Row = ({
   id,
   meta,
   mono = false,
-  onSelect,
   search,
   selected = false,
   size = "two-line",
@@ -153,7 +131,7 @@ export const Row = ({
   const link = (
     <AppLink
       aria-current={selected ? "true" : undefined}
-      className={onSelect === undefined ? LINK : `${LINK} ${SELECTS}`}
+      className={LINK}
       data-list-key={id}
       data-said=""
       search={search}
@@ -176,13 +154,7 @@ export const Row = ({
   }`;
 
   return (
-    // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- selecting by a click off the link is the pointer's twin of j and k
-    <li
-      className={rowClass}
-      data-selected={selected}
-      onClick={selectOnPress(id, onSelect)}
-      {...data}
-    >
+    <li className={rowClass} data-selected={selected} {...data}>
       {size === "one-line" ? (
         <div className="flex h-10 min-w-0 items-center gap-3">
           <span className="flex w-5 shrink-0 justify-center">{mark}</span>
@@ -239,9 +211,10 @@ export const Row = ({
   );
 };
 
+// Under the top bar (56 px), or under it and a page's 40 px toolbar, each overlapping the hairline above it.
 const STICK = {
-  bar: "top-[2.6875rem] tablet:top-[2.9375rem] shell:top-[2.6875rem]",
-  toolbar: "top-[5.1875rem] tablet:top-[5.4375rem] shell:top-[5.1875rem]",
+  bar: "top-[3.4375rem]",
+  toolbar: "top-[5.9375rem]",
 } as const;
 
 export const RowGroup = ({
@@ -300,10 +273,10 @@ export const useRowSelection = (
   ids: readonly string[],
   param: SelectionParam
 ) => {
-  const { clear, select, selected } = useSelection(param);
-  const { focused } = useListKeys(ids, select);
+  const { clear, selected } = useSelection(param);
+  const { focused } = useListKeys(ids);
 
-  return { clear, focused, select, selected };
+  return { clear, focused, selected };
 };
 
 export const outcomeState = (outcome: Outcome): RowState =>
@@ -368,7 +341,6 @@ const askTime = (progress: AskProgress | undefined) =>
 export const AskRow = ({
   listing,
   now,
-  onSelect,
   progress,
   project,
   selected,
@@ -381,7 +353,6 @@ export const AskRow = ({
   readonly takeable?: boolean | undefined;
   readonly progress?: AskProgress | undefined;
   readonly selected?: boolean | undefined;
-  readonly onSelect?: ((id: string) => void) | undefined;
   readonly showProject?: boolean;
   readonly strip?: ReactNode;
   readonly now?: DateTime.Utc | undefined;
@@ -424,7 +395,6 @@ export const AskRow = ({
           ]}
         />
       }
-      onSelect={onSelect}
       selected={selected}
       state={state}
       strip={strip}

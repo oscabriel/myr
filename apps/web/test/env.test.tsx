@@ -15,7 +15,7 @@ import { ProjectView } from "../src/features/project/project-page.tsx";
 import { readEnv } from "../src/routes/$owner/$project/env.tsx";
 import { inOrder, markupOf, plainText, textOf } from "./ask-fixtures.ts";
 import { textIn } from "./markup.ts";
-import { elementWith, inspectorOf, mainOf } from "./records.ts";
+import { elementWith, factsOf, mainOf } from "./records.ts";
 import { renderAt } from "./render.tsx";
 
 const now = DateTime.makeUnsafe("2026-10-12T12:00:00Z");
@@ -176,7 +176,7 @@ describe("a project's env shape", () => {
   });
 
   it("says where it was read: the file, the landed commit and the environment", () => {
-    const facts = inspectorOf(markupOf(page));
+    const facts = factsOf(markupOf(page));
 
     expect(
       inOrder(plainText(facts), [
@@ -201,7 +201,7 @@ describe("a project's env shape", () => {
     expect(markup).not.toMatch(/reveal|show value/iu);
     // The placeholder unlanded code sees is not a value, but reads like one.
     expect(markup).not.toContain("placeholder-sentry-auth-token");
-    expect(plainText(inspectorOf(markup))).toContain(
+    expect(plainText(factsOf(markup))).toContain(
       `${Brand.cli} env set <KEY> --project oscabriel/datekit --yes`
     );
   });
@@ -211,10 +211,8 @@ describe("a project's env shape", () => {
       <EnvView now={now} posture="openWithSealedEvidence" schema={datekit} />
     );
 
-    expect(inspectorOf(markup)).toContain(
-      'data-posture="openWithSealedEvidence"'
-    );
-    expect(inspectorOf(markupOf(page))).not.toContain("data-posture=");
+    expect(factsOf(markup)).toContain('data-posture="openWithSealedEvidence"');
+    expect(factsOf(markupOf(page))).not.toContain("data-posture=");
   });
 
   it("says a sensitive item nobody set is not set", () => {
