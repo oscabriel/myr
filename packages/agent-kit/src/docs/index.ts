@@ -12,6 +12,7 @@ import {
   gitPage,
   importedPage,
   landingPage,
+  limitsPage,
   mcpPage,
   refusalsPage,
 } from "./reference.ts";
@@ -36,6 +37,7 @@ const sources: readonly DocSource[] = [
   landingPage,
   eventsPage,
   mcpPage,
+  limitsPage,
   importedPage,
 ];
 

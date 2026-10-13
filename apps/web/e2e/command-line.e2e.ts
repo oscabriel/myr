@@ -7,7 +7,7 @@ const web = Effect.runSync(
   )
 );
 
-const PAGES = ["/inbox", "/agents"];
+const PAGES = ["/inbox", "/install"];
 
 const WIDTHS = [390, 1280];
 

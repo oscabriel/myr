@@ -1,4 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
+import { agentEndpoints, agentLimits } from "@repo/agent-kit/agent-setup";
 import { commandDocs } from "@repo/agent-kit/command-doc";
 import { docPage, docPages } from "@repo/agent-kit/docs/index";
 import { Brand } from "@repo/brand";
@@ -128,6 +129,21 @@ describe("a page of the docs in the docs shell", () => {
   );
 });
 
+describe("the docs' links to setup", () => {
+  it("send a reader to /install, never the old /agents", () => {
+    expect(
+      pages.flatMap(({ markdown, slug }) =>
+        /\]\(\/agents[)#]/u.test(markdown) ? [slug] : []
+      )
+    ).toStrictEqual([]);
+    expect(
+      ["connect-an-agent", "mcp"].filter(
+        (slug) => !pageNamed(slug).markdown.includes("](/install)")
+      )
+    ).toStrictEqual([]);
+  });
+});
+
 describe("a page of the docs", () => {
   it.effect(
     "lists its article's h2s under On this page, in order, each linking its heading's id",
@@ -244,6 +260,35 @@ describe("a page of the docs", () => {
       expect(markup).toContain("<table");
       expect(markup).toContain("<code>OutOfScope</code>");
     })
+  );
+
+  it.effect(
+    "draws every limit and endpoint agent-kit gives on the Limits and endpoints page, each endpoint a reader can open as a link",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* renderAt(
+          "/docs/limits",
+          <DocsPageView page={pageNamed("limits")} />
+        );
+
+        const text = textOf(markup);
+
+        expect(markup.match(/<table/gu)).toHaveLength(2);
+        expect(
+          [
+            ...agentLimits().flatMap(({ limit, value }) => [limit, value]),
+            ...agentEndpoints(input).flatMap(({ url, what }) => [url, what]),
+          ].filter((words) => !text.includes(words))
+        ).toStrictEqual([]);
+        expect(
+          agentEndpoints(input)
+            .filter(
+              ({ readable, url }) =>
+                markup.includes(`href="${url}"`) !== readable
+            )
+            .map(({ url }) => url)
+        ).toStrictEqual([]);
+      })
   );
 
   it("names its Markdown in its head, with its summary as its description", () => {

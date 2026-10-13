@@ -7,7 +7,7 @@ import {
 } from "@repo/protocol/contracts";
 import { Context } from "effect";
 
-import { synopsisLine } from "../agent-setup.ts";
+import { endpointLines, limitLines, synopsisLine } from "../agent-setup.ts";
 import { events, gitHere, landing, refusals } from "../llms-sections.ts";
 import { exitCodeSection } from "../refusals.ts";
 import { code, table } from "../text.ts";
@@ -68,12 +68,22 @@ const mcpTools = () =>
 
 export const mcpPage: DocSource = {
   body: ({ platformUrl }) => [
-    `The platform serves its contracts as MCP tools at ${code(`${platformUrl}/mcp`)} over streamable HTTP, signed in with its own OAuth; ${code(`${Brand.cli} mcp`)} serves the same tools over stdio. A refusal comes back as the tool's error, its \`_tag\` intact. [For agents](/agents) has each client's setup.`,
+    `The platform serves its contracts as MCP tools at ${code(`${platformUrl}/mcp`)} over streamable HTTP, signed in with its own OAuth; ${code(`${Brand.cli} mcp`)} serves the same tools over stdio. A refusal comes back as the tool's error, its \`_tag\` intact. [Install](/install) has each client's setup.`,
     "",
     ...table(["Tool", "What it does", "Only reads"], mcpTools()),
     "",
   ],
   slug: "mcp",
+};
+
+export const limitsPage: DocSource = {
+  body: (input) => [
+    "These are the defaults: a project's policy can change any of them, and each project shows its own. Past a cap the platform refuses with `CapReached` (see [Refusals](/docs/refusals)).",
+    "",
+    ...limitLines(),
+    ...endpointLines(input),
+  ],
+  slug: "limits",
 };
 
 export const importedPage: DocSource = {

@@ -77,6 +77,7 @@ describe("the web's own paths", () => {
       "icons",
       "import",
       "inbox",
+      "install",
       "install.sh",
       "llms-full.txt",
       "llms.txt",

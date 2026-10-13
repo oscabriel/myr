@@ -1,25 +1,28 @@
+// The setup page moved from `/agents` to `/install` (ADR 0041); its guarantee moved with it: every snippet and command
+// on the page is `@repo/agent-kit`'s. Its endpoints and limits moved to the docs' Limits and endpoints page, held by
+// `docs.test.tsx` and agent-kit's `docs.test.ts`.
 import { describe, expect, it } from "@effect/vitest";
-import {
-  agentEndpoints,
-  agentLimits,
-  agentSetup,
-  agentSetupMarkdown,
-} from "@repo/agent-kit/agent-setup";
-import { Brand } from "@repo/brand";
-import { groups } from "@repo/protocol/refusal";
-import { Effect } from "effect";
+import { agentSetupMarkdown } from "@repo/agent-kit/agent-setup";
+import { installChannels } from "@repo/agent-kit/install-channels";
+import { isRedirect } from "@tanstack/react-router";
+import { Effect, Option } from "effect";
 
 import { commands } from "../src/features/agents/catalog.ts";
-import { AgentsView } from "../src/features/agents/setup-page.tsx";
+import {
+  installHref,
+  InstallView,
+} from "../src/features/agents/install-page.tsx";
+import { getRouter } from "../src/router.tsx";
+import { agentsLoader } from "../src/routes/agents.tsx";
 import { agentsMarkdownHandler } from "../src/routes/agents[.]md.ts";
-import { factsOf } from "./records.ts";
+import { Route as InstallRoute } from "../src/routes/install.tsx";
 import { renderAt } from "./render.tsx";
 
 const platformUrl = "https://platform-test.example.workers.dev";
 
 const webUrl = "https://web-test.example.workers.dev";
 
-const channels = agentSetup({ commands, platformUrl, webUrl });
+const channels = installChannels({ commands, platformUrl, webUrl });
 
 const ENTITIES: ReadonlyMap<string, string> = new Map([
   ["&#x27;", "'"],
@@ -43,36 +46,54 @@ const codeOf = (html: string) =>
   );
 
 const page = renderAt(
-  "/agents",
-  <AgentsView commands={commands} platformUrl={platformUrl} webUrl={webUrl} />
+  "/install",
+  <InstallView commands={commands} platformUrl={platformUrl} webUrl={webUrl} />
 );
 
 const sectionOf = (html: string, id: string) => {
   const start = html.indexOf(`<section aria-labelledby="${id}"`);
   const end = html.indexOf("</section>", start);
 
-  expect(start).toBeGreaterThanOrEqual(0);
+  expect(start, `#${id}`).toBeGreaterThanOrEqual(0);
 
   return html.slice(start, end);
 };
 
-const SECTIONS = [
-  ["synopsis", "Synopsis"],
-  ["connect", "Connect"],
-  ["endpoints", "Endpoints"],
-  ["limits", "Limits"],
-  ["refusals", "Refusals"],
-] as const;
+const channelNamed = (id: string) =>
+  Option.getOrThrow(
+    Option.fromNullishOr(channels.find((each) => each.id === id))
+  );
 
-describe("the For agents page", () => {
-  it.effect("is titled For agents", () =>
-    Effect.gen(function* () {
-      expect(yield* page).toMatch(/<h1\b[^>]*>For agents<\/h1>/u);
-    })
+const snippetCount = channels.reduce(
+  (count, { snippets }) => count + snippets.length,
+  0
+);
+
+describe("the Install page", () => {
+  it.effect(
+    "is titled Install, every heading in sentence case and never mono",
+    () =>
+      Effect.gen(function* () {
+        const html = yield* page;
+
+        expect(html).toMatch(/<h1\b[^>]*>Install<\/h1>/u);
+
+        for (const { groups: found } of html.matchAll(
+          /<h(?<level>[1-4])\b(?<attributes>[^>]*)>(?<text>.*?)<\/h\k<level>>/gu
+        )) {
+          const words = textOf(found?.text ?? "");
+
+          expect(found?.attributes).not.toContain("uppercase");
+          expect(found?.attributes).not.toContain("font-mono");
+          expect(
+            words === words.toUpperCase() && /[A-Z]/u.test(words)
+          ).toBeFalsy();
+        }
+      })
   );
 
   it.effect(
-    "has its five sections in order, headed in the sans in sentence case",
+    "gives every channel agent-kit names its own section, in order, headed by its title below the sticky bar",
     () =>
       Effect.gen(function* () {
         const html = yield* page;
@@ -85,166 +106,134 @@ describe("the For agents page", () => {
 
         expect(
           headings.map(({ groups: found }) => [found?.id, found?.text])
-        ).toStrictEqual(SECTIONS.map(([id, title]) => [id, title]));
+        ).toStrictEqual(channels.map(({ id, title }) => [id, title]));
 
         for (const { groups: found } of headings) {
-          expect(found?.attributes).not.toContain("font-mono");
-          expect(found?.attributes).not.toContain("uppercase");
+          expect(found?.attributes, `#${found?.id}`).toContain(
+            "scroll-mt-[calc(var(--top-bar)+"
+          );
         }
 
-        for (const { groups: found } of html.matchAll(
-          /<h(?<level>[1-4])\b[^>]*>(?<text>.*?)<\/h\k<level>>/gu
-        )) {
-          const words = textOf(found?.text ?? "");
-
-          expect(
-            words === words.toUpperCase() && /[A-Z]/u.test(words)
-          ).toBeFalsy();
+        for (const { id } of channels) {
+          sectionOf(html, id);
         }
       })
   );
 
-  it.effect("lists the five sections, as anchors, in its contents", () =>
+  it.effect("shows every snippet agent-kit gives, and no code of its own", () =>
     Effect.gen(function* () {
       const html = yield* page;
-      const facts = factsOf(html);
 
-      const anchors = [
-        ...facts.matchAll(/<a\b[^>]*href="#(?<id>[a-z]+)"/gu),
-      ].map(({ groups: found }) => found?.id);
+      expect(codeOf(html)).toStrictEqual(
+        channels.flatMap(({ snippets }) => snippets.map(({ text }) => text))
+      );
 
-      expect(anchors).toStrictEqual(SECTIONS.map(([id]) => id));
-    })
-  );
+      const text = textOf(html);
 
-  it.effect(
-    "lands each anchor's heading below the sticky bars, not under them",
-    () =>
-      Effect.gen(function* () {
-        const html = yield* page;
-
-        for (const [id] of SECTIONS) {
-          // The element the fragment scrolls to is the one with the id: its
-          // own scroll margin is the one the browser reads.
-          const target = new RegExp(
-            `<[a-z0-9]+\\b[^>]*\\bid="${id}"[^>]*>`,
-            "u"
-          )
-            .exec(html)
-            ?.at(0);
-
-          expect(target, `#${id}`).toMatch(/\bscroll-mt-\d+\b/u);
-        }
-      })
-  );
-
-  it.effect("gives every command of the CLI a synopsis line, in mono", () =>
-    Effect.gen(function* () {
-      const synopsis = codeOf(sectionOf(yield* page, "synopsis"));
-
-      expect(synopsis).toHaveLength(commands.length);
-
-      for (const [index, command] of commands.entries()) {
+      for (const { audience, snippets, summary, title } of channels) {
         expect(
-          synopsis[index]?.startsWith(`${Brand.cli} ${command.path.join(" ")}`)
-        ).toBeTruthy();
+          [
+            audience,
+            summary,
+            title,
+            ...snippets.map(({ label }) => label),
+          ].filter((words) => !text.includes(words))
+        ).toStrictEqual([]);
       }
     })
-  );
-
-  it.effect(
-    "shows every snippet agentSetup gives under Connect, and no code of its own",
-    () =>
-      Effect.gen(function* () {
-        const connect = sectionOf(yield* page, "connect");
-
-        expect(codeOf(connect)).toStrictEqual(
-          channels.flatMap(({ snippets }) => snippets.map(({ text }) => text))
-        );
-
-        const text = textOf(connect);
-
-        for (const { snippets, title, useWhen } of channels) {
-          expect(text).toContain(title);
-          expect(text).toContain(useWhen);
-
-          for (const { label } of snippets) {
-            expect(text).toContain(label);
-          }
-        }
-      })
   );
 
   it.effect("gives every snippet a button that copies it", () =>
     Effect.gen(function* () {
-      const buttons = sectionOf(yield* page, "connect").match(
-        /<button\b[^>]*>.*?Copy.*?<\/button>/gu
-      );
-
-      expect(buttons).toHaveLength(
-        channels.reduce((count, { snippets }) => count + snippets.length, 0)
-      );
-    })
-  );
-
-  it.effect("names every endpoint and limit agent-kit gives", () =>
-    Effect.gen(function* () {
-      const html = yield* page;
-      const endpoints = sectionOf(html, "endpoints");
-
-      expect(codeOf(endpoints)).toStrictEqual(
-        agentEndpoints({ platformUrl, webUrl }).map(({ url }) => url)
-      );
-
-      for (const { readable, url, what } of agentEndpoints({
-        platformUrl,
-        webUrl,
-      })) {
-        expect(textOf(endpoints)).toContain(what);
-        expect(endpoints.includes(`href="${url}"`)).toBe(readable);
-      }
-
-      const limits = textOf(sectionOf(html, "limits"));
-
-      for (const { limit, value } of agentLimits()) {
-        expect(limits).toContain(limit);
-        expect(limits).toContain(value);
-      }
+      expect(
+        (yield* page).match(
+          /<button\b[^>]*>(?:(?!<\/button>).)*Copy(?:(?!<\/button>).)*<\/button>/gu
+        )
+      ).toHaveLength(snippetCount);
     })
   );
 
   it.effect(
-    "names every refusal of the union, each linked to its row in /llms-full.txt",
+    "shows MCP's clients and stdio as tabs, each with its snippet in a panel",
     () =>
       Effect.gen(function* () {
-        const refusals = sectionOf(yield* page, "refusals");
+        const mcp = sectionOf(yield* page, "mcp");
+        const names = channelNamed("mcp").snippets.map(({ name }) => name);
 
-        const tags = groups.flatMap(({ members }) =>
-          members.map(({ identifier }) => identifier)
-        );
-
-        expect(codeOf(refusals)).toStrictEqual(tags);
-
-        for (const { members, name } of groups) {
-          expect(textOf(refusals)).toContain(name);
-
-          for (const { identifier } of members) {
-            expect(refusals).toMatch(
-              new RegExp(
-                `<a\\b[^>]*href="/llms-full\\.txt#:~:text=%60${identifier}%60[^"]*"[^>]*><code\\b[^>]*>${identifier}</code>`,
-                "u"
-              )
-            );
-          }
-        }
+        expect(mcp).toContain('role="tablist"');
+        expect(
+          [
+            ...mcp.matchAll(
+              /<button\b[^>]*role="tab"[^>]*>(?<name>.*?)<\/button>/gu
+            ),
+          ].map(({ groups: found }) => textOf(found?.name ?? ""))
+        ).toStrictEqual(names);
+        expect(mcp.match(/role="tabpanel"/gu)).toHaveLength(names.length);
       })
   );
 
-  it.effect("links the same reference as Markdown", () =>
+  it.effect(
+    "shows the pi extension as planned, with no command, and git over HTTPS with no SSH key",
+    () =>
+      Effect.gen(function* () {
+        const html = yield* page;
+        const pi = sectionOf(html, "pi");
+
+        expect(textOf(pi)).toContain("Planned");
+        expect(codeOf(pi)).toStrictEqual([]);
+        expect(textOf(sectionOf(html, "git"))).toContain("HTTPS");
+        expect(
+          textOf(html)
+            .replaceAll("no SSH keys", "")
+            .match(/ssh|git@/giu)
+        ).toBeNull();
+      })
+  );
+
+  it.effect(
+    "links each channel's references, the commands and the limits at the docs, and signing in back to /install",
+    () =>
+      Effect.gen(function* () {
+        const html = yield* page;
+
+        expect(
+          channels
+            .flatMap(({ id, links }) =>
+              links.map((link) => ({ href: installHref(link), id }))
+            )
+            .filter(
+              ({ href, id }) => !sectionOf(html, id).includes(`href="${href}"`)
+            )
+        ).toStrictEqual([]);
+        expect(sectionOf(html, "cli")).toContain('href="/docs/commands"');
+        expect(sectionOf(html, "text")).toContain('href="/docs/limits"');
+        expect(sectionOf(html, "web")).toContain(
+          'href="/auth/signin?return=%2Finstall"'
+        );
+      })
+  );
+});
+
+describe("the old /agents", () => {
+  it.effect("answers a 301 to /install", () =>
     Effect.gen(function* () {
-      expect(yield* page).toMatch(/<a\b[^>]*href="\/agents\.md"[^>]*>/u);
+      const answered = yield* Effect.flip(
+        Effect.tryPromise({
+          catch: (thrown): readonly [number, string | null] =>
+            isRedirect(thrown)
+              ? [thrown.status, thrown.headers.get("location")]
+              : [0, null],
+          try: agentsLoader,
+        })
+      );
+
+      expect(answered).toStrictEqual([301, "/install"]);
     })
   );
+
+  it("leaves /install to the Install page", () => {
+    expect(getRouter().getMatchedRoutes("/install")[2]).toBe(InstallRoute);
+  });
 });
 
 describe("/agents.md", () => {

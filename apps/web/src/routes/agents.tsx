@@ -1,33 +1,15 @@
-import {
-  createFileRoute,
-  getRouteApi,
-  useRouter,
-} from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
+import { Effect } from "effect";
 
-import { commands } from "../features/agents/catalog.ts";
-import { AgentsView } from "../features/agents/setup-page.tsx";
-import { pageHead } from "../features/shared/head.ts";
-import { branchPage } from "../server/cache-headers.ts";
+import { INSTALL_PATH } from "../features/shared/paths.ts";
 
-const root = getRouteApi("__root__");
-
-const AgentsPage = () => {
-  const { platformUrl } = root.useLoaderData();
-  const { origin } = useRouter();
-
-  return (
-    <AgentsView commands={commands} platformUrl={platformUrl} webUrl={origin} />
+// The setup page moved to `/install` (ADR 0041), for good: a 301, so a browser and the edge keep it.
+// The loader rejects with the redirect: the lint keeps a bare `throw` for `Error`s, which a redirect is not.
+export const agentsLoader = (): Promise<never> =>
+  Effect.runPromise(
+    Effect.fail(redirect({ href: INSTALL_PATH, statusCode: 301 }))
   );
-};
 
 export const Route = createFileRoute("/agents")({
-  staticData: { shell: "site" },
-  component: AgentsPage,
-  headers: () => branchPage,
-  head: () =>
-    pageHead({
-      description:
-        "How an agent reaches the platform: the CLI's commands, the ways to connect, the endpoints, the limits and the refusals.",
-      title: "For agents",
-    }),
+  loader: agentsLoader,
 });

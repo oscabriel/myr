@@ -10,6 +10,8 @@ import { span } from "./sections.ts";
 import { code, listed, page, printJson, table } from "./text.ts";
 
 export interface SetupSnippet {
+  /** A short name, for a tab or a list of choices: "Cursor", "npm". */
+  readonly name: string;
   readonly label: string;
   readonly language: "sh" | "json" | "text";
   readonly text: string;
@@ -27,27 +29,30 @@ export interface SetupInput {
   readonly webUrl: string;
 }
 
-const has = (commands: readonly CommandDoc[], words: string) =>
+export const hasCommand = (commands: readonly CommandDoc[], words: string) =>
   Arr.some(commands, ({ path }) => path.join(" ") === words);
 
 const json = (value: Parameters<typeof printJson>[0]) =>
   printJson(value).trimEnd();
 
-const remoteMcp = ({ platformUrl }: SetupInput): SetupChannel => ({
+export const remoteMcp = ({ platformUrl }: SetupInput): SetupChannel => ({
   snippets: [
     {
       label: "Claude Code, then /mcp in a session to sign in",
       language: "sh",
+      name: "Claude Code",
       text: `claude mcp add --transport http ${Brand.slug} ${platformUrl}/mcp`,
     },
     {
       label: "Cursor, in .cursor/mcp.json",
       language: "json",
+      name: "Cursor",
       text: json({ mcpServers: mcpServersFor(platformUrl, "cursor") }),
     },
     {
       label: "VS Code, in .vscode/mcp.json",
       language: "json",
+      name: "VS Code",
       text: json({ servers: mcpServersFor(platformUrl, "claude") }),
     },
   ],
@@ -55,11 +60,12 @@ const remoteMcp = ({ platformUrl }: SetupInput): SetupChannel => ({
   useWhen: `Your client signs in over OAuth: it opens a browser once, you sign in with your account on ${Brand.name}, and it calls the platform's tools at ${platformUrl}/mcp.`,
 });
 
-const stdioMcp = (): SetupChannel => ({
+export const stdioMcp = (): SetupChannel => ({
   snippets: [
     {
       label: "The server's command, once you have signed in with the CLI",
       language: "sh",
+      name: "stdio",
       text: `${Brand.cli} mcp`,
     },
   ],
@@ -67,36 +73,44 @@ const stdioMcp = (): SetupChannel => ({
   useWhen: `Your client starts its MCP servers as local commands, or cannot sign in over OAuth: the CLI serves the same tools over stdio, with the token the CLI stored when you signed in.`,
 });
 
-const theCli = ({
+/** The install script's snippet, the CLI's first step on `/agents.md` and the Install page alike. */
+export const installScript = ({
+  webUrl,
+}: Pick<SetupInput, "webUrl">): SetupSnippet => ({
+  label: "Install",
+  language: "sh",
+  name: "Install script",
+  text: installCommand(webUrl),
+});
+
+/** Signing in with the CLI, once its commands have `login`; none otherwise. */
+export const signIn = ({
   commands,
   platformUrl,
-  webUrl,
-}: SetupInput): SetupChannel => ({
-  snippets: [
-    {
-      label: "Install",
-      language: "sh",
-      text: installCommand(webUrl),
-    },
-    ...(has(commands, "login")
-      ? [
-          {
-            label: "Sign in once; git pushes with your token from then on",
-            language: "sh" as const,
-            text: `${Brand.cli} login --url ${platformUrl}`,
-          },
-        ]
-      : []),
-  ],
+}: Pick<SetupInput, "commands" | "platformUrl">): readonly SetupSnippet[] =>
+  hasCommand(commands, "login")
+    ? [
+        {
+          label: "Sign in once; git pushes with your token from then on",
+          language: "sh",
+          name: "Sign in",
+          text: `${Brand.cli} login --url ${platformUrl}`,
+        },
+      ]
+    : [];
+
+export const theCli = (input: SetupInput): SetupChannel => ({
+  snippets: [installScript(input), ...signIn(input)],
   title: "The CLI",
   useWhen: `Your agent has a shell: it finds and claims asks, checks an answer before it pushes and reads verdicts with the CLI, and pushes with git.`,
 });
 
-const anyAgent = ({ webUrl }: SetupInput): SetupChannel => ({
+export const anyAgent = ({ webUrl }: SetupInput): SetupChannel => ({
   snippets: [
     {
       label: "Paste into the agent's prompt",
       language: "text",
+      name: "Prompt",
       text: `Use ${webUrl}/llms.txt as the source of truth for ${Brand.name}: it says how to take an ask and lists every command and project. Each ask reads as Markdown at ${webUrl}/<owner>/<name>/asks/<ask>.md.`,
     },
   ],
@@ -105,11 +119,12 @@ const anyAgent = ({ webUrl }: SetupInput): SetupChannel => ({
     "Your agent can fetch a URL but has no MCP client or CLI set up: hand it the platform's index and it reads the rest as Markdown.",
 });
 
-const skills = ({ webUrl }: SetupInput): SetupChannel => ({
+export const skills = ({ webUrl }: SetupInput): SetupChannel => ({
   snippets: [
     {
       label: "Add every project's contribute skill",
       language: "sh",
+      name: "Skills",
       text: `npx skills add ${webUrl}`,
     },
   ],
@@ -119,7 +134,7 @@ const skills = ({ webUrl }: SetupInput): SetupChannel => ({
 
 export const agentSetup = (input: SetupInput): readonly SetupChannel[] => [
   remoteMcp(input),
-  ...(has(input.commands, "mcp") ? [stdioMcp()] : []),
+  ...(hasCommand(input.commands, "mcp") ? [stdioMcp()] : []),
   theCli(input),
   anyAgent(input),
   skills(input),
@@ -185,7 +200,7 @@ export const agentEndpoints = ({
   {
     readable: true,
     url: `${webUrl}/agents.md`,
-    what: "This reference as Markdown.",
+    what: "Setup, the endpoints, the limits and the refusals as one Markdown file.",
   },
   {
     readable: true,
@@ -281,17 +296,24 @@ const synopsisLines = (commands: readonly CommandDoc[]) => [
   "",
 ];
 
-const endpointLines = (input: SetupInput) => [
+/** The endpoints as a section, for `/agents.md` and the docs' Limits and endpoints page alike: one a reader can open is a link, a template or a protocol's address is not. */
+export const endpointLines = (
+  input: Pick<SetupInput, "platformUrl" | "webUrl">
+) => [
   "## Endpoints",
   "",
   ...table(
     ["Address", "What it is"],
-    agentEndpoints(input).map(({ url, what }) => [code(url), what])
+    agentEndpoints(input).map(({ readable, url, what }) => [
+      readable ? `[${code(url)}](${url})` : code(url),
+      what,
+    ])
   ),
   "",
 ];
 
-const limitLines = () => [
+/** The limits as a section, for `/agents.md` and the docs' Limits and endpoints page alike. */
+export const limitLines = () => [
   "## Limits",
   "",
   ...table(
