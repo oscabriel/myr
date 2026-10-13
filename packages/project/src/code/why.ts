@@ -24,13 +24,14 @@ import { contentsOf, contentsOfBytes, unlessTooLarge } from "./file.ts";
 import {
   INCREMENT_REACH,
   keyOf,
+  keptOnlyIfCanonical,
   recall,
   throughHistory,
   whyKept,
 } from "./history.ts";
 import type { StoredWhy } from "./history.ts";
 import { commitViews, pageOf } from "./log.ts";
-import { commitAt, resolveRev } from "./revision.ts";
+import { commitAt, resolveAt } from "./revision.ts";
 import { entryAt, READS_AT_ONCE } from "./tree.ts";
 
 export const WHY_SCAN = 200;
@@ -463,6 +464,7 @@ const computed = (
 
 const viewOf = (
   project: CodeProject,
+  repo: RepoName,
   at: CommitSha,
   path: RepoPath,
   kept: StoredWhy,
@@ -472,7 +474,7 @@ const viewOf = (
     const log =
       kept.shas.length === 0
         ? []
-        : yield* pageOf(project.repo, at, 0, Math.max(1, scan));
+        : yield* pageOf(repo, at, 0, Math.max(1, scan));
 
     const bySha = new Map<string, Commit>(
       log.map((commit) => [commit.sha, commit])
@@ -483,10 +485,10 @@ const viewOf = (
       (sha) =>
         Option.match(Option.fromUndefinedOr(bySha.get(sha)), {
           onNone: () =>
-            commitAt(project.repo, sha).pipe(
+            commitAt(repo, sha).pipe(
               Effect.flatMap(Effect.fromOption),
               Effect.catchTag("NoSuchElementError", () =>
-                Effect.die(`${project.repo} has no commit ${sha}`)
+                Effect.die(`${repo} has no commit ${sha}`)
               )
             ),
           onSome: Effect.succeed,
@@ -521,15 +523,18 @@ export const whyView = (
   scan: number = WHY_SCAN
 ): Effect.Effect<WhyView, UnknownRevision | UnknownPath, RepoHost> =>
   Effect.gen(function* () {
-    const commit = yield* resolveRev(project, at);
-    const { repo } = project;
+    const resolved = yield* resolveAt(project, at);
+    const { commit, repo } = resolved;
     const key = yield* keyOf(whyKept, { commit, path, repo, scan });
 
-    const kept = yield* throughHistory(
-      whyKept,
-      key,
-      asOneView(computed(repo, commit, path, scan))
+    const kept = yield* keptOnlyIfCanonical(
+      resolved,
+      throughHistory(
+        whyKept,
+        key,
+        asOneView(computed(repo, commit, path, scan))
+      )
     );
 
-    return yield* viewOf(project, commit, path, kept, scan);
+    return yield* viewOf(project, repo, commit, path, kept, scan);
   }).pipe(inRepoSession, Effect.catchTag("RepoNotFound", Effect.die));

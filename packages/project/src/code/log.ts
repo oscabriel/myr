@@ -18,12 +18,13 @@ import { versionAt, walkableAt } from "./file-walk.ts";
 import {
   INCREMENT_REACH,
   keyOf,
+  keptOnlyIfCanonical,
   pathLogKept,
   recall,
   throughHistory,
 } from "./history.ts";
 import type { StoredPathLog } from "./history.ts";
-import { commitAt, resolveRev } from "./revision.ts";
+import { commitAt, resolveAt } from "./revision.ts";
 import { entryAt, READS_AT_ONCE } from "./tree.ts";
 
 export const LOG_LIMIT = 100;
@@ -260,10 +261,10 @@ export const logPage = (
   }
 ): Effect.Effect<LogPage, UnknownRevision, RepoHost> =>
   Effect.gen(function* () {
-    const sha = yield* resolveRev(project, input.at);
+    const resolved = yield* resolveAt(project, input.at);
+    const { commit: sha, repo } = resolved;
     const from = Math.max(0, Math.floor(input.from));
     const limit = Math.min(LOG_LIMIT, Math.max(1, Math.floor(input.limit)));
-    const { repo } = project;
 
     if (Option.isNone(input.path)) {
       const read = yield* pageOf(repo, sha, from, limit + 1).pipe(Effect.orDie);
@@ -296,10 +297,9 @@ export const logPage = (
       scan: PATH_SCAN,
     });
 
-    const { shas } = yield* throughHistory(
-      pathLogKept,
-      key,
-      asOneView(historyOf(repo, path, scan))
+    const { shas } = yield* keptOnlyIfCanonical(
+      resolved,
+      throughHistory(pathLogKept, key, asOneView(historyOf(repo, path, scan)))
     ).pipe(Effect.orDie);
 
     const at = new Map(scan.map((commit, index) => [commit.sha, index]));

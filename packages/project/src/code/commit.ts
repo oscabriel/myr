@@ -3,10 +3,11 @@ import type { RepoNotFound, TreeEntry } from "@repo/artifacts/repo-host";
 import { treeDiff } from "@repo/git/tree-diff";
 import type { Change } from "@repo/git/tree-diff";
 import { CommitDiff } from "@repo/protocol/domain/code";
-import type { ChangedFile } from "@repo/protocol/domain/code";
+import type { ChangedFile, Rev } from "@repo/protocol/domain/code";
 import { BlobSha, TreeSha } from "@repo/protocol/ids";
 import type { CommitSha, RepoName } from "@repo/protocol/ids";
 import { UnknownCommit } from "@repo/protocol/refusal";
+import type { UnknownRevision } from "@repo/protocol/refusal";
 import { Array, Effect, Option, Order, Schema } from "effect";
 
 import { CodeStore } from "../code-store.ts";
@@ -14,9 +15,10 @@ import type { CodeProject } from "../code.ts";
 import { CodeCache } from "./cache.ts";
 import { contentsOf } from "./file.ts";
 import type { Contents } from "./file.ts";
+import { keptOnlyIfCanonical } from "./history.ts";
 import { commitView } from "./log.ts";
 import { filesUnder, PATHS_CAP } from "./paths.ts";
-import { commitAt } from "./revision.ts";
+import { commitAt, repoAt } from "./revision.ts";
 import { entriesOf, entryAt } from "./tree.ts";
 
 export const DIFF_FILES = 300;
@@ -277,21 +279,32 @@ const computedDiff = (
     return { commit: commitView(commit, Option.none()), files, truncated };
   });
 
+/** `at` names the fork the commit is read in; the canonical repo when it names none. */
 export const commitDiff = (
   project: CodeProject,
-  sha: CommitSha
-): Effect.Effect<CommitDiff, UnknownCommit, RepoHost> =>
+  sha: CommitSha,
+  at: Option.Option<Rev> = Option.none()
+): Effect.Effect<CommitDiff, UnknownCommit | UnknownRevision, RepoHost> =>
   Effect.gen(function* () {
-    const { repo } = project;
-    const kept = yield* keptDiff(repo, sha);
+    const where = yield* repoAt(project, at);
+    const { repo } = where;
 
-    if (Option.isSome(kept)) {
-      return yield* withLanding(project, kept.value);
-    }
+    const diff = yield* keptOnlyIfCanonical(
+      where,
+      Effect.gen(function* () {
+        const kept = yield* keptDiff(repo, sha);
 
-    const diff = yield* computedDiff(repo, sha);
+        if (Option.isSome(kept)) {
+          return kept.value;
+        }
 
-    yield* keepDiff(repo, sha, diff);
+        const computed = yield* computedDiff(repo, sha);
+
+        yield* keepDiff(repo, sha, computed);
+
+        return computed;
+      })
+    );
 
     return yield* withLanding(project, diff);
   });

@@ -323,7 +323,49 @@ export const datekit = Effect.gen(function* () {
     c3,
     c4,
     code: recordOf(repo, c4, [landingOf(c4, c3)]),
+    git,
   };
+});
+
+/**
+ * Datekit with bob's claim fork for `parse-iso`, the one fork it lists: the
+ * answer on its `main`, a `try` branch beside it, and the platform's notes.
+ * Beside them, carol's fork for the same ask, which the project does not list,
+ * and a layer's repo, each holding a file no public read may show.
+ */
+export const forked = Effect.gen(function* () {
+  const { c4, code, git } = yield* datekit;
+
+  const answered: Tree = [
+    ...fourth,
+    ["src/parse.ts", text("export const parse = Date.parse;\n")],
+  ];
+
+  const answer = yield* git.commit("Parse ISO dates", answered, [c4], 5);
+
+  const tried = yield* git.commit(
+    "Try a stricter parse",
+    [...answered, ["src/strict.ts", text("export const strict = 1;\n")]],
+    [answer],
+    6
+  );
+
+  const hidden: Tree = [...fourth, ["secret.txt", text("not public\n")]];
+  const unlisted = yield* git.commit("Not listed", hidden, [c4], 7);
+
+  yield* git.push(fork.repo, [
+    ["refs/heads/main", answer],
+    ["refs/heads/try", tried],
+    [`refs/notes/${Brand.slug}`, tried],
+  ]);
+  yield* git.push(RepoName.make(`${repo}--parse-iso--carol`), [
+    ["refs/heads/main", unlisted],
+  ]);
+  yield* git.push(RepoName.make(`${repo}--layer--secrets`), [
+    ["refs/heads/main", unlisted],
+  ]);
+
+  return { answer, c4, code, tried, unlisted };
 });
 
 export const longHistory = (count: number) =>
