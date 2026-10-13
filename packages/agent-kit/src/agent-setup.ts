@@ -10,6 +10,8 @@ import { span } from "./sections.ts";
 import { code, listed, page, printJson, table } from "./text.ts";
 
 export interface SetupSnippet {
+  /** A short name, for a tab or a list of choices: "Cursor", "npm". */
+  readonly name: string;
   readonly label: string;
   readonly language: "sh" | "json" | "text";
   readonly text: string;
@@ -27,25 +29,28 @@ export interface SetupInput {
   readonly webUrl: string;
 }
 
-const has = (commands: readonly CommandDoc[], words: string) =>
+export const hasCommand = (commands: readonly CommandDoc[], words: string) =>
   Arr.some(commands, ({ path }) => path.join(" ") === words);
 
 const json = (value: Parameters<typeof printJson>[0]) =>
   printJson(value).trimEnd();
 
-const remoteMcp = ({ platformUrl }: SetupInput): SetupChannel => ({
+export const remoteMcp = ({ platformUrl }: SetupInput): SetupChannel => ({
   snippets: [
     {
+      name: "Claude Code",
       label: "Claude Code, then /mcp in a session to sign in",
       language: "sh",
       text: `claude mcp add --transport http ${Brand.slug} ${platformUrl}/mcp`,
     },
     {
+      name: "Cursor",
       label: "Cursor, in .cursor/mcp.json",
       language: "json",
       text: json({ mcpServers: mcpServersFor(platformUrl, "cursor") }),
     },
     {
+      name: "VS Code",
       label: "VS Code, in .vscode/mcp.json",
       language: "json",
       text: json({ servers: mcpServersFor(platformUrl, "claude") }),
@@ -55,9 +60,10 @@ const remoteMcp = ({ platformUrl }: SetupInput): SetupChannel => ({
   useWhen: `Your client signs in over OAuth: it opens a browser once, you sign in with your account on ${Brand.name}, and it calls the platform's tools at ${platformUrl}/mcp.`,
 });
 
-const stdioMcp = (): SetupChannel => ({
+export const stdioMcp = (): SetupChannel => ({
   snippets: [
     {
+      name: "stdio",
       label: "The server's command, once you have signed in with the CLI",
       language: "sh",
       text: `${Brand.cli} mcp`,
@@ -67,20 +73,22 @@ const stdioMcp = (): SetupChannel => ({
   useWhen: `Your client starts its MCP servers as local commands, or cannot sign in over OAuth: the CLI serves the same tools over stdio, with the token the CLI stored when you signed in.`,
 });
 
-const theCli = ({
+export const theCli = ({
   commands,
   platformUrl,
   webUrl,
 }: SetupInput): SetupChannel => ({
   snippets: [
     {
+      name: "Install script",
       label: "Install",
       language: "sh",
       text: installCommand(webUrl),
     },
-    ...(has(commands, "login")
+    ...(hasCommand(commands, "login")
       ? [
           {
+            name: "Sign in",
             label: "Sign in once; git pushes with your token from then on",
             language: "sh" as const,
             text: `${Brand.cli} login --url ${platformUrl}`,
@@ -92,9 +100,10 @@ const theCli = ({
   useWhen: `Your agent has a shell: it finds and claims asks, checks an answer before it pushes and reads verdicts with the CLI, and pushes with git.`,
 });
 
-const anyAgent = ({ webUrl }: SetupInput): SetupChannel => ({
+export const anyAgent = ({ webUrl }: SetupInput): SetupChannel => ({
   snippets: [
     {
+      name: "Prompt",
       label: "Paste into the agent's prompt",
       language: "text",
       text: `Use ${webUrl}/llms.txt as the source of truth for ${Brand.name}: it says how to take an ask and lists every command and project. Each ask reads as Markdown at ${webUrl}/<owner>/<name>/asks/<ask>.md.`,
@@ -105,9 +114,10 @@ const anyAgent = ({ webUrl }: SetupInput): SetupChannel => ({
     "Your agent can fetch a URL but has no MCP client or CLI set up: hand it the platform's index and it reads the rest as Markdown.",
 });
 
-const skills = ({ webUrl }: SetupInput): SetupChannel => ({
+export const skills = ({ webUrl }: SetupInput): SetupChannel => ({
   snippets: [
     {
+      name: "Skills",
       label: "Add every project's contribute skill",
       language: "sh",
       text: `npx skills add ${webUrl}`,
@@ -119,7 +129,7 @@ const skills = ({ webUrl }: SetupInput): SetupChannel => ({
 
 export const agentSetup = (input: SetupInput): readonly SetupChannel[] => [
   remoteMcp(input),
-  ...(has(input.commands, "mcp") ? [stdioMcp()] : []),
+  ...(hasCommand(input.commands, "mcp") ? [stdioMcp()] : []),
   theCli(input),
   anyAgent(input),
   skills(input),
