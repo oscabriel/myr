@@ -8,6 +8,7 @@ import {
   DocsPageView,
 } from "../src/features/docs/docs-view.tsx";
 import { docsHead } from "../src/features/docs/head.ts";
+import { AppShell } from "../src/features/shared/shell/app-shell.tsx";
 import { docsMarkdownHandler } from "../src/routes/docs/{$page}[.]md.ts";
 import { renderAt } from "./render.tsx";
 
@@ -28,6 +29,47 @@ const textOf = (markup: string) =>
     .trim();
 
 const pageNamed = (slug: string) => Option.getOrThrow(docPage(input, slug));
+
+/** The first element of `tag` carrying the attribute, whole; none of these nest in themselves. */
+const elementOf = (markup: string, tag: string, attribute: string) =>
+  new RegExp(`<${tag}\\b[^>]*${attribute}[^>]*>[\\s\\S]*?</${tag}>`, "u").exec(
+    markup
+  )?.[0] ?? "";
+
+const linksOf = (markup: string) =>
+  [...markup.matchAll(/<a\b(?<attributes>[^>]*)>(?<text>[\s\S]*?)<\/a>/gu)].map(
+    ({ groups }) => {
+      const attributes = groups?.attributes ?? "";
+
+      return {
+        current: attributes.includes('aria-current="page"'),
+        href: /href="(?<href>[^"]*)"/u.exec(attributes)?.groups?.href ?? "",
+        text: textOf(groups?.text ?? ""),
+      };
+    }
+  );
+
+/** The article's own `h2`s, as `[id, text]`. */
+const headingsOf = (markup: string) =>
+  [
+    ...elementOf(markup, "article", "data-doc").matchAll(
+      /<h2\b[^>]*id="(?<id>[^"]*)"[^>]*>(?<text>[\s\S]*?)<\/h2>/gu
+    ),
+  ].map(({ groups }) => [groups?.id ?? "", textOf(groups?.text ?? "")]);
+
+/** "On this page": its in-page links, as `[id, text]`. */
+const contentsOf = (markup: string) =>
+  linksOf(elementOf(markup, "aside", 'aria-label="On this page"')).flatMap(
+    ({ href, text }) => (href.startsWith("#") ? [[href.slice(1), text]] : [])
+  );
+
+const inDocsShell = (slug: string) =>
+  renderAt(
+    `/docs/${slug}`,
+    <AppShell>
+      <DocsPageView page={pageNamed(slug)} />
+    </AppShell>
+  );
 
 describe("the docs' index", () => {
   it.effect(
@@ -53,7 +95,63 @@ describe("the docs' index", () => {
   );
 });
 
+describe("a page of the docs in the docs shell", () => {
+  it.effect(
+    "marks itself current in the tree, and offers its Markdown and its headings beside the article",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* inDocsShell("landing");
+        const aside = elementOf(markup, "aside", 'aria-label="On this page"');
+
+        expect(
+          linksOf(elementOf(markup, "nav", 'aria-label="Docs"'))
+            .filter(({ current }) => current)
+            .map(({ text }) => text)
+        ).toStrictEqual(["How a landing happens"]);
+        expect(aside).toMatch(/<button\b[^>]*>[\s\S]*?Copy as Markdown[\s\S]*?<\/button>/u);
+        expect(linksOf(aside)).toContainEqual({
+          current: false,
+          href: "/docs/landing.md",
+          text: "View as .md",
+        });
+        expect(contentsOf(markup)).toStrictEqual(headingsOf(markup));
+      })
+  );
+});
+
 describe("a page of the docs", () => {
+  it.effect(
+    "lists its article's h2s under On this page, in order, each linking its heading's id",
+    () =>
+      Effect.gen(function* () {
+        const mismatched: string[] = [];
+
+        for (const page of pages) {
+          const markup = yield* renderAt(
+            `/docs/${page.slug}`,
+            <DocsPageView page={page} />
+          );
+
+          if (
+            JSON.stringify(contentsOf(markup)) !==
+            JSON.stringify(headingsOf(markup))
+          ) {
+            mismatched.push(page.slug);
+          }
+        }
+
+        expect(mismatched).toStrictEqual([]);
+        expect(
+          contentsOf(
+            yield* renderAt(
+              "/docs/start-here",
+              <DocsPageView page={pageNamed("start-here")} />
+            )
+          )
+        ).toContainEqual(["how-a-change-reaches-main", "How a change reaches main"]);
+      })
+  );
+
   it.effect(
     "draws its Markdown under one title, with the other pages beside it",
     () =>
