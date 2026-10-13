@@ -25,9 +25,20 @@
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
   "preview_urls": false,
-  "observability": { "enabled": true },
+  // Every invocation's logs and trace, unsampled, and Issues. Every stage
+  // inherits it, as it does the source maps below.
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "invocation_logs": true,
+    },
+    "traces": { "enabled": true, "head_sampling_rate": 1 },
+    "issues": { "enabled": true },
+  },
   // The server build is minified (vite.config.ts); its source maps let a
-  // stack trace in the logs name the source.
+  // stack trace in the logs, or an Issue, name the source.
   "upload_source_maps": true,
   "services": [{ "binding": "PLATFORM", "service": "platform" }],
   "vars": {

@@ -26,11 +26,26 @@
   // Nothing here reads a name at run time: Effect's tagged errors
   // set `name` from their tag, services are keyed by strings, and the
   // runtime finds Durable Objects, Workflows and entrypoints by export name,
-  // which minifying keeps. A stack trace shows minified function names.
+  // which minifying keeps. A stack trace shows minified function names, and
+  // the source maps take it back to the source's files and lines.
   "keep_names": false,
+  "upload_source_maps": true,
   "workers_dev": true,
   "preview_urls": false,
-  "observability": { "enabled": true },
+  // Every invocation's logs and trace, unsampled, and Issues, which groups
+  // what failed. Unlike bindings, wrangler gives `observability` and
+  // `upload_source_maps` to every stage that does not set its own
+  // (packages/config/test/observability.test.ts holds each stage to them).
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "invocation_logs": true,
+    },
+    "traces": { "enabled": true, "head_sampling_rate": 1 },
+    "issues": { "enabled": true },
+  },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Project"] }],
   "vars": {
     // Until sign-in exists, one operator holds a session.

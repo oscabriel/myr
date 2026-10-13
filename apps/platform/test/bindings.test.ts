@@ -126,6 +126,7 @@ const NOT_BINDINGS: ReadonlySet<string> = new Set([
   "preview_urls",
   "secrets",
   "triggers",
+  "upload_source_maps",
   "vars",
   "workers_dev",
 ]);
