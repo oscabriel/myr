@@ -53,6 +53,13 @@ export const customHosts = (stage: Stage): Option.Option<Hosts> =>
       })
     : Option.none();
 
+// The job of the Analytics Engine dataset each answer's outcome is written
+// to, named `<job>_<stage>` (`resources(stage).outcomes`). Analytics Engine
+// makes a dataset on its first write, so bootstrap makes none. The refusal
+// alert (`alerts.ts`) reads it by this name, so the binding that writes it
+// names the same.
+export const OUTCOMES_JOB = "outcomes";
+
 export interface Resources {
   readonly platform: string;
   readonly sandbox: string;
@@ -67,6 +74,7 @@ export interface Resources {
   readonly codeCache: string;
   readonly answer: string;
   readonly onPush: string;
+  readonly outcomes: string;
 }
 
 export const resources = (stage: Stage): Resources => ({
@@ -77,6 +85,7 @@ export const resources = (stage: Stage): Resources => ({
   layers: `layers-${stage}`,
   oauth: `oauth-${stage}`,
   onPush: `on-push-${stage}`,
+  outcomes: `${OUTCOMES_JOB}_${stage}`,
   platform: `platform-${stage}`,
   projects: `projects-${stage}`,
   releases: `releases-${stage}`,

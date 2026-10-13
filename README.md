@@ -57,6 +57,20 @@ Smoke ends by reading the stage's Workers Logs through Cloudflare's SQL API, and
 
 [AGENTS.md](AGENTS.md) covers secrets, smoke, seeding, releases and teardown, and its principles table names the check that holds each rule.
 
+### Alerts
+
+Each stage has six alerts, declared in `infra/alerts.ts` as Cloudflare Custom Alerts (beta), each a SQL API query run every minute:
+
+- **errors**, one per Worker: five or more exceptions or error-level lines in 15 minutes.
+- **issue spike**: the stage's Workers report Issues three standard deviations above the two hours before, as after a bad deploy.
+- **container failures**: three or more sandbox jobs whose container never answered, in 30 minutes.
+- **refusal spike**: refusals, from the stage's outcomes dataset in Analytics Engine, three standard deviations above the six hours before.
+
+No API takes a custom alert's query yet, so a person makes each by hand, once per stage, and again when `infra/alerts.ts` changes:
+
+1. Run `bun run bootstrap -- --stage <stage> --dry-run`. It ends by printing each alert's name, detection and SQL for that stage.
+2. In the dashboard, under Notifications, create a Custom Alert for each: its name, the printed SQL as custom SQL, the Automatic time range, the detection and windows printed beside it, the default execution and repeat intervals, and the address `ALERT_EMAIL` names (`infra/.env.schema`) as its email destination.
+
 ## The tree
 
 ```
