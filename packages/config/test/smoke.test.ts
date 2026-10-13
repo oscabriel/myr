@@ -1,6 +1,16 @@
 import { NodeHttpServer, NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
-import { Context, Effect, Layer, Option, Result, Schema } from "effect";
+import {
+  ConfigProvider,
+  Context,
+  DateTime,
+  Effect,
+  Layer,
+  Option,
+  Redacted,
+  Result,
+  Schema,
+} from "effect";
 import {
   FetchHttpClient,
   HttpServer,
@@ -8,10 +18,14 @@ import {
   HttpServerResponse,
 } from "effect/http";
 
+import { workersOf } from "../../../infra/logs.ts";
 import { AGENT_BUDGET_MS, agentProbes } from "../../../infra/smoke.ts";
 import { NoStage, UnknownStage } from "../../../infra/stages.ts";
 import {
+  BadSince,
+  logProbes,
   main,
+  NoLogCredentials,
   NoOrigin,
   platformProbes,
   probes,
@@ -19,6 +33,7 @@ import {
   SmokeFailed,
   webProbes,
 } from "../../../scripts/smoke.ts";
+import type { LogsCheck } from "../../../scripts/smoke.ts";
 
 interface Reply {
   readonly status: number;
@@ -31,6 +46,7 @@ interface Seen {
   readonly method: string;
   readonly path: string;
   readonly authorized: boolean;
+  readonly authorization: string;
   readonly body: string;
 }
 
@@ -126,6 +142,7 @@ const fakePlatform = (answer: (seen: Seen) => Reply) =>
       const url = new URL(request.url, "http://localhost");
 
       const reply = answer({
+        authorization: request.headers.authorization ?? "",
         authorized: request.headers.authorization !== undefined,
         body: yield* Effect.orDie(request.text),
         method: request.method,
@@ -620,6 +637,211 @@ describe("smoke's own checks", () => {
   );
 });
 
+// A SQL API answer, as seen live: rows, their count and the scan's statistics.
+const rowsOf = (
+  data: readonly { readonly scriptName: string; readonly errors: number }[]
+): Reply => ({
+  body: JSON.stringify({
+    data,
+    rows: data.length,
+    statistics: { bytes_read: 0, elapsed_ms: 24, rows_read: 0 },
+  }),
+  status: 200,
+});
+
+const ACCOUNT = "0123456789abcdef0123456789abcdef";
+
+const SINCE = "2026-10-13T12:00:00.000Z";
+
+const checkAt = (sql: string): LogsCheck => ({
+  accountId: ACCOUNT,
+  api: `${sql}/analytics/sql`,
+  ingestion: 0,
+  since: DateTime.makeUnsafe(SINCE),
+  token: Redacted.make("token-from-infra-env"),
+  workers: workersOf("dev-oscabriel"),
+});
+
+// Only what the test sets, whatever the shell running the tests has.
+const withEnv = (env: Readonly<Record<string, string>>) =>
+  Effect.provideService(
+    ConfigProvider.ConfigProvider,
+    ConfigProvider.fromEnv({ env })
+  );
+
+const logsFailures = (result: Result.Result<unknown, SmokeFailed>) =>
+  Result.isFailure(result)
+    ? result.failure.failures.filter(({ probe }) => probe === "worker-logs")
+    : [];
+
+describe("smoke reads the stage's logs after a deploy", () => {
+  it.live(
+    "asks the SQL API, after every probe, for each of the stage's Workers' errors since the deploy began, and passes when there are none",
+    () =>
+      Effect.gen(function* () {
+        const asked: string[] = [];
+        const read: Seen[] = [];
+
+        const origin = yield* fakePlatform((seen) => {
+          asked.push(`platform ${seen.path}`);
+
+          return healthy(seen);
+        });
+
+        const sql = yield* fakePlatform((seen) => {
+          asked.push(`sql ${seen.path}`);
+          read.push(seen);
+
+          return rowsOf([]);
+        });
+
+        const report = yield* smoke(origin, { logs: checkAt(sql) });
+
+        expect({
+          last: asked.at(-1),
+          probes: report.probes.map(({ probe }) => probe),
+          read: read.map(({ authorization, body, method, path }) => ({
+            authorization,
+            body,
+            method,
+            path,
+          })),
+        }).toStrictEqual({
+          last: "sql /analytics/sql",
+          probes: [...platformProbes, ...logProbes],
+          read: [
+            {
+              authorization: "Bearer token-from-infra-env",
+              body: JSON.stringify({
+                query:
+                  "SELECT scriptName, count() AS errors FROM logs.workersLogs WHERE scriptName IN ('platform-dev-oscabriel', 'sandbox-dev-oscabriel', 'web-dev-oscabriel') AND (level = 'error' OR error != '') GROUP BY scriptName",
+                scope: { accountTag: ACCOUNT },
+                time_range: { start: SINCE },
+              }),
+              method: "POST",
+              path: "/analytics/sql",
+            },
+          ],
+        });
+      }).pipe(Effect.scoped, Effect.provide(FetchHttpClient.layer))
+  );
+
+  it.live("fails naming each Worker that logged an error, and how many", () =>
+    Effect.gen(function* () {
+      const origin = yield* fakePlatform(healthy);
+
+      const sql = yield* fakePlatform(() =>
+        rowsOf([
+          { errors: 1, scriptName: "web-dev-oscabriel" },
+          { errors: 3, scriptName: "platform-dev-oscabriel" },
+        ])
+      );
+
+      const result = yield* Effect.result(
+        smoke(origin, { logs: checkAt(sql) })
+      );
+
+      expect(
+        Result.isFailure(result) ? result.failure.failures : []
+      ).toStrictEqual([
+        {
+          probe: "worker-logs",
+          reason: `exceptions or error-level lines since ${SINCE}: platform-dev-oscabriel 3, web-dev-oscabriel 1`,
+        },
+      ]);
+    }).pipe(Effect.scoped, Effect.provide(FetchHttpClient.layer))
+  );
+
+  // Each as the live API answered it: a token it can't authenticate, one
+  // without the permission, and one that can't see the account.
+  it.live.each([
+    {
+      body: '{"success":false,"errors":[{"code":9106,"message":"Authentication failed (status: 400)"}],"messages":[],"result":null}',
+      status: 400,
+    },
+    { body: "Forbidden", status: 403 },
+    {
+      body: "Input was invalid: The account or zone tag is invalid or unknown",
+      status: 422,
+    },
+  ])(
+    "names the permission it needs when the API answers $status to infra's token",
+    ({ body, status }) =>
+      Effect.gen(function* () {
+        const origin = yield* fakePlatform(healthy);
+
+        const sql = yield* fakePlatform(() => ({
+          body,
+          contentType: "text/plain",
+          status,
+        }));
+
+        const result = yield* Effect.result(
+          smoke(origin, { logs: checkAt(sql) })
+        );
+
+        expect(logsFailures(result)).toStrictEqual([
+          {
+            probe: "worker-logs",
+            reason: `POST /analytics/sql for the stage's Workers Logs answered ${status}: CLOUDFLARE_API_TOKEN needs Account › Account Analytics › Read on the account CLOUDFLARE_ACCOUNT_ID names`,
+          },
+        ]);
+      }).pipe(Effect.scoped, Effect.provide(FetchHttpClient.layer))
+  );
+
+  it.live("names the API's own words for a query it can't run", () =>
+    Effect.gen(function* () {
+      const origin = yield* fakePlatform(healthy);
+
+      const sql = yield* fakePlatform(() => ({
+        body: "Input was invalid: Schema error: No field named level.\nValid fields are …",
+        contentType: "text/plain",
+        status: 422,
+      }));
+
+      const result = yield* Effect.result(
+        smoke(origin, { logs: checkAt(sql) })
+      );
+
+      expect(logsFailures(result)).toStrictEqual([
+        {
+          probe: "worker-logs",
+          reason:
+            "POST /analytics/sql for the stage's Workers Logs answered 422: Input was invalid: Schema error: No field named level.",
+        },
+      ]);
+    }).pipe(Effect.scoped, Effect.provide(FetchHttpClient.layer))
+  );
+
+  it.live(
+    "asks again while the SQL API answers with a server error, and passes once it settles",
+    () =>
+      Effect.gen(function* () {
+        const origin = yield* fakePlatform(healthy);
+        const asked = { sql: 0 };
+
+        const sql = yield* fakePlatform(() => {
+          asked.sql += 1;
+
+          return asked.sql === 1 ? { status: 503 } : rowsOf([]);
+        });
+
+        const report = yield* smoke(origin, {
+          logs: checkAt(sql),
+          settling: "10 seconds",
+        });
+
+        expect({
+          asked,
+          probes: report.probes.map(({ probe }) => probe),
+        }).toStrictEqual({
+          asked: { sql: 2 },
+          probes: [...platformProbes, ...logProbes],
+        });
+      }).pipe(Effect.scoped, Effect.provide(FetchHttpClient.layer))
+  );
+});
+
 describe("the smoke command", () => {
   it.live("refuses without a stage it knows, before it probes anything", () =>
     Effect.gen(function* () {
@@ -680,6 +902,51 @@ describe("the smoke command", () => {
       );
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
   );
+
+  it.live(
+    "refuses --since without infra's credentials, or with an instant it can't read, before it probes anything",
+    () =>
+      Effect.gen(function* () {
+        const seen: string[] = [];
+
+        const origin = yield* fakePlatform((request) => {
+          seen.push(request.path);
+
+          return healthy(request);
+        });
+
+        const argv = ["--stage", "dev-oscabriel", "--url", origin];
+
+        expect({
+          bad: yield* Effect.flip(
+            main([...argv, "--since", "yesterday"]).pipe(
+              withEnv({
+                CLOUDFLARE_ACCOUNT_ID: ACCOUNT,
+                CLOUDFLARE_API_TOKEN: "token-from-infra-env",
+              })
+            )
+          ),
+          bare: yield* Effect.flip(
+            main([...argv, "--since", SINCE]).pipe(withEnv({}))
+          ),
+          seen,
+        }).toStrictEqual({
+          bad: new BadSince({ given: "yesterday" }),
+          bare: new NoLogCredentials(),
+          seen: [],
+        });
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
+  );
+
+  it("says what --since needs, naming infra's credentials and never a value", () => {
+    expect({
+      bad: new BadSince({ given: "yesterday" }).message,
+      bare: new NoLogCredentials().message,
+    }).toStrictEqual({
+      bad: "--since yesterday is not an ISO 8601 instant, as 2026-10-13T12:00:00.000Z",
+      bare: "--since reads the stage's Workers Logs with infra's credentials, and CLOUDFLARE_ACCOUNT_ID or CLOUDFLARE_API_TOKEN is not set: run smoke as the deploy does, through bunx varlock run --path infra/ --",
+    });
+  });
 
   it("says to bootstrap first when neither --url nor bootstrap's record names the origin", () => {
     const failed = new NoOrigin({

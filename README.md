@@ -53,6 +53,8 @@ bun run bootstrap -- --stage dev-<you>   # makes the stage's resources; deletes 
 bun run deploy -- --stage dev-<you>      # runs verify, deploys the three Workers, runs smoke
 ```
 
+Smoke ends by reading the stage's Workers Logs through Cloudflare's SQL API, and fails on any exception or error-level line logged since the first upload, naming each Worker and its count, so the token needs Account Analytics Read.
+
 [AGENTS.md](AGENTS.md) covers secrets, smoke, seeding, releases and teardown, and its principles table names the check that holds each rule.
 
 ## The tree

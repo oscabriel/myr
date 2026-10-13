@@ -1,6 +1,7 @@
 // Usage: bun run deploy -- --stage <stage>
 // Runs verify, deploys sandbox, platform and web, checks the push trigger, then
-// smoke. Refused while `infra/.recording` exists, before any flag is read.
+// smoke, which also reads the stage's logs since the first upload began.
+// Refused while `infra/.recording` exists, before any flag is read.
 // `STAGE_SECRETS_FILE` passes only the items `apps/platform/.env.schema`
 // declares, to the platform step alone; no value is ever printed.
 import { BunRuntime, BunServices } from "@effect/platform-bun";
@@ -8,6 +9,7 @@ import {
   Config,
   ConfigProvider,
   Console,
+  DateTime,
   Effect,
   FileSystem,
   Option,
@@ -82,17 +84,27 @@ const hostArgs = (stage: Stage) =>
     }),
   });
 
+const verify: Step = {
+  args: ["run", "verify"],
+  command: "bun",
+  cwd: "",
+  name: "verify",
+};
+
+// Every step after verify. `since` is when the first upload began: smoke
+// fails on any error the stage's Workers logged from then on, read with
+// infra's credentials, so it runs through varlock as bootstrap does.
 const stepsOf = (
   stage: Stage,
   options: {
     readonly web: boolean;
     readonly platformEnv: Readonly<Record<string, string>>;
+    readonly since: DateTime.Utc;
   }
 ): readonly Step[] => {
   const hosts = hostArgs(stage);
 
   return [
-    { args: ["run", "verify"], command: "bun", cwd: "", name: "verify" },
     {
       args: ["deploy", "--env", stage],
       command: bin("apps/sandbox", "wrangler"),
@@ -133,8 +145,19 @@ const stepsOf = (
       name: "triggers",
     },
     {
-      args: ["scripts/smoke.ts", "--stage", stage],
-      command: "bun",
+      args: [
+        "run",
+        "--path",
+        "infra/",
+        "--",
+        "bun",
+        "scripts/smoke.ts",
+        "--stage",
+        stage,
+        "--since",
+        DateTime.formatIso(options.since),
+      ],
+      command: "node_modules/.bin/varlock",
       cwd: "",
       name: "smoke",
     },
@@ -272,8 +295,14 @@ export const deploy = (
 
     const platformEnv = yield* platformSecrets(root);
 
+    yield* runStep(root, stage, verify);
+
+    // Smoke reads the logs from here: an error logged while verify ran is
+    // the replaced version's, never this deploy's.
+    const since = yield* DateTime.now;
+
     yield* Effect.forEach(
-      stepsOf(stage, { platformEnv, web }),
+      stepsOf(stage, { platformEnv, since, web }),
       (step) => runStep(root, stage, step),
       { discard: true }
     );
