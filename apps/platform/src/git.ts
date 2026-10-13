@@ -246,9 +246,15 @@ const serve = (request: Request, route: GitRoute, principal: Principal) =>
           )
         : refuseAll;
 
-    const response = yield* gateway(request).pipe(
+    const served = gateway(request).pipe(
       Effect.provideService(Custody, custody)
     );
+
+    const response = yield* route.endpoint === "git-receive-pack"
+      ? served.pipe(
+          Effect.withSpan("Gateway.push", { attributes: { target: kind._tag } })
+        )
+      : served;
 
     return yield* withNotices(response, yield* Ref.get(notices));
   });

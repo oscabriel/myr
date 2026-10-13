@@ -27,7 +27,9 @@ import { ProjectionMemory } from "@repo/project/projection/memory";
 import type { Projects } from "@repo/project/projects";
 import type { RulesEvaluator } from "@repo/rules/rules-evaluator";
 import { RulesEvaluatorWorker } from "@repo/rules/rules-evaluator/worker";
-import { Layer, Option } from "effect";
+import { Telemetry } from "@repo/telemetry/telemetry";
+import { tracing } from "cloudflare:workers";
+import { Layer, Option, Redacted } from "effect";
 
 import { CheckRunnerSandbox } from "./adapters/check-runner-sandbox.ts";
 import { DoProjects } from "./adapters/do-projects.ts";
@@ -115,6 +117,25 @@ const corePorts = (config: PlatformConfig): Layer.Layer<WorkerPorts> =>
 
 export const workerPorts = (config: PlatformConfig): Layer.Layer<WorkerPorts> =>
   plugIn(config, corePorts(config), Object.values(cartridges));
+
+// Every secret the env holds, a session table's tokens each on its own.
+const secretsOf = (config: PlatformConfig): readonly Redacted.Redacted[] => [
+  config.COOKIE_KEY,
+  config.MASTER_KEY,
+  config.OPERATOR_TOKEN,
+  config.PASSWORD_PEPPER,
+  ...Option.toArray(Option.fromUndefinedOr(config.GOOGLE_CLIENT_SECRET)),
+  ...Option.match(Option.fromUndefinedOr(config.SESSION_TOKENS), {
+    onNone: () => [],
+    onSome: (table) =>
+      Object.keys(Redacted.value(table)).map((token) => Redacted.make(token)),
+  }),
+];
+
+// The JSON logger, defect reporting and spans of every runtime the Worker
+// starts: its routers, each Project DO and each Workflow instance.
+export const telemetryOf = (config: PlatformConfig): Layer.Layer<never> =>
+  Telemetry({ secrets: secretsOf(config), tracing });
 
 export const draftPorts = (config: PlatformConfig): Layer.Layer<Drafter> =>
   Layer.merge(

@@ -21,6 +21,7 @@ import { bundleRules, compose, land, merge } from "./lander/run.ts";
 
 export const landImage = "land";
 
+// A Lander job names no repo: a repo's name is no id (AGENTS.md principle 7).
 export const landerJobs = (
   box: Layer.Layer<Box>,
   turn: Semaphore.Semaphore
@@ -29,14 +30,51 @@ export const landerJobs = (
     job.pipe(Effect.provide(box), Semaphore.withPermit(turn));
 
   return {
-    bundleRules: answerJob(BundleWire, BundleExit, (wire) =>
-      inBox(bundleRules(wire))
+    bundleRules: answerJob(
+      {
+        defects: "whole",
+        exit: BundleExit,
+        ids: ({ job }) => ({ sha: job.at }),
+        name: "Lander.bundleRules",
+        tokens: ({ main }) => [main.token],
+        wire: BundleWire,
+      },
+      (wire) => inBox(bundleRules(wire))
     ),
-    compose: answerJob(ComposeWire, ComposeExit, (wire) =>
-      inBox(compose(wire))
+    compose: answerJob(
+      {
+        defects: "whole",
+        exit: ComposeExit,
+        ids: ({ job }) => ({ sha: job.main }),
+        name: "Lander.compose",
+        tokens: ({ main }) => [main.token],
+        wire: ComposeWire,
+      },
+      (wire) => inBox(compose(wire))
     ),
-    land: answerJob(LandWire, LandExit, (wire) => inBox(land(wire))),
-    merge: answerJob(MergeWire, MergeExit, (wire) => inBox(merge(wire))),
+    land: answerJob(
+      {
+        defects: "whole",
+        exit: LandExit,
+        ids: ({ job }) => ({ requestId: job.requestId, sha: job.main }),
+        name: "Lander.land",
+        tokens: ({ fork, main }) =>
+          fork === undefined ? [main.token] : [main.token, fork.token],
+        wire: LandWire,
+      },
+      (wire) => inBox(land(wire))
+    ),
+    merge: answerJob(
+      {
+        defects: "whole",
+        exit: MergeExit,
+        ids: ({ job }) => ({ sha: job.head }),
+        name: "Lander.merge",
+        tokens: ({ fork, main }) => [main.token, fork.token],
+        wire: MergeWire,
+      },
+      (wire) => inBox(merge(wire))
+    ),
   };
 };
 

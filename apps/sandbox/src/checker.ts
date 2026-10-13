@@ -1,12 +1,13 @@
 // Each check job gets a Checker of its own (a unique id). A Checker named
 // `snapshots:<project>` never starts a container: it only keeps that
 // project's snapshot ids.
+import { CheckAt } from "@repo/checks/check-runner";
 import type { CheckRun } from "@repo/checks/check-runner";
 import { CheckExit, CheckWire } from "@repo/checks/check-runner/wire";
 import { keyOf } from "@repo/protocol/ids";
 import { VerifierBlocked } from "@repo/protocol/refusal";
 import { DurableObject } from "cloudflare:workers";
-import { Effect, Exit, Layer, Option, Schema } from "effect";
+import { Effect, Exit, Layer, Option, Redacted, Schema } from "effect";
 
 import { SdkBox } from "./box/sdk.ts";
 import { envPlanOf } from "./checker/env.ts";
@@ -14,6 +15,8 @@ import { WorkerCheckLogs } from "./checker/logs/worker.ts";
 import { blocked, check } from "./checker/run.ts";
 import { hasGateways, SdkChecker } from "./checker/sdk.ts";
 import { answerJob } from "./job.ts";
+import type { Job } from "./job.ts";
+import { jobTelemetry } from "./telemetry.ts";
 
 const DEFAULT_IMAGE = "checker:default";
 
@@ -22,9 +25,32 @@ const CHECK_IMAGE = "check";
 /** oxlint's JS plugins reserve about 6 GiB of address space per thread; smaller sizes abort. */
 export const checkInstance = "standard-3";
 
+export const checkJob: Job<
+  CheckWire,
+  typeof CheckWire.Encoded,
+  CheckRun,
+  VerifierBlocked,
+  typeof CheckExit.Encoded
+> = {
+  // A defect may quote a sealed file's path: the platform's report of it is
+  // the one place its text goes.
+  defects: "name",
+  exit: CheckExit,
+  ids: ({ job }) => ({
+    project: job.project,
+    sha: CheckAt.match(job.at, {
+      Commit: ({ commit }): string => commit,
+      Tree: ({ tree }): string => tree,
+    }),
+  }),
+  name: "Checker.check",
+  tokens: ({ clone }) => [clone.token],
+  wire: CheckWire,
+};
+
 export class Checker extends DurableObject<Env> {
   check(wire: typeof CheckWire.Encoded): Promise<typeof CheckExit.Encoded> {
-    return answerJob(CheckWire, CheckExit, (job) => this.#checked(job))(wire);
+    return answerJob(checkJob, (job) => this.#checked(job))(wire);
   }
 
   snapshotOf(key: string): string | null {
@@ -134,6 +160,7 @@ export const runCheck = (
       ),
       Effect.orElseSucceed(() => Exit.fail(new VerifierBlocked({}))),
       Effect.flatMap(Schema.encodeEffect(CheckExit)),
-      Effect.orDie
+      Effect.orDie,
+      Effect.provide(jobTelemetry([Redacted.make(wire.clone.token)]))
     )
   );

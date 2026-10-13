@@ -13,12 +13,21 @@ import {
   Scheduler,
   Scope,
 } from "effect";
+import { constTrue } from "effect/Function";
 import type { HttpServerRequest } from "effect/http";
-import { HttpEffect, HttpRouter } from "effect/http";
+import { HttpEffect, HttpMiddleware, HttpRouter } from "effect/http";
 
 export class RouterBuildAwaited extends Data.TaggedError("RouterBuildAwaited")<{
   readonly message: string;
 }> {}
+
+// The runtime traces each request itself, with its URL; effect's own
+// `http.server` span would be a second, carrying the query and the client's
+// address.
+const UntracedRequests = Layer.succeed(
+  HttpMiddleware.TracerDisabledWhen,
+  constTrue
+);
 
 type RequestNeeds<A, R> = Exclude<
   | HttpRouter.Request.Only<"Requires", R>
@@ -35,8 +44,11 @@ export const buildHandler = <
     | HttpRouter.Request<"GlobalRequires", unknown>
     | HttpRouter.Request<"Error", unknown>
     | HttpRouter.Request<"GlobalError", unknown>,
+  TE = never,
 >(
-  appLayer: Layer.Layer<A, E, R>
+  appLayer: Layer.Layer<A, E, R>,
+  // Every request runs with it, and a request's defect is reported through it.
+  telemetry: Layer.Layer<never, TE> = Layer.empty
 ) => {
   const scope = Scope.makeUnsafe();
 
@@ -52,11 +64,16 @@ export const buildHandler = <
   >;
   /* oxlint-enable typescript/no-unsafe-type-assertion */
 
+  const observed = Layer.provideMerge(
+    routed,
+    Layer.merge(telemetry, UntracedRequests)
+  );
+
   // `runSyncExit`'s own scheduler would ride along in any context a layer captures
   // while built, so the build runs on the default one; `runSyncExit` still drains what
   // it schedules before it returns.
   const built = Effect.runSyncExit(
-    Layer.buildWithScope(routed, scope).pipe(
+    Layer.buildWithScope(observed, scope).pipe(
       Effect.provideService(
         Scheduler.Scheduler,
         Scheduler.Scheduler.defaultValue()

@@ -5,9 +5,11 @@ import { ProjectStore } from "@repo/project/project-store";
 import { ProjectStoreSqlite } from "@repo/project/project-store/sqlite";
 import type { ProjectName } from "@repo/protocol/ids";
 import { UnknownProject } from "@repo/protocol/refusal";
+import { withInvocation } from "@repo/telemetry/spans";
 import {
   Context,
   Effect,
+  ErrorReporter,
   Exit,
   Layer,
   Option,
@@ -138,24 +140,33 @@ export const projectShell = (input: {
         const api = yield* service;
         const outcome = yield* Effect.exit(withEvidence(api[method](...args)));
 
+        // The reply carries a defect without its stack, and the caller reports it no
+        // more: it is reported here, where the stack is.
+        if (Exit.isFailure(outcome)) {
+          yield* ErrorReporter.report(outcome.cause);
+        }
+
         return yield* Schema.encodeUnknownEffect(call.exit)(outcome).pipe(
           Effect.orDie
         );
-      });
+      }).pipe(Effect.withSpan(`Project.${method}`));
+
+    const named = withInvocation(
+      input.name === undefined ? {} : { project: input.name }
+    );
 
     return {
-      alarm: () =>
-        Effect.gen(function* () {
-          if (yield* isMade) {
-            yield* Effect.flatMap(service, (api) =>
-              withEvidence(api.onAlarm())
-            );
-          }
-        }),
+      alarm: Effect.fn("Project.alarm")(function* () {
+        if (yield* isMade) {
+          yield* Effect.flatMap(service, (api) =>
+            withEvidence(api.onAlarm())
+          ).pipe(named);
+        }
+      }),
       call: (request) =>
         Effect.flatMap(
           Schema.decodeEffect(CallRequest)(request).pipe(Effect.orDie),
-          ({ method }) => serve(method, request)
+          ({ method }) => named(serve(method, request))
         ),
     };
   });
