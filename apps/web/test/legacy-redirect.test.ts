@@ -90,10 +90,7 @@ describe("a page that moved", () => {
     expect(
       movedTo("/today?project=oscabriel/datekit&decision=dec-000001")
     ).toStrictEqual(
-      Option.some([
-        301,
-        "/inbox?project=oscabriel/datekit&decision=dec-000001",
-      ])
+      Option.some([301, "/inbox?project=oscabriel/datekit&decision=dec-000001"])
     );
   });
 

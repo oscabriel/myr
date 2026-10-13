@@ -1,5 +1,4 @@
 import { useAtom, useAtomValue } from "@effect/atom-react";
-import type { Today } from "@repo/protocol/domain/decision";
 import { ProjectName } from "@repo/protocol/ids";
 import { createFileRoute } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
@@ -13,10 +12,10 @@ import { SeededAtoms, seedSuccess } from "../client/seeded.ts";
 import { todayAtom } from "../client/today.ts";
 import { InboxView } from "../features/inbox/inbox-page.tsx";
 import {
-  Decisions,
   InboxPageData,
-  InboxRead,
   readInbox,
+  todayOf,
+  withToday,
 } from "../features/inbox/read.ts";
 import { pageHead } from "../features/shared/head.ts";
 import {
@@ -37,20 +36,6 @@ const searchOf = Schema.decodeUnknownOption(InboxSearch);
 
 // The reader's own page: never kept by the edge or the browser.
 export const inboxHeaders = () => personalPage;
-
-// The decisions read again after a choice replace the loaded ones; the rest of the page stays as it was read.
-const withLiveDecisions = (
-  read: InboxRead,
-  result: AsyncResult.AsyncResult<Today, unknown>
-): InboxRead =>
-  InboxRead.guards.Read(read) &&
-  Decisions.guards.Decides(read.decisions) &&
-  AsyncResult.isSuccess(result)
-    ? {
-        ...read,
-        decisions: Decisions.cases.Decides.make({ today: result.value }),
-      }
-    : read;
 
 const inboxPage = createServerFn({ method: "GET" })
   .validator((search: { readonly project?: ProjectName }) => search)
@@ -76,7 +61,11 @@ const LiveInbox = ({
       decided={decided}
       now={data.now}
       onDecide={decide}
-      read={withLiveDecisions(data.read, result)}
+      read={
+        AsyncResult.isSuccess(result)
+          ? withToday(data.read, result.value)
+          : data.read
+      }
       selected={selected}
     />
   );
@@ -86,11 +75,10 @@ const InboxPage = () => {
   const { project } = Route.useSearch();
   const data = Schema.decodeSync(InboxPageData)(Route.useLoaderData());
 
-  const seeds =
-    InboxRead.guards.Read(data.read) &&
-    Decisions.guards.Decides(data.read.decisions)
-      ? [seedSuccess(todayAtom(project), data.read.decisions.today)]
-      : [];
+  const seeds = Option.match(todayOf(data.read), {
+    onNone: () => [],
+    onSome: (today) => [seedSuccess(todayAtom(project), today)],
+  });
 
   return (
     <SeededAtoms id={`inbox/${project ?? ""}`} seeds={seeds}>

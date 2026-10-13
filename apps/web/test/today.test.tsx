@@ -33,6 +33,7 @@ import {
   budgetSentence,
   InboxView,
 } from "../src/features/inbox/inbox-page.tsx";
+import { movedToInbox } from "../src/features/inbox/moved.ts";
 import {
   Decisions,
   InboxPageData,
@@ -41,7 +42,6 @@ import {
   Takeable,
 } from "../src/features/inbox/read.ts";
 import { RefusalView } from "../src/features/shared/refusal.tsx";
-import { movedToInbox } from "../src/features/inbox/moved.ts";
 import { Route as TodayRoute } from "../src/routes/today.tsx";
 import { fixturesClient } from "./dev-client.ts";
 
@@ -283,9 +283,7 @@ describe("the inbox, for the decisions waiting on a reader", () => {
   it("takes the default's word from the decision, never from its subject", () => {
     const adopting = { ...stray, default: "adopt" } as const;
 
-    const text = textOf(
-      viewOf(deciding({ ...today, decisions: [adopting] }))
-    );
+    const text = textOf(viewOf(deciding({ ...today, decisions: [adopting] })));
 
     expect(text).toContain("If nobody decides by Thu 8 Oct, 10:00 UTC: adopt");
   });
@@ -295,9 +293,9 @@ describe("the inbox, for the decisions waiting on a reader", () => {
 
     expect(textIn(markup)).toContain("4 more wait for tomorrow");
     expect(markup).toContain('data-overflow="4"');
-    expect(
-      textOf(viewOf(deciding({ ...today, overflow: 3 })))
-    ).toContain("3 more wait for tomorrow");
+    expect(textOf(viewOf(deciding({ ...today, overflow: 3 })))).toContain(
+      "3 more wait for tomorrow"
+    );
   });
 
   it("names the newcomers to welcome and the landings that needed nobody", () => {
@@ -639,15 +637,17 @@ const movedFrom = (searchStr: string) =>
 
 describe("/today, once the maintainer's page", () => {
   // The worker answers a document load with its 301 (legacy-redirect.test.ts); a page kept before the move may still link here.
-  it.effect("sends a navigation on to /inbox, its project and decision kept", () =>
-    Effect.gen(function* () {
-      expect(TodayRoute.options.beforeLoad).toBe(movedToInbox);
-      expect(
-        yield* movedFrom("?project=oscabriel/datekit&decision=dec-000001")
-      ).toStrictEqual([
-        301,
-        "/inbox?project=oscabriel/datekit&decision=dec-000001",
-      ]);
-    })
+  it.effect(
+    "sends a navigation on to /inbox, its project and decision kept",
+    () =>
+      Effect.gen(function* () {
+        expect(TodayRoute.options.beforeLoad).toBe(movedToInbox);
+        expect(
+          yield* movedFrom("?project=oscabriel/datekit&decision=dec-000001")
+        ).toStrictEqual([
+          301,
+          "/inbox?project=oscabriel/datekit&decision=dec-000001",
+        ]);
+      })
   );
 });

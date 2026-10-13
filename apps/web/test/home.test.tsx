@@ -17,6 +17,7 @@ import { isRedirect } from "@tanstack/react-router";
 import { DateTime, Effect, Schema } from "effect";
 
 import { InboxView } from "../src/features/inbox/inbox-page.tsx";
+import { movedToInbox } from "../src/features/inbox/moved.ts";
 import {
   askKey,
   Decisions,
@@ -26,7 +27,6 @@ import {
   readInbox,
   Takeable,
 } from "../src/features/inbox/read.ts";
-import { movedToInbox } from "../src/features/inbox/moved.ts";
 import { Route as HomeRoute } from "../src/routes/home.tsx";
 import { inboxHeaders, Route } from "../src/routes/inbox.tsx";
 import { fixturesClient } from "./dev-client.ts";

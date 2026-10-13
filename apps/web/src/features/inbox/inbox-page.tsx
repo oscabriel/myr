@@ -2,6 +2,7 @@ import { Brand } from "@repo/brand";
 import type { FrontPageEntry } from "@repo/protocol/domain/front-page";
 import { Outcome } from "@repo/protocol/domain/outcome";
 import type { Handle } from "@repo/protocol/ids";
+import { Option } from "effect";
 import type { DateTime } from "effect";
 import { AsyncResult } from "effect/reactivity";
 import type { ReactNode } from "react";
@@ -48,6 +49,7 @@ import {
   InboxRead,
   isRunning,
   Takeable,
+  todayOf,
   WORK_SHOWN,
 } from "./read.ts";
 import type { Work } from "./read.ts";
@@ -330,13 +332,6 @@ const RecentBlock = ({
     Unreachable: () => null,
   });
 
-const budgetOf = (decisions: Decisions) =>
-  Decisions.match(decisions, {
-    Decides: ({ today }) => today.budget,
-    NotDecider: () => undefined,
-    Unreachable: () => undefined,
-  });
-
 const SignedInInbox = ({
   deciding,
   read,
@@ -344,7 +339,9 @@ const SignedInInbox = ({
   readonly deciding: Deciding;
   readonly read: SignedIn;
 }) => {
-  const budget = budgetOf(read.decisions);
+  const budget = Option.getOrUndefined(
+    Option.map(todayOf(read), ({ budget: held }) => held)
+  );
 
   return (
     <Workspace

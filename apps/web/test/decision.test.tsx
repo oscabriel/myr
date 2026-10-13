@@ -35,6 +35,8 @@ import {
 import type { DecisionPageData } from "../src/features/decision/decision-page.tsx";
 import { patchFiles } from "../src/features/finish/files.ts";
 import { waiverPatchOf } from "../src/features/finish/patch.ts";
+import { InboxView } from "../src/features/inbox/inbox-page.tsx";
+import { Decisions, InboxRead, Takeable } from "../src/features/inbox/read.ts";
 import { ProposalFailure } from "../src/features/proposal/failure.tsx";
 import {
   DraftRead,
@@ -42,12 +44,6 @@ import {
   readDraft,
 } from "../src/features/proposal/live-draft.ts";
 import { RefusalView } from "../src/features/shared/refusal.tsx";
-import { InboxView } from "../src/features/inbox/inbox-page.tsx";
-import {
-  Decisions,
-  InboxRead,
-  Takeable,
-} from "../src/features/inbox/read.ts";
 import { ContractsClient, webContracts } from "../src/surfaces.ts";
 
 const markupOf = (element: ReactElement) => renderToStaticMarkup(element);

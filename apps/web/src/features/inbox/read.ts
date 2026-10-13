@@ -74,6 +74,32 @@ export const InboxPageData = Schema.Struct({
 
 export type InboxPageData = typeof InboxPageData.Type;
 
+/** The decisions the read carries, when the reader decides somewhere and they came. */
+export const todayOf = (read: InboxRead): Option.Option<Today> =>
+  InboxRead.match(read, {
+    Read: ({ decisions }) =>
+      Decisions.match(decisions, {
+        Decides: ({ today }) => Option.some(today),
+        NotDecider: () => Option.none(),
+        Unreachable: () => Option.none(),
+      }),
+    Refused: () => Option.none(),
+    SignedOut: () => Option.none(),
+    Unreachable: () => Option.none(),
+  });
+
+/** The decisions read again after a choice take the loaded ones' place; the rest stays as it was read. */
+export const withToday = (read: InboxRead, today: Today): InboxRead =>
+  InboxRead.match(read, {
+    Read: (signed) =>
+      Option.isSome(todayOf(read))
+        ? { ...signed, decisions: Decisions.cases.Decides.make({ today }) }
+        : read,
+    Refused: () => read,
+    SignedOut: () => read,
+    Unreachable: () => read,
+  });
+
 export const isRunning = (claim: ClaimView) =>
   claim.state === "live" || claim.state === "warned";
 
@@ -260,59 +286,59 @@ const failedRead = (cause: Cause.Cause<unknown>): InboxRead => {
 /** `project` narrows the inbox to one project: its decisions, the reader's claims in it and its asks. */
 export const readInbox = ({ project }: { readonly project?: ProjectName }) =>
   Effect.gen(function* () {
-  const client = yield* Client;
-  const scope = project === undefined ? {} : { project };
+    const client = yield* Client;
+    const scope = project === undefined ? {} : { project };
 
-  const [status, today, front] = yield* Effect.all(
-    [
-      Effect.exit(client.status(scope)),
-      Effect.exit(client.today(scope)),
-      Effect.option(client.frontPage({})),
-    ],
-    { concurrency: "unbounded" }
-  );
+    const [status, today, front] = yield* Effect.all(
+      [
+        Effect.exit(client.status(scope)),
+        Effect.exit(client.today(scope)),
+        Effect.option(client.frontPage({})),
+      ],
+      { concurrency: "unbounded" }
+    );
 
-  const decisions = Exit.match(today, {
-    onFailure: (cause) =>
-      Option.exists(Cause.findErrorOption(cause), isNotDecider)
-        ? Decisions.cases.NotDecider.make({})
-        : Decisions.cases.Unreachable.make({}),
-    onSuccess: (read) => Decisions.cases.Decides.make({ today: read }),
-  });
+    const decisions = Exit.match(today, {
+      onFailure: (cause) =>
+        Option.exists(Cause.findErrorOption(cause), isNotDecider)
+          ? Decisions.cases.NotDecider.make({})
+          : Decisions.cases.Unreachable.make({}),
+      onSuccess: (read) => Decisions.cases.Decides.make({ today: read }),
+    });
 
-  const asks = Option.match(front, {
-    onNone: () => Takeable.cases.Unreachable.make({}),
-    onSome: ({ entries }) =>
-      Takeable.cases.Listed.make({
-        asks: entries
-          .filter(
-            (entry) =>
-              entry.takeable &&
-              (project === undefined || entry.project === project)
+    const asks = Option.match(front, {
+      onNone: () => Takeable.cases.Unreachable.make({}),
+      onSome: ({ entries }) =>
+        Takeable.cases.Listed.make({
+          asks: entries
+            .filter(
+              (entry) =>
+                entry.takeable &&
+                (project === undefined || entry.project === project)
+            )
+            .slice(0, ASKS_SHOWN),
+        }),
+    });
+
+    const read = yield* Exit.match(status, {
+      onFailure: (cause) => Effect.succeed(failedRead(cause)),
+      onSuccess: ({ answers, claims, handle }) =>
+        workOf(claims, answers).pipe(
+          Effect.map((work) =>
+            InboxRead.cases.Read.make({
+              asks,
+              decisions,
+              handle,
+              held: claims.length,
+              running: claims.filter(isRunning).length,
+              work,
+            })
           )
-          .slice(0, ASKS_SHOWN),
-      }),
-  });
+        ),
+    });
 
-  const read = yield* Exit.match(status, {
-    onFailure: (cause) => Effect.succeed(failedRead(cause)),
-    onSuccess: ({ answers, claims, handle }) =>
-      workOf(claims, answers).pipe(
-        Effect.map((work) =>
-          InboxRead.cases.Read.make({
-            asks,
-            decisions,
-            handle,
-            held: claims.length,
-            running: claims.filter(isRunning).length,
-            work,
-          })
-        )
-      ),
+    return yield* Schema.encodeEffect(InboxPageData)({
+      now: yield* DateTime.now,
+      read,
+    });
   });
-
-  return yield* Schema.encodeEffect(InboxPageData)({
-    now: yield* DateTime.now,
-    read,
-  });
-});

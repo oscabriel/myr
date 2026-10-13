@@ -42,14 +42,7 @@ const SECTION_OF = {
   why: "code",
 } as const satisfies Record<string, ProjectTab>;
 
-const SITE = new Set([
-  "agents",
-  "asks",
-  "docs",
-  "import",
-  "inbox",
-  "people",
-]);
+const SITE = new Set(["agents", "asks", "docs", "import", "inbox", "people"]);
 
 const addressOf = (pathname: string) => {
   const segments = segmentsOf(pathname);
