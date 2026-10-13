@@ -472,6 +472,14 @@ describe("Pierre's shadow roots", () => {
 
   const roles = new RegExp(`var\\(--(?:${STATES.join("|")})\\)`, "u");
 
+  // Each sets `color-scheme: light dark` on its host, so its own
+  // `light-dark()` colours would follow the system, not the page's resolved
+  // theme; the page's rule for the host wins over the shadow root's.
+  it("take the page's resolved colour scheme, not the system's", () => {
+    expect(diffs).toMatch(/^\s*color-scheme: inherit;/mu);
+    expect(trees).toMatch(/^\s*color-scheme: inherit;/mu);
+  });
+
   it("draw code without ligatures, so `=>` stays two characters", () => {
     expect(declarations(diffs).get("diffs-font-features")).toBe(
       '"calt" 0, "liga" 0'

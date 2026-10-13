@@ -576,6 +576,11 @@
     ligatures are switched off again here.
   */
   diffs-container {
+    /* Pierre's host says `light dark`, which follows the system; this rule,
+       from outside the shadow root, wins, so its `light-dark()` colours take
+       the page's resolved theme (ADR 0042). */
+    color-scheme: inherit;
+
     /* Metrics: the mono token on Pierre's 20 px line. */
     --diffs-font-family: var(--font-mono);
     --diffs-font-size: 0.8125rem;
@@ -624,6 +629,9 @@
   }
 
   file-tree-container {
+    /* As for a diff: the page's resolved theme, not the system's. */
+    color-scheme: inherit;
+
     /* A tree is read like a list, in the UI's own face and size. */
     --trees-font-family-override: var(--font-sans);
     --trees-font-size-override: 0.875rem;
