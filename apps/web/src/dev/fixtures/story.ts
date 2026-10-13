@@ -142,6 +142,7 @@ export const storyOf = (input: {
     const proposals = new Map<ProposalId, HeldProposal>();
     const logs = new Map<string, KeptLog>();
     const firstClaims = new Map<Handle, DateTime.Utc>();
+    const forked = new Set<RepoName>();
 
     const nextSeq = () => events.length + 1;
 
@@ -716,6 +717,39 @@ export const storyOf = (input: {
         }),
 
       head: () => head,
+
+      /** Each claim's fork, made once, at the main the claim began from, as a claim's fork is. */
+      forkClaims: () =>
+        Effect.forEach(
+          [...claims].flatMap(([ask, held]) =>
+            held.map((each) => ({ ask, each }))
+          ),
+          ({ ask, each }) =>
+            Effect.gen(function* () {
+              const fork = claimForkName(project, ask, each.claimant);
+
+              if (forked.has(fork)) {
+                return;
+              }
+
+              forked.add(fork);
+
+              const made = yield* Effect.option(host.fork(repo, fork));
+
+              if (Option.isNone(made) || head === each.base) {
+                return;
+              }
+
+              const into = yield* scratch;
+
+              yield* Effect.orDie(
+                host.push(fork, into.source, [
+                  { from: Option.some(head), ref: main, to: each.base },
+                ])
+              );
+            }),
+          { discard: true }
+        ),
 
       told: (
         apart: Pick<FixtureRecord, "env" | "ledger"> & {

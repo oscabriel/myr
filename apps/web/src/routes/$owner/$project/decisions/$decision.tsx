@@ -33,8 +33,8 @@ import {
 } from "../../../../features/decision/read.ts";
 import type { FoundDecision } from "../../../../features/decision/read.ts";
 import { patchFiles } from "../../../../features/finish/files.ts";
+import { FinishColumn } from "../../../../features/finish/finish-column.tsx";
 import { FinishFilesButton } from "../../../../features/finish/finish-files-button.tsx";
-import { FinishRail } from "../../../../features/finish/finish-rail.tsx";
 import { FinishView } from "../../../../features/finish/finish-view.tsx";
 import {
   isFinishDecision,
@@ -300,7 +300,7 @@ const DecisionPage = () => {
 };
 
 export const Route = createFileRoute("/$owner/$project/decisions/$decision")({
-  staticData: { rail: FinishRail },
+  staticData: { column: FinishColumn, shell: "project" },
   loader: ({ params }) => decisionPage({ data: params }),
   headers: () => personalPage,
   head: ({ params }) =>

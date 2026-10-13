@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { Client, Contracts } from "@repo/protocol/contracts";
+import { forkRev } from "@repo/protocol/domain/code";
 import { ProjectEvent } from "@repo/protocol/domain/event";
 import { Handle, ProjectName } from "@repo/protocol/ids";
 import {
@@ -172,6 +173,37 @@ const listedWithLedgers = inFreshWorld((as) =>
   })
 );
 
+const recentWithLast = inFreshWorld((as) =>
+  Effect.gen(function* () {
+    const anyone = yield* clientOf(as());
+    const { landings } = yield* anyone.recentLandings({});
+    const { projects } = yield* anyone.listProjects({});
+
+    const [latest] = projects.toSorted((one, other) =>
+      DateTime.Order(
+        other.landedAt ?? DateTime.makeUnsafe(0),
+        one.landedAt ?? DateTime.makeUnsafe(0)
+      )
+    );
+
+    const { project } = yield* Effect.orDie(Effect.fromNullishOr(latest));
+
+    const sha = yield* Effect.orDie(
+      Effect.fromNullishOr((yield* anyone.listRefs({ project })).landed)
+    );
+
+    const { landing } = yield* anyone.landing({ project, sha });
+
+    const named = yield* Effect.orDie(
+      Effect.fromNullishOr(landing.ask ?? landing.opened)
+    );
+
+    const { ask } = yield* anyone.showAsk({ ask: named, project });
+
+    return { landing, landings, want: ask.brief.want };
+  })
+);
+
 // Each test seeds whole worlds while turbo runs every package's tests at once: near vitest's 5 s default.
 const seededWorlds = { timeout: 30_000 };
 
@@ -277,6 +309,29 @@ describe("the dev seed", seededWorlds, () => {
   );
 
   it.live(
+    "lists the latest landings across projects, the dev world's last landing first with its ask's want",
+    () =>
+      Effect.gen(function* () {
+        const { landing, landings, want } = yield* recentWithLast;
+
+        expect(landings[0]?._tag).toBe("Landed");
+        expect(landings[0]).toMatchObject({
+          at: landing.landedAt,
+          project: landing.project,
+          sha: landing.sha,
+          want,
+        });
+        expect(
+          landings.map(({ at }) => DateTime.toEpochMillis(at))
+        ).toStrictEqual(
+          landings
+            .map(({ at }) => DateTime.toEpochMillis(at))
+            .toSorted((a, b) => b - a)
+        );
+      })
+  );
+
+  it.live(
     "discloses the harness bram pushed through as Assisted-by, credited to nobody",
     () =>
       Effect.gen(function* () {
@@ -335,6 +390,60 @@ describe("the dev world's raw files", seededWorlds, () => {
         expect(manifest?.csp).toContain("sandbox");
         expect(manifest?.text).toContain('"name": "datekit"');
         expect([climbed?.status, climbed?.text]).toStrictEqual([404, ""]);
+      })
+  );
+});
+
+const forkReads = inFreshWorld((as) =>
+  Effect.gen(function* () {
+    const anyone = yield* clientOf(as());
+    const project = ProjectName.make("oscabriel/datekit");
+    const { forks } = yield* anyone.listRefs({ project });
+
+    const answers = forks.flatMap((fork) =>
+      fork.kind === "claim" && fork.ask !== undefined
+        ? [forkRev({ ask: fork.ask, handle: fork.handle })]
+        : []
+    );
+
+    const read = Effect.forEach(answers, (at) =>
+      Effect.gen(function* () {
+        const tree = yield* anyone.readTree({ at, project });
+        const { commits } = yield* anyone.log({ at, limit: 1, project });
+
+        const { commit } = yield* anyone.showCommit({
+          at,
+          project,
+          sha: tree.at,
+        });
+
+        return [tree.entries.length > 0, commits[0]?.sha, commit.sha, tree.at];
+      })
+    );
+
+    const refused = yield* Effect.flip(
+      anyone.readTree({ at: "@nobody/parse-iso", project })
+    );
+
+    return { answers, read: yield* read, refused };
+  })
+);
+
+describe("the dev world's answer forks", seededWorlds, () => {
+  it.live(
+    "read each at its address, and refuse an address the project does not list",
+    () =>
+      Effect.gen(function* () {
+        const { answers, read, refused } = yield* forkReads;
+
+        expect(answers.length).toBeGreaterThan(0);
+        expect(
+          read.filter(
+            ([listed, logged, shown, at]) =>
+              !(listed === true && logged === at && shown === at)
+          )
+        ).toStrictEqual([]);
+        expect(refused._tag).toBe("UnknownRevision");
       })
   );
 });

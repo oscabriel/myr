@@ -9,6 +9,8 @@ export const projectsMigration = "0004_projects_credits.sql";
 
 export const posturesMigration = "0005_standing_postures.sql";
 
+export const descriptionsMigration = "0007_project_descriptions.sql";
+
 export const migration = (file: string) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -37,3 +39,5 @@ export const migrated = (files: readonly string[]) =>
     Layer.provideMerge(SqliteClient.layer({ filename: ":memory:" })),
     Layer.orDie
   );
+
+export const recentLandingsMigration = "0008_recent_landings.sql";

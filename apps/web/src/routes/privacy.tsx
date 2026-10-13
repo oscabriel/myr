@@ -6,6 +6,7 @@ import { pageHead } from "../features/shared/head.ts";
 import { branchPage } from "../server/cache-headers.ts";
 
 export const Route = createFileRoute("/privacy")({
+  staticData: { shell: "site" },
   component: PrivacyView,
   headers: () => branchPage,
   head: () =>

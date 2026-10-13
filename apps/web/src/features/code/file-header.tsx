@@ -2,7 +2,6 @@ import type { FileView } from "@repo/protocol/domain/code";
 import type { ProjectName } from "@repo/protocol/ids";
 import { Check, Copy, Link2 } from "lucide-react";
 import { Fragment, useEffect } from "react";
-import type { ReactNode } from "react";
 
 import { buttonVariants } from "@/components/ui/button";
 
@@ -19,6 +18,7 @@ import {
   treeHref,
   whyHref,
 } from "./paths.ts";
+import { pinnedRev } from "./rev.ts";
 
 export const linesOf = (text: string): readonly string[] => {
   const lines = text.split("\n");
@@ -224,7 +224,7 @@ export const PathTrail = ({
   );
 };
 
-const SEGMENT =
+export const SEGMENT =
   "text-ui hover:bg-surface aria-[current]:bg-foreground aria-[current]:text-background aria-[current]:hover:bg-foreground flex h-7 items-center px-2.5 font-medium no-underline transition-colors duration-150";
 
 export const ModeToggle = ({
@@ -264,7 +264,6 @@ const TOOL = buttonVariants({
 
 export const FileHeader = ({
   file,
-  files,
   mode,
   path,
   project,
@@ -275,16 +274,12 @@ export const FileHeader = ({
   readonly path?: string | undefined;
   readonly mode?: "code" | "why";
   readonly file?: FileView;
-  readonly files?: ReactNode;
 }) => (
   <>
-    {files === undefined ? null : (
-      <div className="shell:hidden flex shrink-0">{files}</div>
-    )}
     <div className="flex min-w-0 flex-1 items-center gap-3">
       <PathTrail path={path} project={project} rev={rev} />
       {file === undefined ? null : (
-        <p className="text-ui text-muted-foreground diffsplit:block codefacts:hidden hidden min-w-0 truncate tabular-nums">
+        <p className="text-ui text-muted-foreground diffsplit:block hidden min-w-0 truncate tabular-nums">
           {fileWords(file).join(" · ")}
         </p>
       )}
@@ -298,7 +293,10 @@ export const FileHeader = ({
         className="shell:flex hidden shrink-0 items-center gap-0.5"
         data-toolbar="file"
       >
-        <a className={TOOL} href={rawHref(project, file.at, file.path)}>
+        <a
+          className={TOOL}
+          href={rawHref(project, pinnedRev(rev, file.at), file.path)}
+        >
           Raw
         </a>
         <AppLink
@@ -306,7 +304,7 @@ export const FileHeader = ({
           title="Permalink (y)"
           to={(mode === "why" ? whyHref : blobHref)(
             project,
-            file.at,
+            pinnedRev(rev, file.at),
             file.path
           )}
         >

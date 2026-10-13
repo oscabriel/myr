@@ -22,12 +22,13 @@ import {
 } from "../../../../../features/why/why-view.tsx";
 import { branchPage } from "../../../../../server/cache-headers.ts";
 import { serverClient } from "../../../../../server/client.ts";
-import { CodeRail } from "../../tree/-code-rail.tsx";
-import { FilesButton } from "../../tree/-files-button.tsx";
+import { headField, readHead } from "../../../../../server/code-head.ts";
+import { CodeColumn } from "../../tree/-code-column.tsx";
 import { softLanding } from "../../tree/-soft-landing.ts";
 
 const WhyPageData = Schema.Struct({
   file: FileView,
+  head: Schema.optionalKey(CommitView),
   last: Schema.optionalKey(CommitView),
   now: Schema.DateTimeUtcFromString,
   project: ProjectName,
@@ -59,13 +60,14 @@ export const readWhyPage = (params: WhyParams) =>
     // none of it. Should the revision have moved between the reads, the
     // text is read again at the why's own commit. The last change is only
     // a fact beside the file, so the page goes without it.
-    const [view, read, history] = yield* Effect.all(
+    const [view, read, history, head] = yield* Effect.all(
       [
         client.why({ at: rev, path, project }),
         client.readFile({ at: rev, path, project }),
         client.log({ at: rev, limit: 1, path, project }).pipe(Effect.option),
+        readHead(project, rev),
       ],
-      { concurrency: 3 }
+      { concurrency: 4 }
     ).pipe(Effect.catchTags(refused));
 
     const file =
@@ -80,6 +82,7 @@ export const readWhyPage = (params: WhyParams) =>
     );
 
     return yield* Schema.encodeEffect(WhyPageData)({
+      ...headField(head),
       file,
       now: yield* DateTime.now,
       project,
@@ -113,6 +116,7 @@ const WhyPage = () => {
               <WhyFallback
                 now={now}
                 project={project}
+                rev={rev}
                 text={text}
                 view={view}
               />
@@ -120,13 +124,13 @@ const WhyPage = () => {
             key={`${view.at}:${view.path}`}
             now={now}
             project={project}
+            rev={rev}
             text={text}
             view={view}
           />
         )
       }
       file={file}
-      files={<FilesButton />}
       last={last}
       now={now}
       project={project}
@@ -138,13 +142,11 @@ const WhyPage = () => {
 };
 
 export const Route = createFileRoute("/$owner/$project/why/$rev/$")({
-  staticData: { rail: CodeRail },
+  staticData: { column: CodeColumn, shell: "project" },
   headers: () => branchPage,
   loader: ({ params }) => whyPage({ data: params }),
   head: ({ params: { _splat, project, rev } }) =>
     pageHead({ title: `Why ${_splat ?? project} at ${rev}` }),
   component: WhyPage,
-  notFoundComponent: ({ data }) => (
-    <CodeNotFound data={data} files={<FilesButton />} />
-  ),
+  notFoundComponent: CodeNotFound,
 });

@@ -30,6 +30,7 @@ registerCodeTheme();
 export interface WhyCodeProps {
   readonly now: DateTime.Utc;
   readonly project: ProjectName;
+  readonly rev: string;
   readonly text: string;
   readonly view: WhyView;
 }
@@ -38,12 +39,14 @@ const LineDialog = ({
   line,
   onClose,
   project,
+  rev,
   row,
   view,
 }: {
   readonly line: number;
   readonly onClose: () => void;
   readonly project: ProjectName;
+  readonly rev: string;
   readonly row: WhyRow;
   readonly view: WhyView;
 }) => (
@@ -72,12 +75,12 @@ const LineDialog = ({
           adopted, so no landing records who asked for it.
         </p>
       )}
-      <BandLinks project={project} row={row} view={view} />
+      <BandLinks project={project} rev={rev} row={row} view={view} />
     </DialogContent>
   </Dialog>
 );
 
-export const WhyCode = ({ now, project, text, view }: WhyCodeProps) => {
+export const WhyCode = ({ now, project, rev, text, view }: WhyCodeProps) => {
   const [line, setLine] = useState<number | null>(null);
   const rows = useMemo(() => rowsOf(view), [view]);
   const groups = useMemo(() => groupsOf(view), [view]);
@@ -120,7 +123,13 @@ export const WhyCode = ({ now, project, text, view }: WhyCodeProps) => {
           lineAnnotations={annotations}
           options={options}
           renderAnnotation={({ metadata }) => (
-            <WhyBand now={now} project={project} row={metadata} view={view} />
+            <WhyBand
+              now={now}
+              project={project}
+              rev={rev}
+              row={metadata}
+              view={view}
+            />
           )}
         />
         {line === null || Option.isNone(clicked) ? null : (
@@ -130,6 +139,7 @@ export const WhyCode = ({ now, project, text, view }: WhyCodeProps) => {
               setLine(null);
             }}
             project={project}
+            rev={rev}
             row={clicked.value}
             view={view}
           />

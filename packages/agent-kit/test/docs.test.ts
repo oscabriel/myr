@@ -5,6 +5,7 @@ import type { ProjectEvent } from "@repo/protocol/domain/event";
 import { groups } from "@repo/protocol/refusal";
 import { Context, Option } from "effect";
 
+import { agentEndpoints, agentLimits } from "../src/agent-setup.ts";
 import { commandDocs } from "../src/command-doc.ts";
 import { importedProjects } from "../src/docs/imported.ts";
 import { docEntries, docPage, docPages } from "../src/docs/index.ts";
@@ -33,7 +34,13 @@ const cliSpans = (markdown: string) =>
     ...markdown.split("\n"),
   ].flatMap((span) =>
     span.startsWith(`${Brand.cli} `)
-      ? [span.slice(Brand.cli.length + 1).split(/\s+/u)]
+      ? [
+          span
+            .slice(Brand.cli.length + 1)
+            .split(/\s+/u)
+            // A synopsis writes an optional flag as `[--flag]`.
+            .map((word) => word.replaceAll(/^\[|\]$/gu, "")),
+        ]
       : []
   );
 
@@ -58,6 +65,7 @@ describe("the docs", () => {
       ["reference", "landing", "How a landing happens"],
       ["reference", "events", "Events"],
       ["reference", "mcp", "MCP tools"],
+      ["reference", "limits", "Limits and endpoints"],
       ["reference", "imported", "Imported projects"],
     ]);
 
@@ -205,6 +213,31 @@ describe("the reference", () => {
     expect(served).toContain("readFile");
     expect(
       served.filter((tag) => !markdown.includes(`\`${tag}\``))
+    ).toStrictEqual([]);
+  });
+
+  it("names every limit and endpoint agent-kit gives, each with its value or what it is, and links each endpoint a reader can open", () => {
+    const markdown = markdownOf("limits");
+
+    expect(agentLimits().length).toBeGreaterThan(4);
+    expect(
+      agentLimits()
+        .filter(
+          ({ limit, value }) => !markdown.includes(`| ${limit} | ${value} |`)
+        )
+        .map(({ limit }) => limit)
+    ).toStrictEqual([]);
+    expect(
+      agentEndpoints(input)
+        .filter(
+          ({ readable, url, what }) =>
+            !markdown.includes(
+              readable
+                ? `| [\`${url}\`](${url}) | ${what} |`
+                : `| \`${url}\` | ${what} |`
+            )
+        )
+        .map(({ url }) => url)
     ).toStrictEqual([]);
   });
 

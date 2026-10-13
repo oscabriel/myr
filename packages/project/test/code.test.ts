@@ -22,7 +22,7 @@ import {
 import { TestClock } from "effect/testing";
 
 import { CodeStore } from "../src/code-store.ts";
-import { CodeStoreMemory } from "../src/code-store/memory.ts";
+import { CodeStoreCounts, CodeStoreMemory } from "../src/code-store/memory.ts";
 import {
   commitOf,
   fileOf,
@@ -30,6 +30,7 @@ import {
   pathsOf,
   refsOf,
   treeOf,
+  whyOf,
 } from "../src/code.ts";
 import { CodeCache, CodeCacheLive } from "../src/code/cache.ts";
 import { commitKey, DIFF_TEXT } from "../src/code/commit.ts";
@@ -41,6 +42,7 @@ import {
   Content,
   datekit,
   fork,
+  forked,
   linkedReadmes,
   longHistory,
   project,
@@ -282,6 +284,173 @@ describe("a revision", () => {
           refused.map((rev) => Exit.fail(new UnknownRevision({ rev })))
         );
       }).pipe(Effect.provide(RepoHostMemory))
+  );
+});
+
+describe("a fork", () => {
+  it.effect(
+    "is read at its address when the project lists it: its main, a branch by its exact name, or a commit it holds",
+    () =>
+      Effect.gen(function* () {
+        const { answer, c4, code, tried } = yield* forked;
+
+        const resolved = (rev: string) =>
+          Effect.map(
+            treeOf(code, revision(rev), Option.none()),
+            ({ at: sha }) => sha
+          );
+
+        expect(
+          yield* Effect.all([
+            resolved("@bob/parse-iso"),
+            resolved("@Bob/parse-iso"),
+            resolved("@bob/parse-iso:main"),
+            resolved("@bob/parse-iso:try"),
+            resolved(`@bob/parse-iso:${c4}`),
+          ])
+        ).toStrictEqual([answer, answer, answer, tried, c4]);
+      }).pipe(Effect.provide(RepoHostMemory))
+  );
+
+  it.effect("lists the fork's own tree, not main's", () =>
+    Effect.gen(function* () {
+      const { code } = yield* forked;
+      const src = yield* treeOf(code, revision("@bob/parse-iso"), path("src"));
+
+      expect(src.entries.map(({ path: at }) => at)).toStrictEqual([
+        "src/a.ts",
+        "src/parse.ts",
+      ]);
+    }).pipe(Effect.provide(RepoHostMemory))
+  );
+
+  it.effect(
+    "is UnknownRevision when the project does not list it, for a layer's repo, or for a ref path",
+    () =>
+      Effect.gen(function* () {
+        const { answer, code, unlisted } = yield* forked;
+
+        const refused = [
+          "@carol/parse-iso",
+          "@layer/secrets",
+          "@bob/layer",
+          "@bob/other",
+          "alice__datekit--layer--secrets",
+          "alice__datekit--parse-iso--bob",
+          "alice__datekit--parse-iso--carol",
+          "@bob/parse-iso:",
+          "@bob/parse-iso:missing",
+          "@bob/parse-iso:refs/heads/try",
+          "@bob/parse-iso:../heads/try",
+          `@bob/parse-iso:${Brand.refsPrefix}landed`,
+          `@bob/parse-iso:${unlisted}`,
+          "@bob/parse-iso/try",
+          "@bob",
+          answer,
+          unlisted,
+        ];
+
+        expect(
+          yield* Effect.forEach(refused, (rev) =>
+            Effect.exit(treeOf(code, revision(rev), Option.none()))
+          )
+        ).toStrictEqual(
+          refused.map((rev) => Exit.fail(new UnknownRevision({ rev })))
+        );
+      }).pipe(Effect.provide(RepoHostMemory))
+  );
+
+  it.effect(
+    "reads its files, paths, log, why and commits from the fork's repo",
+    () =>
+      Effect.gen(function* () {
+        const { answer, code } = yield* forked;
+        const at = revision("@bob/parse-iso");
+        const parse = RepoPath.make("src/parse.ts");
+        const file = yield* fileOf(code, at, parse);
+        const paths = yield* pathsOf(code, at);
+        const log = yield* logOf(code, { ...page, at, path: path("src") });
+        const why = yield* whyOf(code, at, parse);
+        const diff = yield* commitOf(code, answer, at);
+
+        expect([file.text, paths.paths.includes(parse)]).toStrictEqual([
+          "export const parse = Date.parse;\n",
+          true,
+        ]);
+        expect(log.commits.map(({ subject }) => subject)).toStrictEqual([
+          "Parse ISO dates",
+          "Rework a",
+          "Start",
+        ]);
+        expect(why.commits.map(({ sha }) => sha)).toStrictEqual([answer]);
+        expect(diff.files.map(({ path: changed }) => changed)).toStrictEqual([
+          "src/parse.ts",
+        ]);
+        expect(yield* Effect.exit(commitOf(code, answer))).toStrictEqual(
+          Exit.fail(new UnknownCommit({ sha: answer }))
+        );
+      }).pipe(Effect.provide(RepoHostMemory))
+  );
+
+  it.effect(
+    "reads a commit only at a revision every other read resolves: nonsense, an unlisted fork and a fork's repo name are UnknownRevision",
+    () =>
+      Effect.gen(function* () {
+        const { answer, code } = yield* forked;
+
+        const refused = [
+          "nonsense",
+          "@carol/parse-iso",
+          "alice__datekit--parse-iso--bob",
+        ];
+
+        expect(
+          yield* Effect.forEach(refused, (rev) =>
+            Effect.exit(commitOf(code, answer, revision(rev)))
+          )
+        ).toStrictEqual(
+          refused.map((rev) => Exit.fail(new UnknownRevision({ rev })))
+        );
+      }).pipe(Effect.provide(RepoHostMemory))
+  );
+
+  it.effect(
+    "is kept in the code store under no key, and cached under the fork's repo alone",
+    () =>
+      Effect.gen(function* () {
+        const keys = yield* Ref.make<readonly string[]>([]);
+
+        const recording = Layer.succeed(CodeCache, {
+          through: (key, read) =>
+            Ref.update(keys, (all) => [...all, key]).pipe(Effect.andThen(read)),
+        });
+
+        const counts = yield* Effect.gen(function* () {
+          const { answer, code } = yield* forked;
+          const at = revision("@bob/parse-iso");
+          const parse = RepoPath.make("src/parse.ts");
+
+          yield* treeOf(code, at, Option.none());
+          yield* fileOf(code, at, parse);
+          yield* logOf(code, { ...page, at, path: path("src") });
+          yield* whyOf(code, at, parse);
+          yield* commitOf(code, answer, at);
+
+          return yield* (yield* CodeStoreCounts).counts;
+        }).pipe(
+          Effect.provide(
+            Layer.mergeAll(RepoHostMemory, CodeStoreMemory, recording)
+          )
+        );
+
+        const all = yield* Ref.get(keys);
+
+        expect(counts).toStrictEqual({ gets: 0, puts: 0 });
+        expect(all.length).toBeGreaterThan(0);
+        expect(
+          all.filter((key) => key.split(/[:/]/u)[0] !== fork.repo)
+        ).toStrictEqual([]);
+      })
   );
 });
 

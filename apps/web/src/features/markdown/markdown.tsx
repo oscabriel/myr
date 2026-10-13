@@ -85,12 +85,9 @@ const Image = ({
 
 const components: Components = { a: Anchor, img: Image };
 
-const PROSE = [
-  "prose prose-tokens text-body max-w-[70ch] min-w-0",
+const PROSE_BASE = [
+  "prose prose-tokens text-body max-w-(--measure) min-w-0",
   "prose-headings:font-semibold prose-headings:tracking-[-0.01em]",
-  "prose-h1:text-title prose-h1:mb-3 prose-h1:border-b prose-h1:border-rule prose-h1:pb-2",
-  "prose-h2:text-title prose-h2:mt-8 prose-h2:mb-3",
-  "prose-h3:text-want prose-h4:text-want",
   "prose-code:before:content-none prose-code:after:content-none prose-code:font-normal",
   "[&_:not(pre)>code]:bg-surface [&_:not(pre)>code]:text-mono [&_:not(pre)>code]:px-1 [&_:not(pre)>code]:py-px",
   "prose-pre:bg-surface prose-pre:text-foreground prose-pre:border prose-pre:border-rule prose-pre:rounded-none",
@@ -100,6 +97,22 @@ const PROSE = [
   "[&_blockquote_p]:before:content-none [&_blockquote_p]:after:content-none",
   "prose-img:my-0 prose-img:inline-block prose-img:max-w-full",
   "prose-table:text-ui prose-th:font-semibold",
+];
+
+/** A page's own Markdown: its `#` is the page's one h1. */
+const PROSE = [
+  ...PROSE_BASE,
+  "prose-h1:text-title prose-h1:mb-3 prose-h1:border-b prose-h1:border-rule prose-h1:pb-2",
+  "prose-h2:text-title prose-h2:mt-8 prose-h2:mb-3",
+  "prose-h3:text-want prose-h4:text-want",
+].join(" ");
+
+/** A README, its headings a level down (`rehypeShiftHeadings`), drawn as they were before the shift. */
+const README_PROSE = [
+  ...PROSE_BASE,
+  "prose-h2:text-title prose-h2:mt-0 prose-h2:mb-3 prose-h2:border-b prose-h2:border-rule prose-h2:pb-2",
+  "prose-h3:text-title prose-h3:mt-8 prose-h3:mb-3",
+  "prose-h4:text-want prose-h5:text-want",
 ].join(" ");
 
 export const RepoMarkdown = ({
@@ -108,7 +121,7 @@ export const RepoMarkdown = ({
   project,
   source,
 }: RepoMarkdownProps): ReactNode => (
-  <div className={PROSE}>
+  <div className={README_PROSE}>
     <Markdown
       components={components}
       rehypePlugins={rehypePluginsFor({ dir, project, sha: at })}
@@ -142,7 +155,7 @@ export const RepoText = ({
 }: {
   readonly source: string;
 }): ReactNode => (
-  <pre className="text-mono leading-terminal max-w-[70ch] overflow-x-auto font-mono whitespace-pre-wrap">
+  <pre className="text-mono leading-terminal max-w-(--measure) overflow-x-auto font-mono whitespace-pre-wrap">
     {source}
   </pre>
 );

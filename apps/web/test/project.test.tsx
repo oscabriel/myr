@@ -1,9 +1,10 @@
 import { describe, expect, it } from "@effect/vitest";
+import { commandDocs } from "@repo/agent-kit/command-doc";
 import { Brand } from "@repo/brand";
 import { Client, Contracts } from "@repo/protocol/contracts";
 import { AskListing } from "@repo/protocol/domain/ask";
 import type { Ask } from "@repo/protocol/domain/ask";
-import { FileView, TreeListing } from "@repo/protocol/domain/code";
+import { FileView, TagName, TreeListing } from "@repo/protocol/domain/code";
 import { Glob } from "@repo/protocol/domain/common";
 import type { ProjectEvent } from "@repo/protocol/domain/event";
 import { ProjectListing } from "@repo/protocol/domain/front-page";
@@ -23,6 +24,7 @@ import { asTester, unanswered } from "@repo/protocol/testing";
 import { isNotFound } from "@tanstack/react-router";
 import {
   DateTime,
+  Deferred,
   Duration,
   Effect,
   Layer,
@@ -33,6 +35,7 @@ import {
 } from "effect";
 import { FetchHttpClient } from "effect/http";
 import { RpcClient, RpcSerialization, RpcTest } from "effect/rpc";
+import type { ReactNode } from "react";
 
 import { recentLandings } from "../src/client/events.ts";
 import type { DevWorldOptions } from "../src/dev/server.ts";
@@ -42,6 +45,12 @@ import { stampStep } from "../src/features/front/stamps.ts";
 import { ImportOffer, offerFor } from "../src/features/import/import-offer.tsx";
 import { recentShown } from "../src/features/project/landings.tsx";
 import { postureWord } from "../src/features/project/posture-label.ts";
+import { ProjectFrame } from "../src/features/project/project-frame.tsx";
+import {
+  CloneSteps,
+  ProjectHeader,
+  WatchSteps,
+} from "../src/features/project/project-header.tsx";
 import {
   ProjectView,
   heldBackOf,
@@ -50,13 +59,26 @@ import {
 import type { ProjectViewProps } from "../src/features/project/project-page.tsx";
 import { UnknownProjectView } from "../src/features/project/unknown-project.tsx";
 import { askStates } from "../src/features/shared/ask-progress.ts";
-import { PostureMark } from "../src/features/shared/shell/rail.tsx";
 import {
+  inProjectFrame,
+  projectSections,
+  projectTabOf,
+} from "../src/features/shared/shell/sections.ts";
+import { getRouter } from "../src/router.tsx";
+import {
+  headerLoader,
+  headerOrNone,
+  Route as ProjectLayout,
+} from "../src/routes/$owner/$project/route.tsx";
+import {
+  ProjectHeaderData,
   ProjectPageData,
+  readProjectHeader,
   readProjectPage,
 } from "../src/server/project-page.ts";
 import { ask as parseIsoWeek } from "./ask-fixtures.ts";
-import { markupOf, textIn, textOf } from "./markup.ts";
+import { allInOrder, markupOf, textIn, textOf } from "./markup.ts";
+import { elementWith } from "./records.ts";
 import { renderAt } from "./render.tsx";
 import { reachingTransport } from "./transport.ts";
 
@@ -81,12 +103,37 @@ const foundIn = (text: string, parts: readonly string[]) =>
 const mainOf = (markup: string) =>
   markup.slice(markup.indexOf("<main"), markup.indexOf("</main>"));
 
-const inspectorOf = (markup: string) =>
-  markup.slice(markup.indexOf('data-facts="inspector"'));
+const aboutOf = (markup: string) => elementWith(markup, 'data-column="about"');
+
+/** The main region without its about column. */
+const mainColumnOf = (markup: string) =>
+  mainOf(markup).replace(aboutOf(markup), "");
 
 const now = DateTime.makeUnsafe("2026-10-07T12:00:00Z");
 
 const platformUrl = "https://platform-test.example.workers.dev";
+
+/** The gate's seven stages in cost order, as DESIGN.md's stage strip names them. */
+const STAGES = [
+  "Parse",
+  "Shape",
+  "Merge",
+  "Cheap",
+  "Checks",
+  "Held-back",
+  "Maintainer",
+];
+
+const TABS = [
+  "Overview",
+  "Code",
+  "Asks",
+  "Landings",
+  "Proposals",
+  "People",
+  "Policy",
+  "Visibility",
+];
 
 const listing = Schema.decodeSync(ProjectListing)({
   landedAt: "2026-10-06T09:00:00.000Z",
@@ -331,68 +378,10 @@ describe(ProjectView, () => {
   );
 
   it.effect(
-    "says its posture once, in the short form the rail uses, the platform's words in its title, then its open asks",
+    "says in the about column how a change lands here: the seven stages, who decides, what is held back",
     () =>
       Effect.gen(function* () {
-        const markup = yield* page({
-          postureLabel: "Open with sealed evidence · sealed checks in export",
-        });
-
-        const head = markup.slice(
-          markup.indexOf("<h1"),
-          markup.indexOf('id="open-asks"')
-        );
-
-        const rail = markupOf(<PostureMark posture="openWithSealedEvidence" />);
-
-        expect(head).toContain('data-posture="openWithSealedEvidence"');
-        expect(textIn(head)).toMatch(
-          new RegExp(
-            `${postureWord("openWithSealedEvidence")}\\s*·\\s*5 open asks`,
-            "u"
-          )
-        );
-        expect(textIn(rail)).toContain(postureWord("openWithSealedEvidence"));
-        expect(head).toContain(
-          'title="Open with sealed evidence · sealed checks in export"'
-        );
-        // The delete child waits on its siblings, so it is not counted open yet.
-        expect(textIn(markup)).toContain("5 open asks, 2 open to take");
-      })
-  );
-
-  it.effect(
-    "states how a change lands in one rule sentence under the head, from typed facts, the ledger linked",
-    () =>
-      Effect.gen(function* () {
-        const markup = yield* page({
-          deciders: [
-            {
-              handles: [Handle.make("ines-v")],
-              paths: Glob.make("src/**"),
-            },
-          ],
-          heldBack: heldBackOf(vellumLedger),
-        });
-
-        const rule =
-          /<p\b[^>]*data-rule=""[^>]*>[\s\S]*?<\/p>/u.exec(
-            mainOf(markup)
-          )?.[0] ?? "";
-
-        expect(textIn(rule)).toBe(
-          "Gate: 7 stages · maintainers set for 1 path · 7 sealed checks in 1 area · last landed 1 d ago"
-        );
-        expect(rule).toContain('href="/oscabriel/datekit/ledger"');
-        expect(inspectorOf(markup)).not.toContain("data-posture=");
-      })
-  );
-
-  it.effect(
-    "says how a change lands here: the gate, who decides, what is held back",
-    () =>
-      Effect.gen(function* () {
-        const facts = inspectorOf(
+        const about = aboutOf(
           yield* page({
             deciders: [
               {
@@ -404,22 +393,25 @@ describe(ProjectView, () => {
           })
         );
 
-        const text = textIn(facts);
+        const text = textIn(about);
 
         expect(
           missingFrom(text, [
             "How a change lands here",
-            "Parse · Shape · Merge · Cheap · Checks · Held-back · Maintainer",
             "export: 7 sealed checks",
           ])
         ).toStrictEqual([]);
+        expect(allInOrder(text, STAGES)).toBeTruthy();
         expect(text).toMatch(/src\/\*\*\s*·\s*ines-v, okonkwo/u);
         expect(
-          missingFrom(facts, [
+          missingFrom(about, [
             'href="/oscabriel/datekit/people"',
+            'href="/oscabriel/datekit/visibility#ledger"',
             'href="/oscabriel/datekit/llms.txt"',
           ])
         ).toStrictEqual([]);
+        // The posture is the header's to say, once.
+        expect(about).not.toContain("data-posture=");
       })
   );
 
@@ -427,7 +419,7 @@ describe(ProjectView, () => {
     "names where an imported project came from, with its branch, as a copy read-only here; and nothing for one that started empty",
     () =>
       Effect.gen(function* () {
-        const facts = inspectorOf(
+        const facts = aboutOf(
           yield* page({
             importedFrom: {
               branch: "master",
@@ -449,54 +441,54 @@ describe(ProjectView, () => {
         expect(facts).toMatch(
           /<a[^>]*href="https:\/\/github\.com\/dtolnay\/anyhow"[^>]*rel="noreferrer"/u
         );
-        expect(textIn(inspectorOf(yield* page()))).not.toContain(
-          "Imported from"
-        );
+        expect(textIn(aboutOf(yield* page()))).not.toContain("Imported from");
       })
   );
 
   it.effect(
-    "gives the four commands that take part, numbered, and the last three landings as one-line credits",
+    "gives the clone command and the claim command in the about column, and the last three landings as one-line credits in the main one",
     () =>
       Effect.gen(function* () {
-        const facts = inspectorOf(yield* page());
-        const text = textIn(facts);
+        const markup = yield* page();
+        const about = textIn(aboutOf(markup));
+        const landed = mainColumnOf(markup);
 
-        const steps = [
-          `git clone ${platformUrl}/oscabriel/datekit.git`,
-          `${Brand.cli} asks --project oscabriel/datekit`,
-          `${Brand.cli} claim <ask>`,
-          `${Brand.cli} check`,
-        ].map((command) => text.indexOf(command));
-
-        expect(steps.every((at) => at >= 0)).toBeTruthy();
-        expect(steps.toSorted((a, b) => a - b)).toStrictEqual(steps);
-        expect(facts.match(/data-landing="/gu)).toHaveLength(3);
         expect(
-          missingFrom(text, [
+          allInOrder(about, [
+            `git clone ${platformUrl}/oscabriel/datekit.git`,
+            `${Brand.cli} claim <ask> --project oscabriel/datekit`,
+          ])
+        ).toBeTruthy();
+        expect(landed.match(/data-landing="/gu)).toHaveLength(3);
+        expect(
+          missingFrom(textIn(landed), [
             "Answer parse-iso-week",
             "Asked by ines-v · answered by bram",
           ])
         ).toStrictEqual([]);
-        expect(text).not.toContain("Asked-by: ines-v");
+        expect(textIn(landed)).not.toContain("Asked-by: ines-v");
       })
   );
 
   it.effect(
-    "has no code table and no clone box: the Code section has those",
+    "has no code table, and its clone command only in the about column: the Code tab has the rest",
     () =>
       Effect.gen(function* () {
         const markup = yield* page({ code: { readme, root } });
-        const main = mainOf(markup);
+        const main = mainColumnOf(markup);
 
         expect(main).not.toContain('href="/oscabriel/datekit/tree/main/src"');
-        expect(main).not.toContain("data-clone");
+        expect(main).not.toContain("git clone");
         expect(main).toContain('data-readme="README.md"');
         expect(textIn(main)).toContain("Dates, kept.");
-        // The README comes after the asks.
-        expect(main.indexOf('id="open-asks"')).toBeLessThan(
-          main.indexOf("data-readme")
-        );
+        // The README comes after the asks and the landings.
+        expect(
+          allInOrder(main, [
+            'id="open-asks"',
+            'id="recent-landings"',
+            "data-readme",
+          ])
+        ).toBeTruthy();
       })
   );
 
@@ -531,7 +523,7 @@ describe(ProjectView, () => {
       Effect.gen(function* () {
         const text = textIn(yield* page({ landings: [] }));
 
-        expect(text).toContain("last landed");
+        expect(text).toContain("No landings among the recent events");
         expect(text).not.toContain("Nothing has landed");
         expect(text).not.toContain("git push");
       })
@@ -659,44 +651,79 @@ const inputNamed = (markup: string, name: string) =>
 /** A fresh dev world seeds itself first, which a full test run can slow past 5 s. */
 const seededWorld = { timeout: 30_000 };
 
-const sentFrom = (
-  data: ProjectPageData,
-  more: Partial<ProjectViewProps> = {}
-) => {
+const propsFrom = (data: ProjectPageData): ProjectViewProps => {
   const events = data.events ?? [];
   const [latest] = recentLandings(events);
 
-  return renderAt(
-    `/${data.project}`,
-    <ProjectView
-      asks={data.asks}
-      code={data.code}
-      deciders={data.policy?.policy?.deciders}
-      heldBack={data.ledger === undefined ? undefined : heldBackOf(data.ledger)}
-      importedFrom={data.policy?.importedFrom}
-      landings={recentLandings(events)}
-      lastLanded={latest?.landedAt}
-      listing={homeListing({
-        asks: data.asks,
-        ledger: data.ledger,
-        project: data.project,
-      })}
-      now={data.now}
-      parents={data.parents}
-      platformUrl={platformUrl}
-      postureLabel={data.ledger?.postureLabel}
-      states={askStates(events)}
-      {...more}
-    />
-  );
+  return {
+    asks: data.asks,
+    code: data.code,
+    deciders: data.policy?.policy?.deciders,
+    heldBack: data.ledger === undefined ? undefined : heldBackOf(data.ledger),
+    importedFrom: data.policy?.importedFrom,
+    landings: recentLandings(events),
+    lastLanded: latest?.landedAt,
+    listing: homeListing({
+      asks: data.asks,
+      ledger: data.ledger,
+      project: data.project,
+    }),
+    now: data.now,
+    parents: data.parents,
+    platformUrl,
+    states: askStates(events),
+  };
 };
+
+const sentFrom = (
+  data: ProjectPageData,
+  more: Partial<ProjectViewProps> = {}
+) =>
+  renderAt(`/${data.project}`, <ProjectView {...propsFrom(data)} {...more} />);
 
 const readFrom = (name: string, world: Layer.Layer<Client>) =>
   readProjectPage(name).pipe(Effect.flatMap(decodePage), Effect.provide(world));
 
+const decodeHeader = Schema.decodeEffect(ProjectHeaderData);
+
+const headerFrom = (name: string, world: Layer.Layer<Client>) =>
+  readProjectHeader(name).pipe(
+    Effect.flatMap(decodeHeader),
+    Effect.provide(world)
+  );
+
+/** A project page as its route draws it: the project's frame, its header (its tab from the path alone), then the page. */
+const framed = (url: string, header: ProjectHeaderData, body: ReactNode) =>
+  renderAt(
+    url,
+    <ProjectFrame
+      header={
+        <ProjectHeader
+          current={projectTabOf(new URL(url, platformUrl).pathname)}
+          header={header}
+          platformUrl={platformUrl}
+        />
+      }
+    >
+      {body}
+    </ProjectFrame>
+  );
+
+const tabsOf = (markup: string) =>
+  [
+    ...elementWith(markup, 'data-project-tabs=""').matchAll(
+      /<a\b(?<attributes>[^>]*)>(?<text>[\s\S]*?)<\/a>/gu
+    ),
+  ].map(({ groups }) => ({
+    current: /aria-current="page"/u.test(groups?.attributes ?? ""),
+    label: textIn(groups?.text ?? "")
+      .replaceAll(/\d+/gu, "")
+      .trim(),
+  }));
+
 describe("the project's home as the server sends it", () => {
   it.effect(
-    "carries datekit's asks and its README, with no code table and no clone box",
+    "carries datekit's asks, landings and README, with no code table, and the clone command only beside them",
     () =>
       Effect.gen(function* () {
         const data = yield* readFrom("datekit", devWorld);
@@ -713,18 +740,15 @@ describe("the project's home as the server sends it", () => {
           ])
         ).toStrictEqual([]);
         expect(
-          foundIn(main, [
+          foundIn(mainColumnOf(markup), [
             'href="/oscabriel/datekit/tree/main/src"',
-            "data-clone",
+            "git clone",
             "Reading from the platform",
           ])
         ).toStrictEqual([]);
-
-        const facts = inspectorOf(markup);
-
-        expect(textIn(facts)).toContain("How a change lands here");
+        expect(textIn(aboutOf(markup))).toContain("How a change lands here");
         expect(
-          (facts.match(/data-landing="/gu) ?? []).length
+          (main.match(/data-landing="/gu) ?? []).length
         ).toBeLessThanOrEqual(3);
       }),
     seededWorld
@@ -744,45 +768,6 @@ describe("the project's home as the server sends it", () => {
         expect(family.match(/data-family-child="/gu)).toHaveLength(6);
         expect(textIn(family)).toContain("0 of 6 landed");
         expect(textIn(family)).toContain("Hide 6 children");
-      }),
-    seededWorld
-  );
-
-  it.effect(
-    "takes its posture from the project's own ledger, never the list of projects",
-    () =>
-      Effect.gen(function* () {
-        const listed = yield* Ref.make(0);
-
-        const data = yield* readFrom(
-          "oscabriel/vellum",
-          devWorldWith({ fixtures: "on" }, listed)
-        );
-
-        const head = mainOf(yield* sentFrom(data));
-
-        expect(yield* Ref.get(listed)).toBe(0);
-        expect(head).toContain('data-posture="openWithSealedEvidence"');
-        expect(head).toContain('title="Open with sealed evidence');
-      }),
-    seededWorld
-  );
-
-  it.effect(
-    "says no posture while its own ledger is unread, never one it was not told",
-    () =>
-      Effect.gen(function* () {
-        const { ledger: _unread, ...data } = yield* readFrom(
-          "oscabriel/vellum",
-          devWorldWith({ fixtures: "on" })
-        );
-
-        const markup = yield* sentFrom(data);
-
-        expect({
-          badges: markup.match(/data-posture="/gu)?.length ?? 0,
-          open: textIn(inspectorOf(markup)).includes("Everything it ships"),
-        }).toStrictEqual({ badges: 0, open: false });
       }),
     seededWorld
   );
@@ -821,6 +806,508 @@ describe("the project's home as the server sends it", () => {
       }),
     seededWorld
   );
+});
+
+const headerFacts = {
+  deciders: [Handle.make("ines-v"), Handle.make("okonkwo")],
+  landedAt: DateTime.makeUnsafe("2026-10-06T09:00:00Z"),
+  latestTag: TagName.make("v0.3.0"),
+  lede: "Dates, kept.",
+  now,
+  open: { asks: 5, takeable: 2 },
+  posture: {
+    label: "Open with sealed evidence · sealed checks in export",
+    posture: "openWithSealedEvidence",
+  },
+  project: ProjectName.make("oscabriel/datekit"),
+} satisfies ProjectHeaderData;
+
+const headerOf = (markup: string) =>
+  elementWith(markup, 'data-project-header=""');
+
+/** The header as a page draws it, its current tab's marks (its own and the router's) and its name's element taken out. */
+const sameHeader = (markup: string) =>
+  headerOf(markup)
+    .replaceAll(' aria-current="page"', "")
+    .replaceAll(' data-current=""', "")
+    .replaceAll(' data-status="active"', "")
+    .replaceAll(' active"', '"')
+    .replace('<h1 class="text-headline', '<p class="text-headline')
+    .replace("</h1>", "</p>");
+
+const HEADER_READS = [
+  "ledger",
+  "listAsks",
+  "listRefs",
+  "log",
+  "projectPolicy",
+  "readFile",
+  "readTree",
+] as const;
+
+/** Each read waits until every one has started, so a read made after another never ends. */
+const answeringAtOnce = Layer.unwrap(
+  Effect.gen(function* () {
+    const started = yield* Ref.make(0);
+    const all = yield* Deferred.make<boolean>();
+
+    const held = Effect.gen(function* () {
+      const count = yield* Ref.updateAndGet(started, (seen) => seen + 1);
+
+      if (count === HEADER_READS.length) {
+        yield* Deferred.succeed(all, true);
+      }
+
+      yield* Deferred.await(all);
+
+      return yield* Effect.die("Read at once, answered with nothing.");
+    });
+
+    return Layer.effect(Client, RpcTest.makeClient(Contracts)).pipe(
+      Layer.provide([
+        Layer.mergeAll(
+          unanswered,
+          ...HEADER_READS.map((read) =>
+            Contracts.toLayerHandler(read, () => held)
+          )
+        ),
+        asTester,
+      ])
+    );
+  })
+);
+
+/** Each read asked of `handler`, written down by its contract's name. */
+const counting =
+  (
+    handler: (request: Request) => Promise<Response>,
+    seen: Ref.Ref<readonly string[]>
+  ) =>
+  (request: Request) =>
+    Effect.runPromise(
+      Effect.gen(function* () {
+        const body = yield* Effect.promise(() => request.clone().text());
+
+        const tags = [...body.matchAll(/"tag":"(?<tag>\w+)"/gu)].map(
+          ({ groups }) => groups?.tag ?? ""
+        );
+
+        yield* Ref.update(seen, (before) => [...before, ...tags]);
+
+        return yield* Effect.promise(() => handler(request));
+      })
+    );
+
+/** The dev world, each read it is asked for written down. */
+const countingWorld = (seen: Ref.Ref<readonly string[]>) =>
+  Layer.unwrap(
+    Effect.gen(function* () {
+      const { dispose, handler } = devServer({});
+
+      yield* Effect.addFinalizer(() => Effect.promise(dispose));
+
+      return clientOver(counting(handler, seen));
+    })
+  );
+
+describe("a project's page in its frame", () => {
+  it.effect(
+    "opens burrow on Overview: eight tabs, the clone command and the seven stages in the about column, and no inspector",
+    () =>
+      Effect.gen(function* () {
+        const data = yield* readFrom("oscabriel/burrow", devWorld);
+
+        const markup = yield* framed(
+          "/oscabriel/burrow",
+          data.header,
+          <ProjectView {...propsFrom(data)} />
+        );
+
+        const about = textIn(elementWith(markup, 'data-column="about"'));
+
+        expect(tabsOf(markup)).toStrictEqual(
+          TABS.map((label) => ({ current: label === "Overview", label }))
+        );
+        expect(about).toContain(
+          `git clone ${platformUrl}/oscabriel/burrow.git`
+        );
+        expect(allInOrder(about, STAGES)).toBeTruthy();
+        expect(markup).not.toMatch(/data-facts="(?:inline|inspector)"/u);
+      }),
+    seededWorld
+  );
+
+  it.effect(
+    "draws the same header on Overview, a tree page and an ask page, only the current tab moving",
+    () =>
+      Effect.gen(function* () {
+        const pages = [
+          "/oscabriel/datekit",
+          "/oscabriel/datekit/tree/main/src",
+          "/oscabriel/datekit/asks/fix-week-start",
+        ];
+
+        const markups = yield* Effect.forEach(pages, (url) =>
+          framed(url, headerFacts, <main id="main" />)
+        );
+
+        expect(
+          markups.map((markup) =>
+            tabsOf(markup)
+              .filter(({ current }) => current)
+              .map(({ label }) => label)
+          )
+        ).toStrictEqual([["Overview"], ["Code"], ["Asks"]]);
+        // Overview's title is the project; the others title their own subject.
+        expect(new Set(markups.map(sameHeader)).size).toBe(1);
+        expect(
+          markups.map(headerOf).every((header) => header !== "")
+        ).toBeTruthy();
+      })
+  );
+
+  it.effect(
+    "says the posture once on the page, in its short form, the platform's words in its title",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* framed(
+          "/oscabriel/datekit",
+          headerFacts,
+          <ProjectView {...props({ heldBack: heldBackOf(vellumLedger) })} />
+        );
+
+        const header = headerOf(markup);
+
+        expect(markup.match(/data-posture="/gu)).toHaveLength(1);
+        expect(header).toContain('data-posture="openWithSealedEvidence"');
+        expect(textIn(header)).toContain(postureWord("openWithSealedEvidence"));
+        expect(header).toContain(
+          'title="Open with sealed evidence · sealed checks in export"'
+        );
+      })
+  );
+
+  it.effect(
+    "gives the project's facts in one row: open asks, last landing, newest tag and who decides",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* framed("/oscabriel/datekit", headerFacts, null);
+        const facts = elementWith(markup, 'data-project-facts=""');
+
+        expect(
+          allInOrder(textIn(facts), [
+            "5 open asks",
+            "Landed 1 d ago",
+            "v0.3.0",
+            "Decided by ines-v, okonkwo",
+          ])
+        ).toBeTruthy();
+        expect(facts).toContain('href="/people/ines-v"');
+        expect(textIn(headerOf(markup))).toContain("Dates, kept.");
+      })
+  );
+
+  it.effect(
+    "offers Watch, Clone and Contribute, and counts the open asks on the Asks tab",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* framed("/oscabriel/datekit", headerFacts, null);
+
+        expect(
+          [...headerOf(markup).matchAll(/data-action="(?<action>\w+)"/gu)].map(
+            ({ groups }) => groups?.action
+          )
+        ).toStrictEqual(["watch", "clone", "contribute"]);
+        expect(textIn(elementWith(markup, 'data-project-tabs=""'))).toContain(
+          "Asks5"
+        );
+      })
+  );
+
+  it.effect(
+    "opens each tab that stands for a region of Overview on that region, inside the frame",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* framed(
+          "/oscabriel/datekit",
+          headerFacts,
+          <ProjectView {...props()} />
+        );
+
+        const hashes = projectSections("oscabriel/datekit").flatMap(
+          ({ hash }) => (hash === undefined ? [] : [hash])
+        );
+
+        expect(hashes).toStrictEqual([
+          "open-asks",
+          "recent-landings",
+          "proposals",
+          "who-decides",
+        ]);
+        expect(
+          hashes.filter((hash) => !markup.includes(`id="${hash}"`))
+        ).toStrictEqual([]);
+      })
+  );
+
+  it.effect(
+    "titles Overview with the project whichever region its tabs have opened",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* framed(
+          "/oscabriel/datekit#proposals",
+          headerFacts,
+          null
+        );
+
+        expect(headerOf(markup)).toMatch(/<h1 class="text-headline/u);
+        expect(
+          tabsOf(markup)
+            .filter(({ current }) => current)
+            .map(({ label }) => label)
+        ).toStrictEqual(["Overview"]);
+      })
+  );
+
+  it.effect(
+    "sticks the header and its tabs under the top bar together, and moves what sticks below by their height",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* framed(
+          "/oscabriel/datekit/tree/main",
+          headerFacts,
+          null
+        );
+
+        const head = elementWith(markup, 'data-project-head=""');
+
+        expect(head).toMatch(
+          /^<div\b[^>]*class="[^"]*sticky top-\(--top-bar\)/u
+        );
+        expect(
+          missingFrom(head, ['data-project-header=""', 'data-project-tabs=""'])
+        ).toStrictEqual([]);
+        expect(elementWith(head, 'data-project-tabs=""')).not.toContain(
+          "sticky"
+        );
+        expect(markup).toContain(
+          "[--stick-toolbar:calc(var(--top-bar)_+_var(--project-head,11.25rem)_+_var(--toolbar)_-_1px)]"
+        );
+      })
+  );
+
+  it("says the commands its popovers give whole, each a real CLI command with its project", () => {
+    const steps = textOf(
+      <>
+        <CloneSteps platformUrl={platformUrl} project={headerFacts.project} />
+        <WatchSteps project={headerFacts.project} />
+      </>
+    );
+
+    expect(
+      allInOrder(steps, [
+        `git clone ${platformUrl}/oscabriel/datekit.git`,
+        `${Brand.cli} claim <ask> --project oscabriel/datekit`,
+        `${Brand.cli} status --project oscabriel/datekit`,
+      ])
+    ).toBeTruthy();
+    expect(
+      commandDocs(Contracts)
+        .filter(({ path }) => ["claim", "status"].includes(path.join(" ")))
+        .map(({ flags, path }) => [path.join(" "), flags.includes("--project")])
+    ).toStrictEqual([
+      ["claim", true],
+      ["status", true],
+    ]);
+  });
+});
+
+describe("the project's header as the server sends it", () => {
+  it.effect(
+    "takes its posture from the project's own ledger, never the list of projects",
+    () =>
+      Effect.gen(function* () {
+        const listed = yield* Ref.make(0);
+
+        const header = yield* headerFrom(
+          "oscabriel/vellum",
+          devWorldWith({ fixtures: "on" }, listed)
+        );
+
+        const head = headerOf(yield* framed("/oscabriel/vellum", header, null));
+
+        expect(yield* Ref.get(listed)).toBe(0);
+        expect(head).toContain('data-posture="openWithSealedEvidence"');
+        expect(head).toContain('title="Open with sealed evidence');
+      }),
+    seededWorld
+  );
+
+  it.effect(
+    "says no posture while its own ledger is unread, never one it was not told",
+    () =>
+      Effect.gen(function* () {
+        const { posture: _unread, ...header } = yield* headerFrom(
+          "oscabriel/vellum",
+          devWorldWith({ fixtures: "on" })
+        );
+
+        const markup = yield* framed("/oscabriel/vellum", header, null);
+
+        expect(markup.match(/data-posture="/gu)?.length ?? 0).toBe(0);
+      }),
+    seededWorld
+  );
+
+  it.effect(
+    "comes with Overview's own read on Overview, each of its reads made once",
+    () =>
+      Effect.gen(function* () {
+        const seen = yield* Ref.make<readonly string[]>([]);
+
+        const { alone, data, tags } = yield* Effect.gen(function* () {
+          const overview = yield* readProjectPage("oscabriel/datekit").pipe(
+            Effect.flatMap(decodePage)
+          );
+
+          const made = yield* Ref.get(seen);
+
+          const header = yield* readProjectHeader("oscabriel/datekit").pipe(
+            Effect.flatMap(decodeHeader)
+          );
+
+          return { alone: header, data: overview, tags: made };
+        }).pipe(Effect.provide(countingWorld(seen)));
+
+        expect(
+          HEADER_READS.map((read) => tags.filter((tag) => tag === read).length)
+        ).toStrictEqual(HEADER_READS.map(() => 1));
+        expect(data.header).toStrictEqual(alone);
+      }),
+    seededWorld
+  );
+
+  it.live("makes every read at once, none waiting on another", () =>
+    Effect.gen(function* () {
+      const header = yield* readProjectHeader("oscabriel/datekit").pipe(
+        Effect.flatMap(decodeHeader),
+        Effect.provide(answeringAtOnce),
+        Effect.timeout(Duration.seconds(3))
+      );
+
+      expect(Object.keys(header).toSorted()).toStrictEqual(["now", "project"]);
+    })
+  );
+
+  it.effect.each(["oscabriel/no-such-project", "Not_A_Project"])(
+    "is a not-found for %s, so the page under it says why",
+    (name) =>
+      Effect.gen(function* () {
+        const failed = yield* Effect.flip(
+          readProjectHeader(name).pipe(Effect.provide(devWorld))
+        );
+
+        expect(isNotFound(failed)).toBeTruthy();
+      }),
+    seededWorld
+  );
+});
+
+const datekitAt = (rest: string) => `/oscabriel/datekit${rest}`;
+
+/** What the project's layout loads at `pathname`, its header read through the world it runs in. */
+const layoutLoadAt = (pathname: string) =>
+  Effect.gen(function* () {
+    const services = yield* Effect.context<Client>();
+
+    const load = headerLoader((project) =>
+      Effect.runPromiseWith(services)(headerOrNone(project))
+    );
+
+    const loaded = load({
+      location: { pathname },
+      params: { project: "oscabriel/datekit" },
+    });
+
+    return yield* Effect.promise(() => Promise.resolve(loaded));
+  });
+
+const decodeLoaded = Schema.decodeUnknownEffect(ProjectHeaderData);
+
+const routeSources: Readonly<Record<string, string>> = import.meta.glob(
+  "../src/routes/$owner/$project/**/*.{ts,tsx}",
+  { eager: true, import: "default", query: "?raw" }
+);
+
+const LAYOUT_DIR = "../src/routes/$owner/$project";
+
+/** A route file's address, each param filled in, as the router's file naming spells it. */
+const addressOfFile = (file: string) =>
+  file
+    .replace(LAYOUT_DIR, "/oscabriel/datekit")
+    .replace(/\.tsx?$/u, "")
+    .replace(/\/(?:index|route)$/u, "")
+    .replaceAll("[.]", ".")
+    .replaceAll(/\{?\$\w*\}?/gu, "x");
+
+/** Every page under a project's layout at a concrete address, with the shell its route names. */
+const pagesUnderLayout = () =>
+  Object.entries(routeSources)
+    .filter(([file]) => !file.split("/").some((part) => part.startsWith("-")))
+    .map(([file, source]) => ({
+      path: addressOfFile(file),
+      shell:
+        /shell:\s*"(?<shell>\w+)"/u.exec(source)?.groups?.shell ?? "project",
+    }));
+
+describe("the project's layout route", () => {
+  it.effect(
+    "reads the header for a tree page, and nothing on Overview, which reads its own, or on a new proposal, which draws none",
+    () =>
+      Effect.gen(function* () {
+        const seen = yield* Ref.make<readonly string[]>([]);
+
+        const { made, quiet, tree } = yield* Effect.gen(function* () {
+          const skipped = yield* Effect.forEach(
+            [datekitAt(""), datekitAt("/proposals/new")],
+            layoutLoadAt
+          );
+
+          const before = yield* Ref.get(seen);
+
+          const read = yield* layoutLoadAt(datekitAt("/tree/main")).pipe(
+            Effect.flatMap(decodeLoaded)
+          );
+
+          return { made: before, quiet: skipped, tree: read };
+        }).pipe(Effect.provide(countingWorld(seen)));
+
+        expect(quiet).toStrictEqual([undefined, undefined]);
+        expect(made).toStrictEqual([]);
+        expect(tree.project).toBe("oscabriel/datekit");
+        expect(tree.open?.asks).toBeGreaterThan(0);
+      }),
+    seededWorld
+  );
+
+  it("is matched for every page of a project, and leaves out of its frame exactly the pages that name another shell", () => {
+    const pages = pagesUnderLayout();
+
+    expect(
+      pages.filter(
+        ({ path }) =>
+          !getRouter().getMatchedRoutes(path)[0].includes(ProjectLayout)
+      )
+    ).toStrictEqual([]);
+    expect(
+      pages.filter(({ path }) => !inProjectFrame(path)).map(({ path }) => path)
+    ).toStrictEqual(
+      pages.filter(({ shell }) => shell !== "project").map(({ path }) => path)
+    );
+    expect(pages.map(({ path }) => path)).toContain(
+      datekitAt("/proposals/new")
+    );
+  });
 });
 
 const vellum = ProjectName.make("oscabriel/vellum");

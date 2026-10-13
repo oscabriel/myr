@@ -1,78 +1,147 @@
-import { useLocation } from "@tanstack/react-router";
-import { ChevronLeft, ChevronsUpDown, Menu } from "lucide-react";
+import { Brand } from "@repo/brand";
+import { Keyboard, Menu, Search } from "lucide-react";
+import type { ReactNode } from "react";
 
 import { Button } from "../../../components/ui/button.tsx";
-import { SessionSlot } from "../../auth/session-slot.tsx";
 import { AppLink } from "../link.tsx";
-import { useCurrentProject, useShell } from "./context.ts";
-import { Wordmark } from "./rail.tsx";
-import { crumbsFor } from "./sections.ts";
+import { ASKS_PATH, docsPath, EXPLORE_PATH, INSTALL_PATH } from "../paths.ts";
+import { Account } from "./account.tsx";
+import { useShell } from "./context.ts";
+import { GUTTER } from "./gutter.ts";
+import type { ShellName } from "./shells.ts";
 
-const parentOf = (pathname: string) => {
-  const crumbs = crumbsFor(pathname);
-  const parent = crumbs.at(-2);
+const EXACT = { exact: true, includeSearch: false } as const;
 
-  return crumbs.length >= 3 && parent?.to !== undefined
-    ? { label: parent.label, to: parent.to }
-    : undefined;
-};
+/** The same four in every shell but the focused one, in this order. */
+export const SITE_LINKS = [
+  { label: "Explore", to: EXPLORE_PATH },
+  { label: "Asks", to: ASKS_PATH },
+  { label: "Docs", to: docsPath() },
+  { label: "Install", to: INSTALL_PATH },
+] as const;
 
-export const TopBar = () => {
+const LINK =
+  "text-ui text-muted-foreground hover:text-foreground aria-[current=page]:text-foreground flex h-8 items-center px-2 no-underline transition-colors duration-[120ms] aria-[current=page]:font-medium";
+
+/** The name in the UI sans, and no mark (the maintainer's overrides, 4). */
+export const Wordmark = () => (
+  <AppLink
+    activeOptions={EXACT}
+    className="text-want text-foreground shrink-0 font-semibold tracking-[-0.015em] no-underline"
+    to="/"
+  >
+    {Brand.name}
+  </AppLink>
+);
+
+export const SiteLinks = ({ className }: { readonly className: string }) => (
+  <nav aria-label="Primary" className={className}>
+    {SITE_LINKS.map(({ label, to }) => (
+      <AppLink
+        activeOptions={{ includeSearch: false }}
+        className={LINK}
+        key={to}
+        to={to}
+      >
+        {label}
+      </AppLink>
+    ))}
+  </nav>
+);
+
+/**
+ * The colour comes from around the button: the kit merges classes, reads an
+ * unknown `text-*` as a colour, and would drop the button's `text-ui` size.
+ */
+const Quiet = ({ children }: { readonly children: ReactNode }) => (
+  <span className="text-muted-foreground flex shrink-0">{children}</span>
+);
+
+const Controls = () => {
   const { open } = useShell();
-  const project = useCurrentProject();
-  const parent = useLocation({ select: ({ pathname }) => parentOf(pathname) });
 
   return (
-    <header className="border-rule bg-background tablet:h-12 tablet:px-3 shell:hidden sticky top-0 z-30 flex h-11 shrink-0 items-center gap-1 border-b px-2">
+    <div className="ml-auto flex min-w-0 items-center gap-2">
       <Button
-        className="tablet:inline-flex hidden"
         onClick={() => {
-          open("menu");
+          open("projects");
         }}
         size="sm"
-        variant="ghost"
+        variant="outline"
       >
-        <Menu aria-hidden="true" strokeWidth={1.75} />
-        Menu
+        <Search aria-hidden="true" strokeWidth={1.75} />
+        <span className="tablet:not-sr-only sr-only">Search</span>
       </Button>
-      {parent === undefined ? (
-        <Wordmark className="px-2" />
-      ) : (
-        <>
-          <AppLink
-            className="text-ui hover:bg-surface tablet:hidden flex h-8 min-w-0 items-center gap-1 pr-2 pl-1 no-underline"
-            to={parent.to}
-          >
-            <ChevronLeft
-              aria-hidden="true"
-              className="size-4 shrink-0"
-              strokeWidth={1.75}
-            />
-            <span className="min-w-0 truncate">{parent.label}</span>
-          </AppLink>
-          <Wordmark className="tablet:inline hidden px-2" />
-        </>
-      )}
-      {project === undefined ? null : (
+      {/* The `?` key's twin from `nav` up; below it the menu holds Keys. */}
+      <span className="text-muted-foreground nav:flex hidden shrink-0">
         <Button
-          aria-label={`Project: ${project}. Switch project`}
-          className="text-ui ml-1 max-w-[45vw] min-w-0 font-semibold"
           onClick={() => {
-            open("projects");
+            open("keys");
           }}
           size="sm"
-          variant="outline"
+          variant="ghost"
         >
-          <span className="min-w-0 truncate">{project}</span>
-          <ChevronsUpDown
-            aria-hidden="true"
-            className="text-muted-foreground"
-            strokeWidth={1.75}
-          />
+          <Keyboard aria-hidden="true" strokeWidth={1.75} />
+          <span className="sr-only">Keys</span>
         </Button>
-      )}
-      <div className="tablet:flex ml-auto hidden min-w-0 items-center">
-        <SessionSlot />
+      </span>
+      <Account />
+      <Quiet>
+        <Button
+          aria-label="Open navigation"
+          className="nav:hidden"
+          onClick={() => {
+            open("menu");
+          }}
+          size="sm"
+          variant="ghost"
+        >
+          <Menu aria-hidden="true" strokeWidth={1.75} />
+        </Button>
+      </Quiet>
+    </div>
+  );
+};
+
+const BAR = "flex h-(--top-bar) min-w-0 items-center gap-4";
+
+/**
+ * Framed in the site and the docs (inside the container, its hairline too),
+ * full-bleed in a project, and the wordmark alone in a focused page.
+ */
+export const TopBar = ({ shell }: { readonly shell: ShellName }) => {
+  if (shell === "focus") {
+    return (
+      <header
+        className={`max-w-focus mx-auto w-full ${GUTTER} ${BAR}`}
+        data-top-bar="focus"
+      >
+        <Wordmark />
+      </header>
+    );
+  }
+
+  const inside = (
+    <>
+      <Wordmark />
+      <SiteLinks className="nav:flex hidden items-center gap-1" />
+      <Controls />
+    </>
+  );
+
+  return shell === "project" ? (
+    <header
+      className={`border-rule bg-background sticky top-0 z-30 border-b ${GUTTER} ${BAR}`}
+      data-top-bar="full-bleed"
+    >
+      {inside}
+    </header>
+  ) : (
+    <header className="bg-background sticky top-0 z-30" data-top-bar="framed">
+      <div
+        className={`border-rule max-w-site mx-auto border-b ${GUTTER} ${BAR}`}
+      >
+        {inside}
       </div>
     </header>
   );

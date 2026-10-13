@@ -70,7 +70,8 @@ const oneLine = (text: string) => text.replaceAll(/\s+/gu, " ").trim();
  */
 const inMessage = (line: string) => (endsMessage(line) ? ` ${line}` : line);
 
-const personOf = (handle: Handle) => {
+/** A person as a trailer credits them: `handle <handle@users.<domain>>`. */
+export const creditLine = (handle: Handle): string => {
   const { email, name } = authorLine(handle);
 
   return `${name} <${email}>`;
@@ -94,7 +95,7 @@ export const formatLanding = (input: LandingMessage): string => {
   const trailers: readonly Trailer[] = [
     ...ordered(input.credits).map(({ handle, role }) => ({
       key: role,
-      value: personOf(handle),
+      value: creditLine(handle),
     })),
     ...input.assisted.map((agent) => ({
       key: ASSISTED,
@@ -301,7 +302,7 @@ export const parseTrailers = (message: string): readonly Trailer[] => {
 const escaped = (text: string) =>
   text.replaceAll(/[$()*+.?[\\\]^{|}]/gu, String.raw`\$&`);
 
-// Exactly what `personOf` writes: a handle at the platform's users domain.
+// Exactly what `creditLine` writes: a handle at the platform's users domain.
 const PERSON = new RegExp(
   `^(?<handle>[A-Za-z0-9][A-Za-z0-9-]*) <\\k<handle>@users\\.${escaped(Brand.domain)}>$`,
   "u"

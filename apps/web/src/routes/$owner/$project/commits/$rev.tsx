@@ -20,10 +20,13 @@ import { pageHead } from "../../../../features/shared/head.ts";
 import { notFoundFor } from "../../../../features/shared/refusals.ts";
 import { branchPage } from "../../../../server/cache-headers.ts";
 import { serverClient } from "../../../../server/client.ts";
+import { headField, readHead } from "../../../../server/code-head.ts";
+import { CodeColumn } from "../tree/-code-column.tsx";
 
 const LogPageData = Schema.Struct({
   commits: Schema.Array(CommitView),
   from: Schema.Int,
+  head: Schema.optionalKey(CommitView),
   next: Schema.UndefinedOr(Schema.Int),
   now: Schema.DateTimeUtcFromString,
   path: Schema.UndefinedOr(RepoPath),
@@ -53,16 +56,23 @@ export const readLogPage = (params: LogParams) =>
       onSome: (only) => ({ path: only }),
     });
 
-    const page = yield* client
-      .log({ at: rev, from, limit: LOG_PAGE, project, ...filter })
-      .pipe(
-        Effect.catchTags({
-          UnknownProject: notFoundFor,
-          UnknownRevision: notFoundFor,
-        })
-      );
+    // The page and the revision's head at once: past the first page, or on
+    // a path's history, the head is not the first commit listed.
+    const [page, head] = yield* Effect.all(
+      [
+        client.log({ at: rev, from, limit: LOG_PAGE, project, ...filter }),
+        readHead(project, rev),
+      ],
+      { concurrency: 2 }
+    ).pipe(
+      Effect.catchTags({
+        UnknownProject: notFoundFor,
+        UnknownRevision: notFoundFor,
+      })
+    );
 
     return yield* Schema.encodeEffect(LogPageData)({
+      ...headField(head),
       commits: page.commits,
       from,
       now: yield* DateTime.now,
@@ -98,6 +108,7 @@ const LogPage = () => {
 };
 
 export const Route = createFileRoute("/$owner/$project/commits/$rev")({
+  staticData: { column: CodeColumn, shell: "project" },
   validateSearch: (search: {
     readonly from?: unknown;
     readonly path?: unknown;

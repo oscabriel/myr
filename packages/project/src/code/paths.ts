@@ -12,7 +12,7 @@ import { Array, Effect, Order } from "effect";
 
 import type { CodeProject } from "../code.ts";
 import { CodeCache } from "./cache.ts";
-import { commitAt, resolveRev } from "./revision.ts";
+import { commitAt, resolveAt } from "./revision.ts";
 import { entriesOf } from "./tree.ts";
 
 export const PATHS_CAP = 50_000;
@@ -87,20 +87,19 @@ export const pathList = (
   at: Option.Option<Rev>
 ): Effect.Effect<PathList, UnknownRevision, RepoHost> =>
   Effect.gen(function* () {
-    const commit = yield* resolveRev(project, at);
+    const { commit, repo } = yield* resolveAt(project, at);
     const cache = yield* CodeCache;
 
-    const { tree } = yield* commitAt(project.repo, commit).pipe(
+    const { tree } = yield* commitAt(repo, commit).pipe(
       Effect.flatMap(Effect.fromOption),
       Effect.orDie
     );
 
     const { files, truncated } = yield* cache
-      .through(
-        `${project.repo}:paths:${tree}`,
-        filesUnder(project.repo, tree, PATHS_CAP),
-        { heavy: true, keep: (list) => list.files.length <= KEPT_PATHS }
-      )
+      .through(`${repo}:paths:${tree}`, filesUnder(repo, tree, PATHS_CAP), {
+        heavy: true,
+        keep: (list) => list.files.length <= KEPT_PATHS,
+      })
       .pipe(Effect.orDie);
 
     return { at: commit, paths: files.map(({ path }) => path), truncated };

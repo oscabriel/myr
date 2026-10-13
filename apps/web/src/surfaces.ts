@@ -7,7 +7,7 @@ import { RpcClient, RpcSerialization } from "effect/rpc";
 export const webContracts = surfaced("web");
 
 // One memo map for every registry, so they share one `Reactivity`: a write on a page's own registry
-// must refetch the rail's counts in the root's too.
+// must refetch the shell's counts in the root's too.
 export const sharedRuntime = Atom.context({
   memoMap: Layer.makeMemoMapUnsafe(),
 });

@@ -3,8 +3,20 @@ import type {
   FrontPageEntry,
   ProjectListing,
 } from "@repo/protocol/domain/front-page";
+import {
+  field,
+  RECENT_LANDINGS_CAP,
+  RecentLanding,
+  ShownRefusal,
+} from "@repo/protocol/domain/recent-landing";
 import { CreditSummary } from "@repo/protocol/domain/record";
-import { AskId, KindName, nameOfKey, ProjectKey } from "@repo/protocol/ids";
+import {
+  AskId,
+  KindName,
+  LandedSha,
+  nameOfKey,
+  ProjectKey,
+} from "@repo/protocol/ids";
 import type { Handle } from "@repo/protocol/ids";
 import { Posture } from "@repo/protocol/posture";
 import { Array as Arr, Effect, Layer, Option, Schema } from "effect";
@@ -69,6 +81,50 @@ const listingOf = (row: ProjectRow): Option.Option<ProjectListing> =>
       ? listing
       : { ...listing, landedAt: row.landed_at };
   });
+
+const RecentRow = Schema.Union([
+  Schema.Struct({
+    ask: Schema.NullOr(AskId),
+    at: Schema.DateTimeUtcFromString,
+    opened: Schema.NullOr(AskId),
+    outcome: Schema.Literal("landed"),
+    project: ProjectKey,
+    sha: LandedSha,
+    want: Schema.NullOr(Schema.NonEmptyString),
+  }),
+  Schema.Struct({
+    ask: AskId,
+    at: Schema.DateTimeUtcFromString,
+    outcome: Schema.Literal("refused"),
+    project: ProjectKey,
+    refusals: Schema.fromJsonString(Schema.NonEmptyArray(ShownRefusal)),
+    want: Schema.NullOr(Schema.NonEmptyString),
+  }),
+]);
+
+type RecentRow = typeof RecentRow.Type;
+
+const decodeRecent = Schema.decodeUnknownEffect(Schema.Array(RecentRow));
+
+const recentOf = (row: RecentRow): Option.Option<RecentLanding> =>
+  Option.map(nameOfKey(row.project), (project) =>
+    row.outcome === "landed"
+      ? RecentLanding.cases.Landed.make({
+          at: row.at,
+          project,
+          sha: row.sha,
+          ...field("answered", row.ask),
+          ...field("opened", row.opened),
+          ...field("want", row.want),
+        })
+      : RecentLanding.cases.Refused.make({
+          ask: row.ask,
+          at: row.at,
+          project,
+          refusals: row.refusals,
+          ...field("want", row.want),
+        })
+  );
 
 const entryOf = (row: EntryRow): Option.Option<FrontPageEntry> => {
   const blockedBy = row.blocked_by.filter((ask) =>
@@ -140,6 +196,16 @@ export const FrontPageD1: Layer.Layer<FrontPage, never, SqlClient> =
           Effect.orDie
         );
 
-      return FrontPage.of({ credits, entries, projects });
+      const recentLandings = () =>
+        sql`SELECT project, at, outcome, ask, opened, sha, want, refusals
+          FROM recent_landings
+          ORDER BY at DESC, project, seq DESC
+          LIMIT ${RECENT_LANDINGS_CAP}`.pipe(
+          Effect.flatMap(decodeRecent),
+          Effect.map((rows) => Arr.getSomes(rows.map(recentOf))),
+          Effect.orDie
+        );
+
+      return FrontPage.of({ credits, entries, projects, recentLandings });
     })
   );

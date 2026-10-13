@@ -90,9 +90,12 @@ export const creditsByProject = (
     project: Array.headNonEmpty(inProject).project,
   }));
 
+/** The Landings tab's own address, its region of Overview included. */
 const landingsOf = (project: ProjectName) =>
-  projectSections(project).find(({ tab }) => tab === "landings")?.to ??
-  projectPath(project);
+  projectSections(project).find(({ tab }) => tab === "landings") ?? {
+    hash: undefined,
+    to: projectPath(project),
+  };
 
 const Project = ({ credit }: { readonly credit: ProjectCredit }) => (
   <RowGroup
@@ -103,7 +106,8 @@ const Project = ({ credit }: { readonly credit: ProjectCredit }) => (
     {credit.areas.map(({ area, roles }) => (
       <Row
         data={{ "data-area": area, "data-project": credit.project }}
-        href={landingsOf(credit.project)}
+        hash={landingsOf(credit.project).hash}
+        href={landingsOf(credit.project).to}
         id={`${credit.project}/${area}`}
         key={area}
         meta={

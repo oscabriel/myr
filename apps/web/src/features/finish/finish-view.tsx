@@ -17,19 +17,16 @@ import { statsOf } from "../code/diff-model.ts";
 import { DiffPane, PANE_SCROLLER } from "../code/diff-pane.tsx";
 import type { DiffAnnotation, DiffFileSlot } from "../code/diff-view.tsx";
 import { shortSha } from "../code/paths.ts";
-import {
-  Choices,
-  DecisionRecord,
-  stuckAboveBar,
-} from "../decision/choices.tsx";
+import { Choices, DecisionRecord, stuckAtFoot } from "../decision/choices.tsx";
 import { DecisionCard, ExpiryLines } from "../decision/decision-card.tsx";
 import type { DecideInput } from "../decision/decision-card.tsx";
 import { describeSubject } from "../decision/subject.ts";
 import { CommandLine } from "../shared/command.tsx";
 import { FactBlock, GateFacts } from "../shared/facts.tsx";
 import { AppLink } from "../shared/link.tsx";
-import { askPath } from "../shared/paths.ts";
-import { GUTTER, Workspace } from "../shared/shell/workspace.tsx";
+import { askPath, INBOX_PATH } from "../shared/paths.ts";
+import { GUTTER } from "../shared/shell/gutter.ts";
+import { Workspace } from "../shared/shell/workspace.tsx";
 import { StatusLine } from "../shared/status-line.tsx";
 import type { PlacedRefusal } from "./annotation.tsx";
 import { RefusalNote } from "./annotation.tsx";
@@ -227,7 +224,7 @@ const DecisionBar = ({
 }) => (
   <section
     aria-label="Your choice"
-    className="border-rule bg-background codefacts:hidden flex shrink-0 flex-wrap items-start gap-x-6 gap-y-2 border-t px-4 py-3"
+    className="border-rule bg-background flex shrink-0 flex-wrap items-start gap-x-6 gap-y-2 border-t px-4 py-3"
     data-decision-bar=""
   >
     {decision.decided === undefined ? (
@@ -482,7 +479,7 @@ const PhoneFinish = ({
   >) => (
   <div className={`tablet:hidden flex flex-col gap-6 ${GUTTER}`}>
     {ask === undefined ? null : (
-      <p className="text-want max-w-[70ch]" data-said="">
+      <p className="text-want max-w-(--measure)" data-said="">
         {ask.brief.want}
       </p>
     )}
@@ -503,7 +500,7 @@ const PhoneFinish = ({
     <Failure>{failure}</Failure>
     <DecisionCard
       busy={busy}
-      choices={stuckAboveBar}
+      choices={stuckAtFoot}
       decision={decision}
       finishLink={false}
       now={now}
@@ -613,7 +610,7 @@ export const FinishView = ({
     <Workspace
       crumbs={[
         { label: decision.project, to: `/${decision.project}` },
-        { label: "Today", to: "/today" },
+        { label: "Inbox", to: INBOX_PATH },
         { label: decision.id, mono: true },
       ]}
       facts={<FinishFacts {...props} {...shared} />}

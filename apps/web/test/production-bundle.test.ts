@@ -236,7 +236,7 @@ layer(Layer.effect(Built, productionBuild), { timeout: BUILD })(
   "the web's production build",
   (it) => {
     it.effect(
-      "carries the web app manifest, which opens Today, and every icon it names",
+      "carries the web app manifest, which opens the inbox, and every icon it names",
       () =>
         Effect.gen(function* () {
           const output = yield* Built;
@@ -249,7 +249,7 @@ layer(Layer.effect(Built, productionBuild), { timeout: BUILD })(
           expect(installs).toStrictEqual({
             display: "standalone",
             name: Brand.name,
-            start_url: "/today",
+            start_url: "/inbox",
           });
           expect(icons.length).toBeGreaterThan(0);
           expect(
@@ -354,12 +354,12 @@ layer(Layer.effect(Built, productionBuild), { timeout: BUILD })(
     );
 
     it.effect(
-      "preloads on every page no grammar, nothing of the server's highlighting, and neither the landing's view nor the import page's",
+      "preloads on every page no grammar, nothing of the server's highlighting, and neither the landing's view, Explore's nor the import page's",
       () =>
         Effect.gen(function* () {
           const output = yield* Built;
 
-          // Nor the landing's view, nor the import page's: a route's head or
+          // Nor the landing's view, Explore's or the import page's: a route's head or
           // loader that imported one would carry the whole page into every
           // page's preloads.
           expect(
@@ -369,6 +369,7 @@ layer(Layer.effect(Built, productionBuild), { timeout: BUILD })(
                   GRAMMAR.test(module) ||
                   module.includes("prerender") ||
                   module.endsWith("features/landing/landing-page.tsx") ||
+                  module.endsWith("features/explore/explore-page.tsx") ||
                   module.includes("features/import/")
               )
             )

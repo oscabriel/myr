@@ -10,7 +10,6 @@ import { ChevronDown, Hourglass } from "lucide-react";
 import { useState } from "react";
 import type { ReactNode } from "react";
 
-import { InspectorOnly } from "../answer/answer-page.tsx";
 import {
   deleteChildOf,
   familyHead,
@@ -25,9 +24,7 @@ import { familyMarks } from "../shared/ask-progress.ts";
 import type { AskProgress } from "../shared/ask-progress.ts";
 import {
   ClaimFacts,
-  FamilyFacts,
   PostureFacts,
-  StateFacts,
   TakeItFacts,
   TerritoryFacts,
 } from "../shared/facts.tsx";
@@ -209,7 +206,10 @@ const Brief = ({ ask }: { readonly ask: Ask }) => {
 
   return parts.length === 0 ? null : (
     <Region id="ask-brief" title="Brief">
-      <div className="text-body flex max-w-[70ch] flex-col gap-5" data-said="">
+      <div
+        className="text-body flex max-w-(--measure) flex-col gap-5"
+        data-said=""
+      >
         {parts}
       </div>
     </Region>
@@ -430,7 +430,6 @@ const AskFacts = ({
   platformUrl,
   posture,
   states,
-  subject,
   viewer,
 }: {
   readonly ask: Ask;
@@ -439,20 +438,12 @@ const AskFacts = ({
   readonly platformUrl: string;
   readonly posture: Posture | undefined;
   readonly states: ReadonlyMap<AskId, AskProgress>;
-  readonly subject: StatusSubject;
   readonly viewer: Handle | undefined;
 }) => {
-  const { family, finale, held, progress, takeable } = standing(
-    ask,
-    states,
-    parent
-  );
+  const { held, progress, takeable } = standing(ask, states, parent);
 
   return (
     <>
-      <InspectorOnly>
-        <StateFacts subject={subject} />
-      </InspectorOnly>
       {takeable ? <TakeItFacts ask={ask} platformUrl={platformUrl} /> : null}
       {!takeable && held && ask.state !== "closed" ? (
         <ClaimFacts
@@ -467,17 +458,6 @@ const AskFacts = ({
         />
       ) : null}
       <TerritoryFacts ask={ask} />
-      {family === undefined ? null : (
-        <InspectorOnly>
-          <FamilyFacts
-            current={ask.id}
-            parent={family}
-            project={ask.project}
-            states={states}
-            {...(finale === undefined ? {} : { finale })}
-          />
-        </InspectorOnly>
-      )}
       {posture === undefined ? null : (
         <PostureFacts
           label={postureLabel(posture)}
@@ -580,7 +560,6 @@ export const AskView = ({
           platformUrl={platformUrl}
           posture={posture}
           states={states}
-          subject={subject}
           viewer={viewer}
         />
       }
@@ -602,7 +581,7 @@ export const AskView = ({
             <WaitsOn asks={remaining} project={ask.project} />
           ) : null}
           {family === undefined ? null : (
-            <div className="shell:hidden mt-4">
+            <div className="mt-4">
               <FamilyStrip
                 expanded={false}
                 parent={family}
@@ -622,7 +601,7 @@ export const AskView = ({
       <Brief ask={ask} />
 
       <Region id="ask-check" title="The check">
-        <p className="text-ui max-w-[70ch]">
+        <p className="text-ui max-w-(--measure)">
           <CheckSummary ask={ask} />
         </p>
         {check === undefined ? null : <CheckFile source={check} />}

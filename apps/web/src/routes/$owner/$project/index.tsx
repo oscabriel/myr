@@ -1,20 +1,12 @@
 import { useAtomMount, useAtomValue } from "@effect/atom-react";
-import type { Ask } from "@repo/protocol/domain/ask";
-import { AskId } from "@repo/protocol/ids";
 import type { ProjectName } from "@repo/protocol/ids";
-import {
-  createFileRoute,
-  getRouteApi,
-  useHydrated,
-} from "@tanstack/react-router";
+import { createFileRoute, getRouteApi } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { env } from "cloudflare:workers";
 import { Effect, Option, Predicate, Schema } from "effect";
 import { AsyncResult } from "effect/reactivity";
 import { useMemo } from "react";
-import type { ReactNode } from "react";
 
-import { selectedAskAtom } from "../../../client/ask.ts";
 import { projectCodeAtom } from "../../../client/code.ts";
 import { projectEventsAtom, recentLandings } from "../../../client/events.ts";
 import {
@@ -108,23 +100,6 @@ export const projectPageHead = ({
 
 const root = getRouteApi("__root__");
 
-// Wraps the page whether or not a row is selected, so selecting one never remounts the list.
-const WithFull = ({
-  children,
-  pick,
-}: {
-  readonly pick:
-    | { readonly ask: AskId; readonly project: ProjectName }
-    | undefined;
-  readonly children: (full: Ask | undefined) => ReactNode;
-}) => {
-  const read = useAtomValue(selectedAskAtom(pick));
-
-  return children(AsyncResult.isSuccess(read) ? read.value.ask : undefined);
-};
-
-const decodeAsk = Schema.decodeUnknownOption(AskId);
-
 const valueOr = <A, E, B>(
   read: AsyncResult.AsyncResult<A, E>,
   seeded: B | undefined,
@@ -135,16 +110,13 @@ const valueOr = <A, E, B>(
 const LiveProject = ({
   data,
   platformUrl,
-  selected,
   signedIn,
 }: {
   readonly data: ProjectPageData;
   readonly platformUrl: string;
-  readonly selected: string | undefined;
   readonly signedIn: boolean;
 }) => {
   const { project } = data;
-  const hydrated = useHydrated();
 
   useAtomMount(watchAtom(project));
 
@@ -187,7 +159,7 @@ const LiveProject = ({
   const landings = useMemo(() => recentLandings(events ?? []), [events]);
   const [latest] = landings;
 
-  const view = (selectedAsk?: Ask) => (
+  return (
     <ProjectView
       asks={asks}
       code={code}
@@ -200,29 +172,11 @@ const LiveProject = ({
       now={data.now}
       parents={data.parents}
       platformUrl={platformUrl}
-      postureLabel={ledger?.postureLabel}
-      selectedAsk={selectedAsk}
       signedIn={signedIn}
       stamps={stamps}
       states={states}
       unreachable={AsyncResult.isFailure(asksRead)}
     />
-  );
-
-  const picked = Option.filter(decodeAsk(selected), (ask) =>
-    (asks ?? []).some((listing) => listing.ask === ask)
-  );
-
-  return (
-    <WithFull
-      pick={
-        hydrated && Option.isSome(picked)
-          ? { ask: picked.value, project }
-          : undefined
-      }
-    >
-      {view}
-    </WithFull>
   );
 };
 
@@ -234,7 +188,6 @@ const ProjectPage = () => {
     [loaded]
   );
 
-  const { ask } = Route.useSearch();
   const { platformUrl } = root.useLoaderData();
   const signedIn = useSignedIn();
   const { project } = data;
@@ -259,12 +212,7 @@ const ProjectPage = () => {
 
   return (
     <SeededAtoms id={project} seeds={seeds}>
-      <LiveProject
-        data={data}
-        platformUrl={platformUrl}
-        selected={ask}
-        signedIn={signedIn}
-      />
+      <LiveProject data={data} platformUrl={platformUrl} signedIn={signedIn} />
     </SeededAtoms>
   );
 };
@@ -285,6 +233,7 @@ const Unknown = () => {
 };
 
 export const Route = createFileRoute("/$owner/$project/")({
+  staticData: { shell: "project" },
   // TanStack infers each option from the ones before it.
   validateSearch: ({ ask }: { readonly ask?: unknown }) =>
     Predicate.isString(ask) ? { ask } : {},

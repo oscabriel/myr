@@ -20,12 +20,13 @@ import { pageHead } from "../../../../../features/shared/head.ts";
 import { notFoundFor } from "../../../../../features/shared/refusals.ts";
 import { branchPage } from "../../../../../server/cache-headers.ts";
 import { serverClient } from "../../../../../server/client.ts";
-import { CodeRail } from "../../tree/-code-rail.tsx";
-import { FilesButton } from "../../tree/-files-button.tsx";
+import { headField, readHead } from "../../../../../server/code-head.ts";
+import { CodeColumn } from "../../tree/-code-column.tsx";
 import { softLanding } from "../../tree/-soft-landing.ts";
 
 const BlobPageData = Schema.Struct({
   file: FileView,
+  head: Schema.optionalKey(CommitView),
   last: Schema.optionalKey(CommitView),
   now: Schema.DateTimeUtcFromString,
   project: ProjectName,
@@ -45,14 +46,16 @@ export const readBlobPage = (params: BlobParams) =>
     const path = yield* Effect.fromOption(repoPathOf(params._splat));
     const client = yield* Client;
 
-    // The file and the commit that last changed it, at once; that commit
-    // is only a fact beside the file, so the page goes without it.
-    const [file, history] = yield* Effect.all(
+    // The file, the commit that last changed it and the revision's head, at
+    // once; both commits are only facts beside the file, so the page goes
+    // without them.
+    const [file, history, head] = yield* Effect.all(
       [
         client.readFile({ at: rev, path, project }),
         client.log({ at: rev, limit: 1, path, project }).pipe(Effect.option),
+        readHead(project, rev),
       ],
-      { concurrency: 2 }
+      { concurrency: 3 }
     ).pipe(
       Effect.catchTags({
         UnknownPath: (refusal) => softLanding(refusal, project, rev),
@@ -66,6 +69,7 @@ export const readBlobPage = (params: BlobParams) =>
     );
 
     return yield* Schema.encodeEffect(BlobPageData)({
+      ...headField(head),
       file,
       now: yield* DateTime.now,
       project,
@@ -108,7 +112,6 @@ const BlobPage = () => {
         )
       }
       file={file}
-      files={<FilesButton />}
       last={last}
       now={now}
       plain={plain}
@@ -119,7 +122,7 @@ const BlobPage = () => {
 };
 
 export const Route = createFileRoute("/$owner/$project/blob/$rev/$")({
-  staticData: { rail: CodeRail },
+  staticData: { column: CodeColumn, shell: "project" },
   // The router writes back what this returns, dropping only `undefined`,
   // so a rendered file's address carries no `plain`.
   validateSearch: ({ plain }: { readonly plain?: unknown }) => ({
@@ -174,7 +177,5 @@ export const Route = createFileRoute("/$owner/$project/blob/$rev/$")({
   head: ({ params: { _splat, project, rev } }) =>
     pageHead({ title: `${_splat ?? project} at ${rev}` }),
   component: BlobPage,
-  notFoundComponent: ({ data }) => (
-    <CodeNotFound data={data} files={<FilesButton />} />
-  ),
+  notFoundComponent: CodeNotFound,
 });

@@ -153,6 +153,8 @@ When it does not let git in, the platform answers in plain text:
 4. Only once `main` has moved does it write its bookkeeping, each in a push of its own: the ref that mirrors the landed SHA, then the verdict note. Either may trail `main` for a moment, and nothing decides by them.
 5. A landing tried again finds its own commit on `main` by its `Request-Id` trailer and writes only what is missing, so it never makes a second commit.
 
+Across every project, the MCP tool `recentLandings` lists the latest landings and the answers the gate refused, the latest first and at most 20: when, the project, the ask and its want, and of each refusal its tag and its area, never a held-back check's name.
+
 ## Events
 
 A project's page follows its events as they happen (the `watch` contract). Each event carries `seq`, its place in the project's sequence, and `at`, its time; a watcher resumes after the last `seq` it saw.

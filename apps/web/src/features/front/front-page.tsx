@@ -8,8 +8,7 @@ import type {
 } from "@repo/protocol/domain/front-page";
 import type { AskId, KindName, ProjectName } from "@repo/protocol/ids";
 import type { DateTime } from "effect";
-import { ChevronDown } from "lucide-react";
-import { useMemo } from "react";
+import { useId, useMemo } from "react";
 import type { ReactNode } from "react";
 
 import { postureLabel } from "../project/posture-label.ts";
@@ -22,17 +21,13 @@ import { projectPath } from "../shared/paths.ts";
 import { PostureBadge } from "../shared/posture.tsx";
 import { AskRow, RowGroup, useRowSelection } from "../shared/row.tsx";
 import { Workspace } from "../shared/shell/workspace.tsx";
-import {
-  ProjectsFacts,
-  SelectedAskFacts,
-  StartHere,
-  plural,
-} from "./facts.tsx";
-import { arrange, finaleOf } from "./families.ts";
+import { plural } from "./facts.tsx";
+import { arrange } from "./families.ts";
 import type { Arranged } from "./families.ts";
-import { countWith, filterEntries, frontPath } from "./filter.ts";
+import { compact, countWith, filterEntries, frontPath } from "./filter.ts";
 import type { FrontFilter, FrontFilterInput } from "./filter.ts";
 import { EXPLAINER } from "./head.ts";
+import { HOW_TO_TITLE, HowToTake, useHowTo } from "./how-to.tsx";
 
 export const frontCount = (shown: readonly FrontPageEntry[]) =>
   `${plural(shown.length, "open ask", "open asks")}, ${
@@ -47,9 +42,6 @@ export interface FrontPageProps {
   readonly events: ReadonlyMap<ProjectName, readonly ProjectEvent[]>;
   readonly stampsOf?: (project: ProjectName) => ReadonlySet<AskId>;
   readonly projects: readonly ProjectListing[] | undefined;
-  readonly platformUrl: string;
-  readonly webUrl: string;
-  readonly selectedAsk?: Ask | undefined;
 }
 
 const byProject = (shown: readonly FrontPageEntry[]) => {
@@ -62,6 +54,9 @@ const byProject = (shown: readonly FrontPageEntry[]) => {
   return [...groups];
 };
 
+const OPTION =
+  "text-ui text-muted-foreground hover:bg-surface/50 hover:text-foreground aria-[current=page]:bg-surface aria-[current=page]:text-foreground flex min-h-8 min-w-0 items-center justify-between gap-3 px-2 no-underline transition-colors duration-[120ms] focus-visible:outline-offset-[-2px] aria-[current=page]:font-semibold";
+
 const FilterOption = ({
   count,
   current,
@@ -73,32 +68,41 @@ const FilterOption = ({
   readonly label: string;
   readonly search: FrontFilterInput;
 }) => (
-  <li className="shrink-0">
+  <li className="min-w-0">
     <AppLink
       activeOptions={{ exact: true, includeSearch: true }}
       aria-current={current ? "page" : undefined}
-      className="text-ui text-muted-foreground hover:text-foreground aria-[current=page]:border-foreground aria-[current=page]:text-foreground flex h-10 items-center gap-1.5 border-b-2 border-transparent whitespace-nowrap no-underline transition-colors duration-[120ms] focus-visible:outline-offset-[-2px] aria-[current=page]:font-semibold"
+      className={OPTION}
       to={frontPath(search)}
     >
-      {label}
-      <span className="text-label text-muted-foreground font-normal tabular-nums">
+      <span className="min-w-0 truncate">{label}</span>
+      <span className="text-label text-muted-foreground shrink-0 font-normal tabular-nums">
         {count}
       </span>
     </AppLink>
   </li>
 );
 
-const Segment = ({
+const Facet = ({
   children,
   label,
 }: {
   readonly children: ReactNode;
   readonly label: string;
-}) => (
-  <ul aria-label={label} className="flex shrink-0 items-center gap-4">
-    {children}
-  </ul>
-);
+}) => {
+  const heading = useId();
+
+  return (
+    <div className="flex min-w-0 flex-col gap-1">
+      <h2 className="text-ui px-2 font-semibold" id={heading}>
+        {label}
+      </h2>
+      <ul aria-labelledby={heading} className="flex min-w-0 flex-col">
+        {children}
+      </ul>
+    </div>
+  );
+};
 
 const kindsOf = (entries: readonly FrontPageEntry[], filter: FrontFilter) =>
   [
@@ -121,119 +125,116 @@ const reserveWords = {
   people: "Held for people",
 } as const satisfies Record<Reserve, string>;
 
-/**
- * A disclosure of links, so it works with no script. Its key is the filter's
- * project, so a new address closes it.
- */
-const ProjectMenu = ({
-  entries,
-  filter,
-}: {
-  readonly entries: readonly FrontPageEntry[];
-  readonly filter: FrontFilter;
-}) => (
-  <details
-    className="group relative shrink-0"
-    key={filter.project ?? "every project"}
-  >
-    <summary className="text-ui hover:bg-surface flex h-8 cursor-pointer list-none items-center gap-1.5 px-2 whitespace-nowrap transition-colors duration-[120ms] [&::-webkit-details-marker]:hidden">
-      <span className="text-muted-foreground">Project</span>
-      <span className="font-semibold">{filter.project ?? "All"}</span>
-      <ChevronDown
-        aria-hidden="true"
-        className="text-muted-foreground size-4 transition-transform duration-150 group-open:rotate-180"
-        strokeWidth={1.75}
-      />
-    </summary>
-    <ul
-      aria-label="Projects"
-      className="border-rule bg-popover absolute top-full right-0 z-30 mt-1 flex max-h-80 w-56 flex-col overflow-y-auto border py-1"
-    >
-      {[undefined, ...projectsOf(entries, filter)].map((project) => (
-        <li key={project ?? "every project"}>
-          <AppLink
-            aria-current={filter.project === project ? "page" : undefined}
-            className="text-ui hover:bg-surface aria-[current=page]:bg-surface flex h-9 items-center justify-between gap-3 px-3 no-underline aria-[current=page]:font-semibold"
-            to={frontPath({ ...filter, project })}
-          >
-            <span className="truncate">{project ?? "Every project"}</span>
-            <span className="text-label text-muted-foreground font-normal tabular-nums">
-              {countWith(entries, filter, { project })}
-            </span>
-          </AppLink>
-        </li>
-      ))}
-    </ul>
-  </details>
-);
+const LINK = "decoration-rule underline hover:decoration-current";
 
-const Toolbar = ({
+/**
+ * The board's left column: links, so every filter is an address and works
+ * with no script. Each option keeps the other filters as they are.
+ */
+const Filters = ({
   entries,
   filter,
+  onRestore,
 }: {
   readonly entries: readonly FrontPageEntry[];
   readonly filter: FrontFilter;
+  readonly onRestore: (() => void) | undefined;
 }) => {
-  const held = Reserve.literals.filter((reserved) =>
-    entries.some(({ ask }) => ask.reserve === reserved)
+  const held = Reserve.literals.filter(
+    (reserved) =>
+      entries.some(({ ask }) => ask.reserve === reserved) ||
+      filter.reserved === reserved
   );
 
+  const filtered = Object.keys(compact(filter)).length > 0;
+
   return (
-    <>
-      <nav
-        aria-label="Filter the asks"
-        className="max-shell:pr-8 max-shell:[mask-image:linear-gradient(to_right,#000_calc(100%-2rem),transparent)] flex min-w-0 flex-1 [scrollbar-width:none] items-center gap-6 overflow-x-auto overscroll-x-contain"
-      >
-        <Segment label="Kind">
+    <nav
+      aria-label="Filter the asks"
+      className="columns:sticky columns:top-[calc(var(--top-bar)+1.5rem)] columns:max-h-[calc(100dvh-var(--top-bar)-3rem)] columns:overflow-y-auto tablet:grid-cols-3 columns:flex columns:flex-col columns:self-start -mx-2 grid min-w-0 gap-6"
+    >
+      <Facet label="Kind">
+        <FilterOption
+          count={countWith(entries, filter, { kind: undefined })}
+          current={filter.kind === undefined}
+          label="All"
+          search={{ ...filter, kind: undefined }}
+        />
+        {kindsOf(entries, filter).map((kind: KindName) => (
           <FilterOption
-            count={countWith(entries, filter, { kind: undefined })}
-            current={filter.kind === undefined}
-            label="All"
-            search={{ ...filter, kind: undefined }}
+            count={countWith(entries, filter, { kind })}
+            current={filter.kind === kind}
+            key={kind}
+            label={kind}
+            search={{ ...filter, kind }}
           />
-          {kindsOf(entries, filter).map((kind: KindName) => (
-            <FilterOption
-              count={countWith(entries, filter, { kind })}
-              current={filter.kind === kind}
-              key={kind}
-              label={kind}
-              search={{ ...filter, kind }}
-            />
-          ))}
-        </Segment>
-        <span aria-hidden="true" className="bg-rule h-4 w-px shrink-0" />
-        <Segment label="Who may take it">
+        ))}
+      </Facet>
+      <Facet label="State">
+        <FilterOption
+          count={countWith(entries, filter, {
+            reserved: undefined,
+            take: undefined,
+          })}
+          current={filter.take === undefined && filter.reserved === undefined}
+          label="Any"
+          search={{ ...filter, reserved: undefined, take: undefined }}
+        />
+        <FilterOption
+          count={countWith(entries, filter, {
+            reserved: undefined,
+            take: "open",
+          })}
+          current={filter.take === "open"}
+          label="Open to take"
+          search={{ ...filter, reserved: undefined, take: "open" }}
+        />
+        {held.map((reserved) => (
           <FilterOption
-            count={countWith(entries, filter, {
-              reserved: undefined,
-              take: undefined,
-            })}
-            current={filter.take === undefined && filter.reserved === undefined}
-            label="Any"
-            search={{ ...filter, reserved: undefined, take: undefined }}
+            count={countWith(entries, filter, { reserved, take: undefined })}
+            current={filter.reserved === reserved}
+            key={reserved}
+            label={reserveWords[reserved]}
+            search={{ ...filter, reserved, take: undefined }}
           />
+        ))}
+      </Facet>
+      <Facet label="Project">
+        <FilterOption
+          count={countWith(entries, filter, { project: undefined })}
+          current={filter.project === undefined}
+          label="Every project"
+          search={{ ...filter, project: undefined }}
+        />
+        {projectsOf(entries, filter).map((project) => (
           <FilterOption
-            count={countWith(entries, filter, {
-              reserved: undefined,
-              take: "open",
-            })}
-            current={filter.take === "open"}
-            label="Open to take"
-            search={{ ...filter, reserved: undefined, take: "open" }}
+            count={countWith(entries, filter, { project })}
+            current={filter.project === project}
+            key={project}
+            label={project}
+            search={{ ...filter, project }}
           />
-          {held.map((reserved) => (
-            <FilterOption
-              count={countWith(entries, filter, { reserved, take: undefined })}
-              current={filter.reserved === reserved}
-              key={reserved}
-              label={reserveWords[reserved]}
-              search={{ ...filter, reserved, take: undefined }}
-            />
-          ))}
-        </Segment>
-      </nav>
-      <ProjectMenu entries={entries} filter={filter} />
-    </>
+        ))}
+      </Facet>
+      {filtered || onRestore !== undefined ? (
+        <div className="text-ui flex flex-col items-start gap-2 px-2">
+          {filtered ? (
+            <AppLink className={LINK} to={frontPath({})}>
+              Reset filters
+            </AppLink>
+          ) : null}
+          {onRestore === undefined ? null : (
+            <button
+              className={`text-muted-foreground hover:text-foreground ${LINK}`}
+              onClick={onRestore}
+              type="button"
+            >
+              {HOW_TO_TITLE}
+            </button>
+          )}
+        </div>
+      ) : null}
+    </nav>
   );
 };
 
@@ -272,7 +273,6 @@ const ProjectGroup = ({
   group,
   listing,
   now,
-  onSelect,
   parents,
   selected,
   stamps,
@@ -282,7 +282,6 @@ const ProjectGroup = ({
   readonly now: DateTime.Utc;
   readonly parents: readonly Ask[];
   readonly selected: string | undefined;
-  readonly onSelect: (id: string) => void;
   readonly stamps: ReadonlySet<AskId>;
 }) => {
   const { entries, items, project, states } = group;
@@ -293,7 +292,6 @@ const ProjectGroup = ({
       key={listingOf.ask}
       listing={listingOf}
       now={now}
-      onSelect={onSelect}
       progress={states.get(listingOf.ask)}
       project={project}
       selected={selected === listingOf.ask}
@@ -317,6 +315,7 @@ const ProjectGroup = ({
       }
       label={project}
       name={<AppLink to={projectPath(project)}>{project}</AppLink>}
+      under="bar"
     >
       {items.flatMap((item) => {
         if (item.kind === "ask") {
@@ -355,70 +354,17 @@ const ProjectGroup = ({
   );
 };
 
-const Selected = ({
-  entry,
-  full,
-  parents,
-  platformUrl,
-  projects,
-  states,
-}: {
-  readonly entry: FrontPageEntry;
-  readonly full: Ask | undefined;
-  readonly parents: readonly Ask[];
-  readonly platformUrl: string;
-  readonly projects: readonly ProjectListing[] | undefined;
-  readonly states: ReadonlyMap<AskId, AskProgress>;
-}) => {
-  const { ask, project, takeable } = entry;
-
-  const parent = parents.find(
-    (each) =>
-      each.project === project &&
-      (each.id === ask.ask || each.blockedBy.includes(ask.ask))
-  );
-
-  const listed = projects?.find((each) => each.project === project);
-
-  return (
-    <SelectedAskFacts
-      family={
-        parent === undefined
-          ? undefined
-          : {
-              finale: finaleOf(parent.id),
-              parent,
-              states,
-            }
-      }
-      full={full?.id === ask.ask && full.project === project ? full : undefined}
-      listing={ask}
-      platformUrl={platformUrl}
-      posture={
-        listed === undefined
-          ? undefined
-          : { label: postureLabel(listed.posture), posture: listed.posture }
-      }
-      progress={states.get(ask.ask)}
-      project={project}
-      takeable={takeable}
-    />
-  );
-};
-
 export const FrontPageView = ({
   entries,
   events,
   filter,
   now,
   parents,
-  platformUrl,
   projects,
-  selectedAsk,
   stampsOf,
-  webUrl,
 }: FrontPageProps) => {
   const shown = filterEntries(entries, filter);
+  const { dismiss, dismissed, restore } = useHowTo();
 
   const states = useMemo(
     () =>
@@ -439,81 +385,62 @@ export const FrontPageView = ({
     })
   );
 
-  const { select, selected } = useRowSelection(rowIds(groups), "ask");
-  const picked = entries.find(({ ask }) => ask.ask === selected);
+  const { selected } = useRowSelection(rowIds(groups), "ask");
 
   return (
     <Workspace
       count={frontCount(shown)}
       crumbs={[{ label: "Asks" }]}
-      facts={
-        picked === undefined ? (
-          <>
-            <StartHere webUrl={webUrl} />
-            <ProjectsFacts projects={projects} />
-          </>
-        ) : (
-          <Selected
-            entry={picked}
-            full={selectedAsk}
-            parents={parents}
-            platformUrl={platformUrl}
-            projects={projects}
-            states={states.get(picked.project) ?? new Map()}
-          />
-        )
-      }
-      factsHeading={picked === undefined ? "Start here" : "Selected ask"}
-      {...(selected === undefined ? {} : { factsKey: selected })}
-      factsSummary={
-        picked === undefined
-          ? "Install the command line, list the asks, claim one"
-          : picked.ask.want
-      }
       status={
-        <p className="text-want text-muted-foreground max-w-[70ch]">
+        <p className="text-want text-muted-foreground max-w-(--measure)">
           {EXPLAINER}
         </p>
       }
       title="Open asks"
-      toolbar={
-        entries.length === 0 ? undefined : (
-          <Toolbar entries={entries} filter={filter} />
-        )
-      }
-      variant="list"
+      variant="board"
     >
-      {entries.length === 0 ? <NoAsks projects={projects} /> : null}
-      {entries.length > 0 && shown.length === 0 ? (
-        <EmptyState
-          onward={
-            <AppLink
-              className="decoration-rule underline hover:decoration-current"
-              to={frontPath({})}
-            >
-              Show every open ask
-            </AppLink>
-          }
-          title="No open asks match this filter."
-        />
-      ) : null}
-      {groups.length === 0 ? null : (
-        <div className="flex flex-col gap-6">
-          {groups.map((group) => (
-            <ProjectGroup
-              group={group}
-              key={group.project}
-              listing={projects?.find(
-                ({ project }) => project === group.project
-              )}
-              now={now}
-              onSelect={select}
-              parents={parents}
-              selected={selected}
-              stamps={stampsOf?.(group.project) ?? new Set()}
+      {entries.length === 0 ? (
+        <NoAsks projects={projects} />
+      ) : (
+        <>
+          {dismissed ? null : <HowToTake onDismiss={dismiss} />}
+          <div
+            className="columns:grid columns:grid-cols-[var(--column-filters)_minmax(0,1fr)] flex flex-col gap-8"
+            data-board=""
+          >
+            <Filters
+              entries={entries}
+              filter={filter}
+              onRestore={dismissed ? restore : undefined}
             />
-          ))}
-        </div>
+            <div className="flex min-w-0 flex-col gap-6" data-board-list="">
+              {shown.length === 0 ? (
+                <EmptyState
+                  onward={
+                    <AppLink className={LINK} to={frontPath({})}>
+                      Show every open ask
+                    </AppLink>
+                  }
+                  title="No open asks match this filter."
+                />
+              ) : (
+                groups.map((group) => (
+                  <ProjectGroup
+                    group={group}
+                    key={group.project}
+                    listing={projects?.find(
+                      ({ project }) => project === group.project
+                    )}
+                    now={now}
+                    parents={parents}
+                    selected={selected}
+                    stamps={stampsOf?.(group.project) ?? new Set()}
+                  />
+                ))
+              )}
+            </div>
+          </div>
+        </>
       )}
     </Workspace>
   );

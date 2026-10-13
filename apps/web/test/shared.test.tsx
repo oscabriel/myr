@@ -4,10 +4,7 @@ import { Handle } from "@repo/protocol/ids";
 import { DateTime, Schema } from "effect";
 
 import { Definition, Definitions } from "../src/features/ask/fields.tsx";
-import {
-  CommandLine,
-  InspectorCommands,
-} from "../src/features/shared/command.tsx";
+import { CommandLine } from "../src/features/shared/command.tsx";
 import { CopyAction } from "../src/features/shared/copy-action.tsx";
 import { EmptyState } from "../src/features/shared/empty.tsx";
 import { HandleLink } from "../src/features/shared/handle.tsx";
@@ -147,7 +144,7 @@ describe(When, () => {
 const hangs = (command: string) =>
   [
     ...markupOf(<CommandLine command={command} />).matchAll(
-      /padding-left:(?<hang>\d+)ch;text-indent:-\k<hang>ch/gu
+      /class="tablet:pl-\(--hang\) tablet:-indent-\(--hang\) block" style="--hang:(?<hang>\d+)ch"/gu
     ),
   ].map((found) => Number(found.groups?.hang));
 
@@ -175,7 +172,7 @@ describe(CommandLine, () => {
     expect(textOf(<CommandLine command={command} />)).toContain(command);
   });
 
-  it("hangs a line 6ch, less when its longest word would not fit beside the hang", () => {
+  it("hangs a line 6ch from tablet, less when its longest word would not fit beside the hang", () => {
     // `today` (5ch) beside a 6ch hang needs 11ch; the line is 9ch, so the
     // box hugging it would break the word in two. It never wraps, so its
     // hang never shows.
@@ -185,28 +182,6 @@ describe(CommandLine, () => {
         `${Brand.cli} claim lint-heading-levels --project oscabriel/vellum \\\n  --json`
       )
     ).toStrictEqual([6, 2]);
-  });
-
-  it("takes the bleed form in the inspector: pane-wide, ruled above and below, hanging 2ch, an icon-only Copy", () => {
-    const command = `${Brand.cli} claim lint-heading-levels --project vellum`;
-
-    const markup = markupOf(
-      <InspectorCommands>
-        <CommandLine command={command} />
-      </InspectorCommands>
-    );
-
-    const box = /<div\b[^>]*data-form="bleed"[^>]*>/u.exec(markup)?.[0] ?? "";
-
-    expect(box).toMatch(/\bborder-y\b/u);
-    expect(box).not.toMatch(/\bborder\b(?!-)/u);
-    expect(markup).toMatch(/padding-left:2ch;text-indent:-2ch/u);
-    expect(markup).toMatch(
-      /<button\b[^>]*class="[^"]*\bsize-7\b[^"]*"[^>]*>.*<span class="sr-only">Copy<\/span><\/button>/u
-    );
-    expect(markupOf(<CommandLine command={command} />)).toMatch(
-      /data-form="box"/u
-    );
   });
 });
 

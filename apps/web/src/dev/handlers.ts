@@ -11,6 +11,7 @@ import {
   whyOf,
 } from "@repo/project/code";
 import type { CodeProject } from "@repo/project/code";
+import { landedProjectOf, withDescriptions } from "@repo/project/description";
 import { FrontPage } from "@repo/project/front-page";
 import type { ProjectApi } from "@repo/project/project";
 import { Projects } from "@repo/project/projects";
@@ -247,6 +248,14 @@ export const devHandlers: Layer.Layer<
         frontPage.projects().pipe(
           Effect.flatMap(withStandingPosture),
           Effect.provideService(Projects, projects),
+          Effect.flatMap((listed) =>
+            withDescriptions(listed, (project) =>
+              Effect.map(projects.get(project), (api) =>
+                landedProjectOf(api, project)
+              )
+            )
+          ),
+          Effect.provideService(RepoHost, host),
           Effect.map((listed) => ({ projects: listed }))
         ),
       listRefs: ({ project }) => code(project, refsOf),
@@ -274,6 +283,9 @@ export const devHandlers: Layer.Layer<
         code(project, (of) =>
           treeOf(of, Option.fromUndefinedOr(at), Option.fromUndefinedOr(path))
         ),
+      // Read as nobody: the list ignores the caller, so every caller's read is the same.
+      recentLandings: () =>
+        Effect.map(frontPage.recentLandings(), (landings) => ({ landings })),
       release: ({ ask, project }) =>
         Effect.flatMap(person, (who) =>
           on(project, (api) => api.release(who, ask))
@@ -286,8 +298,8 @@ export const devHandlers: Layer.Layer<
         Effect.flatMap(caller, (who) =>
           on(project, (api) => api.showAsk(who, ask))
         ),
-      showCommit: ({ project, sha }) =>
-        code(project, (of) => commitOf(of, sha)),
+      showCommit: ({ at, project, sha }) =>
+        code(project, (of) => commitOf(of, sha, Option.fromUndefinedOr(at))),
       showProposal: ({ project, proposal }) =>
         Effect.flatMap(caller, (who) =>
           on(project, (api) => api.showProposal(who, proposal))

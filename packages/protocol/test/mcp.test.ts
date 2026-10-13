@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Context, Effect, Layer, Schema } from "effect";
+import { Context, Effect, Layer, Option, Schema } from "effect";
 import { Tool } from "effect/ai";
 import { Rpc, RpcGroup } from "effect/rpc";
 
@@ -11,12 +11,14 @@ import {
   SubmitAnswer,
   surfaced,
 } from "../src/contracts.ts";
+import { PROJECT_DESCRIPTION_CAP } from "../src/domain/front-page.ts";
+import { RECENT_LANDINGS_CAP } from "../src/domain/recent-landing.ts";
 import { AskId, CommitSha, KindName, ProjectName } from "../src/ids.ts";
 import { listTools, toJsonSchema, toToolkit } from "../src/mcp.ts";
-import { StaleBase } from "../src/refusal.ts";
+import { Refusal, StaleBase } from "../src/refusal.ts";
 import { unanswered } from "../src/testing.ts";
 import { ask, base, main, path } from "./examples.ts";
-import { leaks } from "./leaks.ts";
+import { leaks, nested } from "./leaks.ts";
 import { serve } from "./mcp.ts";
 
 const head = CommitSha.make("3333333333333333333333333333333333333333");
@@ -78,6 +80,42 @@ const ListedTools = Schema.Struct({
     })
   ),
 });
+
+const ProjectDescriptionSchema = Schema.Struct({
+  maxLength: Schema.Int,
+  type: Schema.Literal("string"),
+});
+
+const LandingsSchema = Schema.Struct({
+  minimum: Schema.Int,
+  type: Schema.Literal("integer"),
+});
+
+/** A project's listing in a JSON Schema, its description's and landings' schemas beside what it requires. */
+const ListingSchema = Schema.Struct({
+  properties: Schema.Struct({
+    description: ProjectDescriptionSchema,
+    landings: LandingsSchema,
+  }),
+  required: Schema.Array(Schema.String),
+});
+
+const decodeListingSchema = Schema.decodeUnknownOption(ListingSchema);
+
+/** An object in a JSON Schema: what it holds and which of it it requires. */
+const ObjectSchema = Schema.Struct({
+  properties: Schema.Record(Schema.String, Schema.Json),
+  required: Schema.Array(Schema.String),
+});
+
+const decodeObjectSchema = Schema.decodeUnknownOption(ObjectSchema);
+
+const ArraySchema = Schema.Struct({
+  maxItems: Schema.Int,
+  type: Schema.Literal("array"),
+});
+
+const decodeArraySchema = Schema.decodeUnknownOption(ArraySchema);
 
 const receipt = {
   additionalProperties: true,
@@ -243,6 +281,67 @@ describe("the contracts as MCP tools", () => {
     expect(tools.length).toBeGreaterThan(20);
     expect(schemas).toHaveLength(2 * tools.length);
     expect(schemas.flatMap(leaks)).toStrictEqual([]);
+  });
+
+  it("lists each project with an optional description, capped in length, and an optional count of landings", () => {
+    const listProjects = listTools(
+      toToolkit(surfaced("mcp"), Effect.service(Client)).toolkit
+    ).find(({ name }) => name === "listProjects");
+
+    const listings = nested(
+      Schema.decodeUnknownSync(Schema.Json)(listProjects?.outputSchema)
+    ).flatMap((node) => Option.toArray(decodeListingSchema(node)));
+
+    expect(
+      listings.map(({ properties }) => properties.description)
+    ).toStrictEqual([{ maxLength: PROJECT_DESCRIPTION_CAP, type: "string" }]);
+    expect(listings.map(({ properties }) => properties.landings)).toStrictEqual(
+      [{ minimum: 0, type: "integer" }]
+    );
+    expect(listings.flatMap(({ required }) => required)).not.toContain(
+      "description"
+    );
+    expect(listings.flatMap(({ required }) => required)).not.toContain(
+      "landings"
+    );
+  });
+
+  it("lists the latest landings across projects as a tool that only reads, at most a cap of them, each refusal by its tag and area alone", () => {
+    const recent = listTools(
+      toToolkit(surfaced("mcp"), Effect.service(Client)).toolkit
+    ).find(({ name }) => name === "recentLandings");
+
+    const nodes = nested(
+      Schema.decodeUnknownSync(Schema.Json)(recent?.outputSchema)
+    );
+
+    const refusals = nodes
+      .flatMap((node) => Option.toArray(decodeObjectSchema(node)))
+      .filter(({ properties }) => "tag" in properties);
+
+    expect(recent?.annotations).toMatchObject({
+      destructiveHint: false,
+      readOnlyHint: true,
+    });
+    // A non-empty array lists its first item apart from the rest: one shape, twice.
+    expect(
+      new Set(
+        refusals.map(
+          ({ properties, required }) =>
+            `${Object.keys(properties).toSorted().join(", ")}; requires ${required.join(", ")}`
+        )
+      )
+    ).toStrictEqual(new Set(["area, tag; requires tag"]));
+    expect(
+      nodes.flatMap((node) => Option.toArray(decodeArraySchema(node)))
+    ).toContainEqual({ maxItems: RECENT_LANDINGS_CAP, type: "array" });
+    // An agent reads the closed set of tags, not any string.
+    expect(refusals.map(({ properties }) => properties.tag)).toStrictEqual(
+      refusals.map(() => ({
+        enum: Refusal.members.map(({ identifier }) => identifier),
+        type: "string",
+      }))
+    );
   });
 
   it("inlines a named root schema, since MCP wants an object at the root", () => {

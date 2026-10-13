@@ -6,9 +6,18 @@ import {
   PendingPage,
   RouteError,
 } from "../src/features/shared/pending.tsx";
-import { themeColors } from "../src/features/shared/theme.ts";
+import { THEME_SCRIPT, themeColors } from "../src/features/shared/theme.ts";
 import { getRouter } from "../src/router.tsx";
-import { rootHead, ThemeColors } from "../src/routes/__root.tsx";
+import { rootHead, ThemeHead } from "../src/routes/__root.tsx";
+
+// The source as text: what the root imports, read without running it.
+const [rootSource = ""] = Object.values(
+  import.meta.glob<string>("../src/routes/__root.tsx", {
+    eager: true,
+    import: "default",
+    query: "?raw",
+  })
+);
 
 describe("the document's head", () => {
   it("gives each meta a name of its own, since TanStack keeps one per name", () => {
@@ -19,11 +28,23 @@ describe("the document's head", () => {
     expect(names).toStrictEqual([...new Set(names)]);
   });
 
-  it("carries the light and the dark theme colour, each for its own scheme", () => {
-    const markup = renderToStaticMarkup(<ThemeColors />);
+  // ADR 0042: the metas name each scheme's paper only for a page whose
+  // script never runs. Out of a noscript, React's hydration matches a meta by
+  // its content and adds a fresh one beside any the script coloured, so the
+  // browser's bar could take the other theme's paper.
+  it("carries each scheme's theme colour for a page without scripts, then the theme script, verbatim", () => {
+    const markup = renderToStaticMarkup(<ThemeHead />);
 
     expect(markup).toBe(
-      `<meta content="${themeColors.light}" media="(prefers-color-scheme: light)" name="theme-color"/><meta content="${themeColors.dark}" media="(prefers-color-scheme: dark)" name="theme-color"/>`
+      `<noscript><meta content="${themeColors.light}" media="(prefers-color-scheme: light)" name="theme-color"/><meta content="${themeColors.dark}" media="(prefers-color-scheme: dark)" name="theme-color"/></noscript><script>${THEME_SCRIPT}</script>`
+    );
+  });
+
+  // The script writes `data-theme` before React hydrates, so `<html>`
+  // accepts the attribute it finds.
+  it("puts the theme in the document's head, and lets hydration find <html> changed", () => {
+    expect(rootSource).toMatch(
+      /<html lang="en" suppressHydrationWarning>\s*<head>[^]*<ThemeHead \/>[^]*<\/head>/u
     );
   });
 
@@ -60,14 +81,14 @@ describe("the document's head", () => {
       {
         as: "font",
         crossOrigin: "anonymous",
-        file: "public-sans-latin.woff2",
+        file: "ibm-plex-sans-latin-wght-normal.woff2",
         rel: "preload",
         type: "font/woff2",
       },
       {
         as: "font",
         crossOrigin: "anonymous",
-        file: "jetbrains-mono-latin.woff2",
+        file: "ibm-plex-mono-latin-400-normal.woff2",
         rel: "preload",
         type: "font/woff2",
       },
@@ -102,5 +123,23 @@ describe("the router", () => {
   it("scrolls each new page's main pane back to its top", () => {
     expect(options.scrollRestoration).toBeTruthy();
     expect(options.scrollToTopSelectors).toContain("#main");
+  });
+});
+
+describe("the root's reads", () => {
+  // The rail's Today count loaded with every page; the account's inbox count
+  // is fetched, with its read, only once a signed-in reader's page is up.
+  it("reach the inbox's count only through a lazy import", () => {
+    expect(rootSource).not.toMatch(/^import\b[^;]*client\/today/mu);
+    expect(rootSource).toContain(
+      'lazy(() => import("../features/account/inbox-count.tsx"))'
+    );
+  });
+
+  it("read the project list only in the reader the search mounts", () => {
+    expect(rootSource).not.toContain("projectsAtom");
+    expect(rootSource).toMatch(
+      /const ReadProjects[^=]*= \(\{ children \}\) =>\s*children\(useProjectList\(\)\)/u
+    );
   });
 });

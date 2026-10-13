@@ -13,12 +13,12 @@ import {
   markdownAlternateLink,
   markdownLink,
 } from "../features/front/markdown.ts";
+import { LandingNow } from "../features/landing/landing-now.ts";
 import { LandingView } from "../features/landing/landing-page.tsx";
-import { LandingProjects } from "../features/landing/projects.ts";
-import { readLandingProjects } from "../features/landing/read.ts";
+import { readLandingNow } from "../features/landing/read.ts";
 import { LEDE } from "../features/landing/words.ts";
 import { pageHead } from "../features/shared/head.ts";
-import { HOME_PATH } from "../features/shared/paths.ts";
+import { INBOX_PATH } from "../features/shared/paths.ts";
 import { branchPage } from "../server/cache-headers.ts";
 import { serverClient } from "../server/client.ts";
 import { landingHandler } from "../server/front-page.ts";
@@ -30,8 +30,8 @@ const MARKDOWN = "/llms.txt";
 // Read as nobody (no cookie reaches the platform): the list ignores the caller, so the page stays one the edge may keep.
 const landingData = createServerFn({ method: "GET" }).handler(() =>
   Effect.runPromise(
-    readLandingProjects.pipe(
-      Effect.flatMap(Schema.encodeEffect(LandingProjects)),
+    readLandingNow.pipe(
+      Effect.flatMap(Schema.encodeEffect(LandingNow)),
       Effect.provide(serverClient(env))
     )
   )
@@ -51,39 +51,39 @@ export const landingHead = () => ({
   links: [markdownAlternateLink(MARKDOWN)],
 });
 
-const useHomeOnceSignedIn = () => {
+const useInboxOnceSignedIn = () => {
   const signedIn = useSignedIn();
   const router = useRouter();
 
   useEffect(() => {
     if (signedIn) {
-      void router.navigate({ replace: true, to: HOME_PATH });
+      void router.navigate({ replace: true, to: INBOX_PATH });
     }
   }, [router, signedIn]);
 };
 
 const Landing = () => {
-  useHomeOnceSignedIn();
+  useInboxOnceSignedIn();
   const { platformUrl } = root.useLoaderData();
   const { origin } = useRouter();
   const loaded = Route.useLoaderData();
 
-  const projects = useMemo(
-    () => Schema.decodeSync(LandingProjects)(loaded),
+  const landings = useMemo(
+    () => Schema.decodeSync(LandingNow)(loaded),
     [loaded]
   );
 
   return (
     <LandingView
+      landings={landings}
       platformUrl={platformUrl}
-      projects={projects}
       webUrl={origin}
     />
   );
 };
 
 export const Route = createFileRoute("/")({
-  staticData: { shell: "bare" },
+  staticData: { shell: "site" },
   loader: () => landingData(),
   head: landingHead,
   headers: landingHeaders,

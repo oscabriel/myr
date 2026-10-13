@@ -8,7 +8,7 @@ import { Array as Arr, DateTime, Effect, Option, Schema, Stream } from "effect";
 import { wantsMarkdown } from "../features/ask/markdown.ts";
 import { familiesIn } from "../features/front/families.ts";
 import { variedByAccept } from "../features/front/markdown.ts";
-import { HOME_PATH } from "../features/shared/paths.ts";
+import { INBOX_PATH } from "../features/shared/paths.ts";
 import { KEPT_NOWHERE } from "./edge-cache.ts";
 import { frontLlmsHandler } from "./llms.ts";
 import type { ClientFor } from "./llms.ts";
@@ -88,9 +88,9 @@ export const frontPageHandler =
         )
       : next();
 
-const toHome = () =>
+const toInbox = () =>
   new Response(null, {
-    headers: { "cache-control": KEPT_NOWHERE, location: HOME_PATH },
+    headers: { "cache-control": KEPT_NOWHERE, location: INBOX_PATH },
     status: 302,
   });
 
@@ -108,6 +108,6 @@ export const landingHandler =
     }
 
     return Option.isSome(credentialFrom(request))
-      ? Promise.resolve(toHome())
+      ? Promise.resolve(toInbox())
       : next();
   };

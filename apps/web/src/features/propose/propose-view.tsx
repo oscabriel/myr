@@ -84,7 +84,7 @@ const SignInFirst = ({
 }) => (
   <section
     aria-label="Sign in to propose"
-    className="flex max-w-[70ch] flex-col items-start gap-3"
+    className="flex max-w-(--measure) flex-col items-start gap-3"
   >
     <p className="text-body">
       A proposal asks {project} to open an ask nobody wrote yet: a want in your
@@ -157,7 +157,7 @@ const Form = ({
   return (
     <form
       aria-label="Propose an ask"
-      className="flex max-w-[70ch] flex-col gap-6"
+      className="flex max-w-(--measure) flex-col gap-6"
       data-propose=""
       onSubmit={(event) => {
         event.preventDefault();
@@ -326,7 +326,7 @@ export const ProposeView = ({
       >
         {children}
       </ProposeBody>
-      <div className="shell:hidden border-rule flex flex-col border-t pt-4">
+      <div className="border-rule flex flex-col border-t pt-4">
         <GoodWant />
       </div>
     </Workspace>

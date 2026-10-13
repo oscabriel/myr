@@ -145,6 +145,21 @@ describe("an owner", () => {
     expect(sourceHosts).toContain("gitlab.com");
   });
 
+  // ADR 0041: the pages the redesign adds, and the old ones kept for their redirects.
+  it("is never a page the four shells add, nor one kept for its redirect", () => {
+    expect(reservedProjectNames).toStrictEqual(
+      expect.arrayContaining([
+        "agents",
+        "explore",
+        "home",
+        "inbox",
+        "install",
+        "settings",
+        "today",
+      ])
+    );
+  });
+
   it("is never a word the web serves its own pages at", () => {
     expect(reservedProjectNames).toContain("import");
 

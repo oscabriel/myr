@@ -12,7 +12,12 @@ import { HandleLink } from "../shared/handle.tsx";
 import { AppLink } from "../shared/link.tsx";
 import { POSTURE_MARKS } from "../shared/mark-look.ts";
 import { Mark } from "../shared/marks.tsx";
-import { answerPath, envPath, ledgerPath } from "../shared/paths.ts";
+import {
+  answerPath,
+  ENVIRONMENT_ANCHOR,
+  LEDGER_ANCHOR,
+  visibilityPath,
+} from "../shared/paths.ts";
 import { refWords } from "./subject.ts";
 
 const LINK = "decoration-rule underline hover:decoration-current";
@@ -146,7 +151,11 @@ const SubjectFacts = ({ decision }: { readonly decision: Decision }) =>
           />
         </FactRow>
         <FactRow label="Ledger">
-          <AppLink className={LINK} to={ledgerPath(decision.project)}>
+          <AppLink
+            className={LINK}
+            hash={LEDGER_ANCHOR}
+            to={visibilityPath(decision.project)}
+          >
             The ledger of {decision.project}
           </AppLink>
         </FactRow>
@@ -193,7 +202,8 @@ const SubjectFacts = ({ decision }: { readonly decision: Decision }) =>
         <FactRow label="Item">
           <AppLink
             className={`${CODE} text-sealed ${LINK}`}
-            to={envPath(decision.project)}
+            hash={ENVIRONMENT_ANCHOR}
+            to={visibilityPath(decision.project)}
           >
             {item}
           </AppLink>

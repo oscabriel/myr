@@ -24,6 +24,7 @@ export const importSearch = ({
 }): { readonly url?: string } => (Predicate.isString(url) ? { url } : {});
 
 export const Route = createFileRoute("/import")({
+  staticData: { shell: "focus" },
   validateSearch: importSearch,
   headers: importHeaders,
   head: () => pageHead({ title: "Import a repo" }),

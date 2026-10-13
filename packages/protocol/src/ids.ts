@@ -173,26 +173,42 @@ export const RepoName = Schema.String.pipe(
 
 export type RepoName = typeof RepoName.Type;
 
+/** A branch by its short name: never `refs/...`, never `..`, no empty part. */
+export const BranchName = Schema.String.pipe(
+  Schema.check(
+    Schema.isPattern(
+      /^(?!refs\/)(?!.*\.\.)[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/u
+    )
+  ),
+  Schema.brand("BranchName")
+);
+
+export type BranchName = typeof BranchName.Type;
+
 export const RepoPath = Schema.NonEmptyString.pipe(Schema.brand("RepoPath"));
 
 export type RepoPath = typeof RepoPath.Type;
 
 // The web serves its own pages at these first path segments, so a project
 // owned by one would be unreachable. `apps/web/test/routes.test.ts` holds
-// this list to the web's routes.
+// this list to the web's routes and the few reserved ahead of their page.
 export const reservedProjectNames = [
   "agents",
   "asks",
   "assets",
   "auth",
   "docs",
+  "explore",
   "home",
   "icons",
   "import",
+  "inbox",
+  "install",
   "people",
   "privacy",
   "releases",
   "rpc",
+  "settings",
   "terms",
   "today",
 ] as const;

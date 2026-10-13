@@ -88,7 +88,7 @@ describe("a person's page", () => {
 
       for (const project of ["oscabriel/datekit", "oscabriel/burrow"]) {
         expect(html).toContain(`href="/${project}"`);
-        expect(html).toContain(`href="/${project}/commits/main"`);
+        expect(html).toContain(`href="/${project}#recent-landings"`);
       }
     })
   );

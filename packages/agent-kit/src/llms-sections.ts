@@ -1,6 +1,10 @@
 import { Brand } from "@repo/brand";
+import { RecentLandingsOf, Surfaces } from "@repo/protocol/contracts";
 import type { ProjectEvent } from "@repo/protocol/domain/event";
+import { RECENT_LANDINGS_CAP } from "@repo/protocol/domain/recent-landing";
+import { Context } from "effect";
 
+import { pushCommand } from "./install.ts";
 import { refusalCatalog } from "./refusals.ts";
 import { code, table } from "./text.ts";
 
@@ -8,7 +12,7 @@ const cli = (...words: readonly string[]) => [Brand.cli, ...words].join(" ");
 
 const notesRef = `refs/notes/${Brand.slug}`;
 
-export const pushAnswer = () => code(`git push ${Brand.slug} HEAD:main`);
+export const pushAnswer = () => code(pushCommand);
 
 const signIn = (reason: string) => `${reason}; sign in with ${cli("login")}`;
 
@@ -88,6 +92,12 @@ export const landing = () => [
   "4. Only once `main` has moved does it write its bookkeeping, each in a push of its own: the ref that mirrors the landed SHA, then the verdict note. Either may trail `main` for a moment, and nothing decides by them.",
   "5. A landing tried again finds its own commit on `main` by its `Request-Id` trailer and writes only what is missing, so it never makes a second commit.",
   "",
+  ...(Context.get(RecentLandingsOf.annotations, Surfaces).includes("mcp")
+    ? [
+        `Across every project, the MCP tool ${code(RecentLandingsOf._tag)} lists the latest landings and the answers the gate refused, the latest first and at most ${RECENT_LANDINGS_CAP}: when, the project, the ask and its want, and of each refusal its tag and its area, never a held-back check's name.`,
+        "",
+      ]
+    : []),
 ];
 
 const eventLines = {

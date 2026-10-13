@@ -1,28 +1,14 @@
 import { Check, Copy } from "lucide-react";
-import { createContext, useContext } from "react";
-import type { ReactNode } from "react";
+import type { CSSProperties } from "react";
 
 import { Button } from "../../components/ui/button.tsx";
 import { useCopy } from "./copy-action.tsx";
 import { useNumberedCommand } from "./keys.tsx";
 
-type Form = "bleed" | "box";
+const HANG = 6;
 
-const FormContext = createContext<Form>("box");
-
-export const InspectorCommands = ({
-  children,
-}: {
-  readonly children: ReactNode;
-}) => <FormContext value="bleed">{children}</FormContext>;
-
-const HANGS = { bleed: 2, box: 6 } as const satisfies Record<Form, number>;
-
-const BOXES = {
-  bleed:
-    "border-rule bg-surface text-mono leading-terminal -mx-4 flex min-w-0 items-start gap-2 border-y py-1 pr-1 pl-4 font-mono",
-  box: "border-rule bg-surface text-mono leading-terminal flex w-fit max-w-full min-w-0 items-start gap-2 border py-1 pr-1 pl-3 font-mono",
-} as const satisfies Record<Form, string>;
+const BOX =
+  "border-rule bg-surface text-mono leading-terminal flex w-fit max-w-full min-w-0 items-start gap-2 border py-1 pr-1 pl-3 font-mono";
 
 /**
  * The box hugs its longest line, so a word wider than the room beside the hang
@@ -34,14 +20,21 @@ const hangOf = (hang: number, words: readonly string[], line: string) =>
     line.length - Math.max(0, ...words.map(({ length }) => length))
   );
 
+/** The hang as a variable, which the line takes from `tablet` only: on a phone the words want the whole width. */
+const hangStyle = (
+  hang: number
+): CSSProperties & { readonly "--hang": string } => ({
+  "--hang": `${hang}ch`,
+});
+
 // Breaks between words, never after a word's own hyphen (`--project`) nor
 // before a closing ` \`.
-const wordsOf = (command: string, form: Form) =>
+const wordsOf = (command: string) =>
   command.split("\n").map((line, at, lines) => {
     const parts = line.split(/(?<space>\s+)(?!\\$)/u);
 
     const hang = hangOf(
-      HANGS[form],
+      HANG,
       parts.filter((part) => part.trim() !== ""),
       line
     );
@@ -49,9 +42,9 @@ const wordsOf = (command: string, form: Form) =>
     return (
       // A line never moves: its place in the command is its key.
       <span
-        className="block"
+        className="tablet:pl-(--hang) tablet:-indent-(--hang) block"
         key={at}
-        style={{ paddingLeft: `${hang}ch`, textIndent: `-${hang}ch` }}
+        style={hangStyle(hang)}
       >
         {parts.map((part, index) =>
           part.trim() === "" ? (
@@ -78,11 +71,9 @@ const Line = ({
   readonly number: number | undefined;
 }) => {
   const { copied, copy } = useCopy(command);
-  const form = useContext(FormContext);
-  const bleed = form === "bleed";
 
   return (
-    <div className={BOXES[form]} data-form={form}>
+    <div className={BOX}>
       {number === undefined ? null : (
         <span
           aria-hidden="true"
@@ -95,22 +86,18 @@ const Line = ({
         $
       </span>
       <code className="min-w-0 flex-1 py-0.5 whitespace-pre-wrap select-all">
-        {wordsOf(command, form)}
+        {wordsOf(command)}
       </code>
       <Button
         className="shrink-0 font-sans"
         onClick={copy}
-        size={bleed ? "icon-sm" : "sm"}
+        size="sm"
         title={number === undefined ? undefined : `Copy (${number})`}
         type="button"
         variant="ghost"
       >
         {copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
-        <span
-          className={
-            bleed ? "sr-only" : "sr-only sm:not-sr-only @max-xs:sr-only"
-          }
-        >
+        <span className="sr-only sm:not-sr-only @max-xs:sr-only">
           {copied ? "Copied" : "Copy"}
         </span>
       </Button>

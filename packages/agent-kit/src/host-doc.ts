@@ -6,7 +6,7 @@ import type { Posture } from "@repo/protocol/posture";
 import { Array as Arr, Option } from "effect";
 
 import type { CommandDoc } from "./command-doc.ts";
-import { installCommand } from "./install.ts";
+import { installCommand, pushCommand } from "./install.ts";
 
 type Command = CommandDoc;
 
@@ -100,7 +100,7 @@ const takeAnAsk = (commands: Commands, known: Known) => {
       (each) =>
         `Change only the ask's territory, then run ${each} and fix everything it reports.`
     ),
-    `Push to your fork with ${code(`git push ${Brand.slug} HEAD:main`)}${Option.match(
+    `Push to your fork with ${code(pushCommand)}${Option.match(
       typed(commands, "verdict", known, ["ask", "project"]),
       { onNone: () => "", onSome: (each) => `, then read the verdict: ${each}` }
     )}. A refusal names the command to run next.`,

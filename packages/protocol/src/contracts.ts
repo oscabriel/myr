@@ -40,6 +40,7 @@ import { FrontPageEntry, ProjectListing } from "./domain/front-page.ts";
 import { LandingView } from "./domain/landing.ts";
 import { ImportSource, PolicyPending, PublicPolicy } from "./domain/policy.ts";
 import { DraftNote, Proposal } from "./domain/proposal.ts";
+import { RecentLandings } from "./domain/recent-landing.ts";
 import { CreditSummary } from "./domain/record.ts";
 import { Ledger } from "./domain/visibility.ts";
 import {
@@ -140,6 +141,8 @@ const servedOn = {
   proposeAsk: SurfaceName.literals,
   readFile: ["rpc", "mcp", "web"],
   readTree: ["rpc", "mcp", "web"],
+  // A list with no command: an agent asks it over MCP, a person reads it on the landing.
+  recentLandings: ["rpc", "mcp", "web"],
   release: ["rpc", "mcp", "cli"],
   // A value must never pass through an agent's transcript, so never MCP.
   setEnv: ["rpc", "cli"],
@@ -175,6 +178,22 @@ export class ListProjects extends Rpc.make("listProjects", {
   .annotate(NeedsApproval, false)
   .annotate(Cli, { name: "projects" })
   .annotate(Surfaces, servedOn.listProjects) {}
+
+export class RecentLandingsOf extends Rpc.make("recentLandings", {
+  payload: NoPayload,
+  success: Schema.Struct({ landings: RecentLandings }),
+})
+  .annotate(
+    Description,
+    "List the latest landings across every project, and the answers the gate refused, the latest first: when, the project, the ask and its want, and each refusal's tag and area."
+  )
+  .annotate(Audience, "public")
+  .annotate(Visibility, "public")
+  .annotate(ReadOnly, true)
+  .annotate(Idempotent, true)
+  .annotate(Destructive, false)
+  .annotate(NeedsApproval, false)
+  .annotate(Surfaces, servedOn.recentLandings) {}
 
 export class FrontPage extends Rpc.make("frontPage", {
   payload: {
@@ -407,7 +426,7 @@ export class ListRefs extends Rpc.make("listRefs", {
 export class ReadTree extends Rpc.make("readTree", {
   error: Schema.Union([UnknownProject, UnknownRevision, UnknownPath]),
   payload: {
-    /** `main`, a commit or a tag; main's landed commit when absent. */
+    /** `main`, a commit, a tag or a fork's address (`@<handle>/<ask>`); main's landed commit when absent. */
     at: Schema.optionalKey(Rev),
     path: Schema.optionalKey(RepoPath),
     project: ProjectName,
@@ -495,8 +514,13 @@ export class LogOf extends Rpc.make("log", {
   .annotate(Surfaces, servedOn.log) {}
 
 export class ShowCommit extends Rpc.make("showCommit", {
-  error: Schema.Union([UnknownProject, UnknownCommit]),
-  payload: { project: ProjectName, sha: CommitSha },
+  error: Schema.Union([UnknownProject, UnknownCommit, UnknownRevision]),
+  payload: {
+    /** A fork's address, to read the commit in that fork; the project's own commits when absent. */
+    at: Schema.optionalKey(Rev),
+    project: ProjectName,
+    sha: CommitSha,
+  },
   success: CommitDiff,
 })
   .annotate(
@@ -989,6 +1013,7 @@ export class SetEnv extends Rpc.make("setEnv", {
 
 export class Contracts extends RpcGroup.make(
   ListProjects,
+  RecentLandingsOf,
   FrontPage,
   ListAsks,
   ShowAsk,

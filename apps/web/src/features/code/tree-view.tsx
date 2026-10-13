@@ -13,7 +13,8 @@ import type { ReactNode } from "react";
 
 import { ReadmeSection } from "../project/readme-section.tsx";
 import { AppLink } from "../shared/link.tsx";
-import { GUTTER, MEASURE, Workspace } from "../shared/shell/workspace.tsx";
+import { GUTTER } from "../shared/shell/gutter.ts";
+import { MEASURE, Workspace } from "../shared/shell/workspace.tsx";
 import { When } from "../shared/time.tsx";
 import { askOf } from "../why/rows.ts";
 import { FileHeader } from "./file-header.tsx";
@@ -127,12 +128,10 @@ export interface TreeViewProps {
   readonly readme?: FileView | undefined;
   readonly last?: ReadonlyMap<string, CommitView>;
   readonly now: DateTime.Utc;
-  readonly files?: ReactNode;
   readonly notice?: ReactNode;
 }
 
 export const TreeView = ({
-  files,
   last,
   listing,
   notice,
@@ -155,12 +154,7 @@ export const TreeView = ({
       title={name}
       toolbar={
         <>
-          <FileHeader
-            files={files}
-            path={listing.path}
-            project={project}
-            rev={rev}
-          />
+          <FileHeader path={listing.path} project={project} rev={rev} />
           <AppLink
             className="text-ui text-muted-foreground hover:text-foreground tablet:inline hidden shrink-0 no-underline"
             search={listing.path === undefined ? {} : { path: listing.path }}
@@ -170,6 +164,7 @@ export const TreeView = ({
           </AppLink>
         </>
       }
+      quietHead
       variant="code"
     >
       <div className={`${GUTTER} ${MEASURE} flex flex-col gap-8`}>

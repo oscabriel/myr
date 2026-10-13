@@ -2,71 +2,119 @@
 @import "shadcn/tailwind.css";
 
 /* `prose` for rendered Markdown (a README, an ask's brief); its `dark:`
-   variant is the media query below, like every other one here. */
+   variant is the attribute below, like every other one here. */
 @plugin "@tailwindcss/typography";
 
 /*
   The web's tokens (DESIGN.md names each one and when to use it).
 
-  The world is a test certificate: every page is a report sheet on cool
-  bond paper, ruled in one-pixel hairlines, with fields, a results row, and
-  signatories (credit) kept apart from the instruments used (agents). Colour
-  carries state and nothing else, always beside a word and a mark:
+  The palette is the maintainer's "sage garden" (2026-10-12): warm paper,
+  navy ink, a sage primary for the one main action and the focus ring, and
+  soft sage fills for shadcn's secondary and accent. Its values sit on the
+  web's own token names, so no component changed its classes: shadcn's
+  `muted` is the web's --surface, its `border` the web's --rule, its
+  `muted-foreground` the web's --muted, its `destructive` the web's
+  --refused. Not taken from it: --spacing (it rescales every utility),
+  --font-serif (no serif), its shadows (the web is flat) and its 0.35rem
+  radius (shapes stay square, which colour and type do not touch).
 
-  --landed    the change is on main (a certified result)
+  Nudged, in lightness alone, where a pasted value failed a pair that
+  test/tokens.test.ts holds: --muted 0.551 to 0.5 (4.5:1 on the surface),
+  --primary 0.6333 to 0.56 in light (white on it at 4.5:1), --refused
+  0.5624 to 0.49 in light and 0.6368 to 0.68 in dark (5:1 on the pressed
+  surface), --rule 0.9251 to 0.87 in light (the paste's border equals its
+  muted, so a hairline vanished on the surface; now 1.19:1 there and
+  1.38:1 on paper). --surface-2, --input and --skeleton are new steps in the
+  palette's own hues, measured the same way.
+
+  Colour carries state and nothing else, always beside a word and a mark:
+
+  --landed    the change is on main
   --checking  the gate is running a stage now
   --waiting   passed or paused, waiting on a person or a parent ask
-  --refused   a refusal (nonconformance); the one rubric colour
+  --refused   a refusal; the one rubric colour
   --sealed    held-back checks, layers and sealed evidence
   --muted     not reached, not needed, secondary text
 
-  Everything else is neutral: controls are ruled in --input, placeholders
-  in --skeleton, code is drawn in the low-chroma --syntax-* colours, and a
-  diff's added and removed lines in teal and rose (--diff-*), a family of
-  their own, so a deletion never reads as a refusal or an addition as a
-  landing. test/tokens.test.ts measures every pair that must hold.
+  No colour is orange, amber or brown (no hue from 40 to 100 above chroma
+  0.02): waiting is olive (hue 120), 35 degrees from landed's green.
+  Checking sits at hue 238, 30 degrees from the ink's blue cast, so code
+  drawn in ink never reads as a running stage. Everything else is neutral:
+  controls are ruled in --input, placeholders in --skeleton, code is drawn
+  in the low-chroma --syntax-* colours, and a diff's added and removed
+  lines in teal and rose (--diff-*), a family of their own, so a deletion
+  never reads as a refusal or an addition as a landing.
 
-  Light and dark follow the system setting (no toggle, no script, no flash):
-  shadcn's `dark:` variant is the media query, not a class.
+  Light and dark follow the system setting, or its opposite by the reader's
+  choice on /settings (ADR 0042). One inline script in the head
+  (features/shared/theme.ts) reads the choice from localStorage, never a
+  cookie, and sets data-theme="light" or "dark" on <html> before first
+  paint. The `dark` variant reads that attribute, and the media query
+  stands in only where no attribute is set (the script never ran). The dark
+  palette is written once, under the variant, so `data-theme="light"` on a
+  dark system draws the light palette and nothing else ever sets a colour
+  by the system's scheme. color-scheme follows the resolved theme, so the
+  browser's own controls and scrollbars match it.
 */
-@custom-variant dark (@media (prefers-color-scheme: dark));
+@custom-variant dark {
+  &:where([data-theme="dark"], [data-theme="dark"] *) {
+    @slot;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not([data-theme]), :root:not([data-theme]) *) {
+      @slot;
+    }
+  }
+}
 
 /*
+  The faces: IBM Plex Sans (variable, 100 to 700) for the UI and IBM Plex
+  Mono for what a terminal prints, both from fontsource, latin and
+  latin-ext only, with fontsource's own unicode ranges (copied from each
+  package's unicode.json, so this file stays the one place a face is
+  declared; check them when the packages move), so a page fetches
+  the latin file alone unless it sets an accented letter. Mono comes at the
+  three weights the UI sets it in (400, 500, 600).
+
   Until a face arrives (font-display: swap), text is drawn in a local face
   scaled to its metrics, so the swap moves nothing: Arial (or its metric
-  twin Liberation Sans) for Public Sans, Courier New (or Liberation Mono)
-  for JetBrains Mono. Measured in Chromium from the latin files: Public Sans
-  sets 103.89% wider than Arial, ascent 0.95 em and descent 0.225 em;
-  JetBrains Mono sets as wide as Courier New, ascent 1.02 em and descent
-  0.3 em. Each override is the face's metric over its size-adjust.
+  twin Liberation Sans) for Plex Sans, Courier New (or Liberation Mono) for
+  Plex Mono. Measured in headless Chromium on 2026-10-12 from the latin
+  files at 400, with canvas measureText over a 240-character English
+  sample at 1000 px: Plex Sans sets 100.41% as wide as Liberation Sans,
+  ascent 1.025 em and descent 0.275 em; Plex Mono sets 99.98% as wide as
+  Liberation Mono, ascent 1.025 em and descent 0.275 em. Each override is
+  the face's metric over its size-adjust.
 */
 @font-face {
-  font-family: "Public Sans Fallback";
+  font-family: "IBM Plex Sans Fallback";
   src:
     local("Arial"), local("ArialMT"), local("Liberation Sans"), local("Arimo");
-  size-adjust: 103.89%;
-  ascent-override: 91.45%;
-  descent-override: 21.66%;
+  size-adjust: 100.41%;
+  ascent-override: 102.08%;
+  descent-override: 27.39%;
   line-gap-override: 0%;
 }
 
 @font-face {
-  font-family: "JetBrains Mono Fallback";
+  font-family: "IBM Plex Mono Fallback";
   src:
     local("Courier New"), local("CourierNewPSMT"), local("Liberation Mono"),
     local("Cousine");
   size-adjust: 99.98%;
-  ascent-override: 102.02%;
-  descent-override: 30%;
+  ascent-override: 102.52%;
+  descent-override: 27.5%;
   line-gap-override: 0%;
 }
 
 @font-face {
-  font-family: "Public Sans";
+  font-family: "IBM Plex Sans Variable";
   font-style: normal;
-  font-weight: 100 900;
+  font-weight: 100 700;
   font-display: swap;
-  src: url("./assets/fonts/public-sans-latin.woff2") format("woff2");
+  src: url("@fontsource-variable/ibm-plex-sans/files/ibm-plex-sans-latin-wght-normal.woff2")
+    format("woff2-variations");
   unicode-range:
     U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
     U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
@@ -74,23 +122,25 @@
 }
 
 @font-face {
-  font-family: "Public Sans";
+  font-family: "IBM Plex Sans Variable";
   font-style: normal;
-  font-weight: 100 900;
+  font-weight: 100 700;
   font-display: swap;
-  src: url("./assets/fonts/public-sans-latin-ext.woff2") format("woff2");
+  src: url("@fontsource-variable/ibm-plex-sans/files/ibm-plex-sans-latin-ext-wght-normal.woff2")
+    format("woff2-variations");
   unicode-range:
     U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
     U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
-    U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+    U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 
 @font-face {
-  font-family: "JetBrains Mono";
+  font-family: "IBM Plex Mono";
   font-style: normal;
-  font-weight: 100 800;
+  font-weight: 400;
   font-display: swap;
-  src: url("./assets/fonts/jetbrains-mono-latin.woff2") format("woff2");
+  src: url("@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-400-normal.woff2")
+    format("woff2");
   unicode-range:
     U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
     U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
@@ -98,52 +148,105 @@
 }
 
 @font-face {
-  font-family: "JetBrains Mono";
+  font-family: "IBM Plex Mono";
   font-style: normal;
-  font-weight: 100 800;
+  font-weight: 400;
   font-display: swap;
-  src: url("./assets/fonts/jetbrains-mono-latin-ext.woff2") format("woff2");
+  src: url("@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-ext-400-normal.woff2")
+    format("woff2");
   unicode-range:
     U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
     U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
-    U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+    U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-500-normal.woff2")
+    format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-ext-500-normal.woff2")
+    format("woff2");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+    U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
+    U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-600-normal.woff2")
+    format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-ext-600-normal.woff2")
+    format("woff2");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+    U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
+    U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
 
   /* Paper, ink and rules. The paper is hex: the theme-color meta and the
      manifest repeat it (src/features/shared/theme.ts, held by a test). */
-  --background: #f5f8fa;
-  --foreground: oklch(0.21 0.015 258);
-  --surface: oklch(0.955 0.005 245);
+  --background: #f8f7f4;
+  --foreground: oklch(0.2417 0.0298 269.8827);
+  --surface: oklch(0.9251 0.0071 88.645);
   /* One step past the surface, for a selected thing under the pointer only
      (DESIGN.md "Pressed Surface"); every state role keeps 5:1 on it. */
-  --surface-2: oklch(0.935 0.006 250);
-  --muted: oklch(0.48 0.012 258);
-  --rule: oklch(0.86 0.007 255);
-  --rule-strong: oklch(0.21 0.015 258);
+  --surface-2: oklch(0.91 0.0071 88.645);
+  --muted: oklch(0.5 0.0234 264.3637);
+  --rule: oklch(0.87 0.0071 88.645);
+  --rule-strong: var(--foreground);
 
   /* State roles: text-safe on paper, on surface and on surface-2 (at least 5:1). */
-  --landed: oklch(0.47 0.11 155);
-  --checking: oklch(0.48 0.13 252);
-  --waiting: oklch(0.5 0.1 70);
-  --refused: oklch(0.5 0.18 27);
+  --landed: oklch(0.46 0.11 155);
+  --checking: oklch(0.47 0.1 238);
+  --waiting: oklch(0.46 0.1 120);
+  --refused: oklch(0.49 0.1743 26.1433);
   --sealed: oklch(0.46 0.13 305);
 
   /* A control's border at 3:1 on paper (WCAG 2.2 SC 1.4.11), and the
      stroke of a placeholder that holds a row's place. */
-  --input: oklch(0.62 0.01 258);
-  --skeleton: oklch(0.8 0.008 255);
+  --input: oklch(0.6 0.0234 264.3637);
+  --skeleton: oklch(0.82 0.0071 88.645);
 
   /* Code: ink carries keywords, names and calls; strings lean teal and
-     constants olive, both too grey to be mistaken for a state. Each keeps
+     constants plum, both too grey to be mistaken for a state. Each keeps
      4.5:1 on a changed word's tint as well as on the paper. */
   --syntax-keyword: var(--foreground);
   --syntax-function: var(--foreground);
   --syntax-parameter: var(--foreground);
   --syntax-string: oklch(0.42 0.035 200);
-  --syntax-constant: oklch(0.42 0.035 110);
+  --syntax-constant: oklch(0.42 0.035 340);
   /* A step darker than muted: a changed word's tint sits under these, and
      they keep 4.5:1 on it too. */
   --syntax-comment: oklch(0.42 0.012 258);
@@ -171,44 +274,45 @@
   );
 
   /* shadcn's names, mapped onto the roles above. */
-  --card: var(--background);
+  --card: oklch(1 0 0);
   --card-foreground: var(--foreground);
-  --popover: oklch(0.995 0.002 240);
+  --popover: oklch(1 0 0);
   --popover-foreground: var(--foreground);
-  --primary: var(--foreground);
-  --primary-foreground: var(--background);
-  --secondary: var(--surface);
+  --primary: oklch(0.56 0.0309 154.9039);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.8596 0.0291 119.9919);
   --secondary-foreground: var(--foreground);
   --muted-foreground: var(--muted);
-  --accent: var(--surface);
+  --accent: oklch(0.8242 0.0221 136.6092);
   --accent-foreground: var(--foreground);
   --destructive: var(--refused);
   --border: var(--rule);
-  --ring: var(--foreground);
+  --ring: var(--primary);
   --radius: 0.125rem;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0e1114;
-    --foreground: oklch(0.94 0.005 258);
-    --surface: oklch(0.215 0.009 258);
-    --surface-2: oklch(0.25 0.01 258);
-    --muted: oklch(0.72 0.01 258);
-    --rule: oklch(0.33 0.01 258);
-    --rule-strong: oklch(0.94 0.005 258);
+:root {
+  @variant dark {
+    color-scheme: dark;
+
+    --background: #0a0a0a;
+    --foreground: oklch(0.9702 0 0);
+    --surface: oklch(0.2178 0 0);
+    --surface-2: oklch(0.245 0 0);
+    --muted: oklch(0.7058 0 0);
+    --rule: oklch(0.285 0 0);
 
     --landed: oklch(0.78 0.13 155);
-    --checking: oklch(0.76 0.11 250);
-    --waiting: oklch(0.82 0.12 78);
-    --refused: oklch(0.73 0.15 25);
+    --checking: oklch(0.76 0.11 238);
+    --waiting: oklch(0.82 0.12 120);
+    --refused: oklch(0.68 0.2078 25.3313);
     --sealed: oklch(0.76 0.11 305);
 
-    --input: oklch(0.55 0.01 258);
-    --skeleton: oklch(0.36 0.01 258);
+    --input: oklch(0.52 0 0);
+    --skeleton: oklch(0.36 0 0);
 
     --syntax-string: oklch(0.8 0.035 200);
-    --syntax-constant: oklch(0.82 0.035 110);
+    --syntax-constant: oklch(0.82 0.035 340);
     --syntax-comment: var(--muted);
     --syntax-punctuation: var(--muted);
 
@@ -235,30 +339,91 @@
       transparent
     );
 
-    --popover: oklch(0.235 0.009 258);
+    --card: oklch(0.1822 0 0);
+    --popover: oklch(0.1822 0 0);
+    --primary: oklch(0.6333 0.0309 154.9039);
+    --primary-foreground: oklch(0 0 0);
+    --secondary: oklch(0.2178 0 0);
+    --accent: oklch(0.3709 0.0248 153.9823);
   }
 }
 
 /*
-  The shell's widths, by name: a phone below `tablet`; from `tablet` a top
-  bar with the rail as a sheet; from `diffsplit` a diff may go side by
-  side; from `shell` (1120 px, so the 110% zoom of a 1280 frame keeps it)
-  the rail and the inspector are columns; from `codefacts` code pages keep
-  the inspector open beside the code.
+  The widths a page changes at, by name: a phone below `tablet`; from
+  `diffsplit` a diff may go side by side; from `nav` the top bar shows its
+  links; from `columns` a side column stands beside its main column; from
+  `shell` (1120 px, so the 110% zoom of a 1280 frame keeps it) a page takes
+  its widest gutter and its wide-only tools.
 */
 @theme {
   --breakpoint-tablet: 40rem;
   --breakpoint-diffsplit: 48rem;
+  --breakpoint-nav: 56.25rem;
+  --breakpoint-columns: 68.75rem;
   --breakpoint-shell: 70rem;
-  --breakpoint-codefacts: 90rem;
+}
+
+/*
+  The four shells' widths (DESIGN.md "Shells"), so a page names a width by
+  its job and never as a literal. Static, so each is a variable on :root
+  whether or not a utility reads it: `max-w-site`, `max-w-project` and
+  `max-w-focus` read the containers, and a column or the measure is read
+  as `w-(--column-about)`, `max-w-(--measure)` or `max-w-(--measure-page)`.
+
+  site     a centred 1360 px container with 32 px gutters
+  project  fluid to 1600 px with 28 px gutters; the about column (340 px)
+           on Overview and the file tree (280 px) on Code are its only
+           side columns
+  docs     the site's container: a 240 px nav tree, the article at the
+           measure, a 220 px "on this page"
+  focus    one 400 px card
+  filters  the asks board's filters (240 px), the one side column in the
+           site, left of the list
+  measure  prose stops at 72ch (DESIGN.md allows 72 to 80ch; 72 is the
+           docs article's cap, so one measure serves every page's prose)
+  measure-page
+           a project page's head, facts, toolbar and document body stop
+           at 56rem (Workspace), wide enough for a table beside its prose
+
+  From `columns` (1100 px) a side column stands beside its main column,
+  and below it stacks under it; from `nav` (900 px) the top bar's links
+  are shown, and below it they fold into a menu.
+
+  top-bar  the top bar's height (56 px), and the toolbar's (40 px) under
+           it; what sticks under them reads `--stick-bar` or
+           `--stick-toolbar`, each overlapping the hairline above it
+  tabs     a project's tab strip (44 px), under its header; the header
+           and tabs stick under the top bar together, and inside a
+           project's frame `--stick-bar` and `--stick-toolbar` are moved
+           down by the height they are drawn at (`--project-head`), so what
+           sticks there clears them
+*/
+@theme static {
+  --container-site: 85rem;
+  --container-project: 100rem;
+  --container-focus: 25rem;
+  --column-about: 21.25rem;
+  --column-tree: 17.5rem;
+  --column-docs-nav: 15rem;
+  --column-docs-toc: 13.75rem;
+  --column-filters: 15rem;
+  --gutter-site: 2rem;
+  --gutter-project: 1.75rem;
+  --measure: 72ch;
+  --measure-page: 56rem;
+  --top-bar: 3.5rem;
+  --toolbar: 2.5rem;
+  --tabs: 2.75rem;
+  --stick-bar: calc(var(--top-bar) - 1px);
+  --stick-toolbar: calc(var(--top-bar) + var(--toolbar) - 1px);
 }
 
 @theme inline {
   --font-sans:
-    "Public Sans", "Public Sans Fallback", ui-sans-serif, system-ui,
-    -apple-system, "Segoe UI", sans-serif;
+    "IBM Plex Sans Variable", "IBM Plex Sans Fallback", ui-sans-serif,
+    system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono:
-    "JetBrains Mono", "JetBrains Mono Fallback", ui-monospace, "SFMono-Regular",
+    "IBM Plex Mono", "IBM Plex Mono Fallback", ui-monospace, "SFMono-Regular",
     "Cascadia Mono", Menlo, monospace;
 
   /*
@@ -359,6 +524,22 @@
   }
 }
 
+/*
+  What each theme choice on /settings gives, before React can see the
+  system (ADR 0042): the head script names the system's scheme in
+  data-system, and these name the resolution the same way the component
+  does once it runs. Where the script never ran, nothing is named.
+*/
+:root[data-system="light"] [data-system-resolves="same"]::after,
+:root[data-system="dark"] [data-system-resolves="opposite"]::after {
+  content: "Light";
+}
+
+:root[data-system="dark"] [data-system-resolves="same"]::after,
+:root[data-system="light"] [data-system-resolves="opposite"]::after {
+  content: "Dark";
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -375,12 +556,12 @@
     caret-color: var(--checking);
   }
 
-  /* On a phone a decision's choices are a bar fixed above the bottom bar
-     (decision/choices.tsx): main keeps room for it at its foot, so the
-     page's last lines scroll clear of it. */
+  /* On a phone a decision's choices are a bar fixed at the foot of the
+     screen (decision/choices.tsx): main keeps room for the bar's own height
+     at its foot, so the page's last lines scroll clear of it. */
   @media (width < 40rem) {
     main:has([data-choices-bar]) {
-      padding-bottom: 10rem;
+      padding-bottom: calc(6.5rem + env(safe-area-inset-bottom));
     }
   }
 
@@ -419,11 +600,16 @@
     Pierre draws code inside shadow roots: `diffs-container` (@pierre/diffs)
     and `file-tree-container` (@pierre/trees). Each reads these variables
     from its host, so setting them here maps both onto the tokens above,
-    and both follow the media-query dark mode with them. Nothing outside
+    and both follow the resolved theme with them. Nothing outside
     them reaches in: the `code` rule above stops at the shadow root, so the
     ligatures are switched off again here.
   */
   diffs-container {
+    /* Pierre's host says `light dark`, which follows the system; this rule,
+       from outside the shadow root, wins, so its `light-dark()` colours take
+       the page's resolved theme (ADR 0042). */
+    color-scheme: inherit;
+
     /* Metrics: the mono token on Pierre's 20 px line. */
     --diffs-font-family: var(--font-mono);
     --diffs-font-size: 0.8125rem;
@@ -472,6 +658,9 @@
   }
 
   file-tree-container {
+    /* As for a diff: the page's resolved theme, not the system's. */
+    color-scheme: inherit;
+
     /* A tree is read like a list, in the UI's own face and size. */
     --trees-font-family-override: var(--font-sans);
     --trees-font-size-override: 0.875rem;

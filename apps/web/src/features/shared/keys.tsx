@@ -16,6 +16,7 @@ import {
 import type { ReactNode } from "react";
 
 import { Kbd } from "../../components/ui/kbd.tsx";
+import { browserStorage } from "./storage.ts";
 
 export interface KeyPress {
   readonly altKey: boolean;
@@ -45,8 +46,6 @@ const MOVES = {
 } as const satisfies Record<string, KeyIntent["kind"]>;
 
 const DIGIT = /^[1-9]$/u;
-
-const SHELL_WIDTH = "(min-width: 70rem)";
 
 export const intentOf = (
   press: KeyPress,
@@ -90,14 +89,12 @@ export const writeShortcuts = (storage: Storage | undefined, on: boolean) => {
   Result.try(() => storage?.setItem(SWITCH, on ? "on" : "off"));
 };
 
-const localStorageOf = (): Storage | undefined =>
-  Result.getOrUndefined(Result.try(() => globalThis.localStorage));
-
 const KEYS = [
   { does: "Show these keys", keys: ["?"] },
   { does: "Next or previous row", keys: ["j", "k"] },
   { does: "Open the focused row", keys: ["Enter"] },
   { does: "Next or previous file", keys: ["J", "K"] },
+  { does: "Go to file, in the Code tab", keys: ["t"] },
   { does: "Copy the page's numbered command", keys: ["1", "…", "9"] },
   { does: "Close, or clear the selection", keys: ["Esc"] },
 ] as const;
@@ -175,7 +172,6 @@ interface ListRegistration {
   readonly focus: (id: string) => void;
   readonly read: () => {
     readonly ids: readonly string[];
-    readonly onSelect: (id: string) => void;
   };
   focused?: string;
 }
@@ -269,7 +265,7 @@ const copyNumbered = (command: string, shown: (copied?: string) => void) =>
   );
 
 const moveTo = (list: ListRegistration, step: 1 | -1) => {
-  const { ids, onSelect } = list.read();
+  const { ids } = list.read();
   const at = list.focused === undefined ? -1 : ids.indexOf(list.focused);
 
   const next =
@@ -292,10 +288,6 @@ const moveTo = (list: ListRegistration, step: 1 | -1) => {
   if (row instanceof HTMLElement) {
     row.focus({ preventScroll: true });
     row.scrollIntoView({ block: "nearest" });
-  }
-
-  if (globalThis.matchMedia(SHELL_WIDTH).matches) {
-    onSelect(next);
   }
 };
 
@@ -376,7 +368,7 @@ export const KeysProvider = ({
 }) => {
   // The server has no storage and renders the keys on; nothing it renders
   // depends on them.
-  const [on, setOn] = useState(() => readShortcuts(localStorageOf()));
+  const [on, setOn] = useState(() => readShortcuts(browserStorage()));
   const [commands, setCommands] = useState<readonly Command[]>([]);
   const [copied, setCopied] = useState<string>();
 
@@ -398,7 +390,7 @@ export const KeysProvider = ({
 
   const turn = useCallback((next: boolean) => {
     setOn(next);
-    writeShortcuts(localStorageOf(), next);
+    writeShortcuts(browserStorage(), next);
   }, []);
 
   const numbered = useMemo(() => numberOf(commands), [commands]);
@@ -476,12 +468,11 @@ const useLatest = <A,>(value: A) => {
 };
 
 export const useListKeys = (
-  ids: readonly string[],
-  onSelect: (id: string) => void
+  ids: readonly string[]
 ): { readonly focused?: string } => {
   const registry = useContext(RegistryContext);
   const [focused, setFocused] = useState<string>();
-  const latest = useLatest({ ids, onSelect });
+  const latest = useLatest({ ids });
 
   useEffect(
     () =>

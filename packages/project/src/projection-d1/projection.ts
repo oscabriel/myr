@@ -2,6 +2,11 @@ import { TypeId } from "@effect/sql-d1/D1Client";
 import type { D1Client } from "@effect/sql-d1/D1Client";
 import { ProjectEvent } from "@repo/protocol/domain/event";
 import type { LandingView } from "@repo/protocol/domain/landing";
+import { Outcome } from "@repo/protocol/domain/outcome";
+import {
+  RECENT_LANDINGS_CAP,
+  shownRefusal,
+} from "@repo/protocol/domain/recent-landing";
 import { LedgerEntry } from "@repo/protocol/domain/visibility";
 import { keyOf, nameOfKey, ProjectKey } from "@repo/protocol/ids";
 import type { AskId, ProjectName } from "@repo/protocol/ids";
@@ -53,6 +58,12 @@ const creditedOn = (landing: Pick<LandingView, "credits">) =>
     (one, other) => one.person === other.person && one.role === other.role
   );
 
+/** Which of the tables later migrations add this database has. */
+interface Kept {
+  readonly postures: boolean;
+  readonly recent: boolean;
+}
+
 export const ProjectionD1: Layer.Layer<Projection, never, SqlClient> =
   Layer.effect(
     Projection,
@@ -66,35 +77,35 @@ export const ProjectionD1: Layer.Layer<Projection, never, SqlClient> =
           ? sql.batch(statements)
           : sql.withTransaction(Effect.all(statements));
 
-      const posturesFound = yield* Ref.make(false);
-
       // Looked for until found, so a database the migration has not reached projects as before.
-      const keepsPostures = Effect.gen(function* () {
-        if (yield* Ref.get(posturesFound)) {
-          return true;
-        }
+      const keeps = (table: string, found: Ref.Ref<boolean>) =>
+        Effect.gen(function* () {
+          if (yield* Ref.get(found)) {
+            return true;
+          }
 
-        const tables =
-          yield* sql`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'standing_postures'`;
+          const tables =
+            yield* sql`SELECT name FROM sqlite_master WHERE type = 'table' AND name = ${table}`;
 
-        yield* Ref.set(posturesFound, tables.length > 0);
+          yield* Ref.set(found, tables.length > 0);
 
-        return tables.length > 0;
-      });
+          return tables.length > 0;
+        });
+
+      const keepsPostures = keeps("standing_postures", yield* Ref.make(false));
+
+      const keepsRecent = keeps("recent_landings", yield* Ref.make(false));
 
       const isNext = (project: ProjectName, seq: number) =>
         sql`(SELECT COALESCE(MAX(seq), 0) FROM cursor WHERE project = ${keyOf(project)}) = ${seq - 1}`;
 
-      const writes = (
-        { event, project }: ProjectedEvent,
-        postures: boolean
-      ) => {
+      const writes = ({ event, project }: ProjectedEvent, kept: Kept) => {
         const next = isNext(project, event.seq);
 
         // Every row keeps the project's key, never its name.
         const key = keyOf(project);
 
-        const unkept = postures
+        const unkept = kept.postures
           ? [
               sql`DELETE FROM standing_postures
                 WHERE project = ${key} AND ${next}`,
@@ -127,8 +138,58 @@ export const ProjectionD1: Layer.Layer<Projection, never, SqlClient> =
                       DO UPDATE SET count = credits.count + 1`
               );
 
+        const wantOf = (ask: AskId) =>
+          sql`(SELECT want FROM front_page WHERE project = ${key} AND ask = ${ask})`;
+
+        const recent = (
+          statements: () => readonly Statement<object>[]
+        ): readonly Statement<object>[] => (kept.recent ? statements() : []);
+
+        // A landing or a refusal may come before or after its ask opens or closes: whichever comes second names the want.
+        const wanted = (ask: AskId, want: Statement<object> | string) =>
+          recent(() => [
+            sql`UPDATE recent_landings SET want = ${want}
+              WHERE project = ${key} AND want IS NULL
+                AND (ask = ${ask} OR opened = ${ask}) AND ${next}`,
+          ]);
+
+        const landedRow = ({ landing }: { readonly landing: LandingView }) =>
+          recent(() => {
+            const named = landing.ask ?? landing.opened;
+
+            return [
+              sql`INSERT INTO recent_landings (project, seq, at, outcome, ask, opened, sha, want)
+                SELECT ${key}, ${event.seq}, ${DateTime.formatIso(landing.landedAt)}, 'landed',
+                  ${landing.ask ?? null}, ${landing.opened ?? null}, ${landing.sha},
+                  ${named === undefined ? null : wantOf(named)}
+                WHERE ${next}
+                ON CONFLICT (project, seq) DO NOTHING`,
+            ];
+          });
+
+        const refusedRow = ({
+          ask,
+          at,
+          outcome,
+        }: {
+          readonly ask: AskId;
+          readonly at: DateTime.Utc;
+          readonly outcome: Outcome;
+        }) =>
+          Outcome.guards.Refused(outcome)
+            ? recent(() => [
+                sql`INSERT INTO recent_landings (project, seq, at, outcome, ask, want, refusals)
+                  SELECT ${key}, ${event.seq}, ${DateTime.formatIso(at)}, 'refused',
+                    ${ask}, ${wantOf(ask)},
+                    ${JSON.stringify(outcome.refusals.map(shownRefusal))}
+                  WHERE ${next}
+                  ON CONFLICT (project, seq) DO NOTHING`,
+              ])
+            : [];
+
         const changes = ProjectEvent.match(event, {
           AskClosed: ({ ask }) => [
+            ...wanted(ask, wantOf(ask)),
             sql`DELETE FROM front_page
               WHERE project = ${key} AND ask = ${ask} AND ${next}`,
             counted,
@@ -146,11 +207,13 @@ export const ProjectionD1: Layer.Layer<Projection, never, SqlClient> =
                 claimed = excluded.claimed, blocked_by = excluded.blocked_by,
                 opened_at = excluded.opened_at`,
             counted,
+            ...wanted(ask.ask, ask.want),
           ],
           Claimed: ({ ask }) => [claims(ask, 1)],
           Decided: () => unkept,
-          Judged: () => [],
+          Judged: refusedRow,
           Landed: ({ landing }) => [
+            ...landedRow({ landing }),
             sql`UPDATE projects SET landed_at = ${DateTime.formatIso(landing.landedAt)}
               WHERE project = ${key} AND ${next}`,
             ...credited(landing),
@@ -176,6 +239,13 @@ export const ProjectionD1: Layer.Layer<Projection, never, SqlClient> =
         return [listed, ...changes];
       };
 
+      // Ordered as the list reads them, so the rows kept are the rows listed.
+      const pruned = sql`DELETE FROM recent_landings WHERE rowid NOT IN (
+          SELECT rowid FROM recent_landings
+          ORDER BY at DESC, project, seq DESC
+          LIMIT ${RECENT_LANDINGS_CAP}
+        )`;
+
       const advance = (project: ProjectName, seq: number) =>
         sql`INSERT INTO cursor (project, seq)
           SELECT ${keyOf(project)}, ${seq} WHERE ${isNext(project, seq)}
@@ -188,7 +258,10 @@ export const ProjectionD1: Layer.Layer<Projection, never, SqlClient> =
         Effect.gen(function* () {
           const last = lastOf(events);
 
-          const postures = yield* keepsPostures.pipe(
+          const kept = yield* Effect.all({
+            postures: keepsPostures,
+            recent: keepsRecent,
+          }).pipe(
             Effect.mapError(
               (failed) => new ProjectionFailed({ reason: failed.message })
             )
@@ -196,9 +269,10 @@ export const ProjectionD1: Layer.Layer<Projection, never, SqlClient> =
 
           const results = yield* atomically([
             ...events.flatMap((projected) => [
-              ...writes(projected, postures),
+              ...writes(projected, kept),
               advance(projected.project, projected.event.seq),
             ]),
+            ...(kept.recent ? [pruned] : []),
             cursorsOf([...last.keys()]),
           ]).pipe(
             Effect.mapError(

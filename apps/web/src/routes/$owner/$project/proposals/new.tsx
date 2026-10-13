@@ -110,6 +110,7 @@ const Page = () => {
 };
 
 export const Route = createFileRoute("/$owner/$project/proposals/new")({
+  staticData: { shell: "focus" },
   component: Page,
   validateSearch: (search: {
     readonly about?: unknown;

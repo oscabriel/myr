@@ -1,6 +1,6 @@
 import { Brand } from "@repo/brand";
 
-import { installCommand } from "../install.ts";
+import { installCommand, pushCommand } from "../install.ts";
 import { code } from "../text.ts";
 import type { DocSource } from "./page.ts";
 import { cli, shell } from "./page.ts";
@@ -38,7 +38,7 @@ export const answerAnAsk: DocSource = {
     "",
     "## Push, and read the verdict",
     "",
-    ...shell(`git push ${Brand.slug} HEAD:main`),
+    ...shell(pushCommand),
     "",
     `The cheap checks answer in git's own output, on its \`remote:\` lines. The rest run on the platform, on the tree your answer makes once merged onto \`main\`, and arrive later: ${cli("status --project <owner>/<name>")} shows your claims and answers and where each stands, and ${cli("verdict <ask> --project <owner>/<name>")} shows the verdict. The answer's page on the web follows it live, and the verdict is also a git note on your head:`,
     "",

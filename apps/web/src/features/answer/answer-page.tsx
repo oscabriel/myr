@@ -13,7 +13,6 @@ import { ChecksFailed } from "@repo/protocol/refusal";
 import type { DateTime } from "effect";
 import { ArrowRight, ChevronDown, LockKeyhole } from "lucide-react";
 import { useState } from "react";
-import type { ReactNode } from "react";
 
 import { Region } from "../ask/fields.tsx";
 import { commitHref, shortSha } from "../code/paths.ts";
@@ -27,7 +26,6 @@ import {
   FamilyFacts,
   ProvenanceFacts,
   shortValue,
-  StateFacts,
   TerritoryFacts,
   verdictProvenance,
 } from "../shared/facts.tsx";
@@ -241,16 +239,6 @@ const Sha = ({ sha }: { readonly sha: string }) => (
   </code>
 );
 
-export const InspectorOnly = ({
-  children,
-}: {
-  readonly children: ReactNode;
-}) => (
-  <div className="border-rule flex min-w-0 flex-col border-t pt-3 first:border-t-0 first:pt-0 [[data-facts=inline]_&]:hidden">
-    {children}
-  </div>
-);
-
 const RoundsRegion = ({
   ask,
   current,
@@ -448,7 +436,7 @@ const Run = ({
         "AwaitingFinish",
         "WaitingOnParent",
       ])(verdict.outcome) ? (
-        <p className="text-body max-w-[70ch]" data-waiting="">
+        <p className="text-body max-w-(--measure)" data-waiting="">
           {waitingSentence(round)}
         </p>
       ) : null}
@@ -475,7 +463,7 @@ const Run = ({
 
     {verdict.heldBack.length === 0 ? null : (
       <Region id="answer-held-back" title="Held back">
-        <p className="text-ui text-muted-foreground max-w-[70ch]">
+        <p className="text-ui text-muted-foreground max-w-(--measure)">
           Checks the answer could not see: how many passed in each area, and the
           root of the suite the project committed to before the claim.
         </p>
@@ -548,8 +536,8 @@ const Run = ({
       </Region>
     )}
 
-    {/* Below the shell's width the inspector's facts sit above the run, so the plumbing comes here, last. */}
-    <div className="shell:hidden">
+    {/* The facts sit above the run, so the plumbing comes here, last. */}
+    <div>
       <ProvenanceFacts entries={verdictProvenance(verdict, now)} />
     </div>
   </>
@@ -575,7 +563,6 @@ const AnswerFacts = ({
   parent,
   progress,
   states,
-  subject,
   verdict,
   viewer,
 }: {
@@ -584,7 +571,6 @@ const AnswerFacts = ({
   readonly parent: Ask | undefined;
   readonly progress: AskProgress | undefined;
   readonly states: ReadonlyMap<AskId, AskProgress>;
-  readonly subject: StatusSubject | undefined;
   readonly verdict: Verdict | undefined;
   readonly viewer: Handle | undefined;
 }) => {
@@ -596,11 +582,6 @@ const AnswerFacts = ({
 
   return (
     <>
-      {subject === undefined ? null : (
-        <InspectorOnly>
-          <StateFacts subject={subject} />
-        </InspectorOnly>
-      )}
       {landed ? null : (
         <ClaimFacts
           now={now}
@@ -623,11 +604,6 @@ const AnswerFacts = ({
         />
       )}
       <TerritoryFacts ask={ask} />
-      {verdict === undefined ? null : (
-        <InspectorOnly>
-          <ProvenanceFacts entries={verdictProvenance(verdict, now)} />
-        </InspectorOnly>
-      )}
     </>
   );
 };
@@ -711,7 +687,6 @@ export const AnswerView = ({
           parent={parent}
           progress={progress}
           states={states}
-          subject={subject}
           verdict={verdict}
           viewer={viewer}
         />

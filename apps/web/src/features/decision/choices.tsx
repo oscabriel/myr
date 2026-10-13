@@ -159,11 +159,12 @@ export const DecisionRecord = ({
   </section>
 );
 
-// Fixed, not sticky, on a phone: a bar that only stuck would stay below the
-// screen while its decision starts low on the page.
-export const stuckAboveBar = (node: ReactNode) => (
+// Fixed at the foot of the screen, not sticky, on a phone: a bar that only
+// stuck would stay below the screen while its decision starts low on the page.
+// Its own padding clears the safe area, so no page shows beneath it.
+export const stuckAtFoot = (node: ReactNode) => (
   <div
-    className="border-rule bg-background tablet:static tablet:border-t-0 tablet:p-0 fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-[6] border-t px-4 py-2"
+    className="border-rule bg-background tablet:static tablet:border-t-0 tablet:p-0 fixed inset-x-0 bottom-0 z-[6] border-t px-4 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]"
     data-choices-bar=""
   >
     {node}

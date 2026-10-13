@@ -17,7 +17,8 @@ import { HandleLink } from "../shared/handle.tsx";
 import { AppLink } from "../shared/link.tsx";
 import { StateMarkIcon } from "../shared/marks.tsx";
 import { answerPath, askPath } from "../shared/paths.ts";
-import { GUTTER, MEASURE, Workspace } from "../shared/shell/workspace.tsx";
+import { GUTTER } from "../shared/shell/gutter.ts";
+import { MEASURE, Workspace } from "../shared/shell/workspace.tsx";
 import { When } from "../shared/time.tsx";
 import { askOf } from "../why/rows.ts";
 import { drawnFiles, statsOf } from "./diff-model.ts";
@@ -25,6 +26,7 @@ import type { DiffStats, DrawnFile } from "./diff-model.ts";
 import { DiffPane, PANE_SCROLLER } from "./diff-pane.tsx";
 import { commitHref, shortSha, treeHref } from "./paths.ts";
 import { ChangeCounts, PlainDiff } from "./plain-diff.tsx";
+import { pinnedRev } from "./rev.ts";
 
 const LINK = "decoration-rule underline hover:decoration-current";
 
@@ -99,11 +101,13 @@ export const LandingStatus = ({
 };
 
 const GitLine = ({
+  at,
   commit,
   now,
   project,
   stats,
 }: {
+  readonly at: string;
   readonly commit: Commit;
   readonly now: DateTime.Utc;
   readonly project: ProjectName;
@@ -125,7 +129,7 @@ const GitLine = ({
             {index === 0 ? null : ", "}
             <AppLink
               className={`text-mono font-mono ${LINK}`}
-              to={commitHref(project, parent)}
+              to={commitHref(project, pinnedRev(at, parent))}
             >
               {shortSha(parent)}
             </AppLink>
@@ -134,7 +138,7 @@ const GitLine = ({
       </>
     )}
     {" · "}
-    <AppLink className={LINK} to={treeHref(project, commit.sha)}>
+    <AppLink className={LINK} to={treeHref(project, pinnedRev(at, commit.sha))}>
       Browse files
     </AppLink>
     {" · "}
@@ -294,7 +298,7 @@ export const DiffToolbar = ({
 }) => (
   <>
     {files === undefined ? null : (
-      <div className="shell:hidden flex shrink-0">{files}</div>
+      <div className="columns:hidden flex shrink-0">{files}</div>
     )}
     <fieldset className="border-input diffsplit:flex m-0 hidden min-w-0 border p-0">
       <legend className="sr-only">Diff layout</legend>
@@ -338,6 +342,8 @@ export const DiffToolbar = ({
 );
 
 export interface CommitViewProps {
+  /** The fork the commit was read in (`@<handle>/<ask>`); its links stay inside it. */
+  readonly at?: string | undefined;
   readonly diff: CommitDiff;
   readonly now: DateTime.Utc;
   readonly project: ProjectName;
@@ -348,15 +354,14 @@ export interface CommitViewProps {
   readonly onFold?: ((path: string, folded: boolean) => void) | undefined;
   readonly onFoldAll?: ((folded: boolean) => void) | undefined;
   readonly drawing?: ReactNode;
-  readonly files?: ReactNode;
   readonly drawn?: readonly DrawnFile[] | undefined;
 }
 
 export const CommitView = ({
+  at = "main",
   diff,
   drawing,
   drawn: parsed,
-  files: filesButton,
   folded,
   now,
   onFold,
@@ -382,7 +387,13 @@ export const CommitView = ({
         commit.landing === undefined ? "This commit" : "This landing"
       }
       meta={
-        <GitLine commit={commit} now={now} project={project} stats={stats} />
+        <GitLine
+          at={at}
+          commit={commit}
+          now={now}
+          project={project}
+          stats={stats}
+        />
       }
       state={
         commit.landing === undefined ? undefined : (
@@ -397,7 +408,7 @@ export const CommitView = ({
           <LandingStatus commit={commit} project={project} />
           {body === "" ? null : (
             <p
-              className="text-body max-w-[70ch] [overflow-wrap:anywhere] whitespace-pre-wrap"
+              className="text-body max-w-(--measure) [overflow-wrap:anywhere] whitespace-pre-wrap"
               data-body=""
               data-said=""
             >
@@ -414,7 +425,6 @@ export const CommitView = ({
       toolbar={
         <DiffToolbar
           allFolded={allFolded}
-          files={filesButton}
           onFoldAll={onFoldAll}
           onSplit={onSplit}
           split={split}

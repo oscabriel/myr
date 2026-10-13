@@ -25,7 +25,8 @@ export const FilesButton = ({
         variant="outline"
       >
         <FolderTree aria-hidden="true" strokeWidth={1.75} />
-        Files
+        {/* Not "Files": the bar's toggle beside it is Files | Commits. */}
+        {commit ? "Changed files" : "Tree"}
       </Button>
       {FilesSheet === undefined || !open ? null : (
         <Suspense fallback={null}>

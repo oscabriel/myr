@@ -24,16 +24,18 @@ const LABEL = "text-label text-muted-foreground";
 
 export const BandLinks = ({
   project,
+  rev,
   row,
   view,
 }: {
   readonly project: ProjectName;
+  readonly rev: string;
   readonly row: WhyRow;
   readonly view: WhyView;
 }) => {
   const prior = Option.getOrUndefined(
     Option.flatMap(row.commit, (commit) =>
-      priorHref(project, commit, view.path)
+      priorHref(project, commit, view.path, rev)
     )
   );
 
@@ -64,11 +66,13 @@ export const BandLinks = ({
 export const WhyBand = ({
   now,
   project,
+  rev,
   row,
   view,
 }: {
   readonly now: DateTime.Utc;
   readonly project: ProjectName;
+  readonly rev: string;
   readonly row: WhyRow;
   readonly view: WhyView;
 }) => (
@@ -82,10 +86,11 @@ export const WhyBand = ({
         landing={row.landing}
         now={now}
         project={project}
+        rev={rev}
         sha={row.range.sha}
       />
     </p>
-    <BandLinks project={project} row={row} view={view} />
+    <BandLinks project={project} rev={rev} row={row} view={view} />
   </div>
 );
 

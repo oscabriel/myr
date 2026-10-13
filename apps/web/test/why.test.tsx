@@ -363,7 +363,15 @@ describe("a line's landing, in the line dialog", () => {
 describe("the why page's drawing", () => {
   it("draws the file with @pierre/diffs", () => {
     expect(
-      markupOf(<WhyCode now={now} project={datekit} text={TEXT} view={view} />)
+      markupOf(
+        <WhyCode
+          now={now}
+          project={datekit}
+          rev="main"
+          text={TEXT}
+          view={view}
+        />
+      )
     ).toContain("<diffs-container");
   });
 });
@@ -465,4 +473,48 @@ describe("the why page's read", () => {
         expect((yield* Ref.get(asked)).files).toStrictEqual(["main", AT]);
       })
   );
+});
+
+const inFork = (sha: string) => `%40bob%2Fparse-iso%3A${sha}`;
+
+describe("why, in an answer fork", () => {
+  const file = Schema.decodeSync(FileView)({
+    at: AT,
+    binary: false,
+    path: "src/format.ts",
+    sha: "c".repeat(40),
+    size: TEXT.length,
+    text: TEXT,
+    truncated: false,
+  });
+
+  it("links each line's commit, one step back and the permalink inside the fork", () => {
+    const hrefs = hrefsOf(
+      markupOf(
+        <WhyLines
+          file={file}
+          now={now}
+          project={datekit}
+          rev="@bob/parse-iso"
+          text={TEXT}
+          view={view}
+        />
+      )
+    );
+
+    expect(hrefs).toStrictEqual(
+      expect.arrayContaining([
+        `/oscabriel/datekit/commit/${inFork(LANDED)}`,
+        `/oscabriel/datekit/why/${inFork(IMPORTED)}/src/format.ts`,
+        `/oscabriel/datekit/why/${inFork(AT)}/src/format.ts`,
+      ])
+    );
+    expect(
+      hrefs.filter((href) =>
+        [LANDED, IMPORTED, AT].some(
+          (sha) => href.includes(`/${sha}`) && !href.includes("%3A")
+        )
+      )
+    ).toStrictEqual([]);
+  });
 });

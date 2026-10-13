@@ -46,6 +46,14 @@ const table = [
   },
   {
     audience: "public",
+    cli: "none",
+    errors: [],
+    flags: "RI",
+    on: "RMW",
+    tag: "recentLandings",
+  },
+  {
+    audience: "public",
     cli: "front",
     errors: [],
     flags: "RI",
@@ -175,7 +183,7 @@ const table = [
   {
     audience: "public",
     cli: "none",
-    errors: ["UnknownProject", "UnknownCommit"],
+    errors: ["UnknownProject", "UnknownCommit", "UnknownRevision"],
     flags: "RI",
     on: "RW",
     tag: "showCommit",
@@ -615,7 +623,7 @@ describe("the group a surface serves", () => {
       Exclude<Contract["_tag"], UncappedRead | "evidence" | "setEnv" | "watch">
     >();
     expectTypeOf<TagOn<"cli">>().toEqualTypeOf<
-      Exclude<Contract["_tag"], CodeRead | "watch">
+      Exclude<Contract["_tag"], CodeRead | "recentLandings" | "watch">
     >();
   });
 

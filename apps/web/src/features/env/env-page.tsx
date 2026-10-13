@@ -1,24 +1,22 @@
 /**
- * Never a value, and nothing that would take or show one: `setEnv` is RPC and
- * CLI alone. Lint keeps "shape" out of code names, so the prop is `schema`.
+ * The Visibility tab's Environment: each key's type, sensitivity, when it is
+ * required and whether it is set. Never a value, and nothing that would take
+ * or show one: `setEnv` is RPC and CLI alone. Lint keeps "shape" out of code
+ * names, so the prop is `schema`.
  */
 import { Brand } from "@repo/brand";
 import type { EnvItem, EnvSchemaView } from "@repo/protocol/domain/env";
 import type { ProjectName } from "@repo/protocol/ids";
-import type { Posture } from "@repo/protocol/posture";
 import { DateTime } from "effect";
 import { LockKeyhole } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { Definition, Definitions } from "../ask/fields.tsx";
+import { Definition, Definitions, Region } from "../ask/fields.tsx";
 import { commitHref, shortSha } from "../code/paths.ts";
-import { postureLabel } from "../project/posture-label.ts";
 import { CommandLine } from "../shared/command.tsx";
 import { EmptyState } from "../shared/empty.tsx";
-import { FactBlock, PostureFacts } from "../shared/facts.tsx";
 import { HandleLink } from "../shared/handle.tsx";
 import { AppLink } from "../shared/link.tsx";
-import { Workspace } from "../shared/shell/workspace.tsx";
 import { distanceInWords, When } from "../shared/time.tsx";
 
 const VARLOCK = "https://varlock.dev";
@@ -199,12 +197,17 @@ const ItemRow = ({
   >
     <ItemLine item={item} now={now} />
     {item.description === undefined || item.description === "" ? null : (
-      <p className="max-w-[70ch] text-pretty">{item.description}</p>
+      <p className="max-w-(--measure) text-pretty">{item.description}</p>
     )}
     <Definitions label={`Env item ${item.key}`}>
       {item.type === undefined ? null : (
         <Definition term="Type">
           <Code>{item.type}</Code>
+        </Definition>
+      )}
+      {item.sensitive ? null : (
+        <Definition term="Sensitive">
+          No. The platform holds no value for it.
         </Definition>
       )}
       <Definition term="Required">{requiredWords(item.required)}</Definition>
@@ -226,12 +229,13 @@ const ItemRow = ({
 );
 
 const Caption = () => (
-  <>
-    env shape:{" "}
+  <p className="text-ui text-muted-foreground max-w-(--measure)">
+    Declared in{" "}
     <a className={LINK} href={VARLOCK} rel="noreferrer">
       varlock&apos;s <Code>.env.schema</Code> format
     </a>
-  </>
+    . Values are never shown.
+  </p>
 );
 
 const Read = ({
@@ -249,97 +253,65 @@ const Read = ({
   </div>
 );
 
-const SetValueFacts = ({ project }: { readonly project: ProjectName }) => (
-  <FactBlock label="Set a value">
+const WhereRead = ({ schema }: { readonly schema: EnvSchemaView }) => (
+  <div className="flex flex-col gap-1">
+    <p className="text-label text-muted-foreground">Where it was read</p>
+    <dl aria-label="Where the environment was read" className="flex flex-col">
+      <Read term="File">
+        <Code>{schema.file}</Code>
+      </Read>
+      <Read term="At">
+        <AppLink
+          className={`text-mono font-mono ${LINK}`}
+          title={schema.at}
+          to={commitHref(schema.project, schema.at)}
+        >
+          {shortSha(schema.at)}
+        </AppLink>
+        , landed
+      </Read>
+      {schema.currentEnvKey === undefined ? null : (
+        <Read term="Environment">
+          chosen by <Code>{schema.currentEnvKey}</Code>
+        </Read>
+      )}
+      {schema.imports.length === 0 ? null : (
+        <Read term="Imports">
+          {schema.imports.join(", ")} (recorded, not merged)
+        </Read>
+      )}
+    </dl>
+  </div>
+);
+
+const SetValue = ({ project }: { readonly project: ProjectName }) => (
+  <div className="flex flex-col gap-2">
     <p className="text-ui text-muted-foreground">
-      A maintainer sets one from a terminal; nobody reads it back.
+      A maintainer sets a sensitive value from a terminal; nobody reads it back.
     </p>
     <CommandLine
       command={`${Brand.cli} env set <KEY> --project ${project} --yes`}
       numbered
     />
-  </FactBlock>
+  </div>
 );
 
-const PostureOf = ({
-  posture,
-  project,
-}: {
-  readonly posture: Posture | undefined;
-  readonly project: ProjectName;
-}) =>
-  posture === undefined ? null : (
-    <PostureFacts
-      label={postureLabel(posture)}
-      posture={posture}
-      project={project}
-    />
-  );
-
-const Facts = ({
-  posture,
-  schema,
-}: {
-  readonly posture: Posture | undefined;
-  readonly schema: EnvSchemaView;
-}) => (
-  <>
-    <FactBlock label="Where it was read">
-      <dl aria-label="Where the env shape was read" className="flex flex-col">
-        <Read term="File">
-          <Code>{schema.file}</Code>
-        </Read>
-        <Read term="At">
-          <AppLink
-            className={`text-mono font-mono ${LINK}`}
-            title={schema.at}
-            to={commitHref(schema.project, schema.at)}
-          >
-            {shortSha(schema.at)}
-          </AppLink>
-          , landed
-        </Read>
-        {schema.currentEnvKey === undefined ? null : (
-          <Read term="Environment">
-            chosen by <Code>{schema.currentEnvKey}</Code>
-          </Read>
-        )}
-        {schema.imports.length === 0 ? null : (
-          <Read term="Imports">
-            {schema.imports.join(", ")} (recorded, not merged)
-          </Read>
-        )}
-      </dl>
-    </FactBlock>
-    <SetValueFacts project={schema.project} />
-    <PostureOf posture={posture} project={schema.project} />
-  </>
-);
-
-export const EnvView = ({
+const Items = ({
   now,
-  posture,
   schema,
 }: {
   readonly now: DateTime.Utc;
-  readonly posture?: Posture | undefined;
   readonly schema: EnvSchemaView;
 }) => {
   const { items } = schema;
   const seen = readAt(schema, now);
 
   return (
-    <Workspace
-      facts={<Facts posture={posture} schema={schema} />}
-      factsHeading="This env shape"
-      meta={<Caption />}
-      status={
-        <p className="text-want" data-env-status="">
-          {`${plural(items.length, "item", "items")} · ${sensitiveWords(items, seen)}`}
-        </p>
-      }
-      title="Env shape"
-    >
+    <>
+      <p className="text-want" data-env-status="">
+        {`${plural(items.length, "item", "items")} · ${sensitiveWords(items, seen)}`}
+      </p>
+      <WhereRead schema={schema} />
       {items.length === 0 ? (
         <EmptyState title="No env items: the landed .env.schema declares none, or the project commits none." />
       ) : (
@@ -349,19 +321,30 @@ export const EnvView = ({
           ))}
         </ol>
       )}
-    </Workspace>
+      <SetValue project={schema.project} />
+    </>
   );
 };
 
-export const NothingLanded = ({
+/** `schema` is undefined until the project's main first lands: there is no .env.schema to read before it. */
+export const EnvironmentRegion = ({
+  now,
   project,
+  schema,
 }: {
+  readonly now: DateTime.Utc;
   readonly project: ProjectName;
+  readonly schema: EnvSchemaView | undefined;
 }) => (
-  <Workspace meta={<Caption />} title="Env shape">
-    <EmptyState
-      command={`${Brand.cli} env shape --project ${project}`}
-      title={`Nothing has landed in ${project} yet, so there is no .env.schema to read. Its env shape appears here once its main lands.`}
-    />
-  </Workspace>
+  <Region id="environment" title="Environment">
+    <Caption />
+    {schema === undefined ? (
+      <EmptyState
+        command={`${Brand.cli} env shape --project ${project}`}
+        title={`Nothing has landed in ${project} yet, so there is no .env.schema to read. Its environment appears here once its main lands.`}
+      />
+    ) : (
+      <Items now={now} schema={schema} />
+    )}
+  </Region>
 );

@@ -134,6 +134,7 @@ const everyMethod = (api: ProjectApi) =>
       api.land(bob, { base: sha, head: sha, message: "Tidy", requestId })
     ),
     landing: settled("landing", api.landing(anyone, sha)),
+    landingCount: settled("landingCount", api.landingCount()),
     landings: settled("landings", api.landings([sha])),
     layerAccess: settled("layerAccess", api.layerAccess(alice, layer)),
     layerFacts: settled("layerFacts", api.layerFacts(bob)),

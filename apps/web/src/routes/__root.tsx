@@ -1,4 +1,5 @@
-import { useAtomValue } from "@effect/atom-react";
+import sansFont from "@fontsource-variable/ibm-plex-sans/files/ibm-plex-sans-latin-wght-normal.woff2?url";
+import monoFont from "@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-400-normal.woff2?url";
 import { Brand } from "@repo/brand";
 import {
   createRootRoute,
@@ -9,19 +10,16 @@ import {
 } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { env } from "cloudflare:workers";
-import { AsyncResult } from "effect/reactivity";
+import { lazy, Suspense } from "react";
 import type { ReactNode } from "react";
 
-import monoFont from "../assets/fonts/jetbrains-mono-latin.woff2?url";
-import sansFont from "../assets/fonts/public-sans-latin.woff2?url";
-import { projectsAtom } from "../client/front.ts";
-import { todayAtom } from "../client/today.ts";
+import { useProjectList } from "../client/front.ts";
 import { TooltipProvider } from "../components/ui/tooltip.tsx";
 import { MANIFEST_PATH } from "../features/agents/manifest.ts";
 import { useSignedIn } from "../features/auth/session-slot.tsx";
 import { AppShell } from "../features/shared/shell/app-shell.tsx";
-import { RailCount } from "../features/shared/shell/rail.tsx";
-import { themeColors } from "../features/shared/theme.ts";
+import type { ShellReads } from "../features/shared/shell/context.ts";
+import { THEME_SCRIPT, themeColors } from "../features/shared/theme.ts";
 
 import styles from "../styles.css?url";
 
@@ -32,27 +30,36 @@ const siteFacts = createServerFn({ method: "GET" }).handler(() => ({
 }));
 
 // Rendered into the head directly, not through `rootHead`: both metas are named `theme-color`,
-// and TanStack's `HeadContent` keeps one meta per name.
-export const ThemeColors = () => (
+// and TanStack's `HeadContent` keeps one meta per name. Each meta names its scheme's paper for a
+// page whose script never runs, so they sit in a noscript: React's hydration matches a meta by its
+// content and adds a fresh one beside any the script changed, and the browser takes the first that
+// matches. The script (ADR 0042) sets `data-theme` on `<html>` and owns the one live `theme-color`
+// meta, before the body is parsed, so nothing paints in the other theme. `<html>` takes no
+// hydration warning for the attribute.
+export const ThemeHead = () => (
   <>
-    <meta
-      content={themeColors.light}
-      media="(prefers-color-scheme: light)"
-      name="theme-color"
-    />
-    <meta
-      content={themeColors.dark}
-      media="(prefers-color-scheme: dark)"
-      name="theme-color"
-    />
+    <noscript>
+      <meta
+        content={themeColors.light}
+        media="(prefers-color-scheme: light)"
+        name="theme-color"
+      />
+      <meta
+        content={themeColors.dark}
+        media="(prefers-color-scheme: dark)"
+        name="theme-color"
+      />
+    </noscript>
+    {/* oxlint-disable-next-line react/no-danger -- the theme must apply before first paint, so its script is inline and verbatim (THEME_SCRIPT_SOURCE is its hash); the text is the module's own constant, never input */}
+    <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
   </>
 );
 
 const Document = ({ children }: Readonly<{ children: ReactNode }>) => (
-  <html lang="en">
+  <html lang="en" suppressHydrationWarning>
     <head>
       <HeadContent />
-      <ThemeColors />
+      <ThemeHead />
     </head>
     <body>
       {children}
@@ -61,45 +68,39 @@ const Document = ({ children }: Readonly<{ children: ReactNode }>) => (
   </html>
 );
 
-const railToday = todayAtom();
+// Fetched, with its read, only in a signed-in reader's browser once the page is up: no page's first load carries
+// the inbox's client, and a signed-out reader never asks for it.
+const InboxCount = import.meta.env.SSR
+  ? undefined
+  : lazy(() => import("../features/account/inbox-count.tsx"));
 
-const TodayWaiting = () => {
-  const today = useAtomValue(railToday);
-
-  if (!AsyncResult.isSuccess(today)) {
-    return null;
-  }
-
-  const waiting = today.value.decisions.length + today.value.overflow;
-
-  return waiting === 0 ? null : (
-    <RailCount count={waiting} of="decisions waiting" />
-  );
-};
-
-const TodayCount = () => {
+const LaterInboxCount = () => {
   const hydrated = useHydrated();
   const signedIn = useSignedIn();
 
-  return hydrated && signedIn ? <TodayWaiting /> : null;
+  return hydrated && signedIn && InboxCount !== undefined ? (
+    <Suspense fallback={null}>
+      <InboxCount />
+    </Suspense>
+  ) : null;
 };
 
-const Root = () => {
-  const listed = useAtomValue(projectsAtom);
+// Mounted only while the search is open: no page reads the project list for the shell.
+const ReadProjects: ShellReads["ReadProjects"] = ({ children }) =>
+  children(useProjectList());
 
-  return (
-    <TooltipProvider>
-      <AppShell
-        projects={
-          AsyncResult.isSuccess(listed) ? listed.value.projects : undefined
-        }
-        todayCount={<TodayCount />}
-      >
-        <Outlet />
-      </AppShell>
-    </TooltipProvider>
-  );
+const reads: ShellReads = {
+  ReadProjects,
+  inboxCount: <LaterInboxCount />,
 };
+
+const Root = () => (
+  <TooltipProvider>
+    <AppShell reads={reads}>
+      <Outlet />
+    </AppShell>
+  </TooltipProvider>
+);
 
 export const SITE_DESCRIPTION =
   "A git platform where a project says what it wants as asks, anyone may answer, and a change lands on main only by passing a typed gate, with credit for every person involved.";

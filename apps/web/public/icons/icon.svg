@@ -1,6 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" fill="#f5f8fa"/>
-  <rect x="136" y="148" width="240" height="14" fill="#14191f"/>
-  <rect x="136" y="176" width="240" height="14" fill="#14191f"/>
-  <path d="M170 292 L230 352 L346 236" fill="none" stroke="#106c3e" stroke-width="40" stroke-linecap="square" stroke-linejoin="miter"/>
+  <!-- The repeat button emoji, drawn as text by the reader's emoji font, then set in the palette: its greys
+       mapped to the ink, the sage primary and white, so no platform's own colour (Noto's is orange) shows. -->
+  <filter id="palette" color-interpolation-filters="sRGB">
+    <feColorMatrix type="saturate" values="0"/>
+    <feComponentTransfer>
+      <feFuncR type="table" tableValues="0.102 0.404 0.404 1"/>
+      <feFuncG type="table" tableValues="0.122 0.478 0.478 1"/>
+      <feFuncB type="table" tableValues="0.180 0.427 0.427 1"/>
+    </feComponentTransfer>
+  </filter>
+  <rect width="512" height="512" fill="#f8f7f4"/>
+  <text x="256" y="256" font-size="240" text-anchor="middle" dominant-baseline="central" filter="url(#palette)" font-family="'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif">🔁</text>
 </svg>

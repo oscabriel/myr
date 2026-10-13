@@ -608,6 +608,26 @@ export const describeProjectStore = (
     );
 
     it.effect(
+      "counts every landing, past the snapshot's newest 50, each sha once",
+      () =>
+        Effect.gen(function* () {
+          const store = yield* ProjectStore;
+          const before = yield* store.landingCount();
+
+          const landings = Array.from({ length: 51 }, (_, n) =>
+            landingOf(n + 1)
+          );
+
+          yield* store.commit({ landings: decodedAll(LandingRow, landings) });
+          yield* store.commit({
+            landings: decodedAll(LandingRow, [landingOf(51)]),
+          });
+
+          expect([before, yield* store.landingCount()]).toStrictEqual([0, 51]);
+        }).pipe(Effect.provide(layer))
+    );
+
+    it.effect(
       "loads layers, attempts, ledger entries and write-only values, each replaced under its key",
       () =>
         Effect.gen(function* () {

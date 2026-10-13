@@ -116,6 +116,15 @@ export const remember = <A>(
     yield* cache.through(key, Effect.succeedSome(value), { heavy: true });
   });
 
+/** A fork's reads keep nothing: the store is keyed under a canonical repo alone. */
+export const keptOnlyIfCanonical = <A, E, R>(
+  at: { readonly canonical: boolean },
+  read: Effect.Effect<A, E, R>
+): Effect.Effect<A, E, R> =>
+  at.canonical
+    ? read
+    : Effect.provideService(read, CodeStore, CodeStore.defaultValue());
+
 /** A failure is never kept. */
 export const throughHistory = <A, E, R>(
   kept: Kept<A>,

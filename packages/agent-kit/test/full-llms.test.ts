@@ -3,6 +3,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import type { ProjectEvent } from "@repo/protocol/domain/event";
 import type { ProjectListing } from "@repo/protocol/domain/front-page";
+import { RECENT_LANDINGS_CAP } from "@repo/protocol/domain/recent-landing";
 import { ExitCode } from "@repo/protocol/exit-code";
 import { ProjectName } from "@repo/protocol/ids";
 import { groups } from "@repo/protocol/refusal";
@@ -189,6 +190,14 @@ describe(fullLlms, () => {
         (tag) => !events.some((line) => line.startsWith(`- \`${tag}\`: `))
       )
     ).toStrictEqual([]);
+  });
+
+  it("names the MCP tool that lists the latest landings across projects, its cap, and what it shows of a refusal", () => {
+    const landed = section("How a landing happens").join("\n");
+
+    expect(landed).toContain("`recentLandings`");
+    expect(landed).toContain(`at most ${RECENT_LANDINGS_CAP}`);
+    expect(landed).toContain("its tag and its area");
   });
 
   it("names the repos a person meets by their patterns", () => {

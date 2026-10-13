@@ -14,7 +14,7 @@ import { EmptyState } from "../shared/empty.tsx";
 import { FactBlock } from "../shared/facts.tsx";
 import { HandleLink } from "../shared/handle.tsx";
 import { AppLink } from "../shared/link.tsx";
-import { ledgerPath } from "../shared/paths.ts";
+import { LEDGER_ANCHOR, visibilityPath } from "../shared/paths.ts";
 import { Workspace } from "../shared/shell/workspace.tsx";
 
 type Vouches = PublicPolicy["vouches"];
@@ -170,7 +170,7 @@ const Vouching = ({
 
   return (
     <Region id="vouching" title="Vouching">
-      <p className="max-w-[70ch]">{vouchModes[vouch.mode]}</p>
+      <p className="max-w-(--measure)">{vouchModes[vouch.mode]}</p>
       {vouches.length === 0 ? (
         <p className="text-ui">
           <Code>{vouch.file}</Code> vouches for nobody and denounces nobody.
@@ -233,7 +233,7 @@ const Limits = ({ policy }: { readonly policy: PublicPolicy }) => {
 
 const Agents = ({ policy }: { readonly policy: PublicPolicy }) => (
   <Region id="agents" title="Agents">
-    <p className="max-w-[70ch]">
+    <p className="max-w-(--measure)">
       {policy.agents === "trailer" ? (
         <>
           Each landing names the agents its people worked through, in an{" "}
@@ -282,7 +282,11 @@ const LayersLine = ({
         </Fragment>
       ))}
       {". Who reads and writes each, and its history, are on "}
-      <AppLink className={LINK} to={ledgerPath(project)}>
+      <AppLink
+        className={LINK}
+        hash={LEDGER_ANCHOR}
+        to={visibilityPath(project)}
+      >
         the ledger
       </AppLink>
       .
@@ -312,7 +316,7 @@ const Evaluated = ({
 }) => (
   <>
     {policy.source === "defaults" ? (
-      <p className="max-w-[70ch]" data-source="defaults">
+      <p className="max-w-(--measure)" data-source="defaults">
         {`This project has no ${PROJECT_FILE}: the person who set it up decides everything, under the platform's defaults.`}
       </p>
     ) : null}
@@ -351,7 +355,7 @@ const Pending = ({
   >
     {pending.reason === "noConfig" ? (
       <>
-        <p className="max-w-[70ch] font-medium">
+        <p className="max-w-(--measure) font-medium">
           <NotEvaluated at={pending.at} project={project} />
           {": the project has no "}
           <Code>{CONFIG_DIR}</Code>
@@ -359,7 +363,7 @@ const Pending = ({
             " folder, and the defaults need a test command that the platform could not find in its CI or package files."
           }
         </p>
-        <p className="text-ui max-w-[70ch]">
+        <p className="text-ui max-w-(--measure)">
           {"To make it evaluate, a maintainer lands a "}
           <Code>{PROJECT_FILE}</Code>
           {
@@ -372,7 +376,7 @@ const Pending = ({
       </>
     ) : (
       <>
-        <p className="max-w-[70ch] font-medium">
+        <p className="max-w-(--measure) font-medium">
           <NotEvaluated at={pending.at} project={project} />
           {": "}
           <CodeLink to={treeHref(project, pending.at, Brand.configDir)}>
@@ -380,7 +384,7 @@ const Pending = ({
           </CodeLink>
           {` at ${shortSha(pending.at)} did not evaluate.`}
         </p>
-        <p className="text-ui max-w-[70ch]">
+        <p className="text-ui max-w-(--measure)">
           {`Fix it by landing a change to ${CONFIG_DIR}.`}
         </p>
       </>

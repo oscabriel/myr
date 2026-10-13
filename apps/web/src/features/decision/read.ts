@@ -16,8 +16,8 @@ import { Refusal } from "@repo/protocol/refusal";
 import { notFound } from "@tanstack/react-router";
 import { DateTime, Effect, Exit, Option, Schema, Stream } from "effect";
 
+import { findDecision, readOfCause, TodayRead } from "../inbox/decisions.ts";
 import { askStates } from "../shared/ask-progress.ts";
-import { findDecision, readOfCause, TodayRead } from "../today/read.ts";
 
 export const Placed = Schema.Struct({
   line: Schema.Int,

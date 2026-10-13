@@ -10,7 +10,7 @@ import { Effect, Option, Schema } from "effect";
 import type { CodeProject } from "../code.ts";
 import { CodeCache } from "./cache.ts";
 import { versionAt } from "./file-walk.ts";
-import { commitAt, resolveRev } from "./revision.ts";
+import { commitAt, resolveAt } from "./revision.ts";
 import { entryAt } from "./tree.ts";
 
 export const TEXT_CAP = 1024 * 1024;
@@ -137,9 +137,9 @@ export const fileView = (
   path: RepoPath
 ): Effect.Effect<FileView, UnknownRevision | UnknownPath, RepoHost> =>
   Effect.gen(function* () {
-    const commit = yield* resolveRev(project, at);
+    const { commit, repo } = yield* resolveAt(project, at);
 
-    const whole = yield* wholeAt(project.repo, commit, path).pipe(Effect.orDie);
+    const whole = yield* wholeAt(repo, commit, path).pipe(Effect.orDie);
 
     if (Option.isSome(whole)) {
       return viewOf(
@@ -150,12 +150,12 @@ export const fileView = (
       );
     }
 
-    const { tree } = yield* commitAt(project.repo, commit).pipe(
+    const { tree } = yield* commitAt(repo, commit).pipe(
       Effect.flatMap(Effect.fromOption),
       Effect.orDie
     );
 
-    const entry = yield* entryAt(project.repo, tree, path).pipe(Effect.orDie);
+    const entry = yield* entryAt(repo, tree, path).pipe(Effect.orDie);
 
     if (Option.isNone(entry) || entry.value.type !== "blob") {
       return yield* new UnknownPath({ commit, path });
@@ -163,7 +163,7 @@ export const fileView = (
 
     const sha = BlobSha.make(entry.value.sha);
 
-    const contents = yield* contentsOf(project.repo, sha).pipe(
+    const contents = yield* contentsOf(repo, sha).pipe(
       Effect.orDie,
       Effect.flatMap(Effect.fromOption),
       Effect.orDie

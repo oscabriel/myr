@@ -5,7 +5,8 @@ import type { ReactNode } from "react";
 
 import { ReadmeSection } from "../project/readme-section.tsx";
 import { AppLink } from "../shared/link.tsx";
-import { GUTTER, MEASURE, Workspace } from "../shared/shell/workspace.tsx";
+import { GUTTER } from "../shared/shell/gutter.ts";
+import { MEASURE, Workspace } from "../shared/shell/workspace.tsx";
 import { FileFacts } from "./file-facts.tsx";
 import { FileHeader, PermalinkKey } from "./file-header.tsx";
 import { NumberedLines } from "./numbered-lines.tsx";
@@ -16,22 +17,28 @@ import {
   rawHref,
   sizeInWords,
 } from "./paths.ts";
+import { pinnedRev } from "./rev.ts";
 
 const LINK = "decoration-rule underline hover:decoration-current";
 
 const Bytes = ({
   file,
   project,
+  rev,
   words,
 }: {
   readonly file: FileView;
   readonly project: ProjectName;
+  readonly rev: string;
   readonly words: string;
 }) => (
   <div className={`${GUTTER} ${MEASURE} pt-6`}>
     <p className="border-rule text-ui border border-dashed px-4 py-5">
       {words} ({sizeInWords(file.size)}).{" "}
-      <a className={LINK} href={rawHref(project, file.at, file.path)}>
+      <a
+        className={LINK}
+        href={rawHref(project, pinnedRev(rev, file.at), file.path)}
+      >
         View raw
       </a>
     </p>
@@ -57,14 +64,16 @@ const Body = ({
         <img
           alt={file.path}
           className="border-rule max-w-full border"
-          src={rawHref(project, file.at, file.path)}
+          src={rawHref(project, pinnedRev(rev, file.at), file.path)}
         />
       </div>
     );
   }
 
   if (file.binary) {
-    return <Bytes file={file} project={project} words="A binary file" />;
+    return (
+      <Bytes file={file} project={project} rev={rev} words="A binary file" />
+    );
   }
 
   if (file.text === undefined) {
@@ -72,6 +81,7 @@ const Body = ({
       <Bytes
         file={file}
         project={project}
+        rev={rev}
         words="This file is too large to show"
       />
     );
@@ -116,13 +126,11 @@ export interface BlobViewProps {
   readonly plain?: boolean;
   readonly last?: CommitView | undefined;
   readonly now: DateTime.Utc;
-  readonly files?: ReactNode;
 }
 
 export const BlobView = ({
   code,
   file,
-  files,
   last,
   now,
   plain = false,
@@ -149,16 +157,18 @@ export const BlobView = ({
     toolbar={
       <FileHeader
         file={file}
-        files={files}
         mode="code"
         path={file.path}
         project={project}
         rev={rev}
       />
     }
+    quietHead
     variant="code"
   >
-    <PermalinkKey href={blobHref(project, file.at, file.path)} />
+    <PermalinkKey
+      href={blobHref(project, pinnedRev(rev, file.at), file.path)}
+    />
     <Body code={code} file={file} plain={plain} project={project} rev={rev} />
   </Workspace>
 );

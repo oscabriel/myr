@@ -1,22 +1,12 @@
 import { useAtomMount, useAtomRefresh, useAtomValue } from "@effect/atom-react";
-import type { Ask } from "@repo/protocol/domain/ask";
 import type { ProjectListing } from "@repo/protocol/domain/front-page";
-import { AskId } from "@repo/protocol/ids";
-import type { ProjectName } from "@repo/protocol/ids";
-import {
-  createFileRoute,
-  getRouteApi,
-  useHydrated,
-  useRouter,
-} from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { env } from "cloudflare:workers";
-import { Array as Arr, Effect, Option, Predicate, Schema } from "effect";
+import { Effect, Option, Predicate, Schema } from "effect";
 import { AsyncResult } from "effect/reactivity";
 import { useEffect, useMemo } from "react";
-import type { ReactNode } from "react";
 
-import { selectedAskAtom } from "../client/ask.ts";
 import { projectEventsAtom } from "../client/events.ts";
 import { frontPageAtom, projectsAtom } from "../client/front.ts";
 import {
@@ -67,43 +57,17 @@ export const frontPageHead = () => ({
 
 const everyAsk = frontPageAtom({});
 
-const root = getRouteApi("__root__");
-
-// Wraps the page whether or not a row is selected, so selecting one never remounts the list.
-const WithFull = ({
-  children,
-  pick,
-}: {
-  readonly pick:
-    | { readonly ask: AskId; readonly project: ProjectName }
-    | undefined;
-  readonly children: (full: Ask | undefined) => ReactNode;
-}) => {
-  const read = useAtomValue(selectedAskAtom(pick));
-
-  return children(AsyncResult.isSuccess(read) ? read.value.ask : undefined);
-};
-
-const decodeAsk = Schema.decodeUnknownOption(AskId);
-
 const LiveFront = ({
   data,
   filter,
-  platformUrl,
   projects,
-  selected,
   signedIn,
-  webUrl,
 }: {
   readonly data: FrontPageData;
   readonly filter: FrontFilter;
-  readonly platformUrl: string;
   readonly projects: readonly ProjectListing[] | undefined;
-  readonly selected: string | undefined;
   readonly signedIn: boolean;
-  readonly webUrl: string;
 }) => {
-  const hydrated = useHydrated();
   const key = projectsKey(data.events.map(({ project }) => project));
   const refresh = useAtomRefresh(everyAsk);
 
@@ -124,46 +88,28 @@ const LiveFront = ({
   const events = useAtomValue(familyEventsAtom(key));
   const stampsOf = useStamps(events);
 
-  const picked = Option.flatMap(decodeAsk(selected), (ask) =>
-    Option.map(
-      Arr.findFirst(entries, (entry) => entry.ask.ask === ask),
-      (entry) => ({ ask, project: entry.project })
-    )
-  );
-
-  const view = (selectedAsk?: Ask) => (
+  return (
     <FrontPageView
       entries={entries}
       events={events}
       filter={filter}
       now={data.now}
       parents={data.parents}
-      platformUrl={platformUrl}
       projects={projects}
-      selectedAsk={selectedAsk}
       stampsOf={stampsOf}
-      webUrl={webUrl}
     />
-  );
-
-  return (
-    <WithFull pick={hydrated ? Option.getOrUndefined(picked) : undefined}>
-      {view}
-    </WithFull>
   );
 };
 
 const FrontPage = () => {
-  const { ask, ...filter } = Route.useSearch();
+  // `ask` is the selected row's, which the list reads from the address itself.
+  const { ask: _selected, ...filter } = Route.useSearch();
   const loaded = Route.useLoaderData();
 
   const data = useMemo(
     () => Schema.decodeSync(FrontPageData)(loaded),
     [loaded]
   );
-
-  const { platformUrl } = root.useLoaderData();
-  const { origin } = useRouter();
 
   // The root's own reads, in the registry it shares with the shell.
   const listed = useAtomValue(projectsAtom);
@@ -181,13 +127,10 @@ const FrontPage = () => {
       <LiveFront
         data={data}
         filter={filter}
-        platformUrl={platformUrl}
         projects={
           AsyncResult.isSuccess(listed) ? listed.value.projects : undefined
         }
-        selected={ask}
         signedIn={signedIn}
-        webUrl={origin}
       />
     </SeededAtoms>
   );
@@ -208,6 +151,7 @@ const readSearch = (search: {
 });
 
 export const Route = createFileRoute("/asks")({
+  staticData: { shell: "site" },
   // TanStack infers each option from the ones before it.
   validateSearch: readSearch,
   loader: () => frontPageData(),

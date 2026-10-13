@@ -12,36 +12,32 @@ import type { Ledger } from "@repo/protocol/domain/visibility";
 import type { AreaName, AskId, Handle, ProjectName } from "@repo/protocol/ids";
 import type { Posture } from "@repo/protocol/posture";
 import { useRouter } from "@tanstack/react-router";
-import { Option, Predicate } from "effect";
+import { Predicate } from "effect";
 import type { DateTime } from "effect";
+import { LockKeyhole } from "lucide-react";
 import type { ReactNode } from "react";
 
-import {
-  ForAgents,
-  Onward,
-  SelectedAskFacts,
-  Step,
-  plural,
-} from "../front/facts.tsx";
-import { finaleOf, stillWaiting } from "../front/families.ts";
-import { ledeOf } from "../front/head.ts";
+import { ForAgents, Onward, plural } from "../front/facts.tsx";
+import { stillWaiting } from "../front/families.ts";
 import { ProposeLink } from "../propose/propose-link.tsx";
 import type { AskProgress } from "../shared/ask-progress.ts";
 import { LINK } from "../shared/classes.ts";
 import { CommandLine } from "../shared/command.tsx";
 import { EmptyState } from "../shared/empty.tsx";
-import { FactBlock, GateFacts, HeldBackFacts } from "../shared/facts.tsx";
+import { CommandSlotProvider } from "../shared/keys.tsx";
 import { AppLink } from "../shared/link.tsx";
-import { ledgerPath } from "../shared/paths.ts";
+import {
+  ENVIRONMENT_ANCHOR,
+  LEDGER_ANCHOR,
+  visibilityPath,
+} from "../shared/paths.ts";
 import { ReadingRows, UnreachableNotice } from "../shared/pending.tsx";
-import { PostureBadge } from "../shared/posture.tsx";
-import { MetaCode, MetaLine, useRowSelection } from "../shared/row.tsx";
-import { Workspace } from "../shared/shell/workspace.tsx";
-import { When } from "../shared/time.tsx";
+import { MetaCode, useRowSelection } from "../shared/row.tsx";
+import { GUTTER } from "../shared/shell/gutter.ts";
+import { stageNames, stageRuns } from "../shared/status-line.tsx";
 import { AskList, askListIds, openAsks, openToTake } from "./asks.tsx";
 import { LandingList, recentShown } from "./landings.tsx";
-import { postureLabel, postureWord } from "./posture-label.ts";
-import { ProjectNav } from "./project-nav.tsx";
+import { CloneSteps } from "./project-header.tsx";
 import { ReadmeSection } from "./readme-section.tsx";
 
 export interface ProjectCode {
@@ -112,18 +108,12 @@ export const homeListing = ({
   project,
 });
 
-interface KnownPosture {
-  readonly label: string;
-  readonly posture: Posture;
-}
-
 export interface ProjectViewProps {
   readonly asks: readonly AskListing[] | undefined;
   readonly unreachable?: boolean;
   readonly landings: readonly LandingView[];
   readonly listing: HomeListing;
   readonly lastLanded?: DateTime.Utc | undefined;
-  readonly postureLabel?: string | undefined;
   readonly heldBack?: readonly HeldBackArea[] | undefined;
   readonly deciders?: readonly Deciders[] | undefined;
   readonly importedFrom?: ImportSource | undefined;
@@ -133,9 +123,56 @@ export interface ProjectViewProps {
   readonly parents?: readonly Ask[];
   readonly states?: ReadonlyMap<AskId, AskProgress>;
   readonly stamps?: ReadonlySet<AskId>;
-  readonly selectedAsk?: Ask | undefined;
   readonly signedIn?: boolean;
 }
+
+/** A plain bordered surface, its headline first (DESIGN.md "Cards"). */
+const AboutCard = ({
+  children,
+  id,
+  title,
+}: {
+  readonly title: string;
+  readonly id: string;
+  readonly children: ReactNode;
+}) => (
+  <section
+    aria-labelledby={id}
+    className="border-rule bg-card flex min-w-0 flex-col gap-3 rounded-md border p-4"
+  >
+    <h2 className="text-ui scroll-mt-(--stick-toolbar) font-semibold" id={id}>
+      {title}
+    </h2>
+    {children}
+  </section>
+);
+
+const HowItLands = () => (
+  <AboutCard id="how-it-lands" title="How a change lands here">
+    <p className="text-ui text-muted-foreground">
+      Every answer is checked on the exact tree it would land as, by seven
+      stages in turn.
+    </p>
+    <ol aria-label="Gate stages" className="flex flex-col gap-2">
+      {StageName.literals.map((stage, at) => (
+        <li className="flex min-w-0 gap-3" data-stage={stage} key={stage}>
+          <span className="text-label text-muted-foreground w-4 shrink-0 pt-0.5 text-right tabular-nums">
+            {at + 1}
+          </span>
+          <span className="flex min-w-0 flex-col">
+            <span className="text-ui font-medium" data-term="">
+              {stageNames(stage).label}
+            </span>
+            <span className="text-label text-muted-foreground font-normal">
+              {stageRuns(stage)}
+            </span>
+          </span>
+        </li>
+      ))}
+    </ol>
+    <Onward to="/docs/landing">How a landing happens</Onward>
+  </AboutCard>
+);
 
 const WhoDecides = ({
   deciders,
@@ -148,7 +185,7 @@ const WhoDecides = ({
   const more = (deciders?.length ?? 0) - shown.length;
 
   return (
-    <FactBlock label="Who decides">
+    <AboutCard id="who-decides" title="Who decides">
       {deciders === undefined || deciders.length === 0 ? (
         <p className="text-ui text-muted-foreground">
           Its policy names who decides for which paths.
@@ -170,12 +207,72 @@ const WhoDecides = ({
         </ul>
       )}
       <Onward to={`/${project}/people`}>Policy</Onward>
-    </FactBlock>
+    </AboutCard>
+  );
+};
+
+/** The posture is the header's to say; this card says what is held back and where to read more. */
+const VisibilitySummary = ({
+  heldBack,
+  project,
+}: {
+  readonly heldBack: readonly HeldBackArea[] | undefined;
+  readonly project: ProjectName;
+}) => {
+  let held: ReactNode;
+
+  if (heldBack === undefined) {
+    held = null;
+  } else if (heldBack.length === 0) {
+    held = <p className="text-ui text-muted-foreground">Nothing held back</p>;
+  } else {
+    held = (
+      <ul className="flex flex-col gap-1">
+        {heldBack.map(({ area, detail }) => (
+          <li
+            className="text-ui text-sealed flex items-start gap-2"
+            data-area={area}
+            key={area}
+          >
+            <LockKeyhole
+              aria-hidden="true"
+              className="mt-0.5 size-4 shrink-0"
+              strokeWidth={1.75}
+            />
+            <span className="min-w-0 [overflow-wrap:anywhere]">
+              <span className="text-mono font-mono">{area}</span>: {detail}
+            </span>
+          </li>
+        ))}
+      </ul>
+    );
+  }
+
+  return (
+    <AboutCard id="visibility" title="Visibility">
+      {held}
+      <p className="text-ui flex flex-wrap gap-x-4 gap-y-1">
+        <AppLink
+          className={LINK}
+          hash={LEDGER_ANCHOR}
+          to={visibilityPath(project)}
+        >
+          Ledger
+        </AppLink>
+        <AppLink
+          className={LINK}
+          hash={ENVIRONMENT_ANCHOR}
+          to={visibilityPath(project)}
+        >
+          Environment
+        </AppLink>
+      </p>
+    </AboutCard>
   );
 };
 
 const ImportedFrom = ({ source }: { readonly source: ImportSource }) => (
-  <FactBlock label="Imported from">
+  <AboutCard id="imported-from" title="Imported from">
     <p className="text-ui">
       <a
         className={`${LINK} [overflow-wrap:anywhere]`}
@@ -194,34 +291,54 @@ const ImportedFrom = ({ source }: { readonly source: ImportSource }) => (
     <p className="text-ui text-muted-foreground">
       This project is {IMPORTED_NOTE}.
     </p>
-  </FactBlock>
+  </AboutCard>
 );
 
-const TakePart = ({
-  platformUrl,
-  project,
+const About = ({ props }: { readonly props: ProjectViewProps }) => {
+  const { project } = props.listing;
+
+  return (
+    <aside
+      aria-label="About"
+      className="flex min-w-0 flex-col gap-4"
+      data-column="about"
+    >
+      <AboutCard id="clone" title="Clone">
+        <CloneSteps platformUrl={props.platformUrl} project={project} />
+      </AboutCard>
+      <HowItLands />
+      <WhoDecides deciders={props.deciders} project={project} />
+      <VisibilitySummary heldBack={props.heldBack} project={project} />
+      {props.importedFrom === undefined ? null : (
+        <ImportedFrom source={props.importedFrom} />
+      )}
+      <ForAgents href={`/${project}/llms.txt`} />
+    </aside>
+  );
+};
+
+const SectionHead = ({
+  action,
+  count,
+  id,
+  title,
 }: {
-  readonly platformUrl: string;
-  readonly project: ProjectName;
+  readonly id: string;
+  readonly title: string;
+  readonly count?: string | undefined;
+  readonly action?: ReactNode;
 }) => (
-  <FactBlock label="Take part">
-    <Step
-      command={`git clone ${platformUrl}/${project}.git`}
-      label="Clone it with plain git"
-    />
-    <Step
-      command={`${Brand.cli} asks --project ${project}`}
-      label="See what it asks for"
-    />
-    <Step
-      command={`${Brand.cli} claim <ask>`}
-      label="Claim one, in the clone"
-    />
-    <Step
-      command={`${Brand.cli} check`}
-      label="Check your answer before you push"
-    />
-  </FactBlock>
+  <div className="flex min-h-8 flex-wrap items-baseline gap-x-3 gap-y-1">
+    <h2 className="text-title scroll-mt-(--stick-toolbar)" id={id}>
+      {title}
+    </h2>
+    {count === undefined ? null : (
+      <span className="text-label text-muted-foreground tabular-nums">
+        {count}
+      </span>
+    )}
+    {action === undefined ? null : <span className="ml-auto">{action}</span>}
+  </div>
 );
 
 /**
@@ -231,15 +348,15 @@ const TakePart = ({
 const RecentLandings = ({
   landedAt,
   landings,
-  listing,
   now,
   platformUrl,
+  project,
 }: {
   readonly landedAt: DateTime.Utc | undefined;
   readonly landings: readonly LandingView[];
-  readonly listing: HomeListing;
   readonly now: DateTime.Utc;
   readonly platformUrl: string;
+  readonly project: ProjectName;
 }) => {
   let shown: ReactNode;
 
@@ -253,148 +370,44 @@ const RecentLandings = ({
           lands it.
         </p>
         <CommandLine
-          command={`git push ${platformUrl}/${listing.project}.git HEAD:main`}
+          command={`git push ${platformUrl}/${project}.git HEAD:main`}
         />
       </>
     );
   } else {
     shown = (
       <p className="text-ui text-muted-foreground">
-        No landings among the recent events of {listing.project}.
+        No landings among the recent events of {project}.
       </p>
     );
   }
 
-  return <FactBlock label="Recent landings">{shown}</FactBlock>;
-};
-
-const HowItLands = ({
-  deciders,
-  heldBack,
-  importedFrom,
-  landedAt,
-  landings,
-  listing,
-  now,
-  platformUrl,
-}: Pick<
-  ProjectViewProps,
-  | "deciders"
-  | "heldBack"
-  | "importedFrom"
-  | "landings"
-  | "listing"
-  | "now"
-  | "platformUrl"
-> & {
-  readonly landedAt: DateTime.Utc | undefined;
-}) => (
-  <>
-    <GateFacts />
-    <WhoDecides deciders={deciders} project={listing.project} />
-    {heldBack === undefined ? null : <HeldBackFacts areas={heldBack} />}
-    {importedFrom === undefined ? null : <ImportedFrom source={importedFrom} />}
-    <TakePart platformUrl={platformUrl} project={listing.project} />
-    <RecentLandings
-      landedAt={landedAt}
-      landings={landings}
-      listing={listing}
-      now={now}
-      platformUrl={platformUrl}
-    />
-    <ForAgents href={`/${listing.project}/llms.txt`} />
-  </>
-);
-
-const RuleSentence = ({
-  deciders,
-  heldBack,
-  landedAt,
-  now,
-  project,
-}: {
-  readonly deciders: readonly Deciders[] | undefined;
-  readonly heldBack: readonly HeldBackArea[] | undefined;
-  readonly landedAt: DateTime.Utc | undefined;
-  readonly now: DateTime.Utc;
-  readonly project: ProjectName;
-}) => {
-  const checks = (heldBack ?? []).reduce((sum, area) => sum + area.checks, 0);
-
-  const sealed =
-    heldBack === undefined ? undefined : (
-      <AppLink className={LINK} key="ledger" to={ledgerPath(project)}>
-        {heldBack.length === 0
-          ? "nothing held back"
-          : `${plural(checks, "sealed check", "sealed checks")} in ${plural(heldBack.length, "area", "areas")}`}
-      </AppLink>
-    );
-
-  const parts = [
-    `Gate: ${plural(StageName.literals.length, "stage", "stages")}`,
-    deciders === undefined || deciders.length === 0
-      ? undefined
-      : `maintainers set for ${plural(deciders.length, "path", "paths")}`,
-    sealed,
-    landedAt === undefined ? (
-      "nothing landed yet"
-    ) : (
-      <span key="landed">
-        last landed <When at={landedAt} now={now} />
-      </span>
-    ),
-  ];
-
   return (
-    <p className="text-ui text-muted-foreground max-w-[70ch]" data-rule="">
-      <MetaLine parts={parts} />
-    </p>
+    <section
+      aria-labelledby="recent-landings"
+      className="flex min-w-0 flex-col gap-2"
+    >
+      <SectionHead
+        action={<Onward to={`/${project}/commits/main`}>Every landing</Onward>}
+        id="recent-landings"
+        title="Recent landings"
+      />
+      {shown}
+    </section>
   );
 };
 
-const ProjectLine = ({
-  count,
-  lede,
-  posture,
-  rule,
-}: {
-  readonly count: number;
-  readonly posture: KnownPosture | undefined;
-  readonly lede: string | undefined;
-  readonly rule: ReactNode;
-}) => (
-  <div className="flex flex-col gap-3">
-    <p className="text-ui text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1">
-      {/* Its dot after it, so a line never opens on one. */}
-      {posture === undefined ? null : (
-        <span className="flex items-center gap-x-2">
-          <PostureBadge
-            label={postureWord(posture.posture)}
-            posture={posture.posture}
-            title={posture.label}
-          />
-          <span aria-hidden="true">·</span>
-        </span>
-      )}
-      <span className="tabular-nums">
-        {plural(count, "open ask", "open asks")}
-      </span>
-    </p>
-    {lede === undefined ? null : (
-      <p className="text-want max-w-[70ch]">{lede}</p>
-    )}
-    {rule}
-  </div>
-);
+const countOf = (open: readonly AskListing[]) =>
+  `${plural(open.length, "open ask", "open asks")}, ${
+    open.filter(openToTake).length
+  } open to take`;
 
 const AsksSection = ({
   asks,
   now,
-  onSelect,
   parents,
   project,
   selected,
-  signedIn,
   stamps,
   states,
   unreachable,
@@ -407,8 +420,6 @@ const AsksSection = ({
   readonly states: ReadonlyMap<AskId, AskProgress>;
   readonly stamps: ReadonlySet<AskId>;
   readonly selected: string | undefined;
-  readonly onSelect: ((id: string) => void) | undefined;
-  readonly signedIn: boolean;
 }) => {
   let list: ReactNode;
 
@@ -426,7 +437,6 @@ const AsksSection = ({
       <AskList
         asks={asks}
         now={now}
-        onSelect={onSelect}
         parents={parents}
         project={project}
         selected={selected}
@@ -441,180 +451,111 @@ const AsksSection = ({
       aria-labelledby="open-asks"
       className="flex min-w-0 flex-col gap-2"
     >
-      <div className="flex min-h-8 flex-wrap items-center justify-between gap-x-6 gap-y-1">
-        <h2 className="text-title" id="open-asks">
-          Open asks
-        </h2>
-        {signedIn ? <ProposeLink project={project} /> : null}
-      </div>
+      <SectionHead
+        count={asks === undefined ? undefined : countOf(openAsks(asks))}
+        id="open-asks"
+        title="Open asks"
+      />
       {list}
     </section>
   );
 };
 
-const PageFacts = ({
-  landedAt,
-  picked,
-  posture,
-  props,
-  states,
+/**
+ * The Proposals tab opens this region until a project's proposals have a
+ * page of their own, so the tab keeps the project's header and tabs.
+ */
+const ProposalsSection = ({
+  project,
+  signedIn,
 }: {
-  readonly props: ProjectViewProps;
-  readonly picked: AskListing | undefined;
-  readonly posture: KnownPosture | undefined;
-  readonly landedAt: DateTime.Utc | undefined;
-  readonly states: ReadonlyMap<AskId, AskProgress>;
-}) => {
-  const { listing, parents = [], platformUrl, selectedAsk } = props;
-
-  if (picked === undefined) {
-    return (
-      <HowItLands
-        deciders={props.deciders}
-        heldBack={props.heldBack}
-        importedFrom={props.importedFrom}
-        landedAt={landedAt}
-        landings={props.landings}
-        listing={listing}
-        now={props.now}
-        platformUrl={platformUrl}
-      />
-    );
-  }
-
-  const family = parents.find(
-    ({ blockedBy, id }) => id === picked.ask || blockedBy.includes(picked.ask)
-  );
-
-  return (
-    <SelectedAskFacts
-      family={
-        family === undefined
-          ? undefined
-          : { finale: finaleOf(family.id), parent: family, states }
-      }
-      full={selectedAsk?.id === picked.ask ? selectedAsk : undefined}
-      listing={picked}
-      platformUrl={platformUrl}
-      posture={posture}
-      progress={states.get(picked.ask)}
-      project={listing.project}
-      takeable={openToTake(picked)}
+  readonly project: ProjectName;
+  readonly signedIn: boolean;
+}) => (
+  <section aria-labelledby="proposals" className="flex min-w-0 flex-col gap-2">
+    <SectionHead
+      action={signedIn ? <ProposeLink project={project} /> : undefined}
+      id="proposals"
+      title="Proposals"
     />
-  );
-};
+    <p className="text-ui text-muted-foreground max-w-(--measure)">
+      A proposal asks a maintainer to open an ask. An agent on the platform
+      drafts its ask file and check, and it expires unless a maintainer accepts
+      it.
+      {signedIn ? null : " Sign in to propose one."}
+    </p>
+  </section>
+);
 
-const countOf = (open: readonly AskListing[]) =>
-  `${plural(open.length, "open ask", "open asks")}, ${
-    open.filter(openToTake).length
-  } open to take`;
-
+/**
+ * Overview: open asks, recent landings, proposals and the README in the main column,
+ * and the about column beside it from `columns`, under it below.
+ */
 const ProjectPanes = ({
   props,
-  select,
   selected,
 }: {
   readonly props: ProjectViewProps;
   readonly selected: string | undefined;
-  readonly select: ((id: string) => void) | undefined;
 }) => {
   const { asks, code, listing } = props;
   const states = props.states ?? new Map<AskId, AskProgress>();
   const { project } = listing;
 
-  const posture = Option.getOrUndefined(
-    Option.map(
-      Option.fromUndefinedOr(listing.posture),
-      (known): KnownPosture => ({
-        label: props.postureLabel ?? postureLabel(known),
-        posture: known,
-      })
-    )
-  );
-
-  const landedAt = props.lastLanded ?? listing.landedAt;
-  const open = Option.map(Option.fromUndefinedOr(asks), openAsks);
-  const text = code?.readme?.text;
-
   return (
-    <Workspace
-      {...Option.match(open, {
-        onNone: () => ({}),
-        onSome: (each) => ({ count: countOf(each) }),
-      })}
-      crumbs={[{ label: project, to: `/${project}` }, { label: "Asks" }]}
-      facts={
-        <PageFacts
-          landedAt={landedAt}
-          picked={asks?.find(({ ask }) => ask === selected)}
-          posture={posture}
-          props={props}
-          states={states}
-        />
-      }
-      factsHeading={
-        asks?.some(({ ask }) => ask === selected) === true
-          ? "Selected ask"
-          : "How a change lands here"
-      }
-      {...Option.match(Option.fromUndefinedOr(selected), {
-        onNone: () => ({}),
-        onSome: (factsKey) => ({ factsKey }),
-      })}
-      factsSummary={
-        posture === undefined
-          ? "Gate, who decides, take part"
-          : postureWord(posture.posture)
-      }
-      status={
-        <ProjectLine
-          count={Option.match(open, {
-            onNone: () => listing.openAsks,
-            onSome: (each) => each.length,
-          })}
-          lede={Predicate.isString(text) ? ledeOf(text) : undefined}
-          posture={posture}
-          rule={
-            <RuleSentence
-              deciders={props.deciders}
-              heldBack={props.heldBack}
-              landedAt={landedAt}
+    <main
+      className="flex min-w-0 flex-1 flex-col outline-none"
+      data-scroll-restoration-id="main"
+      data-variant="overview"
+      id="main"
+      tabIndex={-1}
+    >
+      <CommandSlotProvider slot="main">
+        <div
+          className={`columns:grid columns:grid-cols-[minmax(0,1fr)_var(--column-about)] columns:items-start flex flex-col gap-10 pt-6 pb-16 ${GUTTER}`}
+        >
+          <div className="flex min-w-0 flex-col gap-8">
+            <AsksSection
+              asks={asks}
               now={props.now}
+              parents={props.parents ?? []}
+              project={project}
+              selected={selected}
+              stamps={props.stamps ?? new Set()}
+              states={states}
+              unreachable={props.unreachable === true}
+            />
+            <RecentLandings
+              landedAt={props.lastLanded ?? listing.landedAt}
+              landings={props.landings}
+              now={props.now}
+              platformUrl={props.platformUrl}
               project={project}
             />
-          }
-        />
-      }
-      title={project}
-      variant="list"
-    >
-      <ProjectNav current="overview" project={project} />
-      <AsksSection
-        asks={asks}
-        now={props.now}
-        onSelect={select}
-        parents={props.parents ?? []}
-        project={project}
-        selected={selected}
-        signedIn={props.signedIn === true}
-        stamps={props.stamps ?? new Set()}
-        states={states}
-        unreachable={props.unreachable === true}
-      />
-      {code?.readme === undefined ? null : (
-        <ReadmeSection file={code.readme} project={project} />
-      )}
-    </Workspace>
+            <ProposalsSection
+              project={project}
+              signedIn={props.signedIn === true}
+            />
+            {code?.readme === undefined ? null : (
+              <div className="max-w-(--measure) min-w-0">
+                <ReadmeSection file={code.readme} project={project} />
+              </div>
+            )}
+          </div>
+          <About props={props} />
+        </div>
+      </CommandSlotProvider>
+    </main>
   );
 };
 
 const Selectable = ({ props }: { readonly props: ProjectViewProps }) => {
-  const { select, selected } = useRowSelection(
+  const { selected } = useRowSelection(
     props.asks === undefined ? [] : askListIds(props.asks),
     "ask"
   );
 
-  return <ProjectPanes props={props} select={select} selected={selected} />;
+  return <ProjectPanes props={props} selected={selected} />;
 };
 
 export const ProjectView = (given: ProjectViewProps) => {
@@ -626,6 +567,6 @@ export const ProjectView = (given: ProjectViewProps) => {
   return Predicate.isNotNullish(useRouter({ warn: false })) ? (
     <Selectable props={props} />
   ) : (
-    <ProjectPanes props={props} select={undefined} selected={undefined} />
+    <ProjectPanes props={props} selected={undefined} />
   );
 };

@@ -1,6 +1,7 @@
 import { Brand } from "@repo/brand";
+import type { ProjectListing } from "@repo/protocol/domain/front-page";
 import { useRouter } from "@tanstack/react-router";
-import { BookOpen, Bot, FolderInput, Keyboard } from "lucide-react";
+import { FolderInput, Keyboard } from "lucide-react";
 import { useRef } from "react";
 import type { RefObject } from "react";
 
@@ -19,19 +20,13 @@ import {
   DialogTitle,
 } from "../../../components/ui/dialog.tsx";
 import { Sheet, SheetContent } from "../../../components/ui/sheet.tsx";
-import { SessionSlot } from "../../auth/session-slot.tsx";
+import { PostureMark } from "../../project/posture-mark.tsx";
 import { KeysHelp, useKeys } from "../keys.tsx";
 import { AppLink } from "../link.tsx";
-import { docsPath, IMPORT_PATH } from "../paths.ts";
-import { useCurrentProject, useProjectList, useShell } from "./context.ts";
+import { IMPORT_PATH } from "../paths.ts";
+import { useCurrentProject, useShell, useShellReads } from "./context.ts";
 import type { Overlay } from "./context.ts";
-import {
-  PostureMark,
-  ProjectSectionList,
-  RAIL_ROW,
-  RailContent,
-  RailFoot,
-} from "./rail.tsx";
+import { SITE_LINKS } from "./top-bar.tsx";
 
 export interface OverlayProps {
   readonly overlay: Overlay | undefined;
@@ -47,16 +42,20 @@ const openState = (open: boolean, onClose: () => void) => ({
   open,
 });
 
+const ROW =
+  "text-ui text-foreground hover:bg-surface flex h-10 min-w-0 items-center gap-2.5 px-3 no-underline transition-colors duration-[120ms] focus-visible:outline-offset-[-2px] [&[aria-current]]:font-semibold";
+
 const atLeastTablet = () => globalThis.matchMedia("(min-width: 40rem)").matches;
 
 const ProjectSwitcher = ({
   input,
+  listed,
   onChosen,
 }: {
   readonly input: RefObject<HTMLInputElement | null>;
+  readonly listed: readonly ProjectListing[] | undefined;
   readonly onChosen: () => void;
 }) => {
-  const listed = useProjectList();
   const current = useCurrentProject();
   const router = useRouter();
   const names = (listed ?? []).map(({ project }) => project);
@@ -120,15 +119,17 @@ const ProjectSwitcher = ({
 
 export const ProjectsSheetBody = ({
   input,
+  listed,
   onChosen,
 }: {
   readonly input: RefObject<HTMLInputElement | null>;
+  readonly listed: readonly ProjectListing[] | undefined;
   readonly onChosen: () => void;
 }) => (
   <>
-    <ProjectSwitcher input={input} onChosen={onChosen} />
+    <ProjectSwitcher input={input} listed={listed} onChosen={onChosen} />
     <div className="border-rule border-t p-1">
-      <AppLink className={RAIL_ROW} to={IMPORT_PATH}>
+      <AppLink className={ROW} to={IMPORT_PATH}>
         <FolderInput
           aria-hidden="true"
           className="text-muted-foreground size-4 shrink-0"
@@ -140,52 +141,24 @@ export const ProjectsSheetBody = ({
   </>
 );
 
-const More = () => {
-  const project = useCurrentProject();
-  const listed = useProjectList();
+/** Below `nav` the top bar's links fold into this sheet, with the keys' list. */
+export const MenuBody = () => {
   const { open } = useShell();
 
   return (
-    <div className="flex flex-col gap-2 px-2 py-2">
-      <AppLink
-        activeOptions={{ exact: true }}
-        className={RAIL_ROW}
-        to={docsPath()}
-      >
-        <BookOpen
-          aria-hidden="true"
-          className="text-muted-foreground size-4"
-          strokeWidth={1.75}
-        />
-        Docs
-      </AppLink>
-      <AppLink
-        activeOptions={{ exact: true }}
-        className={RAIL_ROW}
-        to="/agents"
-      >
-        <Bot
-          aria-hidden="true"
-          className="text-muted-foreground size-4"
-          strokeWidth={1.75}
-        />
-        For agents
-      </AppLink>
-      {project === undefined ? null : (
-        <div className="flex flex-col gap-1">
-          <h2 className="text-label text-muted-foreground px-2 pt-3 pb-1">
-            {project}
-          </h2>
-          <ProjectSectionList
-            openAsks={
-              listed?.find((listing) => listing.project === project)?.openAsks
-            }
-            project={project}
-          />
-        </div>
-      )}
+    <div className="flex flex-col gap-1 px-1 py-2">
+      {SITE_LINKS.map(({ label, to }) => (
+        <AppLink
+          activeOptions={{ includeSearch: false }}
+          className={ROW}
+          key={to}
+          to={to}
+        >
+          {label}
+        </AppLink>
+      ))}
       <button
-        className={`${RAIL_ROW} w-full cursor-pointer`}
+        className={`${ROW} w-full cursor-pointer`}
         onClick={() => {
           open("keys");
         }}
@@ -198,9 +171,6 @@ const More = () => {
         />
         Keys
       </button>
-      <div className="border-rule mt-1 border-t px-2 pt-3 pb-1">
-        <SessionSlot layout="rail" />
-      </div>
     </div>
   );
 };
@@ -236,33 +206,44 @@ const KeysDialog = ({
 };
 
 /** They stay mounted once loaded, so each one slides in from closed. */
+/** The list is read while the search is open, never by the shell on every page. */
+const ListedProjects = ({
+  input,
+  onChosen,
+}: {
+  readonly input: RefObject<HTMLInputElement | null>;
+  readonly onChosen: () => void;
+}) => {
+  const { ReadProjects } = useShellReads();
+
+  return ReadProjects === undefined ? (
+    <ProjectsSheetBody input={input} listed={undefined} onChosen={onChosen} />
+  ) : (
+    <ReadProjects>
+      {(listed) => (
+        <ProjectsSheetBody input={input} listed={listed} onChosen={onChosen} />
+      )}
+    </ReadProjects>
+  );
+};
+
 const ShellOverlays = ({ onClose, overlay }: OverlayProps) => {
   const filter = useRef<HTMLInputElement>(null);
 
   return (
     <>
       <Sheet {...openState(overlay === "menu", onClose)}>
-        <SheetContent side="left" title={Brand.name}>
-          <div className="flex min-h-full flex-col">
-            <div className="flex-1">
-              <RailContent />
-            </div>
-            <RailFoot />
-          </div>
-        </SheetContent>
-      </Sheet>
-      <Sheet {...openState(overlay === "more", onClose)}>
-        <SheetContent side="bottom" title="More">
-          <More />
+        <SheetContent side="right" title={Brand.name}>
+          <MenuBody />
         </SheetContent>
       </Sheet>
       <Sheet {...openState(overlay === "projects", onClose)}>
         <SheetContent
           initialFocus={filter}
           side={overlay === "projects" && atLeastTablet() ? "left" : "full"}
-          title="Projects"
+          title="Search projects"
         >
-          <ProjectsSheetBody input={filter} onChosen={onClose} />
+          <ListedProjects input={filter} onChosen={onClose} />
         </SheetContent>
       </Sheet>
       <KeysDialog onClose={onClose} open={overlay === "keys"} />

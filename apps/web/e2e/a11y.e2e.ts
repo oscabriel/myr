@@ -40,8 +40,8 @@ const VISITS: readonly Visit[] = [
   { name: "landing", path: "/" },
   { name: "front", path: "/asks" },
   { name: "front, signed in", path: "/asks", signedIn: true },
-  { name: "today", path: "/today", signedIn: true },
-  { name: "today, signed out", path: "/today" },
+  { name: "inbox", path: "/inbox", signedIn: true },
+  { name: "inbox, signed out", path: "/inbox" },
   { name: "project home", path: `/${project}` },
   { name: "project home, examples", path: "/oscabriel/burrow" },
   { name: "project home, no open asks", path: "/lin-h/mossgate" },
@@ -76,8 +76,7 @@ const VISITS: readonly Visit[] = [
     name: "answer, unclaimed",
     path: `/${project}/answers/lint-heading-levels`,
   },
-  { name: "ledger", path: `/${project}/ledger` },
-  { name: "env shape", path: `/${project}/env` },
+  { name: "visibility", path: `/${project}/visibility` },
   { name: "policy", path: `/${project}/people` },
   { name: "refs", path: `/${project}/refs` },
   { name: "tree", path: `/${project}/tree/main` },
@@ -105,7 +104,7 @@ const VISITS: readonly Visit[] = [
   },
   { name: "propose, signed out", path: `/${project}/proposals/new` },
   { name: "person", path: `/people/${DECIDER}` },
-  { name: "for agents", path: "/agents" },
+  { name: "install", path: "/install" },
   { name: "unknown project", path: "/no-such-project", status: 404 },
   {
     name: "unknown ask",
@@ -498,7 +497,7 @@ test.describe("the keyboard", () => {
       Effect.gen(function* () {
         for (const [path, param, signedIn] of [
           ["/asks", "ask", false],
-          ["/today", "decision", true],
+          ["/inbox", "decision", true],
         ] as const) {
           const { context, page } = yield* keyboardPage(
             browser,

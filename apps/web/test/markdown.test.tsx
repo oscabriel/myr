@@ -229,8 +229,17 @@ describe("GitHub-flavoured Markdown", () => {
     ]);
   });
 
-  it("gives a heading an id a link can point at", () => {
-    expect(rendered("## Hello World")).toContain('<h2 id="hello-world">');
+  // A README sits under the project's own h1, so its levels go down by one.
+  it("gives a heading an id a link can point at, a level under the page's h1", () => {
+    expect(rendered("## Hello World")).toContain('<h3 id="hello-world">');
+  });
+
+  it("draws no h1 of its own, and keeps an h6 an h6", () => {
+    const markup = rendered("# burrow\n\n###### Small");
+
+    expect(markup).not.toContain("<h1");
+    expect(markup).toContain('<h2 id="burrow">');
+    expect(markup).toContain('<h6 id="small">');
   });
 
   describe("a footnote", () => {
@@ -327,12 +336,14 @@ describe("a README drawn in the page's own type", () => {
     expect(classes.has("prose-pre:text-mono")).toBeTruthy();
   });
 
-  it("keeps lines to 70 characters", () => {
-    expect(proseClasses().has("max-w-[70ch]")).toBeTruthy();
+  // `--measure` is 72ch, which design-rules.test.tsx holds against DESIGN.md.
+  it("keeps lines to the measure", () => {
+    expect(proseClasses().has("max-w-(--measure)")).toBeTruthy();
   });
 
-  it("sets its h1 at the title size, under the page's own headline", () => {
-    expect(proseClasses().has("prose-h1:text-title")).toBeTruthy();
+  // Its `#` is an h2 by then (`rehypeShiftHeadings`), under the page's own h1.
+  it("sets its top heading at the title size, under the page's own headline", () => {
+    expect(proseClasses().has("prose-h2:text-title")).toBeTruthy();
   });
 
   it("sizes every element from the type scale, never an arbitrary size", () => {

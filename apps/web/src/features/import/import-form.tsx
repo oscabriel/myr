@@ -110,7 +110,7 @@ const SignInToImport = ({
   return (
     <section
       aria-label="Sign in to import"
-      className="flex max-w-[70ch] flex-col items-start gap-4"
+      className="flex max-w-(--measure) flex-col items-start gap-4"
     >
       {prefill === undefined || prefill.url === "" ? null : (
         <dl className="border-rule flex w-full flex-col border-y">
@@ -234,7 +234,7 @@ const Form = ({
   return (
     <form
       aria-label="Import a repo"
-      className="flex max-w-[70ch] flex-col gap-6"
+      className="flex max-w-(--measure) flex-col gap-6"
       data-import=""
       onSubmit={(event) => {
         event.preventDefault();

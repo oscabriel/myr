@@ -1,7 +1,6 @@
 import type { Refusal } from "@repo/protocol/refusal";
 import { Option, Schema } from "effect";
 import type { Array } from "effect";
-import type { ReactNode } from "react";
 
 import { EmptyState } from "../shared/empty.tsx";
 import { AppLink } from "../shared/link.tsx";
@@ -40,20 +39,13 @@ const Refused = ({
   </Workspace>
 );
 
-export const CodeNotFound = ({
-  data,
-  files,
-}: {
-  readonly data?: unknown;
-  readonly files?: ReactNode;
-}) =>
+export const CodeNotFound = ({ data }: { readonly data?: unknown }) =>
   Option.match(decodeLanding(data), {
     onNone: () => (
       <Refused refusals={Option.getOrUndefined(decodeRefusals(data))} />
     ),
     onSome: (landing) => (
       <TreeView
-        files={files}
         listing={landing.nearest}
         notice={<RefusalView refusals={landing.refusals} />}
         now={landing.now}

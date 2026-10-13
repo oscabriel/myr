@@ -9,7 +9,7 @@ import { Array, Effect, Match, Option, Order } from "effect";
 
 import type { CodeProject } from "../code.ts";
 import { CodeCache } from "./cache.ts";
-import { commitAt, resolveRev } from "./revision.ts";
+import { commitAt, resolveAt } from "./revision.ts";
 
 /** Live store reads take 0.1-0.5 s and chain per path segment; 48 at once keeps a walk fast and under the store's 2,000 requests per 10 s per repo. */
 export const READS_AT_ONCE = 48;
@@ -237,15 +237,15 @@ export const listing = (
   path: Option.Option<RepoPath>
 ): Effect.Effect<TreeListing, UnknownRevision | UnknownPath, RepoHost> =>
   Effect.gen(function* () {
-    const commit = yield* resolveRev(project, at);
-    const tree = yield* folderAt(project.repo, commit, path);
+    const { commit, repo } = yield* resolveAt(project, at);
+    const tree = yield* folderAt(repo, commit, path);
 
     const prefix = Option.match(path, {
       onNone: () => "",
       onSome: (folder) => `${folder}/`,
     });
 
-    const read = yield* entriesOf(project.repo, tree).pipe(Effect.orDie);
+    const read = yield* entriesOf(repo, tree).pipe(Effect.orDie);
 
     const entries = Array.sort(
       read.map((entry): CodeEntry => ({
@@ -258,14 +258,14 @@ export const listing = (
       byKindThenName
     );
 
-    const root = commitAt(project.repo, commit).pipe(
+    const root = commitAt(repo, commit).pipe(
       Effect.flatMap(Effect.fromOption),
       Effect.map(({ tree: id }) => id),
       Effect.orDie
     );
 
     const readme = yield* readmeOf(
-      project.repo,
+      repo,
       root,
       Option.getOrElse(path, () => ""),
       entries

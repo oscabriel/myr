@@ -7,6 +7,7 @@ import { useCallback, useMemo, useState } from "react";
 
 import { commitOf, projectOf } from "../../../../features/code/address.ts";
 import { ClientDiffs } from "../../../../features/code/client-code.tsx";
+import { CommitPageData } from "../../../../features/code/commit-page-data.ts";
 import { CommitView } from "../../../../features/code/commit-view.tsx";
 import { drawnFiles } from "../../../../features/code/diff-model.ts";
 import { PANE_SCROLLER } from "../../../../features/code/diff-pane.tsx";
@@ -14,13 +15,12 @@ import { SPLIT_QUERY, useMedia } from "../../../../features/code/media.ts";
 import { CodeNotFound } from "../../../../features/code/not-found.tsx";
 import { PlainDiff } from "../../../../features/code/plain-diff.tsx";
 import { prerenderedPaths } from "../../../../features/code/prerender.ts";
+import { revLabel, revOf } from "../../../../features/code/rev.ts";
 import { pageHead } from "../../../../features/shared/head.ts";
 import { notFoundFor } from "../../../../features/shared/refusals.ts";
 import { branchPage } from "../../../../server/cache-headers.ts";
 import { serverClient } from "../../../../server/client.ts";
-import { CommitRail } from "../tree/-code-rail.tsx";
-import { CommitPageData } from "../tree/-commit-files.ts";
-import { FilesButton } from "../tree/-files-button.tsx";
+import { CommitColumn } from "../tree/-code-column.tsx";
 
 // A commit never changes, but its page carries its landing, which the project records after main has moved,
 // and times reckoned from the read: a browser keeps it briefly, as a page at `main`.
@@ -33,13 +33,19 @@ interface CommitParams {
 export const readCommitPage = (params: CommitParams) =>
   Effect.gen(function* () {
     const project = yield* Effect.fromOption(projectOf(params.project));
-    const sha = yield* Effect.fromOption(commitOf(params.sha));
+    const { at, sha } = yield* Effect.fromOption(commitOf(params.sha));
     const client = yield* Client;
 
-    const diff = yield* client.showCommit({ project, sha }).pipe(
+    const asked = Option.match(at, {
+      onNone: () => ({ project, sha }),
+      onSome: (fork) => ({ at: fork, project, sha }),
+    });
+
+    const diff = yield* client.showCommit(asked).pipe(
       Effect.catchTags({
         UnknownCommit: notFoundFor,
         UnknownProject: notFoundFor,
+        UnknownRevision: notFoundFor,
       })
     );
 
@@ -52,7 +58,7 @@ export const readCommitPage = (params: CommitParams) =>
           Effect.option
         );
 
-    return yield* Schema.encodeEffect(CommitPageData)({
+    const read = {
       diff,
       now: yield* DateTime.now,
       project,
@@ -60,7 +66,14 @@ export const readCommitPage = (params: CommitParams) =>
         onNone: () => ({}),
         onSome: (paths) => ({ territory: paths }),
       }),
-    });
+    };
+
+    return yield* Schema.encodeEffect(CommitPageData)(
+      Option.match(at, {
+        onNone: () => read,
+        onSome: (fork) => ({ ...read, at: fork }),
+      })
+    );
   }).pipe(Effect.catchTag("NoSuchElementError", () => Effect.fail(notFound())));
 
 const commitPage = createServerFn({ method: "GET" })
@@ -76,7 +89,7 @@ const CommitPage = () => {
 
   // Decoded once per read: the diff's files keep one identity while the
   // reader folds, splits and moves, so nothing is parsed or drawn again.
-  const { diff, now, project, territory } = useMemo(
+  const { at, diff, now, project, territory } = useMemo(
     () => Schema.decodeSync(CommitPageData)(loaded),
     [loaded]
   );
@@ -140,6 +153,7 @@ const CommitPage = () => {
 
   return (
     <CommitView
+      at={at}
       diff={diff}
       drawing={
         diff.truncated ? undefined : (
@@ -164,7 +178,6 @@ const CommitPage = () => {
         )
       }
       drawn={drawn}
-      files={<FilesButton commit />}
       folded={folded}
       now={now}
       onFold={onFold}
@@ -178,7 +191,7 @@ const CommitPage = () => {
 };
 
 export const Route = createFileRoute("/$owner/$project/commit/$sha")({
-  staticData: { rail: CommitRail },
+  staticData: { column: CommitColumn, shell: "project" },
   // The router writes back what this returns, dropping only `undefined`,
   // so a unified diff's address carries no `style`.
   validateSearch: (search: { readonly style?: unknown }) => ({
@@ -221,7 +234,9 @@ export const Route = createFileRoute("/$owner/$project/commit/$sha")({
   staleTime: Number.POSITIVE_INFINITY,
   headers: () => branchPage,
   head: ({ params: { project, sha } }) =>
-    pageHead({ title: `${project}: commit ${sha.slice(0, 7)}` }),
+    pageHead({
+      title: `${project}: commit ${revLabel(Option.getOrElse(revOf(sha), () => sha))}`,
+    }),
   component: CommitPage,
   notFoundComponent: CodeNotFound,
 });

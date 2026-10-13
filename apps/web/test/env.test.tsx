@@ -1,21 +1,24 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
-import { Client, Contracts, EnvSchemaOf } from "@repo/protocol/contracts";
 import { EnvSchemaView } from "@repo/protocol/domain/env";
 import type { EnvItem } from "@repo/protocol/domain/env";
 import { ProjectListing } from "@repo/protocol/domain/front-page";
-import { UnknownProject } from "@repo/protocol/refusal";
-import { asTester, unanswered } from "@repo/protocol/testing";
-import { isNotFound } from "@tanstack/react-router";
-import { DateTime, Effect, Layer, Ref, Schema } from "effect";
-import { RpcTest } from "effect/rpc";
+import { Ledger } from "@repo/protocol/domain/visibility";
+import { isRedirect } from "@tanstack/react-router";
+import { DateTime, Effect, Option, Schema } from "effect";
 
-import { EnvView, NothingLanded } from "../src/features/env/env-page.tsx";
 import { ProjectView } from "../src/features/project/project-page.tsx";
-import { readEnv } from "../src/routes/$owner/$project/env.tsx";
+import {
+  movedToEnvironment,
+  movedToLedger,
+} from "../src/features/visibility/moved.ts";
+import { VisibilityView } from "../src/features/visibility/visibility-page.tsx";
+import { Route as EnvRoute } from "../src/routes/$owner/$project/env.tsx";
+import { Route as LedgerRoute } from "../src/routes/$owner/$project/ledger.tsx";
+import { canonicalAddress } from "../src/server/addresses.ts";
 import { inOrder, markupOf, plainText, textOf } from "./ask-fixtures.ts";
 import { textIn } from "./markup.ts";
-import { elementWith, inspectorOf, mainOf } from "./records.ts";
+import { elementWith, mainOf } from "./records.ts";
 import { renderAt } from "./render.tsx";
 
 const now = DateTime.makeUnsafe("2026-10-12T12:00:00Z");
@@ -70,7 +73,23 @@ const datekit = decodeView({
 /** A docs entry that is a script, not an address; joined at run time, as lint refuses it written out. */
 const scriptAddress = ["javascript", "alert(1)"].join(":");
 
-const page = <EnvView now={now} schema={datekit} />;
+const ledger = Schema.decodeSync(Ledger)({
+  entries: [],
+  layers: [],
+  posture: "open",
+  postureLabel: "Open",
+  project: "datekit",
+});
+
+/** The Visibility tab as an environment test reads it, beside a ledger with nothing held back. */
+const tabWith = (schema?: EnvSchemaView, at: DateTime.Utc = now) => (
+  <VisibilityView env={schema} ledger={ledger} now={at} />
+);
+
+const page = tabWith(datekit);
+
+const environmentOf = (markup: string) =>
+  elementWith(markup, 'aria-labelledby="environment"');
 
 const itemOf = (markup: string, key: string) => {
   const start = markup.indexOf(`data-env-key="${key}"`);
@@ -86,11 +105,13 @@ const keysOf = (markup: string) =>
     (found) => found.groups?.key
   );
 
-describe("a project's env shape", () => {
-  it("is titled Env shape, and its status line counts the items and says who set the sensitive one", () => {
+describe("a project's environment", () => {
+  it("is titled Environment, and its status line counts the items and says who set the sensitive one", () => {
     const markup = markupOf(page);
 
-    expect(markup).toMatch(/<h1\b[^>]*>Env shape<\/h1>/u);
+    expect(environmentOf(markup)).toMatch(
+      /<h2\b[^>]*id="environment"[^>]*>Environment<\/h2>/u
+    );
     expect(textIn(elementWith(markup, "data-env-status")).trim()).toBe(
       "4 items · 1 sensitive, set by ines-v 2 d ago"
     );
@@ -134,16 +155,22 @@ describe("a project's env shape", () => {
     ).toBeTruthy();
   });
 
+  it("says each item's sensitivity once: the lock on a sensitive item's line, a plain no on any other", () => {
+    const main = mainOf(markupOf(page));
+    const sensitive = plainText(itemOf(main, "SENTRY_AUTH_TOKEN"));
+
+    // Past its data-sensitive attribute, the word is said once in the row.
+    expect(sensitive.match(/(?<!-)\bsensitive\b/giu)).toHaveLength(1);
+    expect(plainText(itemOf(main, "APP_ENV"))).toContain(
+      "Sensitive No. The platform holds no value for it."
+    );
+  });
+
   it("never says a value was set in the future, though it was set after the page was read", () => {
     // Served at 09:00; ines-v set the value at 09:30 while the page stayed open.
     const item = itemOf(
       mainOf(
-        markupOf(
-          <EnvView
-            now={DateTime.makeUnsafe("2026-10-10T09:00:00Z")}
-            schema={datekit}
-          />
-        )
+        markupOf(tabWith(datekit, DateTime.makeUnsafe("2026-10-10T09:00:00Z")))
       ),
       "SENTRY_AUTH_TOKEN"
     );
@@ -168,15 +195,21 @@ describe("a project's env shape", () => {
     ).toBeTruthy();
   });
 
-  it("credits the format to varlock, linked", () => {
-    const markup = markupOf(page);
+  it("credits the format to varlock, linked, and says no value is shown", () => {
+    const region = environmentOf(markupOf(page));
 
-    expect(textOf(page)).toContain("env shape: varlock's .env.schema format");
-    expect(markup).toMatch(/<a\b[^>]*href="https:\/\/varlock\.dev"/u);
+    expect(
+      inOrder(plainText(region), [
+        "Declared in",
+        "varlock's .env.schema format",
+        "Values are never shown.",
+      ])
+    ).toBeTruthy();
+    expect(region).toMatch(/<a\b[^>]*href="https:\/\/varlock\.dev"/u);
   });
 
   it("says where it was read: the file, the landed commit and the environment", () => {
-    const facts = inspectorOf(markupOf(page));
+    const facts = environmentOf(markupOf(page));
 
     expect(
       inOrder(plainText(facts), [
@@ -201,20 +234,26 @@ describe("a project's env shape", () => {
     expect(markup).not.toMatch(/reveal|show value/iu);
     // The placeholder unlanded code sees is not a value, but reads like one.
     expect(markup).not.toContain("placeholder-sentry-auth-token");
-    expect(plainText(inspectorOf(markup))).toContain(
+    expect(plainText(environmentOf(markup))).toContain(
       `${Brand.cli} env set <KEY> --project oscabriel/datekit --yes`
     );
   });
 
-  it("shows the project's posture in its facts once the project list has it", () => {
-    const markup = markupOf(
-      <EnvView now={now} posture="openWithSealedEvidence" schema={datekit} />
+  it("shows the posture the project's own ledger gives in its status line", () => {
+    const layered = markupOf(
+      <VisibilityView
+        env={datekit}
+        ledger={{ ...ledger, posture: "openCore", postureLabel: "Open core" }}
+        now={now}
+      />
     );
 
-    expect(inspectorOf(markup)).toContain(
-      'data-posture="openWithSealedEvidence"'
+    expect(elementWith(layered, "data-ledger-head")).toContain(
+      'data-posture="openCore"'
     );
-    expect(inspectorOf(markupOf(page))).not.toContain("data-posture=");
+    expect(elementWith(markupOf(page), "data-ledger-head")).toContain(
+      'data-posture="open"'
+    );
   });
 
   it("says a sensitive item nobody set is not set", () => {
@@ -223,7 +262,7 @@ describe("a project's env shape", () => {
       items: items.map(({ value: _value, ...item }) => item),
     });
 
-    const markup = markupOf(<EnvView now={now} schema={unset} />);
+    const markup = markupOf(tabWith(unset));
     const item = itemOf(mainOf(markup), "SENTRY_AUTH_TOKEN");
 
     expect(item).toContain("not set");
@@ -255,7 +294,7 @@ describe("a project's env shape", () => {
       ],
     });
 
-    const markup = mainOf(markupOf(<EnvView now={now} schema={view} />));
+    const markup = mainOf(markupOf(tabWith(view)));
 
     expect(itemOf(markup, "OLD_LOCALE_DIR")).toContain(
       'href="https://docs.example.invalid/locales"'
@@ -271,30 +310,28 @@ describe("a project's env shape", () => {
       items: [],
     });
 
-    expect(textOf(<EnvView now={now} schema={empty} />)).toContain(
-      "No env items"
-    );
+    expect(textOf(tabWith(empty))).toContain("No env items");
   });
 
-  it.effect("sits under the project's crumbs: datekit, then Env shape", () =>
+  it.effect("sits under the project's crumbs: datekit, then Visibility", () =>
     Effect.gen(function* () {
-      const markup = yield* renderAt("/oscabriel/datekit/env", page);
+      const markup = yield* renderAt("/oscabriel/datekit/visibility", page);
       const crumbs = elementWith(markup, 'aria-label="Breadcrumb"');
 
       expect(crumbs).toMatch(
         /<a\b[^>]*href="\/oscabriel\/datekit"[^>]*>oscabriel\/datekit<\/a>/u
       );
-      expect(plainText(crumbs)).toContain("Env shape");
+      expect(plainText(crumbs)).toContain("Visibility");
     })
   );
 });
 
 describe("a project with nothing landed", () => {
-  it("says it has no env shape yet, rather than that it is unknown, with the command to read it", () => {
-    const view = <NothingLanded project={datekit.project} />;
-    const text = textOf(view);
+  it("says it has no environment yet, rather than that it is unknown, with the command to read it", () => {
+    const view = tabWith();
+    const text = plainText(environmentOf(markupOf(view)));
 
-    expect(markupOf(view)).toMatch(/<h1\b[^>]*>Env shape<\/h1>/u);
+    expect(markupOf(view)).toMatch(/<h1\b[^>]*>Visibility<\/h1>/u);
     expect(text).toContain("Nothing has landed in oscabriel/datekit yet");
     expect(text).toContain(
       `${Brand.cli} env shape --project oscabriel/datekit`
@@ -303,7 +340,7 @@ describe("a project with nothing landed", () => {
   });
 });
 
-describe("the env shape's way in", () => {
+describe("the environment's way in", () => {
   it("is linked from the project's page", () => {
     const listing = Schema.decodeSync(ProjectListing)({
       landedAt: "2026-10-11T09:00:00.000Z",
@@ -323,125 +360,91 @@ describe("the env shape's way in", () => {
     );
 
     expect(markup).toMatch(
-      /<a\b[^>]*href="\/oscabriel\/datekit\/env"[^>]*>Env shape<\/a>/u
+      /<a\b[^>]*href="\/oscabriel\/datekit\/visibility#environment"[^>]*>Environment<\/a>/u
     );
   });
 });
 
-interface Asked {
-  readonly asks: number;
-  readonly schemas: number;
-}
+const WEB_URL = "https://web-test.example.workers.dev";
 
-const nothingAsked: Asked = { asks: 0, schemas: 0 };
+const movedTo = (path: string) =>
+  Option.map(canonicalAddress(new Request(`${WEB_URL}${path}`)), (response) => [
+    response.status,
+    response.headers.get("location"),
+  ]);
 
-const platformWhere = (
-  asked: Ref.Ref<Asked>,
-  { known, landed }: { readonly known: boolean; readonly landed: boolean }
+const sentOnFrom = (
+  moved: typeof movedToEnvironment,
+  project: string,
+  searchStr = ""
 ) =>
-  Layer.effect(Client, RpcTest.makeClient(Contracts)).pipe(
-    Layer.provide([
-      Layer.mergeAll(
-        unanswered,
-        Contracts.toLayerHandler(EnvSchemaOf._tag, ({ project }) =>
-          Effect.gen(function* () {
-            yield* Ref.update(asked, (seen) => ({
-              ...seen,
-              schemas: seen.schemas + 1,
-            }));
+  Effect.tryPromise({
+    catch: (thrown) =>
+      isRedirect(thrown)
+        ? [thrown.status, thrown.headers.get("location")]
+        : ["not a redirect"],
+    try: () => moved({ location: { searchStr }, params: { project } }),
+  }).pipe(Effect.flip);
 
-            if (!(known && landed) || project !== datekit.project) {
-              return yield* new UnknownProject({ project });
-            }
+describe("the old Env shape and Ledger addresses", () => {
+  it("are a 301 to the Visibility tab, at its Environment and its Ledger, the query kept", () => {
+    expect(movedTo("/oscabriel/datekit/env")).toStrictEqual(
+      Option.some([301, "/oscabriel/datekit/visibility#environment"])
+    );
+    expect(movedTo("/oscabriel/datekit/ledger?x=1")).toStrictEqual(
+      Option.some([301, "/oscabriel/datekit/visibility?x=1#ledger"])
+    );
+  });
 
-            return datekit;
-          })
-        ),
-        Contracts.toLayerHandler("listAsks", ({ project }) =>
-          Effect.gen(function* () {
-            yield* Ref.update(asked, (seen) => ({
-              ...seen,
-              asks: seen.asks + 1,
-            }));
+  it("take an old or miscased name to the tab in one move", () => {
+    expect(movedTo("/datekit/env")).toStrictEqual(
+      Option.some([301, "/oscabriel/datekit/visibility#environment"])
+    );
+    expect(movedTo("/GitHub.com/Pallets/click/ledger")).toStrictEqual(
+      Option.some([301, "/github.com/pallets/click/visibility#ledger"])
+    );
+  });
 
-            if (!known || project !== datekit.project) {
-              return yield* new UnknownProject({ project });
-            }
+  it("move only the page itself, never a path below it", () => {
+    expect(movedTo("/oscabriel/datekit/env/extra")).toStrictEqual(
+      Option.none()
+    );
+    expect(movedTo("/oscabriel/datekit/visibility")).toStrictEqual(
+      Option.none()
+    );
+  });
 
-            return { asks: [] };
-          })
-        )
-      ),
-      asTester,
-    ])
-  );
-
-describe(readEnv, () => {
-  it.effect(
-    "reads the env shape of a project whose main has landed, and asks nothing more",
-    () =>
-      Effect.gen(function* () {
-        const asked = yield* Ref.make(nothingAsked);
-
-        const read = yield* readEnv("datekit").pipe(
-          Effect.provide(platformWhere(asked, { known: true, landed: true }))
-        );
-
-        expect(read.project).toBe("oscabriel/datekit");
-        expect(read.schema?.items.map(({ key }) => key)).toStrictEqual([
-          "APP_ENV",
-          "SENTRY_DSN",
-          "SENTRY_AUTH_TOKEN",
-          "DATEKIT_LOCALE_DIR",
-        ]);
-        expect(yield* Ref.get(asked)).toStrictEqual({ asks: 0, schemas: 1 });
-      })
-  );
-
-  it.effect(
-    "reads no env shape, and no 404, for a project whose main has not landed",
-    () =>
-      Effect.gen(function* () {
-        const asked = yield* Ref.make(nothingAsked);
-
-        const read = yield* readEnv("datekit").pipe(
-          Effect.provide(platformWhere(asked, { known: true, landed: false }))
-        );
-
-        expect(read.project).toBe("oscabriel/datekit");
-        expect(read.schema).toBeUndefined();
-        expect(yield* Ref.get(asked)).toStrictEqual({ asks: 1, schemas: 1 });
-      })
-  );
-
-  it.effect("is a not-found for a project the platform does not know", () =>
+  // The worker answers a document load with its 301; a page kept before the move may still link here.
+  it.effect("send a navigation inside the app on to the tab", () =>
     Effect.gen(function* () {
-      const asked = yield* Ref.make(nothingAsked);
-
-      const failed = yield* Effect.flip(
-        readEnv("oscabriel/no-such-project").pipe(
-          Effect.provide(platformWhere(asked, { known: true, landed: true }))
-        )
-      );
-
-      expect(isNotFound(failed)).toBeTruthy();
+      expect(EnvRoute.options.beforeLoad).toBe(movedToEnvironment);
+      expect(LedgerRoute.options.beforeLoad).toBe(movedToLedger);
+      expect(
+        yield* sentOnFrom(movedToEnvironment, "oscabriel/datekit")
+      ).toStrictEqual([301, "/oscabriel/datekit/visibility#environment"]);
+      expect(
+        yield* sentOnFrom(movedToLedger, "github.com/pallets/click", "?x=1")
+      ).toStrictEqual([301, "/github.com/pallets/click/visibility?x=1#ledger"]);
     })
   );
+});
 
-  it.effect(
-    "is a not-found, asking nothing, for an address that names no project",
-    () =>
-      Effect.gen(function* () {
-        const asked = yield* Ref.make(nothingAsked);
+const webSources: Readonly<Record<string, string>> = import.meta.glob(
+  [
+    "../src/**/*.{ts,tsx}",
+    "!../src/**/*.gen.ts",
+    "../../../packages/agent-kit/src/**/*.ts",
+  ],
+  { eager: true, import: "default", query: "?raw" }
+);
 
-        const failed = yield* Effect.flip(
-          readEnv("Not_A-Project").pipe(
-            Effect.provide(platformWhere(asked, { known: true, landed: true }))
-          )
-        );
-
-        expect(isNotFound(failed)).toBeTruthy();
-        expect(yield* Ref.get(asked)).toStrictEqual(nothingAsked);
-      })
-  );
+describe("the Env shape label", () => {
+  it("appears nowhere the web draws from: the page is Environment now", () => {
+    expect(Object.keys(webSources).length).toBeGreaterThan(100);
+    expect(
+      Object.entries(webSources).flatMap(([path, source]) =>
+        /Env shape/u.test(source) ? [path] : []
+      )
+    ).toStrictEqual([]);
+  });
 });

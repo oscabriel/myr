@@ -4,7 +4,7 @@ import { cli } from "./page.ts";
 
 export const connectAnAgent: DocSource = {
   body: ({ platformUrl, webUrl }) => [
-    `Any coding agent can take an ask: it works in git through the CLI, or over MCP, as the person it works for. The exact setup for each agent is on [For agents](/agents); this page says what each way gives.`,
+    `Any coding agent can take an ask: it works in git through the CLI, or over MCP, as the person it works for. The exact setup for each agent is on [Install](/install); this page says what each way gives.`,
     "",
     "## The ways in",
     "",

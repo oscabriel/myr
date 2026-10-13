@@ -1,5 +1,9 @@
 import { describe, expect, it } from "@effect/vitest";
+import { agentEndpoints, agentLimits } from "@repo/agent-kit/agent-setup";
+import { commandDocs } from "@repo/agent-kit/command-doc";
 import { docPage, docPages } from "@repo/agent-kit/docs/index";
+import { Brand } from "@repo/brand";
+import { Contracts } from "@repo/protocol/contracts";
 import { Effect, Option } from "effect";
 
 import { commands } from "../src/features/agents/catalog.ts";
@@ -8,7 +12,9 @@ import {
   DocsPageView,
 } from "../src/features/docs/docs-view.tsx";
 import { docsHead } from "../src/features/docs/head.ts";
+import { AppShell } from "../src/features/shared/shell/app-shell.tsx";
 import { docsMarkdownHandler } from "../src/routes/docs/{$page}[.]md.ts";
+import { attributeOf, tagsWith, textIn } from "./markup.ts";
 import { renderAt } from "./render.tsx";
 
 const input = {
@@ -23,11 +29,55 @@ const textOf = (markup: string) =>
   markup
     .replaceAll(/<[^>]+>/gu, " ")
     .replaceAll("&#x27;", "'")
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&quot;", '"')
     .replaceAll("&amp;", "&")
     .replaceAll(/\s+/gu, " ")
     .trim();
 
 const pageNamed = (slug: string) => Option.getOrThrow(docPage(input, slug));
+
+/** The first element of `tag` carrying the attribute, whole; none of these nest in themselves. */
+const elementOf = (markup: string, tag: string, attribute: string) =>
+  new RegExp(`<${tag}\\b[^>]*${attribute}[^>]*>[\\s\\S]*?</${tag}>`, "u").exec(
+    markup
+  )?.[0] ?? "";
+
+const linksOf = (markup: string) =>
+  [...markup.matchAll(/<a\b(?<attributes>[^>]*)>(?<text>[\s\S]*?)<\/a>/gu)].map(
+    ({ groups }) => {
+      const attributes = groups?.attributes ?? "";
+
+      return {
+        current: attributes.includes('aria-current="page"'),
+        href: /href="(?<href>[^"]*)"/u.exec(attributes)?.groups?.href ?? "",
+        text: textOf(groups?.text ?? ""),
+      };
+    }
+  );
+
+/** The article's own `h2`s, as `[id, text]`. */
+const headingsOf = (markup: string) =>
+  [
+    ...elementOf(markup, "article", "data-doc").matchAll(
+      /<h2\b[^>]*id="(?<id>[^"]*)"[^>]*>(?<text>[\s\S]*?)<\/h2>/gu
+    ),
+  ].map(({ groups }) => [groups?.id ?? "", textOf(groups?.text ?? "")]);
+
+/** "On this page": its in-page links, as `[id, text]`. */
+const contentsOf = (markup: string) =>
+  linksOf(elementOf(markup, "aside", 'aria-label="On this page"')).flatMap(
+    ({ href, text }) => (href.startsWith("#") ? [[href.slice(1), text]] : [])
+  );
+
+const inDocsShell = (slug: string) =>
+  renderAt(
+    `/docs/${slug}`,
+    <AppShell>
+      <DocsPageView page={pageNamed(slug)} />
+    </AppShell>
+  );
 
 describe("the docs' index", () => {
   it.effect(
@@ -53,7 +103,131 @@ describe("the docs' index", () => {
   );
 });
 
+describe("a page of the docs in the docs shell", () => {
+  it.effect(
+    "marks itself current in the tree, and offers its Markdown and its headings beside the article",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* inDocsShell("landing");
+        const aside = elementOf(markup, "aside", 'aria-label="On this page"');
+
+        expect(
+          linksOf(elementOf(markup, "nav", 'aria-label="Docs"'))
+            .filter(({ current }) => current)
+            .map(({ text }) => text)
+        ).toStrictEqual(["How a landing happens"]);
+        expect(aside).toMatch(
+          /<button\b[^>]*>[\s\S]*?Copy as Markdown[\s\S]*?<\/button>/u
+        );
+        expect(linksOf(aside)).toContainEqual({
+          current: false,
+          href: "/docs/landing.md",
+          text: "View as .md",
+        });
+        expect(contentsOf(markup)).toStrictEqual(headingsOf(markup));
+      })
+  );
+});
+
+/** The classes on the docs tree's wrapper. */
+const treeClasses = (tag: string) =>
+  (attributeOf(tag, "class") ?? "").split(" ");
+
+describe("the docs below `columns`", () => {
+  it.effect(
+    "fold a page's headings into a disclosure ahead of its body, linking what On this page links",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* inDocsShell("start-here");
+        const ahead = elementOf(markup, "details", 'class="');
+        const article = elementOf(markup, "article", "data-doc");
+
+        expect(ahead).toContain("columns:hidden");
+        expect(
+          linksOf(ahead).map(({ href, text }) => [href.slice(1), text])
+        ).toStrictEqual(contentsOf(markup));
+        expect(article.indexOf("<details")).toBeLessThan(
+          article.indexOf("<h2")
+        );
+      })
+  );
+
+  // The index already lists every page, so the tree under it would say it twice.
+  it.effect("show no tree under the index, and the tree under a page", () =>
+    Effect.gen(function* () {
+      const index = tagsWith(
+        yield* renderAt(
+          "/docs",
+          <AppShell>
+            <DocsIndexView pages={pages} />
+          </AppShell>
+        ),
+        "data-docs-tree"
+      );
+
+      const page = tagsWith(yield* inDocsShell("landing"), "data-docs-tree");
+
+      expect(
+        ["hidden", "columns:block"].filter(
+          (name) => !index.flatMap(treeClasses).includes(name)
+        )
+      ).toStrictEqual([]);
+      expect(page.flatMap(treeClasses)).not.toContain("hidden");
+    })
+  );
+});
+
+describe("the docs' links to setup", () => {
+  it("send a reader to /install, never the old /agents", () => {
+    expect(
+      pages.flatMap(({ markdown, slug }) =>
+        /\]\(\/agents[)#]/u.test(markdown) ? [slug] : []
+      )
+    ).toStrictEqual([]);
+    expect(
+      ["connect-an-agent", "mcp"].filter(
+        (slug) => !pageNamed(slug).markdown.includes("](/install)")
+      )
+    ).toStrictEqual([]);
+  });
+});
+
 describe("a page of the docs", () => {
+  it.effect(
+    "lists its article's h2s under On this page, in order, each linking its heading's id",
+    () =>
+      Effect.gen(function* () {
+        const mismatched: string[] = [];
+
+        for (const page of pages) {
+          const markup = yield* renderAt(
+            `/docs/${page.slug}`,
+            <DocsPageView page={page} />
+          );
+
+          if (
+            JSON.stringify(contentsOf(markup)) !==
+            JSON.stringify(headingsOf(markup))
+          ) {
+            mismatched.push(page.slug);
+          }
+        }
+
+        expect(mismatched).toStrictEqual([]);
+        expect(
+          contentsOf(
+            yield* renderAt(
+              "/docs/start-here",
+              <DocsPageView page={pageNamed("start-here")} />
+            )
+          )
+        ).toContainEqual([
+          "how-a-change-reaches-main",
+          "How a change reaches main",
+        ]);
+      })
+  );
+
   it.effect(
     "draws its Markdown under one title, with the other pages beside it",
     () =>
@@ -62,7 +236,7 @@ describe("a page of the docs", () => {
 
         const markup = yield* renderAt(
           "/docs/answer-an-ask",
-          <DocsPageView page={page} pages={pages} />
+          <DocsPageView page={page} />
         );
 
         expect(markup.match(/<h1\b[^>]*>[^<]*<\/h1>/gu)).toStrictEqual([
@@ -83,16 +257,86 @@ describe("a page of the docs", () => {
       })
   );
 
+  it.effect(
+    "lists on Commands every command the CLI has, in its order, each as its synopsis with what it does",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* renderAt(
+          "/docs/commands",
+          <DocsPageView page={pageNamed("commands")} />
+        );
+
+        const rows = [
+          ...elementOf(markup, "article", "data-doc").matchAll(
+            /<tr>\s*<td\b[^>]*>(?<usage>[\s\S]*?)<\/td>\s*<td\b[^>]*>(?<summary>[\s\S]*?)<\/td>/gu
+          ),
+        ].map(({ groups }) => ({
+          summary: textIn(groups?.summary ?? ""),
+          usage: textOf(groups?.usage ?? ""),
+        }));
+
+        const expected = commandDocs(Contracts).map(
+          ({ flags, path, positional, summary }) => ({
+            summary,
+            words: [
+              Brand.cli,
+              ...path,
+              ...positional.map((name) => `<${name}>`),
+              ...flags
+                .filter((flag) => !positional.includes(flag.slice(2)))
+                .map((flag) => `[${flag}]`),
+            ],
+          })
+        );
+
+        expect(rows.map(({ usage }) => usage.split(" "))).toStrictEqual(
+          expected.map(({ words }) => words)
+        );
+        expect(rows.map(({ summary }) => summary)).toStrictEqual(
+          expected.map(({ summary }) => summary.replaceAll("`", ""))
+        );
+      })
+  );
+
   it.effect("draws a reference page's tables", () =>
     Effect.gen(function* () {
       const markup = yield* renderAt(
         "/docs/refusals",
-        <DocsPageView page={pageNamed("refusals")} pages={pages} />
+        <DocsPageView page={pageNamed("refusals")} />
       );
 
       expect(markup).toContain("<table");
       expect(markup).toContain("<code>OutOfScope</code>");
     })
+  );
+
+  it.effect(
+    "draws every limit and endpoint agent-kit gives on the Limits and endpoints page, each endpoint a reader can open as a link",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* renderAt(
+          "/docs/limits",
+          <DocsPageView page={pageNamed("limits")} />
+        );
+
+        const text = textOf(markup);
+
+        expect(markup.match(/<table/gu)).toHaveLength(2);
+        expect(
+          [
+            ...agentLimits().flatMap(({ limit, value }) => [limit, value]),
+            ...agentEndpoints(input).flatMap(({ url, what }) => [url, what]),
+          ].filter((words) => !text.includes(words))
+        ).toStrictEqual([]);
+        expect(
+          agentEndpoints(input)
+            .filter(
+              ({ readable, url }) =>
+                markup.includes(`href="${url}"`) !== readable
+            )
+            .map(({ url }) => url)
+        ).toStrictEqual([]);
+      })
   );
 
   it("names its Markdown in its head, with its summary as its description", () => {

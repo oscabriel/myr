@@ -1,32 +1,90 @@
 import { projectAddressOf } from "@repo/protocol/ids";
 import { Option } from "effect";
 
-import { segmentsOf } from "../paths.ts";
+import { INBOX_PATH, segmentsOf } from "../paths.ts";
 
+/** A project's eight tabs (ADR 0041), in the header's order. */
 export type ProjectTab =
+  | "asks"
   | "code"
-  | "env"
   | "landings"
-  | "ledger"
   | "overview"
   | "people"
-  | "refs";
+  | "policy"
+  | "proposals"
+  | "visibility";
 
 export interface Section {
   readonly label: string;
   readonly tab: ProjectTab;
   readonly to: string;
+  /** A tab whose own page has not been built yet opens the region of Overview that holds it. */
+  readonly hash?: string;
 }
 
+/**
+ * Each tab opens a page inside the project's frame that exists today: Asks,
+ * Landings, Proposals and People open their regions of Overview (the history
+ * of commits is the Code tab's), Policy the policy at the address it has
+ * always had, and Visibility its own page. Starting a
+ * proposal is a focused page of its own, so it is Contribute's, not a tab's.
+ */
 export const projectSections = (project: string): readonly Section[] => [
-  { label: "Asks", tab: "overview", to: `/${project}` },
+  { label: "Overview", tab: "overview", to: `/${project}` },
   { label: "Code", tab: "code", to: `/${project}/tree/main` },
-  { label: "Landings", tab: "landings", to: `/${project}/commits/main` },
-  { label: "Refs", tab: "refs", to: `/${project}/refs` },
-  { label: "Policy", tab: "people", to: `/${project}/people` },
-  { label: "Ledger", tab: "ledger", to: `/${project}/ledger` },
-  { label: "Env shape", tab: "env", to: `/${project}/env` },
+  { hash: "open-asks", label: "Asks", tab: "asks", to: `/${project}` },
+  {
+    hash: "recent-landings",
+    label: "Landings",
+    tab: "landings",
+    to: `/${project}`,
+  },
+  {
+    hash: "proposals",
+    label: "Proposals",
+    tab: "proposals",
+    to: `/${project}`,
+  },
+  { hash: "who-decides", label: "People", tab: "people", to: `/${project}` },
+  { label: "Policy", tab: "policy", to: `/${project}/people` },
+  { label: "Visibility", tab: "visibility", to: `/${project}/visibility` },
 ];
+
+/** The tab each page of a project sits under, by its first segment. */
+const TAB_OF = {
+  answers: "landings",
+  asks: "asks",
+  blob: "code",
+  commit: "code",
+  commits: "code",
+  decisions: "asks",
+  people: "policy",
+  proposals: "proposals",
+  raw: "code",
+  refs: "code",
+  tree: "code",
+  visibility: "visibility",
+  why: "code",
+} as const satisfies Record<string, ProjectTab>;
+
+/** A crumb names the page itself, which may be narrower than its tab. */
+type PageSection =
+  | "code"
+  | "landings"
+  | "overview"
+  | "people"
+  | "refs"
+  | "visibility";
+
+const PAGE_TO = (project: string) =>
+  ({
+    code: `/${project}/tree/main`,
+    landings: `/${project}/commits/main`,
+    overview: `/${project}`,
+    people: `/${project}/people`,
+    refs: `/${project}/refs`,
+    visibility: `/${project}/visibility`,
+  }) as const satisfies Record<PageSection, string>;
 
 const SECTION_OF = {
   answers: "overview",
@@ -34,23 +92,14 @@ const SECTION_OF = {
   blob: "code",
   commit: "landings",
   commits: "landings",
-  env: "env",
-  ledger: "ledger",
   people: "people",
   refs: "refs",
   tree: "code",
+  visibility: "visibility",
   why: "code",
-} as const satisfies Record<string, ProjectTab>;
+} as const satisfies Record<string, PageSection>;
 
-const SITE = new Set([
-  "agents",
-  "asks",
-  "docs",
-  "home",
-  "import",
-  "people",
-  "today",
-]);
+const SITE = new Set(["agents", "asks", "docs", "import", "inbox", "people"]);
 
 const addressOf = (pathname: string) => {
   const segments = segmentsOf(pathname);
@@ -64,7 +113,42 @@ const addressOf = (pathname: string) => {
 export const projectOf = (pathname: string): string | undefined =>
   addressOf(pathname)?.spelled;
 
-export const sectionOf = (pathname: string): ProjectTab | undefined => {
+/** The tab a project's page sits under; Overview for the project's own address. */
+export const projectTabOf = (pathname: string): ProjectTab | undefined => {
+  const address = addressOf(pathname);
+
+  if (address === undefined) {
+    return undefined;
+  }
+
+  const [page] = address.rest;
+
+  return page === undefined
+    ? "overview"
+    : Object.entries(TAB_OF).find(([segment]) => segment === page)?.[1];
+};
+
+/**
+ * The pages under a project that its route draws in another shell: starting
+ * a proposal is focused (`staticData.shell` is `focus`), so it has no header.
+ */
+const OUTSIDE_FRAME: readonly (readonly string[])[] = [["proposals", "new"]];
+
+/** Whether a path is a project's page drawn in the project's frame, under its header. */
+export const inProjectFrame = (pathname: string): boolean => {
+  const address = addressOf(pathname);
+
+  return (
+    address !== undefined &&
+    !OUTSIDE_FRAME.some(
+      (page) =>
+        page.length === address.rest.length &&
+        page.every((segment, at) => address.rest[at] === segment)
+    )
+  );
+};
+
+const sectionOf = (pathname: string): PageSection | undefined => {
   const address = addressOf(pathname);
 
   if (address === undefined) {
@@ -86,28 +170,26 @@ export interface Crumb {
 
 const SECTION_LABEL = {
   code: "Code",
-  env: "Env shape",
   landings: "Landings",
-  ledger: "Ledger",
   overview: "Asks",
   people: "Policy",
   refs: "Refs",
-} as const satisfies Record<ProjectTab, string>;
+  visibility: "Visibility",
+} as const satisfies Record<PageSection, string>;
 
 const sectionCrumb = (
   project: string,
-  tab: ProjectTab,
+  tab: PageSection,
   below: boolean
 ): Crumb => {
   const label = SECTION_LABEL[tab];
-  const section = projectSections(project).find((each) => each.tab === tab);
 
-  return below && section !== undefined ? { label, to: section.to } : { label };
+  return below ? { label, to: PAGE_TO(project)[tab] } : { label };
 };
 
 const projectCrumbs = (
   project: string,
-  tab: ProjectTab,
+  tab: PageSection,
   below: boolean
 ): readonly Crumb[] => [
   { label: project, to: `/${project}` },
@@ -120,15 +202,13 @@ const pathCrumbs = (project: string, path: string): readonly Crumb[] =>
     : [...projectCrumbs(project, "code", true), { label: path, mono: true }];
 
 const SITE_CRUMBS = {
-  agents: () => [{ label: "For agents" }],
   asks: () => [{ label: "Asks" }],
   docs: (page: string | undefined) =>
     page === undefined
       ? [{ label: "Docs" }]
       : [{ label: "Docs", to: "/docs" }, { label: page }],
-  home: () => [{ label: "Home" }],
+  inbox: () => [{ label: "Inbox" }],
   people: (handle: string | undefined) => [{ label: handle ?? "People" }],
-  today: () => [{ label: "Today" }],
 } as const satisfies Record<
   string,
   (second: string | undefined) => readonly Crumb[]
@@ -152,7 +232,7 @@ const SUBJECT_CRUMBS = {
   ],
   decisions: (project: string, decision: string) => [
     { label: project, to: `/${project}` },
-    { label: "Today", to: "/today" },
+    { label: "Inbox", to: INBOX_PATH },
     { label: decision, mono: true },
   ],
   proposals: (project: string, proposal: string) => [

@@ -141,7 +141,7 @@ describe("an answer to a request with no cookie", () => {
   });
 
   it("keeps a page about its reader nowhere, as the route says", () => {
-    expect(kept(forTheEdge(get("/today"), answer(personalPage)))).toStrictEqual(
+    expect(kept(forTheEdge(get("/inbox"), answer(personalPage)))).toStrictEqual(
       {
         cacheControl: personalPage["Cache-Control"],
         vary: null,
@@ -367,7 +367,7 @@ const landing = (request: Request) =>
 
 describe("the landing", () => {
   it.effect(
-    "sends a reader who carries a session to their home, and the edge keeps that nowhere",
+    "sends a reader who carries a session to their inbox, and the edge keeps that nowhere",
     () =>
       Effect.gen(function* () {
         const served = yield* Effect.promise(() =>
@@ -382,7 +382,7 @@ describe("the landing", () => {
           ...kept(served),
         }).toStrictEqual({
           cacheControl: KEPT_NOWHERE,
-          location: "/home",
+          location: "/inbox",
           status: 302,
           vary: null,
         });
@@ -434,8 +434,7 @@ describe("a page", () => {
 
     expect(reading.toSorted()).toStrictEqual([
       "../src/routes/$owner/$project/decisions/$decision.tsx",
-      "../src/routes/home.tsx",
-      "../src/routes/today.tsx",
+      "../src/routes/inbox.tsx",
     ]);
 
     for (const path of reading) {

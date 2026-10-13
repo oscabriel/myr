@@ -8,6 +8,13 @@ import type {
   FrontPageEntry,
   ProjectListing,
 } from "@repo/protocol/domain/front-page";
+import { Outcome } from "@repo/protocol/domain/outcome";
+import {
+  field,
+  RECENT_LANDINGS_CAP,
+  RecentLanding,
+  shownRefusal,
+} from "@repo/protocol/domain/recent-landing";
 import { LedgerEntry } from "@repo/protocol/domain/visibility";
 import type { ProjectName } from "@repo/protocol/ids";
 import type { Posture } from "@repo/protocol/posture";
@@ -166,6 +173,85 @@ const entryOf =
     };
   };
 
+interface Recent {
+  readonly landing: RecentLanding;
+  readonly seq: number;
+}
+
+const latestFirst = Order.combineAll([
+  Order.flip(
+    Order.mapInput(DateTime.Order, ({ landing }: Recent) => landing.at)
+  ),
+  Order.mapInput(Order.String, ({ landing }: Recent) => landing.project),
+  Order.flip(Order.mapInput(Order.Number, ({ seq }: Recent) => seq)),
+]);
+
+const wantsOf = (events: readonly ProjectedEvent[]) =>
+  new Map(
+    events.flatMap(({ event, project }) =>
+      ProjectEvent.guards.AskOpened(event)
+        ? [[keyOf(project, event.ask.ask), event.ask.want] as const]
+        : []
+    )
+  );
+
+/** The latest landings and refused answers, as D1's list keeps them: public facts only. */
+const recentOf = (
+  events: readonly ProjectedEvent[]
+): readonly RecentLanding[] => {
+  const wants = wantsOf(events);
+
+  const wantFor = (project: ProjectName, ask: string | undefined) =>
+    field(
+      "want",
+      ask === undefined ? undefined : wants.get(keyOf(project, ask))
+    );
+
+  const rows = events.flatMap(({ event, project }): readonly Recent[] => {
+    if (ProjectEvent.guards.Landed(event)) {
+      const { landing } = event;
+
+      return [
+        {
+          landing: RecentLanding.cases.Landed.make({
+            at: landing.landedAt,
+            project,
+            sha: landing.sha,
+            ...field("answered", landing.ask),
+            ...field("opened", landing.opened),
+            ...wantFor(project, landing.ask ?? landing.opened),
+          }),
+          seq: event.seq,
+        },
+      ];
+    }
+
+    if (
+      ProjectEvent.guards.Judged(event) &&
+      Outcome.guards.Refused(event.outcome)
+    ) {
+      return [
+        {
+          landing: RecentLanding.cases.Refused.make({
+            ask: event.ask,
+            at: event.at,
+            project,
+            refusals: Array.map(event.outcome.refusals, shownRefusal),
+            ...wantFor(project, event.ask),
+          }),
+          seq: event.seq,
+        },
+      ];
+    }
+
+    return [];
+  });
+
+  return Array.take(Array.sort(rows, latestFirst), RECENT_LANDINGS_CAP).map(
+    ({ landing }) => landing
+  );
+};
+
 const matches =
   ({ kind, reserved }: FrontPageFilter) =>
   ({ ask }: Row) =>
@@ -198,6 +284,7 @@ export const DevFrontPage: Layer.Layer<
         ),
       projects: () =>
         Effect.map(page, (folded) => folded.projects.map(listingOf(folded))),
+      recentLandings: () => Effect.map(projected.events, recentOf),
     });
   })
 );

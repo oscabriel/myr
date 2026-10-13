@@ -1,6 +1,6 @@
 /**
- * Kept apart from `marks.tsx` so the rail, on every page, carries only the
- * three icons a posture needs.
+ * Kept apart from `marks.tsx` so a list of projects carries only the three
+ * icons a posture needs.
  */
 import type { Posture } from "@repo/protocol/posture";
 import { Eye, LockKeyhole, LockKeyholeOpen } from "lucide-react";

@@ -2,6 +2,8 @@ import type {
   FrontPageEntry,
   ProjectListing,
 } from "@repo/protocol/domain/front-page";
+import { RECENT_LANDINGS_CAP } from "@repo/protocol/domain/recent-landing";
+import type { RecentLanding } from "@repo/protocol/domain/recent-landing";
 import type { CreditSummary } from "@repo/protocol/domain/record";
 import { sameHandle } from "@repo/protocol/ids";
 import type { Handle } from "@repo/protocol/ids";
@@ -17,6 +19,8 @@ export interface FrontPageSeed {
     readonly handle: Handle;
     readonly credit: CreditSummary;
   }[];
+  /** The latest first; none when absent. */
+  readonly landings?: readonly RecentLanding[];
 }
 
 const matches =
@@ -39,6 +43,8 @@ export const FrontPageMemory = {
         entries: (filter) =>
           Effect.succeed(seed.entries.filter(matches(filter))),
         projects: () => Effect.succeed(seed.projects),
+        recentLandings: () =>
+          Effect.succeed((seed.landings ?? []).slice(0, RECENT_LANDINGS_CAP)),
       })
     ),
 };
