@@ -1,5 +1,5 @@
 import { Brand } from "@repo/brand";
-import { Menu, Search } from "lucide-react";
+import { Keyboard, Menu, Search } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { Button } from "../../../components/ui/button.tsx";
@@ -72,6 +72,19 @@ const Controls = () => {
         <Search aria-hidden="true" strokeWidth={1.75} />
         <span className="tablet:not-sr-only sr-only">Search</span>
       </Button>
+      {/* The `?` key's twin from `nav` up; below it the menu holds Keys. */}
+      <span className="text-muted-foreground nav:flex hidden shrink-0">
+        <Button
+          onClick={() => {
+            open("keys");
+          }}
+          size="sm"
+          variant="ghost"
+        >
+          <Keyboard aria-hidden="true" strokeWidth={1.75} />
+          <span className="sr-only">Keys</span>
+        </Button>
+      </span>
       <Account />
       <Quiet>
         <Button
