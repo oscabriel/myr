@@ -18,6 +18,7 @@ import {
   treeHref,
   whyHref,
 } from "./paths.ts";
+import { pinnedRev } from "./rev.ts";
 
 export const linesOf = (text: string): readonly string[] => {
   const lines = text.split("\n");
@@ -292,7 +293,10 @@ export const FileHeader = ({
         className="shell:flex hidden shrink-0 items-center gap-0.5"
         data-toolbar="file"
       >
-        <a className={TOOL} href={rawHref(project, file.at, file.path)}>
+        <a
+          className={TOOL}
+          href={rawHref(project, pinnedRev(rev, file.at), file.path)}
+        >
           Raw
         </a>
         <AppLink
@@ -300,7 +304,7 @@ export const FileHeader = ({
           title="Permalink (y)"
           to={(mode === "why" ? whyHref : blobHref)(
             project,
-            file.at,
+            pinnedRev(rev, file.at),
             file.path
           )}
         >

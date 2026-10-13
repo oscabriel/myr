@@ -5,6 +5,7 @@ import type { AskId, ProjectName } from "@repo/protocol/ids";
 import { Option } from "effect";
 
 import { whyHref } from "../code/paths.ts";
+import { pinnedRev } from "../code/rev.ts";
 
 export interface WhyRow {
   readonly range: WhyRange;
@@ -82,13 +83,15 @@ export const verdictWords = (landing: LandingView) =>
     isLanded(outcome) ? "checked and landed" : outcome._tag
   );
 
+/** Why at the commit's parent, inside the fork `rev` names when it names one. */
 export const priorHref = (
   project: ProjectName,
   commit: CommitView,
-  path: string
+  path: string,
+  rev: string
 ) =>
   Option.map(Option.fromUndefinedOr(commit.parents[0]), (parent) =>
-    whyHref(project, parent, path)
+    whyHref(project, pinnedRev(rev, parent), path)
   );
 
 export const proposeHref = (

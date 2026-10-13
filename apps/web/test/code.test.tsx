@@ -25,7 +25,7 @@ import type { Refusal } from "@repo/protocol/refusal";
 import { explain } from "@repo/protocol/render";
 import { asTester, unanswered } from "@repo/protocol/testing";
 import { isNotFound } from "@tanstack/react-router";
-import { DateTime, Effect, Layer, Option, Ref, Schema } from "effect";
+import { DateTime, Effect, Layer, Option, Ref, Schema, Struct } from "effect";
 import { RpcTest } from "effect/rpc";
 import type { Rpc } from "effect/rpc";
 import type { ReactElement } from "react";
@@ -1507,6 +1507,12 @@ const platformOf = (calls: Ref.Ref<readonly Sent[]>) => {
             yield* sent(payload);
             yield* knownProject(payload.project);
 
+            if (payload.at !== undefined) {
+              return payload.at === "@bob/parse-iso"
+                ? { ...diff, commit: Struct.omit(diff.commit, ["landing"]) }
+                : yield* new UnknownRevision({ rev: payload.at });
+            }
+
             if (payload.sha !== LANDED) {
               return yield* new UnknownCommit({ sha: payload.sha });
             }
@@ -1891,4 +1897,127 @@ describe("the code browser's views", () => {
     expect(Object.keys(sources).length).toBeGreaterThanOrEqual(3);
     expect(reachingTransport(sources)).toStrictEqual([]);
   });
+});
+
+const FORK = "@bob/parse-iso";
+
+const FORK_SEGMENT = "%40bob%2Fparse-iso";
+
+/** A commit read in bob's fork, as one address segment. */
+const inFork = (sha: string) => `${FORK_SEGMENT}%3A${sha}`;
+
+describe("an answer fork in the Code tab", () => {
+  it("pins raw and the permalink to the commit inside the fork, and keeps the history at the fork", () => {
+    const markup = markupOf(
+      <BlobView file={parseTs} now={now} project={datekit} rev={FORK} />
+    );
+
+    expect(hrefsOf(navOf(markup, 'data-toolbar="file"'))).toStrictEqual([
+      `/oscabriel/datekit/raw/${inFork(AT)}/src/format/parse.ts`,
+      `/oscabriel/datekit/blob/${inFork(AT)}/src/format/parse.ts`,
+    ]);
+    expect(hrefsOf(factsOf(markup))).toContain(
+      `/oscabriel/datekit/commits/${FORK_SEGMENT}?path=src%2Fformat%2Fparse.ts`
+    );
+  });
+
+  it("links each commit of the fork's log to its page inside the fork", () => {
+    const markup = markupOf(
+      <LogView
+        commits={commits}
+        from={0}
+        now={now}
+        project={datekit}
+        rev={FORK}
+      />
+    );
+
+    expect(hrefsOf(markup)).toContain(
+      `/oscabriel/datekit/commit/${inFork(LANDED)}`
+    );
+    expect(hrefsOf(markup)).not.toContain(
+      `/oscabriel/datekit/commit/${LANDED}`
+    );
+  });
+
+  it("links a fork commit's parent and its files inside the fork", () => {
+    const hrefs = hrefsOf(
+      markupOf(<CommitView at={FORK} diff={diff} now={now} project={datekit} />)
+    );
+
+    expect(hrefs).toContain(`/oscabriel/datekit/commit/${inFork(IMPORTED)}`);
+    expect(hrefs).toContain(`/oscabriel/datekit/tree/${inFork(LANDED)}`);
+    expect(hrefs).not.toContain(`/oscabriel/datekit/tree/${LANDED}`);
+  });
+
+  it("reads a fork's address, and a commit inside it, off the path", () => {
+    expect(
+      [
+        `/oscabriel/datekit/tree/${FORK_SEGMENT}/src`,
+        `/oscabriel/datekit/commit/${inFork(LANDED)}`,
+      ].map(codeAddressOf)
+    ).toStrictEqual([
+      Option.some({ page: "tree", path: "src", rev: FORK }),
+      Option.some({
+        page: "commit",
+        path: undefined,
+        rev: `${FORK}:${LANDED}`,
+      }),
+    ]);
+  });
+
+  it.effect(
+    "names the fork in the ref switcher, with Files and Commits kept at the fork",
+    () =>
+      Effect.gen(function* () {
+        const bar = codeBarOf(
+          yield* inCodeTab(
+            `/oscabriel/datekit/tree/${FORK_SEGMENT}`,
+            <TreeView listing={root} now={now} project={datekit} rev={FORK} />
+          )
+        );
+
+        expect(elementWith(bar, `data-ref="${FORK}"`)).toContain(
+          "bob/parse-iso"
+        );
+        expect(
+          linksIn(navOf(bar, 'aria-label="Files or commits"')).map(
+            ({ href }) => href
+          )
+        ).toStrictEqual([
+          `/oscabriel/datekit/tree/${FORK_SEGMENT}`,
+          `/oscabriel/datekit/commits/${FORK_SEGMENT}`,
+        ]);
+      })
+  );
+
+  it.effect(
+    "reads a commit in the fork its address names, and carries back a fork the project does not list",
+    () =>
+      Effect.gen(function* () {
+        const calls = yield* Ref.make<readonly Sent[]>([]);
+
+        const read = yield* readCommitPage({
+          project: "oscabriel/datekit",
+          sha: inFork(LANDED),
+        }).pipe(Effect.provide(platformOf(calls)));
+
+        const { refused } = yield* refusedBy(
+          readCommitPage({
+            project: "oscabriel/datekit",
+            sha: `%40carol%2Fparse-iso%3A${LANDED}`,
+          })
+        );
+
+        expect([read.at, yield* Ref.get(calls)]).toStrictEqual([
+          FORK,
+          [{ at: FORK, project: "oscabriel/datekit", sha: LANDED }],
+        ]);
+        expect(refused).toStrictEqual(
+          Option.some(
+            explain([new UnknownRevision({ rev: "@carol/parse-iso" })])
+          )
+        );
+      })
+  );
 });

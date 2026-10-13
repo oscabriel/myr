@@ -7,6 +7,7 @@ import { Fragment } from "react";
 import type { ReactElement } from "react";
 
 import { commitHref, shortSha } from "../code/paths.ts";
+import { pinnedRev } from "../code/rev.ts";
 import { AppLink } from "../shared/link.tsx";
 import { answerPath, askPath, personPath } from "../shared/paths.ts";
 import { When } from "../shared/time.tsx";
@@ -93,9 +94,12 @@ export const LandingWords = ({
   landing,
   now,
   project,
+  rev,
   sha,
 }: {
   readonly project: ProjectName;
+  /** The revision being read: a fork's commit links inside that fork. */
+  readonly rev: string;
   readonly sha: string;
   readonly commit: Option.Option<CommitView>;
   readonly landing: Option.Option<LandingView>;
@@ -123,7 +127,11 @@ export const LandingWords = ({
     <Parted
       parts={[
         ...what,
-        <AppLink className={CODE_LINK} key="sha" to={commitHref(project, sha)}>
+        <AppLink
+          className={CODE_LINK}
+          key="sha"
+          to={commitHref(project, pinnedRev(rev, sha))}
+        >
           {shortSha(sha)}
         </AppLink>,
         ...when,

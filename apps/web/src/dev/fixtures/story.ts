@@ -717,6 +717,32 @@ export const storyOf = (input: {
 
       head: () => head,
 
+      /** Each claim's fork, made once, at the main the claim began from, as a claim's fork is. */
+      forkClaims: () =>
+        Effect.forEach(
+          [...claims].flatMap(([ask, held]) =>
+            held.map((each) => ({ ask, each }))
+          ),
+          ({ ask, each }) =>
+            Effect.gen(function* () {
+              const fork = claimForkName(project, ask, each.claimant);
+              const made = yield* Effect.option(host.fork(repo, fork));
+
+              if (Option.isNone(made) || head === each.base) {
+                return;
+              }
+
+              const into = yield* scratch;
+
+              yield* Effect.orDie(
+                host.push(fork, into.source, [
+                  { from: Option.some(head), ref: main, to: each.base },
+                ])
+              );
+            }),
+          { discard: true }
+        ),
+
       told: (
         apart: Pick<FixtureRecord, "env" | "ledger"> & {
           readonly working: readonly Handle[];

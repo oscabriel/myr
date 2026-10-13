@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Contracts } from "@repo/protocol/contracts";
-import { RepoName, RepoPath } from "@repo/protocol/ids";
+import { AskId, Handle, RepoName, RepoPath } from "@repo/protocol/ids";
+import { UnknownRevision } from "@repo/protocol/refusal";
 import { advanceTo } from "@repo/testkit/clock";
 import { aProject, withAsk, withVouches } from "@repo/testkit/scenarios";
 import { Effect, Layer, SchemaAST } from "effect";
@@ -17,6 +18,8 @@ const datekit = aProject({ people: ["bob"] }).pipe(
 
 const { project } = datekit;
 
+const BOB = "bob-session";
+
 const platform = Effect.gen(function* () {
   yield* advanceTo("2026-10-07T12:00:00Z");
 
@@ -30,7 +33,7 @@ const platform = Effect.gen(function* () {
     Layer.mergeAll(
       Handlers.pipe(Layer.provide(ports)),
       ports,
-      MemorySessions.layer({})
+      MemorySessions.layer({ [BOB]: Handle.make("bob") })
     )
   );
 });
@@ -133,6 +136,36 @@ describe("the code reads over /rpc", () => {
         expect(response.status).toBe(200);
         expect(text).not.toContain("alice__datekit--me--alice");
         expect(text).toContain(canonical.at);
+      })
+  );
+
+  it.effect(
+    "read bob's claim fork at its address, and no repo the project does not list as its fork",
+    () =>
+      Effect.gen(function* () {
+        const { handler } = yield* platform;
+        const anyone = yield* rpcClient(handler);
+        const bob = yield* rpcClient(handler, BOB);
+
+        yield* bob.claim({ ask: AskId.make("parse-iso"), project });
+
+        const { landed } = yield* anyone.listRefs({ project });
+        const tree = yield* anyone.readTree({ at: "@bob/parse-iso", project });
+
+        const { commit } = yield* anyone.showCommit({
+          at: "@bob/parse-iso",
+          project,
+          sha: tree.at,
+        });
+
+        const refused = ["@carol/parse-iso", "alice__datekit--parse-iso--bob"];
+
+        expect([tree.at, commit.sha]).toStrictEqual([landed, landed]);
+        expect(
+          yield* Effect.forEach(refused, (at) =>
+            Effect.flip(anyone.readTree({ at, project }))
+          )
+        ).toStrictEqual(refused.map((rev) => new UnknownRevision({ rev })));
       })
   );
 

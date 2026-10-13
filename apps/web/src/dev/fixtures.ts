@@ -172,6 +172,9 @@ const overlay: Layer.Layer<
           ).pipe(Effect.orDie);
 
           const out = yield* provided(step(told.story));
+
+          yield* provided(told.story.forkClaims());
+
           const record = yield* decodeRecord(told.told());
 
           yield* Ref.set(fixtures.told, Option.some({ ...told, record }));

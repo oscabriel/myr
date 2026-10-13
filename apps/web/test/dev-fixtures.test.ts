@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Client, Contracts } from "@repo/protocol/contracts";
+import { forkRev } from "@repo/protocol/domain/code";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
 import type { Decision } from "@repo/protocol/domain/decision";
 import { ProjectEvent } from "@repo/protocol/domain/event";
@@ -12,7 +13,15 @@ import {
   ProjectName,
   ProposalId,
 } from "@repo/protocol/ids";
-import { Context, DateTime, Duration, Effect, Layer, Stream } from "effect";
+import {
+  Context,
+  DateTime,
+  Duration,
+  Effect,
+  Exit,
+  Layer,
+  Stream,
+} from "effect";
 import type { Scope } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
 import { RpcClient, RpcSerialization } from "effect/rpc";
@@ -611,6 +620,33 @@ describe("the dev world's fixtures", seededWorlds, () => {
               .filter(({ denounced }) => denounced)
               .map(({ handle }) => handle)
           ).toStrictEqual(["wren"]);
+        })
+      )
+  );
+
+  it.live(
+    "give every answer fork vellum lists a tree at its address, at the main its claim began from",
+    () =>
+      inWorld(withFixtures, (as) =>
+        Effect.gen(function* () {
+          const anyone = yield* as();
+          const { forks } = yield* anyone.listRefs({ project: vellum });
+
+          const answers = forks.flatMap((fork) =>
+            fork.kind === "claim" && fork.ask !== undefined
+              ? [forkRev({ ask: fork.ask, handle: fork.handle })]
+              : []
+          );
+
+          const read = yield* Effect.forEach(answers, (at) =>
+            Effect.map(
+              Effect.exit(anyone.readTree({ at, project: vellum })),
+              (exit) => [at, Exit.isSuccess(exit)] as const
+            )
+          );
+
+          expect(answers.length).toBeGreaterThan(3);
+          expect(read.filter(([, listed]) => !listed)).toStrictEqual([]);
         })
       )
   );

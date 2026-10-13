@@ -26,6 +26,7 @@ import type { DiffStats, DrawnFile } from "./diff-model.ts";
 import { DiffPane, PANE_SCROLLER } from "./diff-pane.tsx";
 import { commitHref, shortSha, treeHref } from "./paths.ts";
 import { ChangeCounts, PlainDiff } from "./plain-diff.tsx";
+import { pinnedRev } from "./rev.ts";
 
 const LINK = "decoration-rule underline hover:decoration-current";
 
@@ -100,11 +101,13 @@ export const LandingStatus = ({
 };
 
 const GitLine = ({
+  at,
   commit,
   now,
   project,
   stats,
 }: {
+  readonly at: string;
   readonly commit: Commit;
   readonly now: DateTime.Utc;
   readonly project: ProjectName;
@@ -126,7 +129,7 @@ const GitLine = ({
             {index === 0 ? null : ", "}
             <AppLink
               className={`text-mono font-mono ${LINK}`}
-              to={commitHref(project, parent)}
+              to={commitHref(project, pinnedRev(at, parent))}
             >
               {shortSha(parent)}
             </AppLink>
@@ -135,7 +138,7 @@ const GitLine = ({
       </>
     )}
     {" · "}
-    <AppLink className={LINK} to={treeHref(project, commit.sha)}>
+    <AppLink className={LINK} to={treeHref(project, pinnedRev(at, commit.sha))}>
       Browse files
     </AppLink>
     {" · "}
@@ -339,6 +342,8 @@ export const DiffToolbar = ({
 );
 
 export interface CommitViewProps {
+  /** The fork the commit was read in (`@<handle>/<ask>`); its links stay inside it. */
+  readonly at?: string | undefined;
   readonly diff: CommitDiff;
   readonly now: DateTime.Utc;
   readonly project: ProjectName;
@@ -353,6 +358,7 @@ export interface CommitViewProps {
 }
 
 export const CommitView = ({
+  at = "main",
   diff,
   drawing,
   drawn: parsed,
@@ -381,7 +387,13 @@ export const CommitView = ({
         commit.landing === undefined ? "This commit" : "This landing"
       }
       meta={
-        <GitLine commit={commit} now={now} project={project} stats={stats} />
+        <GitLine
+          at={at}
+          commit={commit}
+          now={now}
+          project={project}
+          stats={stats}
+        />
       }
       state={
         commit.landing === undefined ? undefined : (

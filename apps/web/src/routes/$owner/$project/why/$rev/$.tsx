@@ -116,6 +116,7 @@ const WhyPage = () => {
               <WhyFallback
                 now={now}
                 project={project}
+                rev={rev}
                 text={text}
                 view={view}
               />
@@ -123,6 +124,7 @@ const WhyPage = () => {
             key={`${view.at}:${view.path}`}
             now={now}
             project={project}
+            rev={rev}
             text={text}
             view={view}
           />

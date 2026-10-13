@@ -359,6 +359,21 @@ describe(RefChoices, () => {
       />
     );
 
+  /** Ines's fork entry, as the list draws it while `rev` is read. */
+  const forkAt = (rev: string) =>
+    elementWith(
+      markupOf(
+        <RefChoices
+          hrefAt={(to) => `/oscabriel/datekit/tree/${to}`}
+          onPick={pickNothing}
+          project={refs.project}
+          refs={refs}
+          rev={rev}
+        />
+      ),
+      'data-fork="ines-v/parse-iso"'
+    );
+
   it("lists main as current, then the tags, then the answers in forks", () => {
     const markup = choices();
 
@@ -372,14 +387,25 @@ describe(RefChoices, () => {
     );
   });
 
-  it("names each answer's ask, claimant and claim state, and opens its answer's page", () => {
+  it("names each answer's ask, claimant and claim state, and opens the fork at its address", () => {
     const fork = elementWith(choices(), 'data-fork="ines-v/parse-iso"');
 
     expect(hrefsOf(fork)).toStrictEqual([
-      "/oscabriel/datekit/answers/parse-iso",
+      "/oscabriel/datekit/tree/@ines-v/parse-iso",
     ]);
     expect(plainText(fork)).toContain("parse-iso");
     expect(plainText(fork)).toContain("ines-v · Warned, no push lately");
+  });
+
+  it("marks the fork being read as current, at its main or at one of its commits", () => {
+    expect(
+      [
+        "@ines-v/parse-iso",
+        `@ines-v/parse-iso:${LANDED}`,
+        "main",
+        "@bram/parse-iso",
+      ].map((rev) => forkAt(rev).includes('aria-current="true"'))
+    ).toStrictEqual([true, true, false, false]);
   });
 
   it("lists no working fork and names no fork's repo", () => {

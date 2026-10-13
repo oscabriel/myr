@@ -333,8 +333,8 @@ export const Handlers: Layer.Layer<
         Effect.flatMap(caller, (who) =>
           on(project, (api) => api.showAsk(who, ask))
         ),
-      showCommit: ({ project, sha }) =>
-        code(project, (of) => commitOf(of, sha)),
+      showCommit: ({ at, project, sha }) =>
+        code(project, (of) => commitOf(of, sha, Option.fromUndefinedOr(at))),
       showProposal: ({ project, proposal }) =>
         Effect.flatMap(caller, (who) =>
           on(project, (api) => api.showProposal(who, proposal))

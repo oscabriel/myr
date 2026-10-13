@@ -1,8 +1,10 @@
 /**
  * The code bar's ref switcher (ADR 0043): `main`, the project's tags, and the
- * answers in forks, each with its claimant, ask and claim state. Until a fork
- * can be browsed (issue 05), a fork's entry opens its answer's page.
+ * answers in forks, each with its claimant, ask and claim state. A fork's
+ * entry opens the same page in that fork, at its address
+ * (`@<handle>/<ask>`), never its repo's name.
  */
+import { forkRev } from "@repo/protocol/domain/code";
 import type { ForkRef, RefsView } from "@repo/protocol/domain/code";
 import type { AskId, ProjectName } from "@repo/protocol/ids";
 import {
@@ -23,10 +25,9 @@ import {
 
 import { AppLink } from "../shared/link.tsx";
 import { StateMarkIcon } from "../shared/marks.tsx";
-import { answerPath } from "../shared/paths.ts";
 import { CLAIM_STATES } from "../shared/row.tsx";
 import { isCommitId } from "./headers.ts";
-import { revLabel } from "./rev.ts";
+import { isForkRev, readsFork, revLabel } from "./rev.ts";
 
 const SHOWN = 100;
 
@@ -35,6 +36,10 @@ const ICON = "size-4 shrink-0";
 const RefMark = ({ rev }: { readonly rev: string }) => {
   if (rev === "main") {
     return <GitBranch aria-hidden="true" className={ICON} strokeWidth={1.75} />;
+  }
+
+  if (isForkRev(rev)) {
+    return <GitFork aria-hidden="true" className={ICON} strokeWidth={1.75} />;
   }
 
   return isCommitId(rev) ? (
@@ -68,21 +73,24 @@ const matches = (filter: string) => (text: string) =>
 
 const ForkEntry = ({
   fork,
+  hrefAt,
   onPick,
-  project,
+  rev,
 }: {
   readonly fork: AnswerFork;
+  readonly hrefAt: (rev: string) => string;
   readonly onPick: () => void;
-  readonly project: ProjectName;
+  readonly rev: string;
 }) => {
   const state = fork.state === undefined ? undefined : CLAIM_STATES[fork.state];
 
   return (
     <li data-fork={`${fork.handle}/${fork.ask}`}>
       <AppLink
+        aria-current={readsFork(rev, fork) ? "true" : undefined}
         className={ROW}
         onClick={onPick}
-        to={answerPath(project, fork.ask)}
+        to={hrefAt(forkRev(fork))}
       >
         {state === undefined ? (
           <GitFork aria-hidden="true" className={ICON} strokeWidth={1.75} />
@@ -111,13 +119,13 @@ export const RefChoices = ({
   filter = "",
   hrefAt,
   onPick,
-  project,
   refs,
   rev,
 }: {
   readonly filter?: string;
   readonly hrefAt: (rev: string) => string;
   readonly onPick: () => void;
+  /** The project whose refs these are: the reader reads them by it. */
   readonly project: ProjectName;
   readonly refs: RefsView | undefined;
   readonly rev: string;
@@ -187,9 +195,10 @@ export const RefChoices = ({
             {forks.map((fork) => (
               <ForkEntry
                 fork={fork}
+                hrefAt={hrefAt}
                 key={`${fork.handle}/${fork.ask}`}
                 onPick={onPick}
-                project={project}
+                rev={rev}
               />
             ))}
           </ul>
