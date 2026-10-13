@@ -36,7 +36,7 @@ import type { ProjectApi } from "./project.ts";
 
 export interface CodeProject {
   readonly project: ProjectName;
-  /** Never a fork's or a layer's. */
+  /** The canonical repo: never a fork's or a layer's. A read reaches a fork only by an address `forks` lists. */
   readonly repo: RepoName;
   readonly head: Effect.Effect<Option.Option<LandedSha>>;
   /** The landings among `shas`, so a forged trailer never reads as one. */
@@ -94,11 +94,13 @@ export const logOf = (
   RepoHost
 > => logPage(project, input);
 
+/** `at` names the fork to read the commit in; the canonical repo when absent. */
 export const commitOf = (
   project: CodeProject,
-  sha: CommitSha
-): Effect.Effect<CommitDiff, UnknownCommit, RepoHost> =>
-  commitDiff(project, sha);
+  sha: CommitSha,
+  at: Option.Option<Rev> = Option.none()
+): Effect.Effect<CommitDiff, UnknownCommit | UnknownRevision, RepoHost> =>
+  commitDiff(project, sha, at);
 
 export const whyOf = (
   project: CodeProject,

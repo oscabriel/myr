@@ -5,7 +5,7 @@ import { Effect, Option } from "effect";
 
 import { treeOf } from "../src/code.ts";
 import { rawOf, rawRequestOf, rawRestOf } from "../src/code/raw.ts";
-import { datekit, png, svg } from "./code-fixtures.ts";
+import { datekit, forked, png, svg } from "./code-fixtures.ts";
 
 const read = (response: Response) =>
   Effect.map(
@@ -128,6 +128,26 @@ describe("a raw file", () => {
           ])
         ).toStrictEqual(answers.map(() => [404, 0, "nosniff", true]));
         expect(answers).toHaveLength(5);
+      }).pipe(Effect.provide(RepoHostMemory))
+  );
+
+  it.effect(
+    "at a listed fork's address is the fork's bytes, and at a fork the project does not list a 404",
+    () =>
+      Effect.gen(function* () {
+        const { code } = yield* forked;
+
+        const at = (rev: string) =>
+          Effect.flatMap(rawOf(code, rev, RepoPath.make("src/parse.ts")), read);
+
+        const listed = yield* at("@bob/parse-iso");
+        const unlisted = yield* at("@carol/parse-iso");
+
+        expect([
+          listed.status,
+          new TextDecoder().decode(listed.body),
+        ]).toStrictEqual([200, "export const parse = Date.parse;\n"]);
+        expect([unlisted.status, unlisted.body.length]).toStrictEqual([404, 0]);
       }).pipe(Effect.provide(RepoHostMemory))
   );
 });

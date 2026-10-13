@@ -1,9 +1,10 @@
 // Read from the project's canonical repo only: no payload names a repo.
-import { Option, Schema } from "effect";
+import { Data, Option, Schema } from "effect";
 
 import {
   AskId,
   BlobSha,
+  BranchName,
   CommitSha,
   Handle,
   LandedSha,
@@ -33,6 +34,77 @@ export const Rev = Schema.String.check(
 );
 
 export type Rev = typeof Rev.Type;
+
+/** Where in a fork an address points: a branch by its exact name, or a commit the fork holds. */
+export type ForkPoint = Data.TaggedEnum<{
+  Branch: { readonly name: BranchName };
+  Commit: { readonly sha: CommitSha };
+}>;
+
+export const ForkPoint = Data.taggedEnum<ForkPoint>();
+
+/**
+ * An answer fork named by its claimant and ask (ADR 0043), never by its repo:
+ * the platform finds it among the project's listed forks.
+ */
+export interface ForkAddress {
+  readonly ask: AskId;
+  readonly handle: Handle;
+  readonly point: ForkPoint;
+}
+
+const FORK = /^@(?<handle>[^/:]+)\/(?<ask>[^/:]+)(?::(?<point>.*))?$/u;
+
+const FULL_SHA = /^[0-9a-f]{40}$/u;
+
+const decodeHandle = Schema.decodeUnknownOption(Handle);
+
+const decodeAsk = Schema.decodeUnknownOption(AskId);
+
+const decodeBranch = Schema.decodeUnknownOption(BranchName);
+
+const pointOf = (text: string | undefined): Option.Option<ForkPoint> => {
+  if (text === undefined) {
+    return Option.some(ForkPoint.Branch({ name: BranchName.make("main") }));
+  }
+
+  if (FULL_SHA.test(text)) {
+    return Option.some(ForkPoint.Commit({ sha: CommitSha.make(text) }));
+  }
+
+  return Option.map(decodeBranch(text), (name) => ForkPoint.Branch({ name }));
+};
+
+/**
+ * `@<handle>/<ask>` is the fork's `main`; `@<handle>/<ask>:<branch>` a branch
+ * matched by its exact name, and `@<handle>/<ask>:<sha>` a full commit id the
+ * fork holds. A closed parse: each part is decoded as its own schema, and
+ * nothing read here is ever joined into a ref path.
+ */
+export const forkAddressOf = (rev: string): Option.Option<ForkAddress> => {
+  const groups = FORK.exec(rev)?.groups;
+
+  if (groups === undefined) {
+    return Option.none();
+  }
+
+  const { ask, handle, point } = groups;
+
+  return Option.all({
+    ask: decodeAsk(ask),
+    handle: decodeHandle(handle),
+    point: pointOf(point),
+  });
+};
+
+/** The revision that names a fork's branch (its `main` when absent) or one of its commits. */
+export const forkRev = (
+  fork: { readonly ask: AskId; readonly handle: Handle },
+  point?: string
+): Rev =>
+  point === undefined || point === "main"
+    ? `@${fork.handle}/${fork.ask}`
+    : `@${fork.handle}/${fork.ask}:${point}`;
 
 export const TagRef = Schema.Struct({ name: TagName, sha: CommitSha });
 

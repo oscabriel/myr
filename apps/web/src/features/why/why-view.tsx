@@ -7,6 +7,7 @@ import { FileFacts } from "../code/file-facts.tsx";
 import { FileHeader, PermalinkKey } from "../code/file-header.tsx";
 import { NumberedLines } from "../code/numbered-lines.tsx";
 import { blobHref, commitHref, shortSha, whyHref } from "../code/paths.ts";
+import { pinnedRev } from "../code/rev.ts";
 import { AppLink } from "../shared/link.tsx";
 import { GUTTER } from "../shared/shell/gutter.ts";
 import { MEASURE, Workspace } from "../shared/shell/workspace.tsx";
@@ -18,11 +19,13 @@ const LINK = "decoration-rule underline hover:decoration-current";
 export const WhyFallback = ({
   now,
   project,
+  rev,
   text,
   view,
 }: {
   readonly now: DateTime.Utc;
   readonly project: ProjectName;
+  readonly rev: string;
   readonly text: string;
   readonly view: WhyView;
 }) => (
@@ -36,6 +39,7 @@ export const WhyFallback = ({
               key={row.range.start}
               now={now}
               project={project}
+              rev={rev}
               row={row}
               view={view}
             />,
@@ -103,13 +107,15 @@ export const WhyLines = ({
       quietHead
       variant="code"
     >
-      <PermalinkKey href={whyHref(project, view.at, view.path)} />
+      <PermalinkKey
+        href={whyHref(project, pinnedRev(rev, view.at), view.path)}
+      />
       {view.stoppedAt === undefined ? null : (
         <p className={`${GUTTER} ${MEASURE} text-ui text-muted-foreground`}>
           The walk stopped after 200 commits: lines older than{" "}
           <AppLink
             className={`text-mono font-mono ${LINK}`}
-            to={commitHref(project, view.stoppedAt)}
+            to={commitHref(project, pinnedRev(rev, view.stoppedAt))}
           >
             {shortSha(view.stoppedAt)}
           </AppLink>{" "}
@@ -124,7 +130,7 @@ export const WhyLines = ({
               : "This file is binary or too large to say why each line is there."}{" "}
             <AppLink
               className={LINK}
-              to={blobHref(project, view.at, view.path)}
+              to={blobHref(project, pinnedRev(rev, view.at), view.path)}
             >
               View the file
             </AppLink>
@@ -132,7 +138,13 @@ export const WhyLines = ({
         </div>
       ) : (
         (code ?? (
-          <WhyFallback now={now} project={project} text={text} view={view} />
+          <WhyFallback
+            now={now}
+            project={project}
+            rev={rev}
+            text={text}
+            view={view}
+          />
         ))
       )}
     </Workspace>

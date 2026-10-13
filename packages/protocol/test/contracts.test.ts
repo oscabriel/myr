@@ -183,7 +183,7 @@ const table = [
   {
     audience: "public",
     cli: "none",
-    errors: ["UnknownProject", "UnknownCommit"],
+    errors: ["UnknownProject", "UnknownCommit", "UnknownRevision"],
     flags: "RI",
     on: "RW",
     tag: "showCommit",

@@ -40,7 +40,7 @@ import {
 } from "./paths.ts";
 import { RefSwitcher } from "./ref-switcher.tsx";
 import type { RefChoicesReader } from "./ref-switcher.tsx";
-import { revLabel } from "./rev.ts";
+import { isForkRev, pinnedRev, revLabel } from "./rev.ts";
 
 const isProject = Schema.is(ProjectName);
 
@@ -121,10 +121,12 @@ const HeadCommit = ({
   head,
   now,
   project,
+  rev,
 }: {
   readonly head: CommitView;
   readonly now: DateTime.Utc;
   readonly project: ProjectName;
+  readonly rev: string;
 }) => (
   <p
     className="text-ui text-muted-foreground tablet:flex hidden min-w-0 flex-1 items-center gap-2"
@@ -133,14 +135,14 @@ const HeadCommit = ({
     <AppLink
       className="text-mono text-foreground shrink-0 font-mono no-underline hover:underline"
       title={head.sha}
-      to={commitHref(project, head.sha)}
+      to={commitHref(project, pinnedRev(rev, head.sha))}
     >
       {shortSha(head.sha)}
     </AppLink>
     <AppLink
       className="text-foreground min-w-0 truncate no-underline hover:underline"
       title={head.subject}
-      to={commitHref(project, head.sha)}
+      to={commitHref(project, pinnedRev(rev, head.sha))}
     >
       {head.subject === "" ? "(no subject)" : head.subject}
     </AppLink>
@@ -184,7 +186,7 @@ const CloneHere = ({
         <p className="text-ui">Clone it with git</p>
         <CommandLine command={cloneCommand(platformUrl, project)} />
       </div>
-      {rev === "main" ? null : (
+      {rev === "main" || isForkRev(rev) ? null : (
         <div className="flex min-w-0 flex-col gap-1">
           <p className="text-ui">
             Then check out{" "}
@@ -247,7 +249,12 @@ export const CodeBar = ({
       {head === undefined ? (
         <span className="flex-1" />
       ) : (
-        <HeadCommit head={head.head} now={head.now} project={project} />
+        <HeadCommit
+          head={head.head}
+          now={head.now}
+          project={project}
+          rev={address.rev}
+        />
       )}
       <GoToFile Finder={Finder} project={project} rev={address.rev} />
       <CloneHere

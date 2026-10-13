@@ -426,7 +426,7 @@ export class ListRefs extends Rpc.make("listRefs", {
 export class ReadTree extends Rpc.make("readTree", {
   error: Schema.Union([UnknownProject, UnknownRevision, UnknownPath]),
   payload: {
-    /** `main`, a commit or a tag; main's landed commit when absent. */
+    /** `main`, a commit, a tag or a fork's address (`@<handle>/<ask>`); main's landed commit when absent. */
     at: Schema.optionalKey(Rev),
     path: Schema.optionalKey(RepoPath),
     project: ProjectName,
@@ -514,8 +514,13 @@ export class LogOf extends Rpc.make("log", {
   .annotate(Surfaces, servedOn.log) {}
 
 export class ShowCommit extends Rpc.make("showCommit", {
-  error: Schema.Union([UnknownProject, UnknownCommit]),
-  payload: { project: ProjectName, sha: CommitSha },
+  error: Schema.Union([UnknownProject, UnknownCommit, UnknownRevision]),
+  payload: {
+    /** A fork's address, to read the commit in that fork; the project's own commits when absent. */
+    at: Schema.optionalKey(Rev),
+    project: ProjectName,
+    sha: CommitSha,
+  },
   success: CommitDiff,
 })
   .annotate(

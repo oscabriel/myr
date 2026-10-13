@@ -9,6 +9,7 @@ import { LandingWords } from "../why/band.tsx";
 import { CopyButton } from "./copy.tsx";
 import { fileWords } from "./file-header.tsx";
 import { blobHref, commitsHref, rawHref, whyHref } from "./paths.ts";
+import { pinnedRev } from "./rev.ts";
 
 const LINK = "decoration-rule underline hover:decoration-current";
 
@@ -46,6 +47,7 @@ export const FileFacts = ({
             landing={Option.fromUndefinedOr(last.landing)}
             now={now}
             project={project}
+            rev={rev}
             sha={last.sha}
           />
         </p>
@@ -63,14 +65,17 @@ export const FileFacts = ({
         aria-label="Take the file"
         className="text-ui flex flex-wrap items-center gap-x-4 gap-y-1"
       >
-        <a className={LINK} href={rawHref(project, file.at, file.path)}>
+        <a
+          className={LINK}
+          href={rawHref(project, pinnedRev(rev, file.at), file.path)}
+        >
           Raw
         </a>
         <AppLink
           className={LINK}
           to={(mode === "why" ? whyHref : blobHref)(
             project,
-            file.at,
+            pinnedRev(rev, file.at),
             file.path
           )}
         >

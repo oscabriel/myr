@@ -58,8 +58,9 @@ export const commitsHref = (
   return `/${project}/commits/${revSegment(rev)}${search === "" ? "" : `?${search}`}`;
 };
 
+/** A commit's page: its id, or the id inside a fork (`@<handle>/<ask>:<sha>`), as one segment. */
 export const commitHref = (project: ProjectName, sha: string) =>
-  `/${project}/commit/${sha}`;
+  `/${project}/commit/${revSegment(sha)}`;
 
 export const shortSha = (sha: string) => sha.slice(0, 7);
 

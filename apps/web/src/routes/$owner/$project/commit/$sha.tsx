@@ -15,6 +15,7 @@ import { SPLIT_QUERY, useMedia } from "../../../../features/code/media.ts";
 import { CodeNotFound } from "../../../../features/code/not-found.tsx";
 import { PlainDiff } from "../../../../features/code/plain-diff.tsx";
 import { prerenderedPaths } from "../../../../features/code/prerender.ts";
+import { revLabel, revOf } from "../../../../features/code/rev.ts";
 import { pageHead } from "../../../../features/shared/head.ts";
 import { notFoundFor } from "../../../../features/shared/refusals.ts";
 import { branchPage } from "../../../../server/cache-headers.ts";
@@ -32,13 +33,19 @@ interface CommitParams {
 export const readCommitPage = (params: CommitParams) =>
   Effect.gen(function* () {
     const project = yield* Effect.fromOption(projectOf(params.project));
-    const sha = yield* Effect.fromOption(commitOf(params.sha));
+    const { at, sha } = yield* Effect.fromOption(commitOf(params.sha));
     const client = yield* Client;
 
-    const diff = yield* client.showCommit({ project, sha }).pipe(
+    const asked = Option.match(at, {
+      onNone: () => ({ project, sha }),
+      onSome: (fork) => ({ at: fork, project, sha }),
+    });
+
+    const diff = yield* client.showCommit(asked).pipe(
       Effect.catchTags({
         UnknownCommit: notFoundFor,
         UnknownProject: notFoundFor,
+        UnknownRevision: notFoundFor,
       })
     );
 
@@ -51,7 +58,7 @@ export const readCommitPage = (params: CommitParams) =>
           Effect.option
         );
 
-    return yield* Schema.encodeEffect(CommitPageData)({
+    const read = {
       diff,
       now: yield* DateTime.now,
       project,
@@ -59,7 +66,14 @@ export const readCommitPage = (params: CommitParams) =>
         onNone: () => ({}),
         onSome: (paths) => ({ territory: paths }),
       }),
-    });
+    };
+
+    return yield* Schema.encodeEffect(CommitPageData)(
+      Option.match(at, {
+        onNone: () => read,
+        onSome: (fork) => ({ ...read, at: fork }),
+      })
+    );
   }).pipe(Effect.catchTag("NoSuchElementError", () => Effect.fail(notFound())));
 
 const commitPage = createServerFn({ method: "GET" })
@@ -75,7 +89,7 @@ const CommitPage = () => {
 
   // Decoded once per read: the diff's files keep one identity while the
   // reader folds, splits and moves, so nothing is parsed or drawn again.
-  const { diff, now, project, territory } = useMemo(
+  const { at, diff, now, project, territory } = useMemo(
     () => Schema.decodeSync(CommitPageData)(loaded),
     [loaded]
   );
@@ -139,6 +153,7 @@ const CommitPage = () => {
 
   return (
     <CommitView
+      at={at}
       diff={diff}
       drawing={
         diff.truncated ? undefined : (
@@ -219,7 +234,9 @@ export const Route = createFileRoute("/$owner/$project/commit/$sha")({
   staleTime: Number.POSITIVE_INFINITY,
   headers: () => branchPage,
   head: ({ params: { project, sha } }) =>
-    pageHead({ title: `${project}: commit ${sha.slice(0, 7)}` }),
+    pageHead({
+      title: `${project}: commit ${revLabel(Option.getOrElse(revOf(sha), () => sha))}`,
+    }),
   component: CommitPage,
   notFoundComponent: CodeNotFound,
 });

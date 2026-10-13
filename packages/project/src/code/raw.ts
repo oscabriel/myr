@@ -8,7 +8,7 @@ import { codeProjectOf } from "../code.ts";
 import type { CodeProject } from "../code.ts";
 import { Projects } from "../projects.ts";
 import { isBinary, unlessTooLarge } from "./file.ts";
-import { commitAt, isFullSha, resolveRev } from "./revision.ts";
+import { commitAt, isFullSha, resolveAt } from "./revision.ts";
 import { entryAt, segmentsOf } from "./tree.ts";
 
 /** Both origins hold a session cookie, so no raw file may run as script: every answer, a refusal too, carries `nosniff` and this CSP. */
@@ -73,13 +73,13 @@ export const rawOf = (
   path: RepoPath
 ): Effect.Effect<Response, never, RepoHost> =>
   Effect.gen(function* () {
-    const commit = yield* resolveRev(project, Option.some(rev));
+    const { commit, repo } = yield* resolveAt(project, Option.some(rev));
 
-    const { tree } = yield* commitAt(project.repo, commit).pipe(
+    const { tree } = yield* commitAt(repo, commit).pipe(
       Effect.flatMap(Effect.fromOption)
     );
 
-    const entry = yield* entryAt(project.repo, tree, path);
+    const entry = yield* entryAt(repo, tree, path);
 
     if (Option.isNone(entry) || entry.value.type !== "blob") {
       return notFound();
@@ -88,7 +88,7 @@ export const rawOf = (
     const blob = BlobSha.make(entry.value.sha);
 
     const bytes = yield* RepoHost.use((host) =>
-      host.readBlob(project.repo, ObjectId.make(blob))
+      host.readBlob(repo, ObjectId.make(blob))
     );
 
     return Option.match(bytes, {

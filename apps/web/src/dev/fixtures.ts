@@ -287,7 +287,17 @@ const overlay: Layer.Layer<
             truncated: false,
           };
         }),
-      forks: () => Effect.map(current, ({ forks }) => forks),
+      // A claim's fork is made when the forks are first read, not when the
+      // world is built: each copies the repo, and most worlds read no code.
+      forks: () =>
+        fixtures.lock
+          .withPermits(1)(
+            Effect.flatMap(
+              Effect.flatMap(Ref.get(fixtures.told), Effect.fromOption),
+              ({ story }) => provided(story.forkClaims())
+            ).pipe(Effect.orDie, Effect.andThen(current))
+          )
+          .pipe(Effect.map(({ forks }) => forks)),
       head: () => Effect.map(current, ({ head }) => ({ landed: head })),
       landing: (_caller, sha) =>
         Effect.flatMap(current, (record) =>

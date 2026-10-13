@@ -15,7 +15,7 @@ import { askOf } from "../why/rows.ts";
 import { LOG_PAGE } from "./log-page.ts";
 import { Pager } from "./pager.tsx";
 import { blobHref, commitHref, commitsHref, shortSha } from "./paths.ts";
-import { revLabel } from "./rev.ts";
+import { pinnedRev, revLabel } from "./rev.ts";
 
 export type LogShow = "all" | "answers" | "openings";
 
@@ -68,10 +68,12 @@ const CommitRow = ({
   commit,
   now,
   project,
+  rev,
 }: {
   readonly commit: CommitView;
   readonly now: DateTime.Utc;
   readonly project: ProjectName;
+  readonly rev: string;
 }) => {
   const { landing } = commit;
   const linked = linkedOf(commit);
@@ -87,7 +89,7 @@ const CommitRow = ({
         </span>
       }
       data={{ "data-commit": commit.sha }}
-      href={commitHref(project, commit.sha)}
+      href={commitHref(project, pinnedRev(rev, commit.sha))}
       id={commit.sha}
       meta={
         landing === undefined ? (
@@ -250,6 +252,7 @@ export const LogView = ({
                     key={commit.sha}
                     now={now}
                     project={project}
+                    rev={rev}
                   />
                 ))}
               </RowGroup>
