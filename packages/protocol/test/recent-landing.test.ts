@@ -45,7 +45,7 @@ describe(shownRefusal, () => {
 
   it("refuses a tag the union does not have", () => {
     expect(
-      Schema.decodeOption(ShownRefusal)({ tag: "SomethingElse" })._tag
+      Schema.decodeUnknownOption(ShownRefusal)({ tag: "SomethingElse" })._tag
     ).toBe("None");
   });
 });

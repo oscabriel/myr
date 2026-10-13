@@ -377,7 +377,10 @@ describe(LandingView, () => {
         expect(hrefsOf(refused)).toContain(
           "/oscabriel/burrow/asks/drop-legacy-fetch-kit"
         );
-        expect(textIn(unasked)).toContain(BURROW_SHA.slice(0, 7));
+        // A commit is code, set in mono; only a want is sentence text.
+        expect(unasked).toContain(
+          `<span class="text-mono font-mono">${BURROW_SHA.slice(0, 7)}</span>`
+        );
         expect(hrefsOf(unasked)).toContain(
           `/oscabriel/burrow/commit/${BURROW_SHA}`
         );
@@ -397,6 +400,16 @@ describe(LandingView, () => {
         ).toStrictEqual(["HeldBackFailed", "OutOfScope"]);
         expect(textIn(refused)).toContain("HeldBackFailed · parser");
         expect(refused).toContain("lucide-octagon-x");
+        // Public facts alone: the project, the want, each tag and area, and when; never a check's name, suite, lane, path or log.
+        expect(textIn(refused)).toBe(
+          [
+            "oscabriel/burrow",
+            "@burrow/kit: move every caller of legacyFetch to http.get",
+            "HeldBackFailed · parser",
+            "OutOfScope",
+            "Refused 1 h ago",
+          ].join("")
+        );
       })
   );
 

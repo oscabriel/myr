@@ -4,7 +4,7 @@
  * fact: a refusal is shown by its tag and the area it names, never by a
  * check's name, a suite, a path or a log.
  */
-import { Schema } from "effect";
+import { Option, Record, Schema } from "effect";
 
 import { AskId, LandedSha, ProjectName } from "../ids.ts";
 import { Refusal } from "../refusal.ts";
@@ -12,16 +12,9 @@ import { Refusal } from "../refusal.ts";
 /** The read keeps and lists at most this many rows. */
 export const RECENT_LANDINGS_CAP = 20;
 
-const refusalTags: ReadonlySet<string> = new Set(
-  Refusal.members.map(({ identifier }) => identifier)
-);
-
-const isRefusalTag = (tag: string): tag is Refusal["_tag"] =>
-  refusalTags.has(tag);
-
-/** One tag of the closed refusal union. */
-export const RefusalTag = Schema.NonEmptyString.pipe(
-  Schema.refine(isRefusalTag, { expected: "a refusal's tag" })
+/** One tag of the closed refusal union, the whole set of them in its JSON Schema. */
+export const RefusalTag = Schema.Literals(
+  Refusal.members.map(({ fields }) => fields._tag.schema.literal)
 );
 
 /** A refusal as a public list shows it: its tag, and its area when it names one. */
@@ -37,6 +30,16 @@ export const shownRefusal = (refusal: Refusal): ShownRefusal =>
   "area" in refusal
     ? { area: refusal.area, tag: refusal._tag }
     : { tag: refusal._tag };
+
+/** A key and its value when there is one, else nothing: an optional field is left out, never set to null or undefined. */
+export const field = <K extends string, A>(
+  key: K,
+  value: A | null | undefined
+): Partial<Record<K, A>> =>
+  Option.match(Option.fromNullishOr(value), {
+    onNone: () => ({}),
+    onSome: (present) => Record.singleton(key, present),
+  });
 
 export const RecentLanding = Schema.TaggedUnion({
   /** A landing on a project's main: the ask it answered or opened, and that ask's want when the list knew it. */

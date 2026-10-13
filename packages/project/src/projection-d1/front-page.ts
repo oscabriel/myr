@@ -4,6 +4,7 @@ import type {
   ProjectListing,
 } from "@repo/protocol/domain/front-page";
 import {
+  field,
   RECENT_LANDINGS_CAP,
   RecentLanding,
   ShownRefusal,
@@ -18,7 +19,7 @@ import {
 } from "@repo/protocol/ids";
 import type { Handle } from "@repo/protocol/ids";
 import { Posture } from "@repo/protocol/posture";
-import { Array as Arr, Effect, Layer, Option, Record, Schema } from "effect";
+import { Array as Arr, Effect, Layer, Option, Schema } from "effect";
 import { SqlClient } from "effect/sql/SqlClient";
 
 import { FrontPage } from "../front-page.ts";
@@ -104,16 +105,6 @@ const RecentRow = Schema.Union([
 type RecentRow = typeof RecentRow.Type;
 
 const decodeRecent = Schema.decodeUnknownEffect(Schema.Array(RecentRow));
-
-/** A key and its value when the row holds one, else nothing: no key set to null. */
-const field = <K extends string, A>(
-  key: K,
-  value: A | null
-): Partial<Record<K, A>> =>
-  Option.match(Option.fromNullishOr(value), {
-    onNone: () => ({}),
-    onSome: (present) => Record.singleton(key, present),
-  });
 
 const recentOf = (row: RecentRow): Option.Option<RecentLanding> =>
   Option.map(nameOfKey(row.project), (project) =>

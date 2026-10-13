@@ -15,7 +15,7 @@ import { PROJECT_DESCRIPTION_CAP } from "../src/domain/front-page.ts";
 import { RECENT_LANDINGS_CAP } from "../src/domain/recent-landing.ts";
 import { AskId, CommitSha, KindName, ProjectName } from "../src/ids.ts";
 import { listTools, toJsonSchema, toToolkit } from "../src/mcp.ts";
-import { StaleBase } from "../src/refusal.ts";
+import { Refusal, StaleBase } from "../src/refusal.ts";
 import { unanswered } from "../src/testing.ts";
 import { ask, base, main, path } from "./examples.ts";
 import { leaks, nested } from "./leaks.ts";
@@ -335,6 +335,13 @@ describe("the contracts as MCP tools", () => {
     expect(
       nodes.flatMap((node) => Option.toArray(decodeArraySchema(node)))
     ).toContainEqual({ maxItems: RECENT_LANDINGS_CAP, type: "array" });
+    // An agent reads the closed set of tags, not any string.
+    expect(refusals.map(({ properties }) => properties.tag)).toStrictEqual(
+      refusals.map(() => ({
+        enum: Refusal.members.map(({ identifier }) => identifier),
+        type: "string",
+      }))
+    );
   });
 
   it("inlines a named root schema, since MCP wants an object at the root", () => {

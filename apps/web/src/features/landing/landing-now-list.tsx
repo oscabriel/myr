@@ -22,6 +22,10 @@ const RefusalLabel = ({ refusal }: { readonly refusal: ShownRefusal }) => (
   </span>
 );
 
+/** A row's title: the ask's want as sentence text, or, when the list does not know it, the ask's id or the commit in mono. */
+const titleOf = (want: string | undefined, code: string): ReactNode =>
+  want ?? <span className="text-mono font-mono">{code}</span>;
+
 /** One row: the mark, the project over what landed or was refused, why it was refused, and when. */
 const Row = ({
   children,
@@ -34,7 +38,7 @@ const Row = ({
   readonly children?: ReactNode;
   readonly outcome: "landed" | "refused";
   readonly project: ProjectName;
-  readonly title: string;
+  readonly title: ReactNode;
   readonly to: string;
   readonly when: ReactNode;
 }) => (
@@ -79,7 +83,7 @@ const rowOf = (landing: RecentLanding, now: DateTime.Utc) =>
         key={keyOf(landing)}
         outcome="landed"
         project={project}
-        title={want ?? answered ?? opened ?? shortSha(sha)}
+        title={titleOf(want, answered ?? opened ?? shortSha(sha))}
         to={commitHref(project, sha)}
         when={
           <>
@@ -96,7 +100,7 @@ const rowOf = (landing: RecentLanding, now: DateTime.Utc) =>
         key={keyOf(landing)}
         outcome="refused"
         project={project}
-        title={want ?? ask}
+        title={titleOf(want, ask)}
         to={askPath(project, ask)}
         when={
           <>

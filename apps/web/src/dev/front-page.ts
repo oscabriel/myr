@@ -10,6 +10,7 @@ import type {
 } from "@repo/protocol/domain/front-page";
 import { Outcome } from "@repo/protocol/domain/outcome";
 import {
+  field,
   RECENT_LANDINGS_CAP,
   RecentLanding,
   shownRefusal,
@@ -17,7 +18,7 @@ import {
 import { LedgerEntry } from "@repo/protocol/domain/visibility";
 import type { ProjectName } from "@repo/protocol/ids";
 import type { Posture } from "@repo/protocol/posture";
-import { Array, DateTime, Effect, Layer, Option, Order, Record } from "effect";
+import { Array, DateTime, Effect, Layer, Order } from "effect";
 
 import { DevProjected } from "./projection.ts";
 
@@ -184,16 +185,6 @@ const latestFirst = Order.combineAll([
   Order.mapInput(Order.String, ({ landing }: Recent) => landing.project),
   Order.flip(Order.mapInput(Order.Number, ({ seq }: Recent) => seq)),
 ]);
-
-/** A key and its value when there is one, else nothing. */
-const field = <K extends string, A>(
-  key: K,
-  value: A | undefined
-): Partial<Record<K, A>> =>
-  Option.match(Option.fromUndefinedOr(value), {
-    onNone: () => ({}),
-    onSome: (present) => Record.singleton(key, present),
-  });
 
 const wantsOf = (events: readonly ProjectedEvent[]) =>
   new Map(
