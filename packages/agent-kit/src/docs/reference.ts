@@ -7,7 +7,7 @@ import {
 } from "@repo/protocol/contracts";
 import { Context } from "effect";
 
-import type { CommandDoc } from "../command-doc.ts";
+import { synopsisLine } from "../agent-setup.ts";
 import { events, gitHere, landing, refusals } from "../llms-sections.ts";
 import { exitCodeSection } from "../refusals.ts";
 import { code, table } from "../text.ts";
@@ -16,23 +16,17 @@ import { importedProjects } from "./imported.ts";
 import type { DocSource } from "./page.ts";
 import { withoutHeading } from "./page.ts";
 
-const usage = ({ path, positional }: CommandDoc) =>
-  code(
-    [Brand.cli, ...path, ...positional.map((name) => `<${name}>`)].join(" ")
-  );
-
 export const commandsPage: DocSource = {
   body: ({ commands }) => [
-    "Every command the CLI has, from the one list the CLI, its skill and `llms.txt` all read. A command that lists `--json` prints JSON for an agent; one that writes takes `--dry-run`, and one that needs your approval takes `--yes`.",
+    "Every command the CLI has, as its synopsis, from the one list the CLI, its skill and `llms.txt` all read. A command that lists `--json` prints JSON for an agent; one that writes takes `--dry-run`, and one that needs your approval takes `--yes`.",
     "",
     ...table(
-      ["Command", "What it does", "Flags", "Only reads"],
-      commands.map((command) => [
-        usage(command),
-        command.summary,
-        command.flags.map(code).join(" "),
-        command.readOnly ? "yes" : "no",
-      ])
+      ["Command", "What it does", "Only reads"],
+      commands.map((command) => {
+        const { summary, usage } = synopsisLine(command);
+
+        return [code(usage), summary, command.readOnly ? "yes" : "no"];
+      })
     ),
     "",
   ],

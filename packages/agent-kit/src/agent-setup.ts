@@ -130,20 +130,28 @@ export interface SynopsisLine {
   readonly summary: string;
 }
 
+/** One command as the synopsis writes it: its words, positionals, then optional flags. */
+export const synopsisLine = ({
+  flags,
+  path,
+  positional,
+  summary,
+}: CommandDoc): SynopsisLine => ({
+  summary,
+  usage: [
+    Brand.cli,
+    ...path,
+    ...positional.map((name) => `<${name}>`),
+    ...flags
+      .filter((flag) => !positional.includes(flag.replace(/^--/u, "")))
+      .map((flag) => `[${flag}]`),
+  ].join(" "),
+});
+
 export const synopsis = (
   commands: readonly CommandDoc[]
 ): readonly SynopsisLine[] =>
-  commands.map(({ flags, path, positional, summary }) => ({
-    summary,
-    usage: [
-      Brand.cli,
-      ...path,
-      ...positional.map((name) => `<${name}>`),
-      ...flags
-        .filter((flag) => !positional.includes(flag.replace(/^--/u, "")))
-        .map((flag) => `[${flag}]`),
-    ].join(" "),
-  }));
+  commands.map((command) => synopsisLine(command));
 
 export interface Endpoint {
   readonly url: string;

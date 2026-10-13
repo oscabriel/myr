@@ -1,5 +1,8 @@
 import { describe, expect, it } from "@effect/vitest";
+import { commandDocs } from "@repo/agent-kit/command-doc";
 import { docPage, docPages } from "@repo/agent-kit/docs/index";
+import { Brand } from "@repo/brand";
+import { Contracts } from "@repo/protocol/contracts";
 import { Effect, Option } from "effect";
 
 import { commands } from "../src/features/agents/catalog.ts";
@@ -10,6 +13,7 @@ import {
 import { docsHead } from "../src/features/docs/head.ts";
 import { AppShell } from "../src/features/shared/shell/app-shell.tsx";
 import { docsMarkdownHandler } from "../src/routes/docs/{$page}[.]md.ts";
+import { textIn } from "./markup.ts";
 import { renderAt } from "./render.tsx";
 
 const input = {
@@ -24,6 +28,9 @@ const textOf = (markup: string) =>
   markup
     .replaceAll(/<[^>]+>/gu, " ")
     .replaceAll("&#x27;", "'")
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&quot;", '"')
     .replaceAll("&amp;", "&")
     .replaceAll(/\s+/gu, " ")
     .trim();
@@ -177,6 +184,47 @@ describe("a page of the docs", () => {
         expect(markup).toMatch(/aria-current="page"[^>]*>Answer an ask</u);
         expect(markup).toMatch(
           /aria-label="Breadcrumb"[\s\S]*?href="\/docs"[^>]*>Docs<[\s\S]*?>Answer an ask</u
+        );
+      })
+  );
+
+  it.effect(
+    "lists on Commands every command the CLI has, in its order, each as its synopsis with what it does",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* renderAt(
+          "/docs/commands",
+          <DocsPageView page={pageNamed("commands")} />
+        );
+
+        const rows = [
+          ...elementOf(markup, "article", "data-doc").matchAll(
+            /<tr>\s*<td\b[^>]*>(?<usage>[\s\S]*?)<\/td>\s*<td\b[^>]*>(?<summary>[\s\S]*?)<\/td>/gu
+          ),
+        ].map(({ groups }) => ({
+          summary: textIn(groups?.summary ?? ""),
+          usage: textOf(groups?.usage ?? ""),
+        }));
+
+        const expected = commandDocs(Contracts).map(
+          ({ flags, path, positional, summary }) => ({
+            summary,
+            words: [
+              Brand.cli,
+              ...path,
+              ...positional.map((name) => `<${name}>`),
+              ...flags
+                .filter((flag) => !positional.includes(flag.slice(2)))
+                .map((flag) => `[${flag}]`),
+            ],
+          })
+        );
+
+        expect(rows.map(({ usage }) => usage.split(" "))).toStrictEqual(
+          expected.map(({ words }) => words)
+        );
+        expect(rows.map(({ summary }) => summary)).toStrictEqual(
+          expected.map(({ summary }) => summary.replaceAll("`", ""))
         );
       })
   );
