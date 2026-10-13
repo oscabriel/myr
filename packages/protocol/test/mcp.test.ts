@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Context, Effect, Layer, Option, Predicate, Schema } from "effect";
+import { Context, Effect, Layer, Option, Schema } from "effect";
 import { Tool } from "effect/ai";
 import { Rpc, RpcGroup } from "effect/rpc";
 
@@ -17,7 +17,7 @@ import { listTools, toJsonSchema, toToolkit } from "../src/mcp.ts";
 import { StaleBase } from "../src/refusal.ts";
 import { unanswered } from "../src/testing.ts";
 import { ask, base, main, path } from "./examples.ts";
-import { leaks } from "./leaks.ts";
+import { leaks, nested } from "./leaks.ts";
 import { serve } from "./mcp.ts";
 
 const head = CommitSha.make("3333333333333333333333333333333333333333");
@@ -85,24 +85,13 @@ const ProjectDescriptionSchema = Schema.Struct({
   type: Schema.Literal("string"),
 });
 
-/** Every object in a JSON Schema whose properties name a project's listing. */
-const listingsIn = (value: unknown): readonly Record<string, unknown>[] => {
-  if (Array.isArray(value)) {
-    return value.flatMap(listingsIn);
-  }
+/** A project's listing in a JSON Schema, its description's schema beside what it requires. */
+const ListingSchema = Schema.Struct({
+  properties: Schema.Struct({ description: ProjectDescriptionSchema }),
+  required: Schema.Array(Schema.String),
+});
 
-  if (!Predicate.isObject(value)) {
-    return [];
-  }
-
-  const here = Predicate.hasProperty(value, "properties") &&
-    Predicate.isObject(value.properties) &&
-    Predicate.hasProperty(value.properties, "openAsks")
-    ? [value]
-    : [];
-
-  return [...here, ...Object.values(value).flatMap(listingsIn)];
-};
+const decodeListingSchema = Schema.decodeUnknownOption(ListingSchema);
 
 const receipt = {
   additionalProperties: true,
@@ -275,16 +264,16 @@ describe("the contracts as MCP tools", () => {
       toToolkit(surfaced("mcp"), Effect.service(Client)).toolkit
     ).find(({ name }) => name === "listProjects");
 
-    const [listing] = listingsIn(listProjects?.outputSchema);
+    const listings = nested(
+      Schema.decodeUnknownSync(Schema.Json)(listProjects?.outputSchema)
+    ).flatMap((node) => Option.toArray(decodeListingSchema(node)));
 
-    const description = Schema.decodeUnknownOption(ProjectDescriptionSchema)(
-      Reflect.get(Object(listing?.["properties"]), "description")
+    expect(
+      listings.map(({ properties }) => properties.description)
+    ).toStrictEqual([{ maxLength: PROJECT_DESCRIPTION_CAP, type: "string" }]);
+    expect(listings.flatMap(({ required }) => required)).not.toContain(
+      "description"
     );
-
-    expect(description).toStrictEqual(
-      Option.some({ maxLength: PROJECT_DESCRIPTION_CAP, type: "string" })
-    );
-    expect(listing?.["required"]).not.toContain("description");
   });
 
   it("inlines a named root schema, since MCP wants an object at the root", () => {

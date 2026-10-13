@@ -12,11 +12,11 @@ import {
 } from "@repo/project/code";
 import type { CodeProject } from "@repo/project/code";
 import { envSchemaMethod } from "@repo/project/deciders";
+import { withDescriptions } from "@repo/project/description";
 import { FrontPage } from "@repo/project/front-page";
 import { GatewayUrl } from "@repo/project/project";
 import type { ProjectApi } from "@repo/project/project";
 import { Projects } from "@repo/project/projects";
-import { withDescriptions } from "@repo/project/description";
 import { withStandingPosture } from "@repo/project/standing-posture";
 import { Contracts, EnvSchemaOf } from "@repo/protocol/contracts";
 import type { AnswerView } from "@repo/protocol/domain/answer";

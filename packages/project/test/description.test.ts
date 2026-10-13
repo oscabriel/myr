@@ -108,10 +108,7 @@ const burrow = ProjectName.make("alice/burrow");
 
 const landedAt = (iso: string) => DateTime.makeUnsafe(iso);
 
-const listingOf = (
-  project: ProjectName,
-  landed?: string
-): ProjectListing =>
+const listingOf = (project: ProjectName, landed?: string): ProjectListing =>
   landed === undefined
     ? { openAsks: 1, posture: "open", project }
     : { landedAt: landedAt(landed), openAsks: 1, posture: "open", project };
@@ -121,7 +118,13 @@ const withReadme = (project: ProjectName, readme: string) =>
   Effect.gen(function* () {
     const git = yield* writer;
     const repo = RepoName.make(keyOf(project));
-    const sha = yield* git.commit("Start", [["README.md", Content.Text({ text: readme })]], [], 1);
+
+    const sha = yield* git.commit(
+      "Start",
+      [["README.md", Content.Text({ text: readme })]],
+      [],
+      1
+    );
 
     yield* git.push(repo, [["refs/heads/main", sha]]);
 
@@ -129,7 +132,10 @@ const withReadme = (project: ProjectName, readme: string) =>
 
     const code: CodeProject = {
       forks: Effect.succeed([]),
-      head: Effect.as(Ref.update(reads, (n) => n + 1), Option.some(LandedSha.make(sha))),
+      head: Effect.as(
+        Ref.update(reads, (n) => n + 1),
+        Option.some(LandedSha.make(sha))
+      ),
       landings: () => Effect.succeed([]),
       project,
       repo,
@@ -148,12 +154,17 @@ describe(withDescriptions, () => {
     "gives each landed project its README's first paragraph, and one not yet landed none",
     () =>
       Effect.gen(function* () {
-        const { code } = yield* withReadme(datekit, "# datekit\n\nDate helpers.\n");
+        const { code } = yield* withReadme(
+          datekit,
+          "# datekit\n\nDate helpers.\n"
+        );
 
         const listed = yield* withDescriptions(
           [listingOf(datekit, "2026-10-12T12:00:00Z"), listingOf(burrow)],
           (project) =>
-            project === datekit ? Effect.succeed(code) : Effect.die("never read")
+            project === datekit
+              ? Effect.succeed(code)
+              : Effect.die("never read")
         );
 
         expect(described(listed)).toStrictEqual({
@@ -163,30 +174,53 @@ describe(withDescriptions, () => {
       }).pipe(Effect.provide(RepoHostMemory))
   );
 
-  it.effect("reads a project once while its last landing stands, and again after the next", () =>
-    Effect.gen(function* () {
-      const { code, reads } = yield* withReadme(datekit, "# datekit\n\nDate helpers.\n");
-      const codeOf = () => Effect.succeed(code);
+  it.effect(
+    "reads a project once while its last landing stands, and again after the next",
+    () =>
+      Effect.gen(function* () {
+        const { code, reads } = yield* withReadme(
+          datekit,
+          "# datekit\n\nDate helpers.\n"
+        );
 
-      yield* withDescriptions([listingOf(datekit, "2026-10-12T12:00:00Z")], codeOf);
-      const kept = yield* withDescriptions([listingOf(datekit, "2026-10-12T12:00:00Z")], codeOf);
-      const readOnce = yield* Ref.get(reads);
+        const codeOf = () => Effect.succeed(code);
 
-      yield* withDescriptions([listingOf(datekit, "2026-10-12T13:00:00Z")], codeOf);
+        yield* withDescriptions(
+          [listingOf(datekit, "2026-10-12T12:00:00Z")],
+          codeOf
+        );
 
-      expect(described(kept)).toStrictEqual({ [datekit]: "Date helpers." });
-      expect([readOnce, yield* Ref.get(reads)]).toStrictEqual([1, 2]);
-    }).pipe(Effect.provide(Layer.merge(RepoHostMemory, ProjectDescriptionsMemory)))
+        const kept = yield* withDescriptions(
+          [listingOf(datekit, "2026-10-12T12:00:00Z")],
+          codeOf
+        );
+
+        const readOnce = yield* Ref.get(reads);
+
+        yield* withDescriptions(
+          [listingOf(datekit, "2026-10-12T13:00:00Z")],
+          codeOf
+        );
+
+        expect(described(kept)).toStrictEqual({ [datekit]: "Date helpers." });
+        expect([readOnce, yield* Ref.get(reads)]).toStrictEqual([1, 2]);
+      }).pipe(
+        Effect.provide(Layer.merge(RepoHostMemory, ProjectDescriptionsMemory))
+      )
   );
 
-  it.effect("lists a project whose README cannot be read, with no description", () =>
-    Effect.gen(function* () {
-      const listed = yield* withDescriptions(
-        [listingOf(datekit, "2026-10-12T12:00:00Z")],
-        () => Effect.die("the record is gone")
-      ).pipe(Effect.provide(Logger.layer([])));
+  it.effect(
+    "lists a project whose README cannot be read, with no description",
+    () =>
+      Effect.gen(function* () {
+        const listed = yield* withDescriptions(
+          [listingOf(datekit, "2026-10-12T12:00:00Z")],
+          () => Effect.die("the record is gone")
+        ).pipe(Effect.provide(Logger.layer([])));
 
-      expect(listed).toStrictEqual([listingOf(datekit, "2026-10-12T12:00:00Z")]);
-    }).pipe(Effect.provide(RepoHostMemory))
+        expect(listed).toStrictEqual([
+          listingOf(datekit, "2026-10-12T12:00:00Z"),
+        ]);
+      }).pipe(Effect.provide(RepoHostMemory))
   );
 });

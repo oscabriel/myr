@@ -3,13 +3,14 @@
  * prose, its markup dropped, cut to the cap. A project's config has no field
  * for it, so the README is the one source.
  */
-import type { RepoHost } from "@repo/artifacts/repo-host";
+import type { RepoHost, RepoNotFound } from "@repo/artifacts/repo-host";
 import {
   PROJECT_DESCRIPTION_CAP,
   ProjectDescription,
 } from "@repo/protocol/domain/front-page";
 import type { ProjectListing } from "@repo/protocol/domain/front-page";
 import type { ProjectName } from "@repo/protocol/ids";
+import type { UnknownPath, UnknownRevision } from "@repo/protocol/refusal";
 import {
   Array as Arr,
   Cause,
@@ -25,14 +26,23 @@ import type { CodeProject } from "./code.ts";
 import { contentsOf } from "./code/file.ts";
 
 const FENCE = /^\s{0,3}(?:`{3,}|~{3,})/u;
+
 const HEADING = /^\s{0,3}#{1,6}(?:\s|$)/u;
-const RULE = /^\s{0,3}(?:([=\-~^*#+_])\s*){3,}$/u;
+
+const RULE = /^\s{0,3}(?:[=\-~^*#+_]\s*){3,}$/u;
+
 const SETEXT = /^\s{0,3}(?:=+|-+)\s*$/u;
+
 const INDENTED = /^(?: {4}|\t)/u;
+
 const LIST_ITEM = /^\s{0,3}(?:[-*+]|\d{1,9}[.)])\s/u;
+
 const TABLE = /^\s*\|/u;
+
 const DEFINITION = /^\s{0,3}\[[^\]]+\]:\s/u;
+
 const DIRECTIVE = /^\.\.(?:\s|$)/u;
+
 const QUOTE = /^\s{0,3}>\s?/u;
 
 const ENTITIES: ReadonlyMap<string, string> = new Map([
@@ -111,11 +121,11 @@ const proseOf = (block: readonly string[]): readonly string[] => {
 const plainOf = (markup: string): string =>
   markup
     .replaceAll(/!\[[^\]]*\](?:\([^)]*\)|\[[^\]]*\])/gu, "")
-    .replaceAll(/\[([^\]]*)\](?:\([^)]*\)|\[[^\]]*\])/gu, "$1")
+    .replaceAll(/\[(?<text>[^\]]*)\](?:\([^)]*\)|\[[^\]]*\])/gu, "$<text>")
     .replaceAll(/<[^>]*>/gu, " ")
     .replaceAll(/&(?:[a-z]+|#\d+);/gu, (entity) => ENTITIES.get(entity) ?? " ")
     .replaceAll(/\*\*|__|`+/gu, "")
-    .replaceAll(/(^|[\s(])[*_](?=\S)/gu, "$1")
+    .replaceAll(/(?<lead>^|[\s(])[*_](?=\S)/gu, "$<lead>")
     .replaceAll(/(?<=\S)[*_](?=[\s).,;:!?]|$)/gu, "")
     .replaceAll(/\s+/gu, " ")
     .trim();
@@ -189,7 +199,11 @@ const orWarn = <A, E, R>(
 
 const readmeDescription = (
   code: CodeProject
-): Effect.Effect<Option.Option<ProjectDescription>, unknown, RepoHost> =>
+): Effect.Effect<
+  Option.Option<ProjectDescription>,
+  UnknownRevision | UnknownPath | RepoNotFound,
+  RepoHost
+> =>
   Effect.gen(function* () {
     const { readme } = yield* treeOf(code, Option.none(), Option.none());
 

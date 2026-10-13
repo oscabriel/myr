@@ -1,27 +1,21 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Contracts } from "@repo/protocol/contracts";
 import { ProjectListing } from "@repo/protocol/domain/front-page";
+import { ProjectName } from "@repo/protocol/ids";
 import { DateTime, Effect, Schema } from "effect";
 
 import { ExploreView } from "../src/features/explore/explore-page.tsx";
 import { exploreGroups } from "../src/features/explore/groups.ts";
-import { readEveryProject } from "../src/features/landing/read.ts";
 import { LandingProjects } from "../src/features/landing/projects.ts";
+import { readEveryProject } from "../src/features/landing/read.ts";
 import { exploreHeaders, Route } from "../src/routes/explore.tsx";
 import { fixturesClient } from "./dev-client.ts";
 import { TEN_LISTED } from "./listings.ts";
 import { textIn } from "./markup.ts";
-import { platformWith, unreachablePlatform } from "./platform.ts";
+import { unreachablePlatform } from "./platform.ts";
 import { renderAt } from "./render.tsx";
 
 const DATEKIT_LINE =
   "Small, dependency-free date helpers: parse, format, add and diff.";
-
-const listing = platformWith(
-  Contracts.toLayerHandler("listProjects", () =>
-    Effect.succeed({ projects: TEN_LISTED })
-  )
-);
 
 const listedIn = (read: LandingProjects) =>
   LandingProjects.match(read, {
@@ -30,6 +24,8 @@ const listedIn = (read: LandingProjects) =>
   });
 
 const decodeListing = Schema.decodeSync(ProjectListing);
+
+const at = (iso: string) => DateTime.makeUnsafe(iso);
 
 /** An import adopted from its source, landed on and taking no answers. */
 const click = decodeListing({
@@ -50,9 +46,7 @@ const groupsIn = (markup: string) => {
 const explored = (projects: readonly ProjectListing[]) =>
   renderAt(
     "/explore",
-    <ExploreView
-      projects={LandingProjects.cases.Listed.make({ projects })}
-    />
+    <ExploreView projects={LandingProjects.cases.Listed.make({ projects })} />
   );
 
 describe("Explore, read on the server", () => {
@@ -90,27 +84,25 @@ describe("Explore, read on the server", () => {
 
 describe(exploreGroups, () => {
   it("puts the projects taking answers first, each group by its latest landing", () => {
-    const at = (iso: string) => DateTime.makeUnsafe(iso);
-
     const { rest, taking } = exploreGroups([
-      { openAsks: 2, posture: "open", project: TEN_LISTED[0].project },
+      { openAsks: 2, posture: "open", project: ProjectName.make("oscabriel/alpha") },
       {
         landedAt: at("2026-10-12T08:00:00Z"),
         openAsks: 1,
         posture: "open",
-        project: TEN_LISTED[1].project,
+        project: ProjectName.make("oscabriel/datekit"),
       },
       {
         landedAt: at("2026-10-12T10:00:00Z"),
         openAsks: 0,
         posture: "open",
-        project: TEN_LISTED[2].project,
+        project: ProjectName.make("oscabriel/zeta"),
       },
       {
         landedAt: at("2026-10-12T11:00:00Z"),
         openAsks: 4,
         posture: "open",
-        project: TEN_LISTED[3].project,
+        project: ProjectName.make("oscabriel/burrow"),
       },
     ]);
 
@@ -131,6 +123,7 @@ describe(ExploreView, () => {
     () =>
       Effect.gen(function* () {
         const projects = listedIn(yield* readEveryProject);
+
         const { rest, taking } = groupsIn(
           yield* explored([...projects, click])
         );
@@ -173,10 +166,12 @@ describe(ExploreView, () => {
     () =>
       Effect.gen(function* () {
         const markup = yield* explored([
-          { openAsks: 0, posture: "open", project: TEN_LISTED[2].project },
+          { openAsks: 0, posture: "open", project: ProjectName.make("oscabriel/zeta") },
         ]);
 
-        expect(textIn(markup)).toContain("No project has an open ask right now.");
+        expect(textIn(markup)).toContain(
+          "No project has an open ask right now."
+        );
         expect(textIn(markup)).toContain("No open asks");
         expect(textIn(markup)).toContain("No landing yet");
       })

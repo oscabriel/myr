@@ -92,9 +92,11 @@ describe("the kept descriptions in D1", () => {
       expect(yield* keptFor([datekit])).toStrictEqual(new Map());
     }).pipe(
       Effect.provide(
-        ProjectDescriptionsD1.pipe(Layer.provideMerge(migrated([])))
-      ),
-      Effect.provide(Logger.layer([]))
+        Layer.merge(
+          ProjectDescriptionsD1.pipe(Layer.provideMerge(migrated([]))),
+          Logger.layer([])
+        )
+      )
     )
   );
 });

@@ -35,8 +35,7 @@ const LastLanded = ({ at }: { readonly at: DateTime.Utc | undefined }) =>
     <span>No landing yet</span>
   ) : (
     <span>
-      Last landed{" "}
-      <time dateTime={DateTime.formatIso(at)}>{dayOf(at)}</time>
+      Last landed <time dateTime={DateTime.formatIso(at)}>{dayOf(at)}</time>
     </span>
   );
 
@@ -147,6 +146,19 @@ const Listed = ({
   );
 };
 
+const Lede = ({ projects }: { readonly projects: LandingProjects }) =>
+  LandingProjects.match(projects, {
+    Listed: ({ projects: listed }) =>
+      `${plural(listed.length, "public project", "public projects")}, the ones taking answers first.`,
+    Unreachable: () => EXPLORE_LEDE,
+  });
+
+const Body = ({ projects }: { readonly projects: LandingProjects }) =>
+  LandingProjects.match(projects, {
+    Listed: ({ projects: listed }) => <Listed projects={listed} />,
+    Unreachable: () => <UnreachableNotice />,
+  });
+
 /** The public projects as cards, in two groups, or a notice when the platform did not answer. */
 export const ExploreView = ({
   projects,
@@ -161,18 +173,10 @@ export const ExploreView = ({
     <div className="flex flex-col gap-3">
       <h1 className="text-headline">{EXPLORE_TITLE}</h1>
       <p className="text-body text-muted-foreground max-w-[72ch]">
-        {LandingProjects.match(projects, {
-          Listed: ({ projects: listed }) =>
-            `${plural(listed.length, "public project", "public projects")}, the ones taking answers first.`,
-          Unreachable: () => EXPLORE_LEDE,
-        })}{" "}
-        Looking for something to work on?{" "}
+        <Lede projects={projects} /> Looking for something to work on?{" "}
         <AppLink to={ASKS_PATH}>Every open ask</AppLink>
       </p>
     </div>
-    {LandingProjects.match(projects, {
-      Listed: ({ projects: listed }) => <Listed projects={listed} />,
-      Unreachable: () => <UnreachableNotice />,
-    })}
+    <Body projects={projects} />
   </main>
 );
