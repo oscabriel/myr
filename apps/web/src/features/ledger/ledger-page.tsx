@@ -406,8 +406,8 @@ export const HeldBackRegion = ({
       <>
         <p className="text-ui text-muted-foreground max-w-[70ch]">
           Held-back checks judge every answer in their area, unseen. A landing
-          they judged names each area&apos;s root in its{" "}
-          <Code>Held-back:</Code> trailer.
+          they judged names each area&apos;s root in its <Code>Held-back:</Code>{" "}
+          trailer.
         </p>
         <ul className="flex flex-col gap-6">
           {areas.map((summary) => (

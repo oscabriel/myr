@@ -30,30 +30,23 @@ export const VisibilityPageData = Schema.Struct({
 
 type VisibilityPageData = typeof VisibilityPageData.Type;
 
+const decodeName = Schema.decodeOption(ProjectName);
+
 // The ledger answers for every project the platform knows; the env's schema only once its main has landed, so the
 // ledger says whether the project exists and the schema's `UnknownProject` means nothing has landed yet.
 export const readVisibility = (name: string) =>
   Effect.gen(function* () {
-    const project = yield* Schema.decodeEffect(ProjectName)(name).pipe(
-      Effect.mapError(() => notFound())
-    );
-
+    const project = yield* Effect.fromOption(decodeName(name));
     const client = yield* Client;
 
+    // Built apart from `Effect.all`, whose expected type would widen the catch's error to `any`.
+    const envRead = client.envShape({ project }).pipe(
+      Effect.asSome,
+      Effect.catchTag("UnknownProject", () => Effect.succeedNone)
+    );
+
     const { ledger, schema } = yield* Effect.all(
-      {
-        ledger: client
-          .ledger({ project })
-          .pipe(
-            Effect.catchTag("UnknownProject", () => Effect.fail(notFound()))
-          ),
-        schema: client.envShape({ project }).pipe(
-          Effect.asSome,
-          Effect.catchTag("UnknownProject", () =>
-            Effect.succeedNone
-          )
-        ),
-      },
+      { ledger: client.ledger({ project }), schema: envRead },
       { concurrency: "unbounded" }
     );
 
@@ -62,7 +55,12 @@ export const readVisibility = (name: string) =>
       ledger,
       now: yield* DateTime.now,
     });
-  });
+  }).pipe(
+    Effect.catchTags({
+      NoSuchElementError: () => Effect.fail(notFound()),
+      UnknownProject: () => Effect.fail(notFound()),
+    })
+  );
 
 const visibilityPage = createServerFn({ method: "GET" })
   .validator((name: string) => name)
@@ -73,11 +71,11 @@ const visibilityPage = createServerFn({ method: "GET" })
   );
 
 const FreshVisibility = ({
-  env,
+  environment,
   ledger,
   read,
 }: {
-  readonly env: EnvSchemaView | undefined;
+  readonly environment: EnvSchemaView | undefined;
   readonly ledger: ReturnType<typeof ledgerAtom>;
   readonly read: VisibilityPageData;
 }) => {
@@ -88,23 +86,26 @@ const FreshVisibility = ({
     () => read.ledger
   );
 
-  return <VisibilityView env={env} ledger={fresh} now={read.now} />;
+  return <VisibilityView env={environment} ledger={fresh} now={read.now} />;
 };
 
 // Read again only once a main has landed: before one, there is no schema to read.
 const WithFreshEnv = ({
-  env,
   ledger,
   read,
   schema,
+  schemaAtom,
 }: {
-  readonly env: ReturnType<typeof envSchemaAtom>;
+  readonly schemaAtom: ReturnType<typeof envSchemaAtom>;
   readonly ledger: ReturnType<typeof ledgerAtom>;
   readonly read: VisibilityPageData;
   readonly schema: EnvSchemaView;
 }) => (
   <FreshVisibility
-    env={Option.getOrElse(AsyncResult.value(useAtomValue(env)), () => schema)}
+    environment={Option.getOrElse(
+      AsyncResult.value(useAtomValue(schemaAtom)),
+      () => schema
+    )}
     ledger={ledger}
     read={read}
   />
@@ -114,7 +115,7 @@ const VisibilityPage = () => {
   const read = Schema.decodeSync(VisibilityPageData)(Route.useLoaderData());
   const { project } = read.ledger;
   const ledger = ledgerAtom(project);
-  const env = envSchemaAtom(project);
+  const schemaAtom = envSchemaAtom(project);
 
   return (
     <RegistryProvider
@@ -122,14 +123,19 @@ const VisibilityPage = () => {
         Atom.initialValue(ledger, AsyncResult.success(read.ledger)),
         ...(read.env === undefined
           ? []
-          : [Atom.initialValue(env, AsyncResult.success(read.env))]),
+          : [Atom.initialValue(schemaAtom, AsyncResult.success(read.env))]),
       ]}
       key={project}
     >
       {read.env === undefined ? (
-        <FreshVisibility env={undefined} ledger={ledger} read={read} />
+        <FreshVisibility environment={undefined} ledger={ledger} read={read} />
       ) : (
-        <WithFreshEnv env={env} ledger={ledger} read={read} schema={read.env} />
+        <WithFreshEnv
+          ledger={ledger}
+          read={read}
+          schema={read.env}
+          schemaAtom={schemaAtom}
+        />
       )}
     </RegistryProvider>
   );

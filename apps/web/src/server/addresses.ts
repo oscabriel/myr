@@ -135,8 +135,9 @@ const movedProjectPage = (
 
   return page === undefined || below.length > 0
     ? Option.none()
-    : Option.map(Option.fromUndefinedOr(MOVED_TO_VISIBILITY.get(page)), (anchor) =>
-        movedTo(visibilityHref(name, anchor, search))
+    : Option.map(
+        Option.fromUndefinedOr(MOVED_TO_VISIBILITY.get(page)),
+        (anchor) => movedTo(visibilityHref(name, anchor, search))
       );
 };
 

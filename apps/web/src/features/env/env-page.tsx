@@ -287,8 +287,7 @@ const WhereRead = ({ schema }: { readonly schema: EnvSchemaView }) => (
 const SetValue = ({ project }: { readonly project: ProjectName }) => (
   <div className="flex flex-col gap-2">
     <p className="text-ui text-muted-foreground">
-      A maintainer sets a sensitive value from a terminal; nobody reads it
-      back.
+      A maintainer sets a sensitive value from a terminal; nobody reads it back.
     </p>
     <CommandLine
       command={`${Brand.cli} env set <KEY> --project ${project} --yes`}

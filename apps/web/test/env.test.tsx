@@ -82,10 +82,9 @@ const ledger = Schema.decodeSync(Ledger)({
 });
 
 /** The Visibility tab as an environment test reads it, beside a ledger with nothing held back. */
-const tabWith = (
-  schema: EnvSchemaView | undefined,
-  at: DateTime.Utc = now
-) => <VisibilityView env={schema} ledger={ledger} now={at} />;
+const tabWith = (schema: EnvSchemaView | undefined, at: DateTime.Utc = now) => (
+  <VisibilityView env={schema} ledger={ledger} now={at} />
+);
 
 const page = tabWith(datekit);
 
@@ -160,9 +159,7 @@ describe("a project's environment", () => {
     // Served at 09:00; ines-v set the value at 09:30 while the page stayed open.
     const item = itemOf(
       mainOf(
-        markupOf(
-          tabWith(datekit, DateTime.makeUnsafe("2026-10-10T09:00:00Z"))
-        )
+        markupOf(tabWith(datekit, DateTime.makeUnsafe("2026-10-10T09:00:00Z")))
       ),
       "SENTRY_AUTH_TOKEN"
     );
@@ -298,9 +295,7 @@ describe("a project's environment", () => {
       items: [],
     });
 
-    expect(textOf(tabWith(empty))).toContain(
-      "No env items"
-    );
+    expect(textOf(tabWith(empty))).toContain("No env items");
   });
 
   it.effect("sits under the project's crumbs: datekit, then Visibility", () =>
@@ -318,7 +313,7 @@ describe("a project's environment", () => {
 
 describe("a project with nothing landed", () => {
   it("says it has no environment yet, rather than that it is unknown, with the command to read it", () => {
-    const view = tabWith(undefined);
+    const view = tabWith();
     const text = plainText(environmentOf(markupOf(view)));
 
     expect(markupOf(view)).toMatch(/<h1\b[^>]*>Visibility<\/h1>/u);

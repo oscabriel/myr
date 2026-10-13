@@ -28,7 +28,7 @@ const tabs = (current: string) =>
     { href: "/oscabriel/datekit#proposals", text: "Proposals" },
     { href: "/oscabriel/datekit#who-decides", text: "People" },
     { href: "/oscabriel/datekit/people", text: "Policy" },
-    { href: "/oscabriel/datekit/ledger", text: "Visibility" },
+    { href: "/oscabriel/datekit/visibility", text: "Visibility" },
   ].map((link) => ({ current: link.text === current, ...link }));
 
 describe("a project's tabs", () => {
@@ -70,9 +70,9 @@ describe("a project's tabs", () => {
     () =>
       Effect.gen(function* () {
         const markup = yield* renderAt(
-          "/oscabriel/datekit/ledger",
+          "/oscabriel/datekit/visibility",
           <ProjectTabs
-            current={projectTabOf("/oscabriel/datekit/ledger")}
+            current={projectTabOf("/oscabriel/datekit/visibility")}
             project={datekit}
           />
         );
@@ -147,8 +147,7 @@ describe(projectTabOf, () => {
     ["/oscabriel/datekit/commits/main", "landings"],
     ["/oscabriel/datekit/proposals/prop-000001", "proposals"],
     ["/oscabriel/datekit/people", "policy"],
-    ["/oscabriel/datekit/ledger", "visibility"],
-    ["/oscabriel/datekit/env", "visibility"],
+    ["/oscabriel/datekit/visibility", "visibility"],
   ])("puts %s under %s", (pathname, tab) => {
     expect(projectTabOf(pathname)).toBe(tab);
   });

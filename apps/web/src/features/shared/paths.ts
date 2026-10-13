@@ -40,7 +40,8 @@ export const answerPath = (project: ProjectName, ask: AskId) =>
 export const personPath = (handle: Handle) => `/people/${handle}`;
 
 /** A project's Visibility tab (ADR 0041), and the regions on it a link may open. */
-export const visibilityPath = (project: ProjectName) => `/${project}/visibility`;
+export const visibilityPath = (project: ProjectName) =>
+  `/${project}/visibility`;
 
 export const LEDGER_ANCHOR = "ledger";
 
@@ -53,8 +54,11 @@ export const MOVED_TO_VISIBILITY: ReadonlyMap<string, string> = new Map([
 ]);
 
 /** Where an old page's address goes: the tab, the query as it was spelled, then the region. */
-export const visibilityHref = (project: string, anchor: string, search: string) =>
-  `/${project}/visibility${search}#${anchor}`;
+export const visibilityHref = (
+  project: string,
+  anchor: string,
+  search: string
+) => `/${project}/visibility${search}#${anchor}`;
 
 export const decisionPath = (project: ProjectName, decision: DecisionId) =>
   `/${project}/decisions/${decision}`;

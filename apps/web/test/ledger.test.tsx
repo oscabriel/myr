@@ -247,12 +247,7 @@ describe("a project's ledger", () => {
     };
 
     expect(
-      textIn(
-        elementWith(
-          markupOf(tabWith(core)),
-          "data-ledger-head"
-        )
-      ).trim()
+      textIn(elementWith(markupOf(tabWith(core)), "data-ledger-head")).trim()
     ).toBe(
       "Open core · closed: maintainers. export: 7 sealed checks by 3 people; parser: 4 sealed checks by 3 people."
     );
@@ -393,9 +388,7 @@ describe("a project's ledger", () => {
   it("never shows an entry as recorded in the future, though it arrived after the page was read", () => {
     // Served at 07:00; the release at 08:00 arrived while the page stayed open.
     const markup = mainOf(
-      markupOf(
-        tabWith(datekit, DateTime.makeUnsafe("2026-10-12T07:00:00Z"))
-      )
+      markupOf(tabWith(datekit, DateTime.makeUnsafe("2026-10-12T07:00:00Z")))
     );
 
     expect(whenOf(markup, 'data-seq="8"')).toBe("now");
