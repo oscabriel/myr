@@ -34,6 +34,9 @@ const rootText = (file: string) =>
   }).pipe(Effect.provide(NodeServices.layer));
 
 const PlatformStage = Schema.Struct({
+  analytics_engine_datasets: Schema.Tuple([
+    Schema.Struct({ dataset: Schema.String }),
+  ]),
   artifacts: Schema.Array(
     Schema.Struct({ binding: Schema.String, namespace: Schema.String })
   ),
@@ -122,6 +125,7 @@ describe("the stage table", () => {
 
           return {
             frontPage: names.frontPage,
+            metrics: names.metrics,
             namespaces: [names.projects, names.layers],
             onPush: [names.onPush, names.onPush],
             platform: names.platform,
@@ -137,6 +141,7 @@ describe("the stage table", () => {
 
           return {
             frontPage: block?.d1_databases[0].database_name,
+            metrics: block?.analytics_engine_datasets[0].dataset,
             namespaces: block?.artifacts.map(({ namespace }) => namespace),
             onPush: [
               block?.triggers.events[0].targets[0].workflow_name,

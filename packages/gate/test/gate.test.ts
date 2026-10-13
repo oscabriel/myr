@@ -4,7 +4,7 @@ import { NotClaimed, OutOfScope, TouchedJudge } from "@repo/protocol/refusal";
 import type { Refusal } from "@repo/protocol/refusal";
 import { Effect, Option } from "effect";
 
-import { pushStages, runGate } from "../src/gate.ts";
+import { pushStages, refusingStage, runGate } from "../src/gate.ts";
 import type { Stage } from "../src/stage.ts";
 import { ask, modified, testFacts, wire } from "./facts.ts";
 
@@ -87,6 +87,54 @@ describe(runGate, () => {
       );
 
       expect(wired(answer)).toStrictEqual(Option.some(wire([outside, judged])));
+    })
+  );
+});
+
+describe(refusingStage, () => {
+  it.effect("names parse when parse refuses the push", () =>
+    Effect.gen(function* () {
+      const refused = yield* refusingStage(
+        pushStages,
+        testFacts({
+          changes: modified("docs/guide.md"),
+          claim: Option.none(),
+        })
+      );
+
+      expect(Option.map(refused, ({ stage }) => stage)).toStrictEqual(
+        Option.some("parse")
+      );
+    })
+  );
+
+  it.effect(
+    "names shape, with every refusal it gave, when parse lets the push through",
+    () =>
+      Effect.gen(function* () {
+        const refused = yield* refusingStage(
+          pushStages,
+          testFacts({
+            changes: modified("docs/guide.md", ".github/workflows/ci.yml"),
+          })
+        );
+
+        expect(
+          Option.map(refused, ({ refusals, stage }) => ({
+            refusals: wire(refusals),
+            stage,
+          }))
+        ).toStrictEqual(
+          Option.some({ refusals: wire([outside, judged]), stage: "shape" })
+        );
+      })
+  );
+
+  it.effect("names no stage when every stage lets the push through", () =>
+    Effect.gen(function* () {
+      expect(yield* refusingStage(pushStages, testFacts())).toStrictEqual(
+        Option.none()
+      );
     })
   );
 });

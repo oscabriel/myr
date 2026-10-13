@@ -17,6 +17,7 @@ import type { AnswerQueue } from "./answer-runs.ts";
 import { DraftParams, DraftRuns } from "./draft-runs.ts";
 import { Lander, Rebuild } from "./lander.ts";
 import { backoff } from "./landing.ts";
+import { MetricPoint, Metrics } from "./metrics.ts";
 import type { OutboxRow } from "./project-store/rows.ts";
 import { Projection, ProjectedEvent } from "./projection.ts";
 import { ProjectVisibility, VisibilityEffect } from "./visibility-port.ts";
@@ -45,6 +46,9 @@ export const OutboxBody = Schema.Union([
   Schema.TaggedStruct("Bookkeeping", { job: LandAgain }),
   Schema.TaggedStruct("Visibility", { effect: VisibilityEffect }),
   Schema.TaggedStruct("StartDraft", DraftParams.fields),
+  Schema.TaggedStruct("Measured", {
+    points: Schema.NonEmptyArray(MetricPoint),
+  }),
 ]).pipe(Schema.toTaggedUnion("_tag"));
 
 export type OutboxBody = typeof OutboxBody.Type;
@@ -94,6 +98,27 @@ export const draftRow = (params: DraftParams, at: DateTime.Utc) =>
     OutboxBody.cases.StartDraft.make(params),
     at
   );
+
+/**
+ * Written in the commit that holds the fact, under an id the fact alone
+ * names, so a replay that changes nothing writes no row and the same fact
+ * kept twice is one row.
+ */
+export const measuredRow = (
+  fact: string,
+  points: readonly MetricPoint[],
+  at: DateTime.Utc
+): Effect.Effect<readonly OutboxRow[]> =>
+  Array.isReadonlyArrayNonEmpty(points)
+    ? Effect.map(
+        outboxRow(
+          `measured:${fact}`,
+          OutboxBody.cases.Measured.make({ points }),
+          at
+        ),
+        Array.of
+      )
+    : Effect.succeed([]);
 
 export const isDue = (row: OutboxRow, now: DateTime.Utc) =>
   DateTime.isLessThanOrEqualTo(row.notBefore, now);
@@ -167,7 +192,9 @@ const bySeq = Order.mapInput(Order.Number, ({ body }: Decoded) =>
 export const runOutbox = (
   rows: readonly OutboxRow[],
   queue: AnswerQueue,
-  now: DateTime.Utc
+  now: DateTime.Utc,
+  // Takes rows out of the store before they run, naming those it still held.
+  claim: (ids: readonly string[]) => Effect.Effect<readonly string[]>
 ): Effect.Effect<
   OutboxRun,
   never,
@@ -226,6 +253,22 @@ export const runOutbox = (
       )
     );
 
+    const metrics = yield* Metrics;
+
+    // A point is written at most once, and never retried: the dataset adds
+    // every point it takes. Its row leaves the store first, so of a call's
+    // settle and the alarm's, both holding it, only the one that took it
+    // writes its points.
+    const taken = new Set(
+      yield* claim(of("Measured").map(({ row }) => row.id))
+    );
+
+    const measured = yield* Effect.forEach(
+      of("Measured").filter(({ row }) => taken.has(row.id)),
+      ({ body, row }) =>
+        Effect.as(metrics.write(body.points), ran(row, true, now))
+    );
+
     const runs = yield* Effect.forEach(of("StartAnswer"), ({ body, row }) =>
       Effect.as(
         AnswerRuns.use((answers) => answers.start(body.requestId, queue)),
@@ -239,6 +282,7 @@ export const runOutbox = (
       ...kept,
       ...planned,
       ...drafts,
+      ...measured,
       ...runs,
     ]);
   });

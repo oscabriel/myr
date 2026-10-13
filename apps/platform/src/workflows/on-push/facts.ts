@@ -15,7 +15,7 @@ import type { OnPushEvent } from "./event.ts";
 
 const platform = Person.make({ handle: platformHandle });
 
-const projectOf = (kind: RepoKind): Option.Option<ProjectName> =>
+export const projectOf = (kind: RepoKind): Option.Option<ProjectName> =>
   RepoKind.$match(kind, {
     Canonical: ({ project }) => Option.some(project),
     ClaimFork: ({ project }) => Option.some(project),

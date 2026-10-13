@@ -4,12 +4,15 @@ import { Brand } from "@repo/brand";
 import {
   Console,
   ConfigProvider,
+  DateTime,
   Effect,
   FileSystem,
   Layer,
+  Option,
   Path,
   Ref,
   Result,
+  Schema,
   Sink,
   Stream,
 } from "effect";
@@ -29,6 +32,8 @@ interface Spawned {
   readonly args: readonly string[];
   readonly cwd: string;
   readonly env: Readonly<Record<string, string | undefined>>;
+  // When it was spawned, in epoch milliseconds.
+  readonly at: number;
 }
 
 const recording = (exitOf: (spawned: Spawned) => number) =>
@@ -45,6 +50,7 @@ const recording = (exitOf: (spawned: Spawned) => number) =>
 
         const call: Spawned = {
           args: command.args,
+          at: DateTime.toEpochMillis(yield* DateTime.now),
           command: path.basename(command.command),
           cwd: path.relative(root, command.options.cwd ?? root),
           env: command.options.env ?? {},
@@ -107,8 +113,15 @@ const run = (
     return { result, spawned: yield* fake.spawned };
   }).pipe(Effect.scoped, Effect.provide(NodeServices.layer));
 
+// The instant smoke reads the logs since is the run's own, so a line shows
+// where it goes; "hands smoke the instant…" holds its value.
 const line = ({ args, command, cwd }: Spawned) =>
-  `${cwd === "" ? "." : cwd}$ ${[command, ...args].join(" ")}`;
+  `${cwd === "" ? "." : cwd}$ ${[
+    command,
+    ...args.map((arg, index) =>
+      args[index - 1] === "--since" ? "<since>" : arg
+    ),
+  ].join(" ")}`;
 
 describe("a deploy without a known stage", () => {
   it.live(
@@ -158,7 +171,7 @@ describe("a deploy to dev-oscabriel", () => {
           "apps/web$ bun run build",
           "apps/web$ wrangler deploy --env dev-oscabriel",
           ".$ bun run bootstrap --stage dev-oscabriel --check-triggers",
-          ".$ bun scripts/smoke.ts --stage dev-oscabriel",
+          ".$ varlock run --path infra/ -- bun scripts/smoke.ts --stage dev-oscabriel --since <since>",
         ]);
       })
   );
@@ -233,6 +246,42 @@ describe("a deploy to dev-oscabriel", () => {
       );
       expect(spawned).toHaveLength(7);
     })
+  );
+
+  it.live(
+    "hands smoke the instant the first upload began, after verify, so an error the replaced version logged during verify never fails it",
+    () =>
+      Effect.gen(function* () {
+        const { result, spawned } = yield* run(["--stage", "dev-oscabriel"]);
+        const [verify, sandbox] = spawned;
+        const smoke = spawned.at(-1);
+
+        const since = Option.map(
+          Schema.decodeUnknownOption(Schema.DateTimeUtcFromString)(
+            smoke?.args.at(-1)
+          ),
+          DateTime.toEpochMillis
+        );
+
+        expect(Result.isSuccess(result)).toBeTruthy();
+        expect({
+          flag: smoke?.args.at(-2),
+          since: Option.isSome(since),
+          verifiedFirst: Option.exists(
+            since,
+            (at) => (verify?.at ?? Infinity) <= at
+          ),
+          withTheUpload: Option.exists(
+            since,
+            (at) => at <= (sandbox?.at ?? -Infinity)
+          ),
+        }).toStrictEqual({
+          flag: "--since",
+          since: true,
+          verifiedFirst: true,
+          withTheUpload: true,
+        });
+      })
   );
 
   it.live("turns Wrangler's metrics off in every command it spawns", () =>
@@ -431,7 +480,7 @@ describe("a deploy to demo", () => {
           "apps/web$ bun run build",
           "apps/web$ wrangler deploy --env demo",
           ".$ bun run bootstrap --stage demo --check-triggers",
-          ".$ bun scripts/smoke.ts --stage demo",
+          ".$ varlock run --path infra/ -- bun scripts/smoke.ts --stage demo --since <since>",
         ]);
         expect(
           spawned.map(({ env }) =>
@@ -466,7 +515,7 @@ describe("a deploy to prod", () => {
           "apps/web$ bun run build",
           `apps/web$ wrangler deploy --env prod --domain ${Brand.domain} --domain www.${Brand.domain} --var PUBLIC_PLATFORM_URL:https://${git}`,
           ".$ bun run bootstrap --stage prod --check-triggers",
-          ".$ bun scripts/smoke.ts --stage prod",
+          ".$ varlock run --path infra/ -- bun scripts/smoke.ts --stage prod --since <since>",
         ]);
       })
   );

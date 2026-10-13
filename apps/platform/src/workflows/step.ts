@@ -1,4 +1,4 @@
-import { Context, Effect, Layer, Option, Ref, Schema } from "effect";
+import { Cause, Context, Effect, Layer, Option, Ref, Schema } from "effect";
 
 export interface WorkflowStepRetries {
   readonly limit: number;
@@ -45,6 +45,14 @@ const configOf = (retry: StepRetry | undefined) =>
         },
       };
 
+// A step's name carries its attempt and the SHA it ran on (`cheap#2`,
+// `main:<sha>:<lane>`): the span is named by its kind alone, and carries the
+// whole name as `step`.
+const stepSpan = (name: string) =>
+  Effect.withSpan(`Workflow.${name.split(/[:#]/u)[0] ?? name}`, {
+    attributes: { step: name },
+  });
+
 const durableStep =
   (steps: WorkflowSteps) =>
   <A, I, E, R>(
@@ -57,12 +65,20 @@ const durableStep =
       const json = Schema.toCodecJson(schema);
       const context = yield* Effect.context<R>();
       const failed = yield* Ref.make(Option.none<E>());
+      // The engine hands back only what the body threw: a defect's cause, as
+      // it died, keeps the mark that another side (a Project DO) reported it.
+      const died = yield* Ref.make(Option.none<Cause.Cause<E>>());
 
+      // Spanned inside the engine's step, so a replay that reads a kept value opens none.
       const run = effect.pipe(
         Effect.tapError((failure) => Ref.set(failed, Option.some(failure))),
+        Effect.tapCauseIf(Cause.hasDies, (cause) =>
+          Ref.set(died, Option.some(cause))
+        ),
         Effect.flatMap((value) =>
           Effect.orDie(Schema.encodeEffect(json)(value))
-        )
+        ),
+        stepSpan(name)
       );
 
       const recorded = yield* Effect.tryPromise(() =>
@@ -71,11 +87,19 @@ const durableStep =
         )
       ).pipe(
         Effect.catch((error) =>
-          Effect.flatMap(Ref.get(failed), (last) =>
-            Option.match(last, {
-              onNone: () => Effect.die(error),
-              onSome: (failure) => Effect.fail(failure),
-            })
+          Effect.flatMap(
+            Effect.all([Ref.get(failed), Ref.get(died)]),
+            ([last, defect]) =>
+              Option.match(last, {
+                onNone: () =>
+                  Option.match(defect, {
+                    // What the engine threw (a replay's, or its own), so a
+                    // defect is reported by its own name.
+                    onNone: () => Effect.die(error.cause),
+                    onSome: Effect.failCause,
+                  }),
+                onSome: (failure) => Effect.fail(failure),
+              })
           )
         )
       );

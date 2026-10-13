@@ -26,11 +26,35 @@
   // Nothing here reads a name at run time: Effect's tagged errors
   // set `name` from their tag, services are keyed by strings, and the
   // runtime finds Durable Objects, Workflows and entrypoints by export name,
-  // which minifying keeps. A stack trace shows minified function names.
+  // which minifying keeps. A stack trace shows minified names and positions.
+  // The uploaded source maps take an uncaught exception's stack back to the
+  // source, but a defect the platform reports itself is logged as thrown:
+  // the same commit's `wrangler deploy --dry-run --outdir` gives the map to
+  // read it by (README, Observability).
   "keep_names": false,
+  "upload_source_maps": true,
   "workers_dev": true,
   "preview_urls": false,
-  "observability": { "enabled": true },
+  // Every invocation's logs and trace, unsampled, and Issues, which groups
+  // what failed. The runtime's own spans record each Durable Object SQL
+  // statement's bound values and each fetch's full URL, so these traces hold
+  // the Project DO's layer names and repos and sealed values (never a plain
+  // one). The maintainer keeps them in the account's trace store alone: no
+  // `destinations`, and no Issues automation sends the platform's anywhere
+  // (principle 7).
+  // Unlike bindings, wrangler gives `observability` and `upload_source_maps`
+  // to every stage that does not set its own
+  // (packages/config/test/observability.test.ts holds each stage to them).
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "invocation_logs": true,
+    },
+    "traces": { "enabled": true, "head_sampling_rate": 1 },
+    "issues": { "enabled": true },
+  },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Project"] }],
   "vars": {
     // Until sign-in exists, one operator holds a session.
@@ -94,6 +118,13 @@
   "worker_loaders": [{ "binding": "LOADER" }],
   // Workers AI, for the drafter (no key: the account's own).
   "ai": { "binding": "AI" },
+  // Domain metrics (landings, refusals, lanes, waits, drafts) in Workers
+  // Analytics Engine, one dataset per stage so no stage's counts mix with
+  // another's. A dataset is made by its first write, so bootstrap makes none;
+  // its name takes `_`, since SQL reads it as a table.
+  "analytics_engine_datasets": [
+    { "binding": "METRICS", "dataset": "metrics_local" },
+  ],
   "services": [{ "binding": "SANDBOX", "service": "sandbox" }],
   // Namespace ids differ per stage, so one stage's counts never spend
   // another's.
@@ -187,6 +218,9 @@
       "send_email": [{ "name": "EMAIL" }],
       "worker_loaders": [{ "binding": "LOADER" }],
       "ai": { "binding": "AI" },
+      "analytics_engine_datasets": [
+        { "binding": "METRICS", "dataset": "metrics_dev_oscabriel" },
+      ],
       "services": [
         { "binding": "SANDBOX", "service": "sandbox-dev-oscabriel" },
       ],
@@ -275,6 +309,9 @@
       "send_email": [{ "name": "EMAIL" }],
       "worker_loaders": [{ "binding": "LOADER" }],
       "ai": { "binding": "AI" },
+      "analytics_engine_datasets": [
+        { "binding": "METRICS", "dataset": "metrics_demo" },
+      ],
       "services": [{ "binding": "SANDBOX", "service": "sandbox-demo" }],
       "ratelimits": [
         {
@@ -366,6 +403,9 @@
       "send_email": [{ "name": "EMAIL" }],
       "worker_loaders": [{ "binding": "LOADER" }],
       "ai": { "binding": "AI" },
+      "analytics_engine_datasets": [
+        { "binding": "METRICS", "dataset": "metrics_prod" },
+      ],
       "services": [{ "binding": "SANDBOX", "service": "sandbox-prod" }],
       "ratelimits": [
         {

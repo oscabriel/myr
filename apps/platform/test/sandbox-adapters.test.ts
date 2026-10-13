@@ -628,6 +628,33 @@ describe("a sandbox job that fails", () => {
         ]);
       })
   );
+
+  it.effect(
+    "logs a defect from the far side by its name and frames alone, since a Checker's may quote a sealed file's path",
+    () =>
+      Effect.gen(function* () {
+        const sealed = "tests/sealed/parse.test.ts";
+
+        const { lander } = yield* world({
+          binding: (sandbox) => ({
+            ...sandbox,
+            merge: () =>
+              Promise.resolve(
+                Schema.encodeSync(MergeExit)(
+                  Exit.die(new Error(`no file at ${sealed}`))
+                )
+              ),
+          }),
+        });
+
+        const { lines } = yield* withLogs(lander.merge(mergeJob));
+
+        expect(
+          lines.map(({ annotations }) => annotations.detail)
+        ).toStrictEqual([expect.stringMatching(/^Error: <withheld>/u)]);
+        expect(JSON.stringify(lines)).not.toContain(sealed);
+      })
+  );
 });
 
 describe("a sandbox job's tokens", () => {

@@ -3,6 +3,7 @@ import type { D1Client } from "@effect/sql-d1";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import type { RepoHostBinding } from "@repo/artifacts/repo-host/binding";
 import type { CodeStoreR2 } from "@repo/project/code-store/binding";
+import type { MetricsBinding } from "@repo/project/metrics/binding";
 import type { RulesEvaluatorWorker } from "@repo/rules/rules-evaluator/worker";
 import {
   Array,
@@ -99,6 +100,7 @@ const Named = Schema.Array(Schema.Struct({ name: Schema.String }));
 
 const BindingKinds = Schema.Struct({
   ai: Schema.optionalKey(Schema.Struct({ binding: Schema.String })),
+  analytics_engine_datasets: Schema.optionalKey(Bound),
   artifacts: Schema.optionalKey(Bound),
   d1_databases: Schema.optionalKey(Bound),
   durable_objects: Schema.optionalKey(Schema.Struct({ bindings: Named })),
@@ -126,6 +128,7 @@ const NOT_BINDINGS: ReadonlySet<string> = new Set([
   "preview_urls",
   "secrets",
   "triggers",
+  "upload_source_maps",
   "vars",
   "workers_dev",
 ]);
@@ -156,6 +159,7 @@ const declaredIn = (raw: typeof Raw.Type) =>
   Effect.map(decodeBlock(raw), (block) => ({
     bindings: sorted([
       ...(block.ai === undefined ? [] : [block.ai.binding]),
+      ...(block.analytics_engine_datasets ?? []).map(({ binding }) => binding),
       ...(block.artifacts ?? []).map(({ binding }) => binding),
       ...(block.d1_databases ?? []).map(({ binding }) => binding),
       ...(block.durable_objects?.bindings ?? []).map(({ name }) => name),
@@ -389,6 +393,45 @@ describe("the platform Worker's bindings", () => {
     }).pipe(Effect.provide(NodeServices.layer))
   );
 
+  it.effect(
+    "write domain metrics to each block's own dataset, so no stage's counts mix with another's",
+    () =>
+      Effect.gen(function* () {
+        const raw = yield* Effect.flatMap(
+          fileText("wrangler.jsonc"),
+          readJsonc
+        );
+
+        const { env = {} } = yield* Schema.decodeUnknownEffect(Staged)(raw);
+
+        const Datasets = Schema.Struct({
+          analytics_engine_datasets: Schema.Array(
+            Schema.Struct({ binding: Schema.String, dataset: Schema.String })
+          ),
+        });
+
+        const datasets = (block: typeof Raw.Type | undefined) =>
+          Effect.map(
+            Schema.decodeUnknownEffect(Datasets)(block),
+            ({ analytics_engine_datasets }) => analytics_engine_datasets
+          );
+
+        expect({
+          demo: yield* datasets(env.demo),
+          "dev-oscabriel": yield* datasets(env["dev-oscabriel"]),
+          prod: yield* datasets(env.prod),
+          top: yield* datasets(raw),
+        }).toStrictEqual({
+          demo: [{ binding: "METRICS", dataset: "metrics_demo" }],
+          "dev-oscabriel": [
+            { binding: "METRICS", dataset: "metrics_dev_oscabriel" },
+          ],
+          prod: [{ binding: "METRICS", dataset: "metrics_prod" }],
+          top: [{ binding: "METRICS", dataset: "metrics_local" }],
+        });
+      }).pipe(Effect.provide(NodeServices.layer))
+  );
+
   it("are all the Env the Worker is given, and nothing else", () => {
     expectTypeOf<keyof Env>().toEqualTypeOf<
       Exclude<
@@ -447,6 +490,10 @@ describe("the platform Worker's bindings", () => {
     expectTypeOf<PlatformConfig["CODE_CACHE"]>().toEqualTypeOf<
       Env["CODE_CACHE"]
     >();
+    expectTypeOf<Env["METRICS"]>().toExtend<
+      Parameters<typeof MetricsBinding>[0]
+    >();
+    expectTypeOf<PlatformConfig["METRICS"]>().toEqualTypeOf<Env["METRICS"]>();
   });
 
   it("type the sandbox service binding by the entrypoint the platform calls", () => {

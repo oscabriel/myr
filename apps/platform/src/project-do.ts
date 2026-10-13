@@ -11,7 +11,7 @@ import type { AlarmStorage } from "./adapters/alarms.ts";
 import { AnswerRunsWorkflow } from "./adapters/answer-runs-workflow.ts";
 import { decodeEnv } from "./platform.ts";
 import type { InvalidEnv, PlatformConfig } from "./platform.ts";
-import { workerPorts } from "./ports.ts";
+import { telemetryOf, workerPorts } from "./ports.ts";
 import type { CallRequest, ExitEncoded } from "./project-calls.ts";
 import { projectShell } from "./project-shell.ts";
 import type { ProjectShell } from "./project-shell.ts";
@@ -44,23 +44,24 @@ export const doPorts = (input: {
     ProjectSkillGenerator
   );
 
+// Every call and alarm runs with the Worker's telemetry, migrations included.
 const shellOf = (ctx: DurableObjectState, env: Env) =>
-  Layer.effect(
-    Shell,
-    Effect.gen(function* () {
-      const config = yield* decodeEnv(env);
-
+  Layer.unwrap(
+    Effect.map(decodeEnv(env), (config) => {
       const name = Option.flatMap(
         Schema.decodeUnknownOption(ProjectKey)(ctx.id.name),
         nameOfKey
       );
 
-      return yield* projectShell({
-        name: Option.getOrUndefined(name),
-        ports: doPorts({ config, name, storage: ctx.storage }),
-        // The storage itself, not `storage.sql`: transactions run through it.
-        sql: SqliteClient.layer({ storage: ctx.storage }),
-      });
+      return Layer.effect(
+        Shell,
+        projectShell({
+          name: Option.getOrUndefined(name),
+          ports: doPorts({ config, name, storage: ctx.storage }),
+          // The storage itself, not `storage.sql`: transactions run through it.
+          sql: SqliteClient.layer({ storage: ctx.storage }),
+        })
+      ).pipe(Layer.provideMerge(telemetryOf(config)));
     })
   );
 

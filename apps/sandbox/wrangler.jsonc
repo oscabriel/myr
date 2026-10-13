@@ -15,9 +15,22 @@
   // The Sandbox SDK's `Files` needs it.
   "compatibility_flags": ["nodejs_compat"],
   "minify": true,
+  // A stack trace in the logs, or an Issue, names the source.
+  "upload_source_maps": true,
   "workers_dev": false,
   "preview_urls": false,
-  "observability": { "enabled": true },
+  // The Worker's own: every invocation's logs and trace, unsampled, and
+  // Issues. Every stage inherits it; a container's logs are its own, below.
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "invocation_logs": true,
+    },
+    "traces": { "enabled": true, "head_sampling_rate": 1 },
+    "issues": { "enabled": true },
+  },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Checker", "Lander"] }],
   "durable_objects": {
     "bindings": [
@@ -28,15 +41,24 @@
   // Untrusted answer code runs in a Checker; the Lander runs only git and
   // Bun. One container per Durable Object, which picks its instance size when
   // it starts it (`ctx.container.start`).
+  //
+  // A container's own logs are off in a Checker: held-back checks run there,
+  // and nothing a sealed check writes may reach a log (principle 7). They are
+  // on in the Lander, which reads and writes only the public namespace's
+  // repos (canonical and forks), never a layer, and hands git its token in
+  // env, never in a URL or an argument. Each stage sets both again: a
+  // container that leaves `observability` out keeps whatever it last had.
   "containers": [
     {
       "class_name": "Checker",
       "scheduling_policy": "durable_object",
+      "observability": { "enabled": false },
       "images": { "check": { "dockerfile": "./images/check.Dockerfile" } },
     },
     {
       "class_name": "Lander",
       "scheduling_policy": "durable_object",
+      "observability": { "enabled": true },
       // The repo root, so the image can carry the sdk for `bundleRules`
       // (land.Dockerfile.dockerignore admits only what it copies).
       "images": {
@@ -59,6 +81,7 @@
         {
           "class_name": "Checker",
           "scheduling_policy": "durable_object",
+          "observability": { "enabled": false },
           "images": {
             "check": { "dockerfile": "./images/check.Dockerfile" },
           },
@@ -66,6 +89,7 @@
         {
           "class_name": "Lander",
           "scheduling_policy": "durable_object",
+          "observability": { "enabled": true },
           "images": {
             "land": {
               "dockerfile": "./images/land.Dockerfile",
@@ -86,6 +110,7 @@
         {
           "class_name": "Checker",
           "scheduling_policy": "durable_object",
+          "observability": { "enabled": false },
           "images": {
             "check": { "dockerfile": "./images/check.Dockerfile" },
           },
@@ -93,6 +118,7 @@
         {
           "class_name": "Lander",
           "scheduling_policy": "durable_object",
+          "observability": { "enabled": true },
           "images": {
             "land": {
               "dockerfile": "./images/land.Dockerfile",
@@ -113,6 +139,7 @@
         {
           "class_name": "Checker",
           "scheduling_policy": "durable_object",
+          "observability": { "enabled": false },
           "images": {
             "check": { "dockerfile": "./images/check.Dockerfile" },
           },
@@ -120,6 +147,7 @@
         {
           "class_name": "Lander",
           "scheduling_policy": "durable_object",
+          "observability": { "enabled": true },
           "images": {
             "land": {
               "dockerfile": "./images/land.Dockerfile",

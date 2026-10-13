@@ -65,6 +65,11 @@ export interface Resources {
   readonly evidence: string;
   readonly releases: string;
   readonly codeCache: string;
+  // Workers Analytics Engine's domain metrics: made by its first write, so
+  // bootstrap makes none, and named with `_`, since SQL reads it as a table.
+  // The platform's `METRICS` binding writes it, and the refusal alert
+  // (`alerts.ts`) reads it.
+  readonly metrics: string;
   readonly answer: string;
   readonly onPush: string;
 }
@@ -75,6 +80,7 @@ export const resources = (stage: Stage): Resources => ({
   evidence: `evidence-${stage}`,
   frontPage: `front-page-${stage}`,
   layers: `layers-${stage}`,
+  metrics: `metrics_${stage.replaceAll("-", "_")}`,
   oauth: `oauth-${stage}`,
   onPush: `on-push-${stage}`,
   platform: `platform-${stage}`,

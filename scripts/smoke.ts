@@ -1,10 +1,14 @@
 /**
  * Usage:
  *   bun scripts/smoke.ts --stage <stage> [--url <origin>] [--web-url <origin>]
+ *     [--since <instant>]
  *   bun scripts/smoke.ts --stage <stage> --loop [--draft] [--as <handle>]
  *
- * `--loop` reads `OPERATOR_TOKEN` and `SESSION_TOKENS` (token to handle) from
- * the env, never from an argument.
+ * `--since` then reads the stage's Workers Logs since that instant, and fails
+ * on any exception or error-level line: it needs infra's credentials, so the
+ * deploy runs it through `varlock run --path infra/`. `--loop` reads
+ * `OPERATOR_TOKEN` and `SESSION_TOKENS` (token to handle) from the env, never
+ * from an argument.
  */
 import { BunRuntime, BunServices } from "@effect/platform-bun";
 import { Handle, sameHandle } from "@repo/protocol/ids";
@@ -40,6 +44,9 @@ export class DraftNeedsLoop extends Schema.TaggedError<DraftNeedsLoop>()(
 }
 
 export {
+  BadSince,
+  logProbes,
+  NoLogCredentials,
   NoOrigin,
   platformProbes,
   probes,
@@ -48,7 +55,7 @@ export {
   webProbes,
 } from "../infra/smoke.ts";
 
-export type { SmokeReport } from "../infra/smoke.ts";
+export type { LogsCheck, SmokeReport } from "../infra/smoke.ts";
 
 export { DemoStageRefused, LoopFailed, smokeLoop } from "./lib/smoke/loop.ts";
 

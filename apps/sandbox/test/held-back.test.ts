@@ -34,6 +34,7 @@ import { TestClock } from "effect/testing";
 import { expectTypeOf } from "vitest";
 
 import { Box, BoxFailed } from "../src/box.ts";
+import { checkJob } from "../src/checker.ts";
 import { REGISTRIES } from "../src/checker/network.ts";
 import { check, REPO, roomFor } from "../src/checker/run.ts";
 import { answerJob } from "../src/job.ts";
@@ -669,7 +670,7 @@ describe("the Checker's held-back phase", () => {
         });
 
         const outcome = yield* Effect.promise(() =>
-          answerJob(CheckWire, CheckExit, (decoded) =>
+          answerJob(checkJob, (decoded) =>
             check(decoded).pipe(Effect.provide(fake.layer))
           )(encoded)
         ).pipe(Effect.flatMap(Schema.decodeEffect(CheckExit)));

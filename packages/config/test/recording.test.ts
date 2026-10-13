@@ -152,14 +152,17 @@ describe("a deploy with no take being recorded", () => {
       );
 
       expect(Result.isSuccess(result)).toBeTruthy();
-      expect(spawned).toStrictEqual([
+      // The instant smoke reads the logs since is the run's own.
+      expect(
+        spawned.map((line) => line.replace(/--since \S+$/u, "--since <since>"))
+      ).toStrictEqual([
         ".$ bun run verify",
         "apps/sandbox$ wrangler deploy --env dev-oscabriel",
         "apps/platform$ varlock-wrangler deploy --env dev-oscabriel",
         "apps/web$ bun run build",
         "apps/web$ wrangler deploy --env dev-oscabriel",
         ".$ bun run bootstrap --stage dev-oscabriel --check-triggers",
-        ".$ bun scripts/smoke.ts --stage dev-oscabriel",
+        ".$ varlock run --path infra/ -- bun scripts/smoke.ts --stage dev-oscabriel --since <since>",
       ]);
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
   );

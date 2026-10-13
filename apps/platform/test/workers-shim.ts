@@ -34,3 +34,6 @@ export class WorkerEntrypoint<E = Env> {
 }
 
 export const env = fakeEnv();
+
+// Outside workerd no invocation is traced: every span is a no-op.
+export { untracedTracing as tracing } from "@repo/telemetry/spans/memory";

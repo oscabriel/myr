@@ -83,7 +83,13 @@ export interface Committed {
 export class ProjectStore extends Context.Service<
   ProjectStore,
   {
-    readonly ackOutbox: (ids: readonly string[]) => Effect.Effect<void>;
+    /**
+     * Takes out the outbox rows it still holds of `ids`, and names them: of
+     * two acks of one row, only the first takes it.
+     */
+    readonly ackOutbox: (
+      ids: readonly string[]
+    ) => Effect.Effect<readonly string[]>;
     readonly commit: (writes: ProjectWrites) => Effect.Effect<Committed>;
     readonly eventsSince: (
       seq: number,

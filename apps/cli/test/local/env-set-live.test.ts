@@ -718,7 +718,7 @@ layer(ScenarioOnce, { excludeTestServices: true, timeout: "240 seconds" })(
           }).toStrictEqual({
             event: true,
             logged: [
-              `["a write-only value was set"] {"by":"ines-v","key":"${token}"}`,
+              `["a write-only value was set"] {"project":"${project}","by":"ines-v","key":"${token}"}`,
             ],
             printed: true,
             replies: 1,

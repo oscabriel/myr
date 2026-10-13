@@ -367,7 +367,10 @@ const git = HttpRouter.use((router) =>
   })
 );
 
-export const serve = <E>(services: Layer.Layer<Services, E>) =>
+export const serve = <E, TE = never>(
+  services: Layer.Layer<Services, E>,
+  telemetry?: Layer.Layer<never, TE>
+) =>
   buildHandler(
     Layer.mergeAll(
       home,
@@ -380,5 +383,6 @@ export const serve = <E>(services: Layer.Layer<Services, E>) =>
       releaseRoutes,
       agentSkillRoutes,
       identifyCaller
-    ).pipe(Layer.provide(services))
+    ).pipe(Layer.provide(services)),
+    telemetry
   );

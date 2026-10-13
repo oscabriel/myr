@@ -21,7 +21,7 @@ import {
 } from "@repo/project/landing";
 import { Projects } from "@repo/project/projects";
 import { LaneOutcome, Verdict } from "@repo/protocol/domain/answer";
-import type { Outcome } from "@repo/protocol/domain/outcome";
+import type { Outcome, StageName } from "@repo/protocol/domain/outcome";
 import { CommitSha } from "@repo/protocol/ids";
 import type {
   EnvKey,
@@ -30,6 +30,7 @@ import type {
   RequestId,
 } from "@repo/protocol/ids";
 import { VerifierBlocked } from "@repo/protocol/refusal";
+import type { Refusal } from "@repo/protocol/refusal";
 import {
   Array,
   Cause,
@@ -276,6 +277,23 @@ interface Ran {
   readonly judged: Option.Option<Judged>;
 }
 
+/** The checks stage runs only when the cheap one refused nothing, and the held-back one only when neither did. */
+const refusingStage = (input: {
+  readonly checked: boolean;
+  readonly held: readonly Refusal[];
+  readonly last: readonly Refusal[];
+}): Option.Option<StageName> => {
+  if (input.held.length > 0) {
+    return Option.some("heldBack");
+  }
+
+  if (input.last.length > 0) {
+    return Option.some(input.checked ? "checks" : "cheap");
+  }
+
+  return Option.none();
+};
+
 const ranOnly = (given: Option.Option<Reported>): Ran => ({
   given,
   judged: Option.none(),
@@ -316,7 +334,8 @@ const guardedOut = (
           refusals: [...run.refusals, ...quarantined],
           tree: call.tree,
         }),
-        { heldBack: [], lanes: [] }
+        // The landing guards hold the shape of the tree, as stage 1 does a push's.
+        { heldBack: [], lanes: [], stage: "shape" }
       )
     )
   );
@@ -377,6 +396,15 @@ const checks = (
       ? Option.some(sealed)
       : Option.none();
 
+    const refusedAt = refusingStage({
+      checked: judged !== undefined,
+      held: Option.match(held, {
+        onNone: () => [],
+        onSome: ({ refusals }) => refusals,
+      }),
+      last: last.refusals,
+    });
+
     const given = StageRun.match(last.ran, {
       Blocked: ({ attempt: at }) =>
         reported(LandingCommand.Blocked({ attempt: at })),
@@ -409,6 +437,10 @@ const checks = (
             ...Option.match(counts, {
               onNone: () => ({}),
               onSome: (ratchets) => ({ ratchets }),
+            }),
+            ...Option.match(refusedAt, {
+              onNone: () => ({}),
+              onSome: (refusing) => ({ stage: refusing }),
             }),
           }
         ),

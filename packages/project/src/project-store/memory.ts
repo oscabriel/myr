@@ -159,17 +159,23 @@ export const ProjectStoreMemory = Layer.effect(
 
     return ProjectStore.of({
       ackOutbox: (ids) =>
-        SynchronizedRef.update(ref, (state) => {
+        SynchronizedRef.modify(ref, (state) => {
           const kept = new Map(rowsIn(state, Tables.outbox));
+          const taken: string[] = [];
 
           for (const id of ids) {
-            kept.delete(keyOf(Tables.outbox, { id }));
+            if (kept.delete(keyOf(Tables.outbox, { id }))) {
+              taken.push(id);
+            }
           }
 
-          return {
-            ...state,
-            tables: new Map(state.tables).set(Tables.outbox.name, kept),
-          };
+          return [
+            taken,
+            {
+              ...state,
+              tables: new Map(state.tables).set(Tables.outbox.name, kept),
+            },
+          ] as const;
         }),
       commit: (writes) =>
         SynchronizedRef.modifyEffect(ref, (state) => {

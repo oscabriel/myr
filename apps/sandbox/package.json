@@ -15,6 +15,7 @@
     "@repo/project": "workspace:*",
     "@repo/protocol": "workspace:*",
     "@repo/rules": "workspace:*",
+    "@repo/telemetry": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {

@@ -4,6 +4,8 @@ import type { RepoHost } from "@repo/artifacts/repo-host";
 import type { Drafter } from "@repo/drafting/drafter";
 import type { Projects } from "@repo/project/projects";
 import { Outcome } from "@repo/protocol/domain/outcome";
+import { annotateInvocation, refusedWith } from "@repo/telemetry/spans";
+import type { InvocationIds } from "@repo/telemetry/spans";
 import { WorkflowEntrypoint } from "cloudflare:workers";
 import type { WorkflowEvent } from "cloudflare:workers";
 import { Effect, Layer, Schema } from "effect";
@@ -11,18 +13,30 @@ import { Effect, Layer, Schema } from "effect";
 import type { WorkflowParams } from "../answer-runs.ts";
 import { AdmissionParams, AnswerParams, DraftParams } from "../answer-runs.ts";
 import { decodeEnv } from "../platform.ts";
-import { draftPorts, workerPorts } from "../ports.ts";
+import { draftPorts, telemetryOf, workerPorts } from "../ports.ts";
 import { admissionSteps } from "./admission-steps.ts";
 import { runAnswer } from "./answer/program.ts";
 import type { AnswerPorts } from "./answer/program.ts";
 import { draftSteps, timedSteps } from "./draft-steps.ts";
 import type { EngineSteps } from "./draft-steps.ts";
+import { instance, invocation } from "./instance.ts";
 import { workflowSteps } from "./step.ts";
 import type { StepRunner, WorkflowSteps } from "./step.ts";
 
 export const OutcomeJson = Schema.toCodecJson(Outcome);
 
 export type OutcomeEncoded = typeof OutcomeJson.Encoded;
+
+// What Issues shows beside a run that ended: the SHA it landed, or what refused it.
+const outcomeIds = (outcome: Outcome): InvocationIds =>
+  Outcome.match(outcome, {
+    AwaitingDecision: () => ({}),
+    AwaitingFinish: () => ({}),
+    Checking: () => ({}),
+    Landed: ({ sha }) => ({ sha }),
+    Refused: ({ refusals }) => refusedWith(refusals),
+    WaitingOnParent: () => ({}),
+  });
 
 export const runWorkflow = <E>(
   ports: Layer.Layer<Exclude<AnswerPorts, StepRunner>, E>,
@@ -32,10 +46,14 @@ export const runWorkflow = <E>(
   Effect.runPromise(
     Effect.gen(function* () {
       const params = yield* Schema.decodeEffect(AnswerParams)(payload);
-      const outcome = yield* runAnswer(params);
 
-      return yield* Schema.encodeEffect(OutcomeJson)(outcome);
+      return yield* runAnswer(params).pipe(
+        Effect.tap((outcome) => annotateInvocation(outcomeIds(outcome))),
+        Effect.flatMap(Schema.encodeEffect(OutcomeJson)),
+        invocation({ project: params.project, requestId: params.requestId })
+      );
     }).pipe(
+      instance("Answer.run"),
       Effect.provide(Layer.merge(ports, workflowSteps(steps))),
       Effect.orDie
     )
@@ -48,12 +66,14 @@ export const runAdmission = <E>(
 ): Promise<null> =>
   Effect.runPromise(
     Effect.gen(function* () {
-      yield* admissionSteps(
-        yield* Schema.decodeEffect(AdmissionParams)(payload)
-      );
+      const params = yield* Schema.decodeEffect(AdmissionParams)(payload);
 
-      return null;
+      return yield* admissionSteps(params).pipe(
+        Effect.as(null),
+        invocation({ project: params.project, sha: params.head })
+      );
     }).pipe(
+      instance("Admission.run"),
       Effect.provide(Layer.merge(ports, workflowSteps(steps))),
       Effect.orDie
     )
@@ -66,10 +86,14 @@ export const runDraftWorkflow = <E>(
 ): Promise<null> =>
   Effect.runPromise(
     Effect.gen(function* () {
-      yield* draftSteps(yield* Schema.decodeEffect(DraftParams)(payload));
+      const params = yield* Schema.decodeEffect(DraftParams)(payload);
 
-      return null;
+      return yield* draftSteps(params).pipe(
+        Effect.as(null),
+        invocation({ project: params.project })
+      );
     }).pipe(
+      instance("Draft.run"),
       Effect.provide(Layer.merge(ports, workflowSteps(timedSteps(steps)))),
       Effect.orDie
     )
@@ -94,7 +118,11 @@ export class Answer extends WorkflowEntrypoint<
       return runDraftWorkflow(
         Layer.unwrap(
           Effect.map(config, (decoded) =>
-            Layer.merge(workerPorts(decoded), draftPorts(decoded))
+            Layer.mergeAll(
+              workerPorts(decoded),
+              draftPorts(decoded),
+              telemetryOf(decoded)
+            )
           )
         ),
         payload,
@@ -102,7 +130,11 @@ export class Answer extends WorkflowEntrypoint<
       );
     }
 
-    const ports = Layer.unwrap(Effect.map(config, workerPorts));
+    const ports = Layer.unwrap(
+      Effect.map(config, (decoded) =>
+        Layer.merge(workerPorts(decoded), telemetryOf(decoded))
+      )
+    );
 
     return admits(payload)
       ? runAdmission(ports, payload, step)
