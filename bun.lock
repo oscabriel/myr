@@ -360,6 +360,19 @@
         "vitest": "catalog:",
       },
     },
+    "packages/telemetry": {
+      "name": "@repo/telemetry",
+      "dependencies": {
+        "effect": "catalog:",
+      },
+      "devDependencies": {
+        "@effect/vitest": "catalog:",
+        "@repo/config": "workspace:*",
+        "@repo/protocol": "workspace:*",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
     "packages/testkit": {
       "name": "@repo/testkit",
       "dependencies": {
@@ -936,6 +949,8 @@
     "@repo/sandbox": ["@repo/sandbox@workspace:apps/sandbox"],
 
     "@repo/sdk": ["@repo/sdk@workspace:packages/sdk"],
+
+    "@repo/telemetry": ["@repo/telemetry@workspace:packages/telemetry"],
 
     "@repo/testkit": ["@repo/testkit@workspace:packages/testkit"],
 
