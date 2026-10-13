@@ -116,7 +116,8 @@ export const runInstance = (
       onSome: (project) => ({ project, sha: event.payload.after }),
     });
 
-    // Its params and its env are decoded before it runs, and refuse as they are.
+    // A payload or an env that does not decode fails the instance as its own
+    // typed error, before the run starts; only the run's defects are reported.
     return yield* runOnPush(event).pipe(
       Effect.flatMap(Schema.encodeEffect(PushVerdict)),
       invocation(ids),

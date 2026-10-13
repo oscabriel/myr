@@ -11,13 +11,15 @@ import { recordingConsole } from "@repo/telemetry/logger/memory";
 import { recordingTracing, ROOT } from "@repo/telemetry/spans/memory";
 import { Telemetry } from "@repo/telemetry/telemetry";
 import { untouchable } from "@repo/testkit/untouchable";
-import { Effect, Layer } from "effect";
-import type { Redacted } from "effect";
+import { Effect, Layer, Redacted, Schema } from "effect";
 import { HttpRouter } from "effect/http";
 
 import { DoProjects } from "../src/adapters/do-projects.ts";
+import { PlatformEnv } from "../src/platform.ts";
+import { telemetryOf } from "../src/ports.ts";
 import { buildHandler } from "../src/router-build.ts";
 import { runWorkflow } from "../src/workflows/answer.ts";
+import { fakeEnv } from "./fake-env.ts";
 import {
   alice,
   bob,
@@ -27,14 +29,14 @@ import {
   world,
 } from "./project-do.fixtures.ts";
 
-const telemetry = (secrets: readonly Redacted.Redacted[] = []) => {
+const telemetry = () => {
   const console = recordingConsole();
   const recording = recordingTracing();
 
   return {
     console,
     layer: Layer.merge(
-      Telemetry({ secrets, tracing: recording.tracing }),
+      Telemetry({ secrets: [], tracing: recording.tracing }),
       console.layer
     ),
     recording,
@@ -78,6 +80,52 @@ describe("a platform router", () => {
           "cause",
           expect.stringMatching(/^Error: the store is gone\n\s+at /u)
         );
+      })
+  );
+});
+
+describe("the Worker's telemetry", () => {
+  it.effect(
+    "takes every secret the env holds out of a defect's report, each session token included",
+    () =>
+      Effect.gen(function* () {
+        const session = "session-token-0123456789abcdef0123456789";
+
+        const config = yield* Schema.decodeUnknownEffect(PlatformEnv)({
+          ...fakeEnv(),
+          SESSION_TOKENS: JSON.stringify({ [session]: "alice" }),
+        }).pipe(Effect.orDie);
+
+        const secrets = [
+          config.COOKIE_KEY,
+          config.MASTER_KEY,
+          config.OPERATOR_TOKEN,
+          config.PASSWORD_PEPPER,
+        ].map((secret) => Redacted.value(secret));
+
+        const console = recordingConsole();
+
+        const { dispose, handler } = buildHandler(
+          HttpRouter.use((router) =>
+            router.add(
+              "GET",
+              "/dies",
+              Effect.die(new Error(`held ${[...secrets, session].join(" ")}`))
+            )
+          ),
+          Layer.merge(telemetryOf(config), console.layer)
+        );
+
+        yield* Effect.promise(() => handler(new Request(`${origin}/dies`)));
+        yield* Effect.promise(dispose);
+
+        const reported = JSON.stringify(console.errors());
+
+        expect(console.errors()).toHaveLength(1);
+        expect(
+          [...secrets, session].filter((secret) => reported.includes(secret))
+        ).toStrictEqual([]);
+        expect(reported).toContain("held <redacted> <redacted>");
       })
   );
 });
