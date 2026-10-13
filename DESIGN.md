@@ -417,9 +417,9 @@ Square. The radius is 2 px (`--radius: 0.125rem`), and shadcn's base-lyra compon
 
 ### Top bar
 
-- **Character:** the same contents in every shell: the wordmark (linking `/`), Explore, Asks, Docs, Install, search, and the account (handle and inbox count, or Sign in). Framed in the site and docs shells (inside the container, a hairline under it), full-bleed in the project shell; the focus shell shows the wordmark alone.
+- **Character:** the same contents in every shell: the wordmark (linking `/`), Explore, Asks, Docs, Install, search, Keys (a keyboard icon that opens the keys dialog, the `?` key's pointer twin) and the account (handle and inbox count, or Sign in). Framed in the site and docs shells (inside the container, a hairline under it), full-bleed in the project shell; the focus shell shows the wordmark alone.
 - **Current item:** ink at 500 with `aria-current="page"`; the others muted. Never a coloured bar.
-- **Below 900 px:** the links fold into a menu (a sheet), the wordmark and the account stay.
+- **Below 900 px:** the links and Keys fold into a menu (a sheet), the wordmark and the account stay.
 
 ### Footer
 

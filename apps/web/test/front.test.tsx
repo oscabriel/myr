@@ -29,6 +29,7 @@ import type { FrontPageProps } from "../src/features/front/front-page.tsx";
 import { FrontPageData, readFrontPage } from "../src/server/front-page.ts";
 import { ask as parseIsoWeek } from "./ask-fixtures.ts";
 import { textIn } from "./markup.ts";
+import { factsOf } from "./records.ts";
 import { renderAt } from "./render.tsx";
 import { reachingTransport } from "./transport.ts";
 
@@ -386,16 +387,16 @@ describe(FrontPageView, () => {
   );
 
   it.effect(
-    "lists the projects in the inspector by their counts, leaving the posture to the group headers",
+    "lists the projects in the facts by their counts, leaving the posture to the group headers",
     () =>
       Effect.gen(function* () {
         const markup = yield* front({});
 
-        const inspector = markup.slice(markup.indexOf('data-facts="inline"'));
+        const facts = factsOf(markup);
 
         const block =
           /<section aria-label="Projects"[\s\S]*?<\/section>/u.exec(
-            inspector
+            facts
           )?.[0] ?? "";
 
         expect(textIn(block)).toContain("open ask");
@@ -503,7 +504,7 @@ describe(FrontPageView, () => {
     () =>
       Effect.gen(function* () {
         const markup = yield* front({});
-        const facts = markup.slice(markup.indexOf('data-facts="inline"'));
+        const facts = factsOf(markup);
         const text = textIn(facts);
 
         expect(
@@ -532,7 +533,7 @@ describe(FrontPageView, () => {
           <FrontPageView {...props({})} />
         );
 
-        const facts = markup.slice(markup.indexOf('data-facts="inline"'));
+        const facts = factsOf(markup);
 
         expect(textIn(facts)).toContain("Selected ask");
         expect(textIn(facts)).toContain(

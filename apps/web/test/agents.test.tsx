@@ -12,6 +12,7 @@ import { Effect } from "effect";
 import { commands } from "../src/features/agents/catalog.ts";
 import { AgentsView } from "../src/features/agents/setup-page.tsx";
 import { agentsMarkdownHandler } from "../src/routes/agents[.]md.ts";
+import { factsOf } from "./records.ts";
 import { renderAt } from "./render.tsx";
 
 const platformUrl = "https://platform-test.example.workers.dev";
@@ -106,10 +107,10 @@ describe("the For agents page", () => {
   it.effect("lists the five sections, as anchors, in its contents", () =>
     Effect.gen(function* () {
       const html = yield* page;
-      const inspector = html.slice(html.indexOf('data-facts="inline"'));
+      const facts = factsOf(html);
 
       const anchors = [
-        ...inspector.matchAll(/<a\b[^>]*href="#(?<id>[a-z]+)"/gu),
+        ...facts.matchAll(/<a\b[^>]*href="#(?<id>[a-z]+)"/gu),
       ].map(({ groups: found }) => found?.id);
 
       expect(anchors).toStrictEqual(SECTIONS.map(([id]) => id));

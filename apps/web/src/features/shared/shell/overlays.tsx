@@ -142,7 +142,7 @@ export const ProjectsSheetBody = ({
 );
 
 /** Below `nav` the top bar's links fold into this sheet, with the keys' list. */
-const MenuBody = () => {
+export const MenuBody = () => {
   const { open } = useShell();
 
   return (
