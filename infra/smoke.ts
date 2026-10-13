@@ -1,6 +1,8 @@
 import { UnknownProject } from "@repo/protocol/refusal";
 import {
+  Config,
   Console,
+  DateTime,
   Duration,
   Effect,
   Option,
@@ -8,8 +10,10 @@ import {
   Schedule,
   Schema,
 } from "effect";
+import type { Redacted } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
 
+import { ANALYTICS_READ, errorsQuery, SQL_API, workersOf } from "./logs.ts";
 import {
   flagValue,
   platformOrigin,
@@ -71,7 +75,10 @@ export const agentProbes = [
 
 export const probes = [...platformProbes, ...webProbes] as const;
 
-export const Probe = Schema.Literals(probes);
+// Run after every other probe, and only when smoke is told when the deploy began.
+export const logProbes = ["worker-logs"] as const;
+
+export const Probe = Schema.Literals([...probes, ...logProbes]);
 
 export type Probe = typeof Probe.Type;
 
@@ -83,6 +90,10 @@ const PATIENCE = Duration.seconds(30);
 const SETTLING = Duration.seconds(30);
 
 const ASK_AGAIN = Duration.seconds(1);
+
+// Workers Logs reach the SQL API some seconds after the invocation, so the
+// logs are read this long after the probes, whose own errors then count.
+const INGESTION = Duration.seconds(30);
 
 export class SmokeFailed extends Schema.TaggedError<SmokeFailed>()(
   "SmokeFailed",
@@ -399,6 +410,96 @@ const webLlmsTxt = (web: string, probe: (typeof agentProbes)[number]) => {
   );
 };
 
+// What reading the stage's logs needs: the instant the deploy's first upload
+// began, the Workers to read, and infra's credentials.
+export interface LogsCheck {
+  readonly since: DateTime.Utc;
+  readonly workers: readonly string[];
+  readonly accountId: string;
+  readonly token: Redacted.Redacted;
+  // The SQL API's endpoint; a test points it at a fake.
+  readonly api?: string;
+  readonly ingestion?: Duration.Input;
+}
+
+const decodeErrors = Schema.decodeUnknownEffect(
+  Schema.fromJsonString(
+    Schema.Struct({
+      data: Schema.Array(
+        Schema.Struct({ errors: Schema.Int, scriptName: Schema.String })
+      ),
+    })
+  )
+);
+
+// How the API refuses the credentials, as seen live: 400 (error 9106) for a
+// token it can't authenticate, and 422 naming the account tag for an account
+// the token can't read; 401 and 403 are its usual answers to a missing
+// permission.
+const refusedCredentials = (status: number, text: string) =>
+  status === 400 ||
+  status === 401 ||
+  status === 403 ||
+  (status === 422 && text.includes("account or zone tag"));
+
+// The API's own first line, which names what it could not run.
+const unread = (label: string, status: number, text: string) => {
+  const said = text.split("\n")[0]?.trim().slice(0, 200) ?? "";
+
+  if (refusedCredentials(status, text)) {
+    return `${label} answered ${status}: CLOUDFLARE_API_TOKEN needs ${ANALYTICS_READ} on the account CLOUDFLARE_ACCOUNT_ID names`;
+  }
+
+  return said === ""
+    ? `${label} answered ${status}`
+    : `${label} answered ${status}: ${said}`;
+};
+
+const workerLogs = (check: LogsCheck) =>
+  Effect.gen(function* () {
+    const label = "POST /analytics/sql for the stage's Workers Logs";
+    const since = DateTime.formatIso(check.since);
+
+    const { status, text } = yield* send(
+      label,
+      HttpClientRequest.bodyJsonUnsafe(
+        HttpClientRequest.post(check.api ?? SQL_API),
+        {
+          query: errorsQuery(check.workers),
+          scope: { accountTag: check.accountId },
+          time_range: { start: since },
+        }
+      ).pipe(HttpClientRequest.bearerToken(check.token))
+    );
+
+    if (status !== 200) {
+      return yield* new Missed({
+        reason: unread(label, status, text),
+        transient: serverError(status),
+      });
+    }
+
+    const { data } = yield* decodeErrors(text).pipe(
+      missing(`${label} answered 200 without {"data":[{scriptName, errors}]}`)
+    );
+
+    const logged = check.workers.flatMap((worker) => {
+      const errors = data
+        .filter(({ scriptName }) => scriptName === worker)
+        .reduce((sum, row) => sum + row.errors, 0);
+
+      return errors > 0 ? [`${worker} ${errors}`] : [];
+    });
+
+    return yield* logged.length === 0
+      ? Effect.void
+      : Effect.fail(
+          new Missed({
+            reason: `exceptions or error-level lines since ${since}: ${logged.join(", ")}`,
+          })
+        );
+  });
+
 const timed = <A>(
   probe: Probe,
   run: Effect.Effect<A, Missed, HttpClient.HttpClient>,
@@ -427,6 +528,7 @@ export const smoke = (
     readonly stage?: Stage;
     readonly settling?: Duration.Input;
     readonly web?: string;
+    readonly logs?: LogsCheck;
   } = {}
 ): Effect.Effect<SmokeReport, SmokeFailed, HttpClient.HttpClient> =>
   Effect.gen(function* () {
@@ -474,11 +576,22 @@ export const smoke = (
       ([probe, run]) => timed(probe, run, settling)
     );
 
+    const { logs } = options;
+
+    const read =
+      logs === undefined
+        ? []
+        : [
+            yield* Effect.sleep(logs.ingestion ?? INGESTION).pipe(
+              Effect.andThen(timed("worker-logs", workerLogs(logs), settling))
+            ),
+          ];
+
     const runs: readonly {
       readonly probe: Probe;
       readonly elapsedMs: number;
       readonly outcome: Result.Result<unknown, Missed>;
-    }[] = [first, ...rest];
+    }[] = [first, ...rest, ...read];
 
     const failures = runs.flatMap(({ outcome, probe }) =>
       Result.isFailure(outcome)
@@ -528,6 +641,51 @@ export class NoOrigin extends Schema.TaggedError<NoOrigin>()("NoOrigin", {
   }
 }
 
+export class BadSince extends Schema.TaggedError<BadSince>()("BadSince", {
+  given: Schema.String,
+}) {
+  override get message() {
+    return `--since ${this.given} is not an ISO 8601 instant, as 2026-10-13T12:00:00.000Z`;
+  }
+}
+
+export class NoLogCredentials extends Schema.TaggedError<NoLogCredentials>()(
+  "NoLogCredentials",
+  {}
+) {
+  override readonly message =
+    "--since reads the stage's Workers Logs with infra's credentials, and CLOUDFLARE_ACCOUNT_ID or CLOUDFLARE_API_TOKEN is not set: run smoke as the deploy does, through bunx varlock run --path infra/ --";
+}
+
+const Credentials = Config.all({
+  accountId: Config.String("CLOUDFLARE_ACCOUNT_ID"),
+  token: Config.Redacted("CLOUDFLARE_API_TOKEN"),
+});
+
+const decodeSince = Schema.decodeUnknownOption(Schema.DateTimeUtcFromString);
+
+const logsOf = (argv: readonly string[], stage: Stage) =>
+  Option.match(flagValue(argv, "--since"), {
+    onNone: () => Effect.succeedNone,
+    onSome: (given) =>
+      Effect.gen(function* () {
+        const since = yield* Effect.fromOption(decodeSince(given)).pipe(
+          Effect.mapError(() => new BadSince({ given }))
+        );
+
+        const { accountId, token } = yield* Credentials.pipe(
+          Effect.mapError(() => new NoLogCredentials())
+        );
+
+        return Option.some({
+          accountId,
+          since,
+          token,
+          workers: workersOf(stage),
+        } satisfies LogsCheck);
+      }),
+  });
+
 interface Origins {
   readonly platform: string;
   readonly web: Option.Option<string>;
@@ -559,11 +717,16 @@ export const main = (argv: readonly string[]) =>
   Effect.gen(function* () {
     const stage = yield* stageOf(argv);
     const origins = yield* originsOf(argv, stage);
+    const logs = yield* logsOf(argv, stage);
 
     yield* Console.log(
       `smoke ${stage}: ${origins.platform}${Option.match(origins.web, {
         onNone: () => "",
         onSome: (web) => ` and ${web}`,
+      })}${Option.match(logs, {
+        onNone: () => "",
+        onSome: ({ since }) =>
+          `, then its Workers' logs since ${DateTime.formatIso(since)}`,
       })}`
     );
 
@@ -572,6 +735,10 @@ export const main = (argv: readonly string[]) =>
       ...Option.match(origins.web, {
         onNone: () => ({}),
         onSome: (web) => ({ web }),
+      }),
+      ...Option.match(logs, {
+        onNone: () => ({}),
+        onSome: (check) => ({ logs: check }),
       }),
     }).pipe(
       Effect.tapError(({ failures }) =>

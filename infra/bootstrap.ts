@@ -1,5 +1,6 @@
 // Usage: bun run bootstrap -- --stage <stage> [--dry-run | --check-triggers]
-// Idempotent: creates only what is missing, and never deletes.
+// Idempotent: creates only what is missing, and never deletes. Either run
+// ends by printing the stage's alerts, which a person makes by hand.
 import { BunRuntime, BunServices } from "@effect/platform-bun";
 import {
   Config,
@@ -17,6 +18,7 @@ import {
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
+import { alertLines, alerts } from "./alerts.ts";
 import { schemaItems } from "./env-schema.ts";
 import type { SchemaItem } from "./env-schema.ts";
 import { blankJsonc, pathKey, valueSpans } from "./jsonc.ts";
@@ -540,11 +542,28 @@ const secrets = (root: string, credentials: Credentials, stage: Stage) =>
       : Effect.fail(new MissingSecrets({ names: missing, stage }));
   });
 
+// Where the alerts are sent, by name: `alertLines` never shows the address.
+const Destination = Config.option(Config.String("ALERT_EMAIL"));
+
+const alertPlan = (credentials: Credentials, stage: Stage) =>
+  Effect.gen(function* () {
+    const destination = yield* Destination.pipe(Effect.orDie);
+
+    yield* Console.log(
+      alertLines(
+        stage,
+        alerts(stage, credentials.accountId),
+        Option.isSome(destination)
+      ).join("\n")
+    );
+  });
+
 const dryRun = (root: string, credentials: Credentials, stage: Stage) =>
   Effect.gen(function* () {
     const steps = plan(stage, yield* readExisting(root, credentials, stage));
 
     yield* Console.log(planLines(stage, steps).join("\n"));
+    yield* alertPlan(credentials, stage);
   });
 
 const make = (root: string, credentials: Credentials, stage: Stage) =>
@@ -603,6 +622,7 @@ const make = (root: string, credentials: Credentials, stage: Stage) =>
     );
 
     yield* secrets(root, credentials, stage);
+    yield* alertPlan(credentials, stage);
 
     yield* Console.log(
       `bootstrap ${stage}: created ${steps.length}; next: bun run deploy -- --stage ${stage}`
