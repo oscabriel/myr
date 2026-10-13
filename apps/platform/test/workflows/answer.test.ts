@@ -47,6 +47,7 @@ import {
   bob,
   bobFork,
   changed,
+  checkedStages,
   Checker,
   DoCalls,
   finishRequired,
@@ -457,6 +458,38 @@ describe(runAnswer, () => {
         })
       );
       expect(yield* namesOf(steps)).not.toContain("checks#1");
+    }).pipe(Effect.provide(world))
+  );
+
+  it.effect("3. names cheap, in its report, when a cheap lane refuses", () =>
+    Effect.gen(function* () {
+      const answer = yield* admitted();
+
+      yield* failsOnMerged(answer, lint, "lint: no-unused-vars", "passed");
+      yield* run(answer, yield* freshSteps());
+
+      expect(yield* checkedStages).toStrictEqual(["cheap"]);
+    }).pipe(Effect.provide(world))
+  );
+
+  it.effect(
+    "3. names checks, in its report, when a lane after the cheap ones refuses",
+    () =>
+      Effect.gen(function* () {
+        const answer = yield* admitted();
+
+        yield* failsOnMerged(answer, unit, "unit: expected 2", "passed");
+        yield* run(answer, yield* freshSteps());
+
+        expect(yield* checkedStages).toStrictEqual(["checks"]);
+      }).pipe(Effect.provide(world))
+  );
+
+  it.effect("3. names no stage, in its report, when nothing refused", () =>
+    Effect.gen(function* () {
+      yield* run(yield* cleanAnswer, yield* freshSteps());
+
+      expect(yield* checkedStages).toStrictEqual([undefined]);
     }).pipe(Effect.provide(world))
   );
 

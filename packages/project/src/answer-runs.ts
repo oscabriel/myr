@@ -9,7 +9,7 @@ import { RatchetSpec } from "@repo/protocol/domain/check";
 import { Choice } from "@repo/protocol/domain/decision";
 import { AskKind } from "@repo/protocol/domain/kind";
 import type { LandingView } from "@repo/protocol/domain/landing";
-import { Outcome } from "@repo/protocol/domain/outcome";
+import { Outcome, StageName } from "@repo/protocol/domain/outcome";
 import { RunBlock } from "@repo/protocol/domain/run";
 import { Territory } from "@repo/protocol/domain/territory";
 import {
@@ -118,6 +118,8 @@ export const AnswerReport = Schema.Struct({
     Schema.Array(Schema.Literals(["mirror", "notes"]))
   ),
   ratchets: Schema.optionalKey(Schema.Array(MeasuredCount)),
+  /** The stage whose refusals a `Checked` report carries: absent when it carries none, or from a run that ran every lane at once. */
+  stage: Schema.optionalKey(StageName),
 });
 
 export type AnswerReport = typeof AnswerReport.Type;
