@@ -151,7 +151,7 @@ const Filters = ({
   return (
     <nav
       aria-label="Filter the asks"
-      className="columns:sticky columns:top-[calc(var(--top-bar)+1.5rem)] columns:max-h-[calc(100dvh-var(--top-bar)-3rem)] columns:overflow-y-auto tablet:grid-cols-3 columns:flex columns:flex-col -mx-2 grid min-w-0 gap-6 self-start"
+      className="columns:sticky columns:top-[calc(var(--top-bar)+1.5rem)] columns:max-h-[calc(100dvh-var(--top-bar)-3rem)] columns:overflow-y-auto tablet:grid-cols-3 columns:flex columns:flex-col columns:self-start -mx-2 grid min-w-0 gap-6"
     >
       <Facet label="Kind">
         <FilterOption
