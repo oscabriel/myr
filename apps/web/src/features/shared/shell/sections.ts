@@ -1,7 +1,7 @@
 import { projectAddressOf } from "@repo/protocol/ids";
 import { Option } from "effect";
 
-import { segmentsOf } from "../paths.ts";
+import { INBOX_PATH, segmentsOf } from "../paths.ts";
 
 export type ProjectTab =
   | "code"
@@ -46,10 +46,9 @@ const SITE = new Set([
   "agents",
   "asks",
   "docs",
-  "home",
   "import",
+  "inbox",
   "people",
-  "today",
 ]);
 
 const addressOf = (pathname: string) => {
@@ -126,9 +125,8 @@ const SITE_CRUMBS = {
     page === undefined
       ? [{ label: "Docs" }]
       : [{ label: "Docs", to: "/docs" }, { label: page }],
-  home: () => [{ label: "Home" }],
+  inbox: () => [{ label: "Inbox" }],
   people: (handle: string | undefined) => [{ label: handle ?? "People" }],
-  today: () => [{ label: "Today" }],
 } as const satisfies Record<
   string,
   (second: string | undefined) => readonly Crumb[]
@@ -152,7 +150,7 @@ const SUBJECT_CRUMBS = {
   ],
   decisions: (project: string, decision: string) => [
     { label: project, to: `/${project}` },
-    { label: "Today", to: "/today" },
+    { label: "Inbox", to: INBOX_PATH },
     { label: decision, mono: true },
   ],
   proposals: (project: string, proposal: string) => [

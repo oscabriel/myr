@@ -17,7 +17,7 @@ import { notFound } from "@tanstack/react-router";
 import { DateTime, Effect, Exit, Option, Schema, Stream } from "effect";
 
 import { askStates } from "../shared/ask-progress.ts";
-import { findDecision, readOfCause, TodayRead } from "../today/read.ts";
+import { findDecision, readOfCause, TodayRead } from "../inbox/decisions.ts";
 
 export const Placed = Schema.Struct({
   line: Schema.Int,

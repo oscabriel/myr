@@ -57,6 +57,9 @@ const segments = [
   .filter((segment) => !notSegments.has(segment) && !segment.startsWith("$"))
   .toSorted();
 
+// Reserved before their page exists (ADR 0041), so no project takes the name meanwhile; each leaves this list with its route.
+const AHEAD_OF_THEIR_PAGE = ["install", "settings"];
+
 describe("the web's own paths", () => {
   it("are found: every page and file the web serves at its top", () => {
     expect(segments).toStrictEqual([
@@ -73,6 +76,7 @@ describe("the web's own paths", () => {
       "home",
       "icons",
       "import",
+      "inbox",
       "install.sh",
       "llms-full.txt",
       "llms.txt",
@@ -92,10 +96,21 @@ describe("the web's own paths", () => {
     ).toStrictEqual([]);
   });
 
-  it("are the protocol's reserved names, where an owner could spell one", () => {
+  it("are the protocol's reserved names, where an owner could spell one, with those reserved ahead of their page", () => {
     expect(
-      segments.filter((segment) => /^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(segment))
+      [
+        ...segments.filter((segment) =>
+          /^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(segment)
+        ),
+        ...AHEAD_OF_THEIR_PAGE,
+      ].toSorted()
     ).toStrictEqual([...reservedProjectNames]);
+  });
+
+  it("leave a name reserved ahead only while no page answers at it", () => {
+    expect(
+      AHEAD_OF_THEIR_PAGE.filter((name) => segments.includes(name))
+    ).toStrictEqual([]);
   });
 });
 

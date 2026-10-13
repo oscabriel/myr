@@ -16,7 +16,8 @@ import {
   RatchetName,
   RepoPath,
 } from "@repo/protocol/ids";
-import { DecisionClosed, NotDecider } from "@repo/protocol/refusal";
+import { DecisionClosed, UnknownProject } from "@repo/protocol/refusal";
+import { isRedirect } from "@tanstack/react-router";
 import { Cause, DateTime, Effect, Schema } from "effect";
 import { AsyncResult } from "effect/reactivity";
 import type { ReactElement } from "react";
@@ -27,16 +28,21 @@ import {
   consequenceOf,
   describeSubject,
 } from "../src/features/decision/decision-card.tsx";
-import { RefusalView } from "../src/features/shared/refusal.tsx";
-import { readToday } from "../src/features/today/read.ts";
+import { orderDecisions } from "../src/features/inbox/decisions.ts";
 import {
   budgetSentence,
-  orderDecisions,
-  TodayPageData,
-  TodayRead,
-  TodayView,
-} from "../src/features/today/today-page.tsx";
-import { Route, todayHeaders } from "../src/routes/today.tsx";
+  InboxView,
+} from "../src/features/inbox/inbox-page.tsx";
+import {
+  Decisions,
+  InboxPageData,
+  InboxRead,
+  readInbox,
+  Takeable,
+} from "../src/features/inbox/read.ts";
+import { RefusalView } from "../src/features/shared/refusal.tsx";
+import { movedToInbox } from "../src/features/inbox/moved.ts";
+import { Route as TodayRoute } from "../src/routes/today.tsx";
 import { fixturesClient } from "./dev-client.ts";
 
 const ENTITIES: ReadonlyMap<string, string> = new Map([
@@ -93,8 +99,8 @@ const sectionsOf = (markup: string) => {
     ? markup.slice(0, markup.indexOf("<aside"))
     : markup;
 
-  return [...main.matchAll(/<h2[^>]*>(?<name>[^<]+)<\/h2>/gu)].map(
-    (match) => match.groups?.name
+  return [...main.matchAll(/<h2[^>]*>(?<name>.*?)<\/h2>/gu)].map((match) =>
+    textIn(match.groups?.name ?? "").trim()
   );
 };
 
@@ -177,14 +183,24 @@ const today: Today = {
   ],
 };
 
+const deciding = (read: Today) =>
+  InboxRead.cases.Read.make({
+    asks: Takeable.cases.Listed.make({ asks: [] }),
+    decisions: Decisions.cases.Decides.make({ today: read }),
+    handle: okonkwo,
+    held: 0,
+    running: 0,
+    work: [],
+  });
+
 const viewOf = (
-  read: TodayRead,
-  extra: Partial<Parameters<typeof TodayView>[0]> = {}
-) => <TodayView now={now} onDecide={() => {}} read={read} {...extra} />;
+  read: InboxRead,
+  extra: Partial<Parameters<typeof InboxView>[0]> = {}
+) => <InboxView now={now} onDecide={() => {}} read={read} {...extra} />;
 
-const page = viewOf(TodayRead.cases.Read.make({ today }));
+const page = viewOf(deciding(today));
 
-describe(TodayView, () => {
+describe("the inbox, for the decisions waiting on a reader", () => {
   it("says the budget as one sentence, the finishes counted apart", () => {
     const text = textOf(page);
 
@@ -202,11 +218,13 @@ describe(TodayView, () => {
     );
   });
 
-  it("puts its sections in order, each under its header", () => {
+  it("puts its sections in order, each under its header: decisions, claims, asks, then what happened lately", () => {
     expect(sectionsOf(markupOf(page))).toStrictEqual([
       "Due today",
       "Within your budget",
       "Waits for tomorrow",
+      "Your claims",
+      "Asks you may take",
       "Newcomers to welcome",
       "Landed without a decision",
     ]);
@@ -266,11 +284,7 @@ describe(TodayView, () => {
     const adopting = { ...stray, default: "adopt" } as const;
 
     const text = textOf(
-      viewOf(
-        TodayRead.cases.Read.make({
-          today: { ...today, decisions: [adopting] },
-        })
-      )
+      viewOf(deciding({ ...today, decisions: [adopting] }))
     );
 
     expect(text).toContain("If nobody decides by Thu 8 Oct, 10:00 UTC: adopt");
@@ -282,9 +296,7 @@ describe(TodayView, () => {
     expect(textIn(markup)).toContain("4 more wait for tomorrow");
     expect(markup).toContain('data-overflow="4"');
     expect(
-      textOf(
-        viewOf(TodayRead.cases.Read.make({ today: { ...today, overflow: 3 } }))
-      )
+      textOf(viewOf(deciding({ ...today, overflow: 3 })))
     ).toContain("3 more wait for tomorrow");
   });
 
@@ -333,12 +345,10 @@ describe(TodayView, () => {
 
     const markup = markupOf(
       viewOf(
-        TodayRead.cases.Read.make({
-          today: {
-            ...today,
-            budget: { ...today.budget, used: 3 },
-            decisions: [vouch, stray],
-          },
+        deciding({
+          ...today,
+          budget: { ...today.budget, used: 3 },
+          decisions: [vouch, stray],
         }),
         { decided: AsyncResult.success({ decision: taken }) }
       )
@@ -360,27 +370,41 @@ describe(TodayView, () => {
     expect(textIn(markup)).toContain("Decisions: 3 taken, 2 left today.");
   });
 
-  it("shows a NotDecider failure as the refusal, says what Today is, and lists no decision", () => {
-    const refused = new NotDecider({});
+  it("leaves the decisions and the budget out for a reader who decides nowhere", () => {
+    const markup = markupOf(
+      viewOf({
+        ...deciding(today),
+        decisions: Decisions.cases.NotDecider.make({}),
+      })
+    );
+
+    expect(markup).not.toContain("data-decision");
+    expect(markup).not.toContain("data-budget");
+  });
+
+  it("shows a refused read as the refusal, says what the inbox is, and lists no decision", () => {
+    const refused = new UnknownProject({
+      project: ProjectName.make("oscabriel/nope"),
+    });
 
     const markup = markupOf(
-      viewOf(TodayRead.cases.Refused.make({ refusal: refused }))
+      viewOf(InboxRead.cases.Refused.make({ refusal: refused }))
     );
 
     expect(markup).toContain(markupOf(<RefusalView refusals={[refused]} />));
     expect(markup).not.toContain("data-decision");
-    expect(textIn(markup)).toContain(`${Brand.cli} today`);
+    expect(textIn(markup)).toContain(`${Brand.cli} status`);
   });
 
-  it("signed out, says what Today is in one sentence, links to sign in, and gives the command", () => {
-    const markup = markupOf(viewOf(TodayRead.cases.SignedOut.make({})));
+  it("signed out, says what the inbox is in one sentence, links to sign in, and gives the command", () => {
+    const markup = markupOf(viewOf(InboxRead.cases.SignedOut.make({})));
     const text = textIn(markup);
 
-    expect(text).toContain("Today is a maintainer's page");
+    expect(text).toContain("The inbox is your own page");
     expect(markup).toMatch(
       /<a[^>]*href="\/auth\/signin[^"]*"[^>]*>Sign in<\/a>/u
     );
-    expect(text).toContain(`${Brand.cli} today`);
+    expect(text).toContain(`${Brand.cli} status`);
     expect(markup).not.toContain("data-decision");
   });
 
@@ -388,7 +412,7 @@ describe(TodayView, () => {
     const closed = new DecisionClosed({ decision: stray.id });
 
     const markup = markupOf(
-      viewOf(TodayRead.cases.Read.make({ today }), {
+      viewOf(deciding(today), {
         decided: AsyncResult.failure(Cause.fail(closed)),
       })
     );
@@ -555,20 +579,20 @@ describe(consequenceOf, () => {
 
 const vellum = ProjectName.make("oscabriel/vellum");
 
-const pageFrom = (encoded: typeof TodayPageData.Encoded) => {
-  const data = Schema.decodeSync(TodayPageData)(encoded);
+const pageFrom = (encoded: typeof InboxPageData.Encoded) => {
+  const data = Schema.decodeSync(InboxPageData)(encoded);
 
   return markupOf(
-    <TodayView now={data.now} onDecide={() => {}} read={data.read} />
+    <InboxView now={data.now} onDecide={() => {}} read={data.read} />
   );
 };
 
-describe("Today, read on the server with the reader's session", () => {
+describe("the inbox's decisions, read on the server with the reader's session", () => {
   it.live(
-    "renders a maintainer's Today from the fixtures: the budget sentence, the sections and what waits",
+    "renders a maintainer's decisions from the fixtures: the budget sentence, the sections and what waits",
     () =>
       Effect.gen(function* () {
-        const markup = pageFrom(yield* readToday({ project: vellum }));
+        const markup = pageFrom(yield* readInbox({ project: vellum }));
         const text = textIn(markup);
 
         expect(text).toContain(
@@ -590,22 +614,40 @@ describe("Today, read on the server with the reader's session", () => {
   );
 
   it.live(
-    "signed out, sends what Today is, the way to sign in and the command",
+    "refuses a project the platform does not know, with the refusal and no decision",
     () =>
       Effect.gen(function* () {
-        const markup = pageFrom(yield* readToday({}));
+        const markup = pageFrom(
+          yield* readInbox({ project: ProjectName.make("oscabriel/nope") })
+        );
 
-        expect(textIn(markup)).toContain("Today is a maintainer's page");
-        expect(textIn(markup)).toContain(`${Brand.cli} today`);
+        expect(markup).toContain('data-refusal="UnknownProject"');
         expect(markup).not.toContain("data-decision");
-      }).pipe(Effect.provide(fixturesClient()), Effect.scoped),
+      }).pipe(Effect.provide(fixturesClient("ines-v")), Effect.scoped),
     60_000
   );
+});
 
-  it("is kept by no cache: its response is private and never stored", () => {
-    expect(Route.options.headers).toBe(todayHeaders);
-    expect(todayHeaders()).toStrictEqual({
-      "Cache-Control": "private, no-store",
-    });
-  });
+const movedFrom = (searchStr: string) =>
+  Effect.tryPromise({
+    catch: (thrown) =>
+      isRedirect(thrown)
+        ? [thrown.status, thrown.headers.get("location")]
+        : ["not a redirect"],
+    try: () => movedToInbox({ location: { searchStr } }),
+  }).pipe(Effect.flip);
+
+describe("/today, once the maintainer's page", () => {
+  // The worker answers a document load with its 301 (legacy-redirect.test.ts); a page kept before the move may still link here.
+  it.effect("sends a navigation on to /inbox, its project and decision kept", () =>
+    Effect.gen(function* () {
+      expect(TodayRoute.options.beforeLoad).toBe(movedToInbox);
+      expect(
+        yield* movedFrom("?project=oscabriel/datekit&decision=dec-000001")
+      ).toStrictEqual([
+        301,
+        "/inbox?project=oscabriel/datekit&decision=dec-000001",
+      ]);
+    })
+  );
 });

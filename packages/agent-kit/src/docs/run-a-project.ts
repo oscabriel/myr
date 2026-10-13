@@ -68,7 +68,7 @@ export const runAProject: DocSource = {
     "",
     "## Today",
     "",
-    `A maintainer's day is a short list of decisions, each with its evidence and a safe default taken if nobody decides before it expires, held to the project's budget. Read it on the web at [Today](/today), or with ${cli("today")}, and take one with ${cli("decide --project <owner>/<name> --decision <decision> --choice accept")} (or \`decline\`, \`adopt\`, \`revert\`).`,
+    `A maintainer's day is a short list of decisions, each with its evidence and a safe default taken if nobody decides before it expires, held to the project's budget. Read it on the web in [your inbox](/inbox), or with ${cli("today")}, and take one with ${cli("decide --project <owner>/<name> --decision <decision> --choice accept")} (or \`decline\`, \`adopt\`, \`revert\`).`,
     "",
     "## Finish an answer, or land your own change",
     "",

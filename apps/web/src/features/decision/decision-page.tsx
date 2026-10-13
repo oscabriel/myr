@@ -18,7 +18,7 @@ import { EmptyState } from "../shared/empty.tsx";
 import { FactBlock, PostureFacts } from "../shared/facts.tsx";
 import { HandleLink } from "../shared/handle.tsx";
 import { AppLink } from "../shared/link.tsx";
-import { askPath } from "../shared/paths.ts";
+import { askPath, INBOX_PATH } from "../shared/paths.ts";
 import { UnreachableNotice } from "../shared/pending.tsx";
 import { RefusalView } from "../shared/refusal.tsx";
 import { Workspace } from "../shared/shell/workspace.tsx";
@@ -45,7 +45,7 @@ const LINK = "decoration-rule underline hover:decoration-current";
 
 const crumbsOf = (project: ProjectName, id: DecisionId) => [
   { label: project, to: `/${project}` },
-  { label: "Today", to: "/today" },
+  { label: "Inbox", to: INBOX_PATH },
   { label: id, mono: true },
 ];
 

@@ -1,22 +1,13 @@
-import { Client } from "@repo/protocol/contracts";
 import { Today } from "@repo/protocol/domain/decision";
 import type { Decision } from "@repo/protocol/domain/decision";
 import type { DecisionId, ProjectName } from "@repo/protocol/ids";
 import { Unauthenticated } from "@repo/protocol/principal";
 import { Refusal } from "@repo/protocol/refusal";
-import {
-  Array as Arr,
-  Cause,
-  DateTime,
-  Effect,
-  Exit,
-  Option,
-  Order,
-  Schema,
-} from "effect";
+import { Array as Arr, Cause, DateTime, Option, Order, Schema } from "effect";
 
 import { decisionKey } from "../decision/subject.ts";
 
+/** What a read of the reader's decisions came back as: the decision page reads it, and the inbox's live decisions. */
 export const TodayRead = Schema.TaggedUnion({
   Read: { today: Today },
   Refused: { refusal: Refusal },
@@ -25,13 +16,6 @@ export const TodayRead = Schema.TaggedUnion({
 });
 
 export type TodayRead = typeof TodayRead.Type;
-
-export const TodayPageData = Schema.Struct({
-  now: Schema.DateTimeUtcFromString,
-  read: TodayRead,
-});
-
-export type TodayPageData = typeof TodayPageData.Type;
 
 const isRefusal = Schema.is(Refusal);
 
@@ -110,20 +94,3 @@ export const findDecision = (
     }))
   );
 };
-
-export const readToday = ({ project }: { readonly project?: ProjectName }) =>
-  Effect.gen(function* () {
-    const client = yield* Client;
-
-    const read = yield* Effect.exit(
-      client.today(project === undefined ? {} : { project })
-    );
-
-    return yield* Schema.encodeEffect(TodayPageData)({
-      now: yield* DateTime.now,
-      read: Exit.match(read, {
-        onFailure: readOfCause,
-        onSuccess: (today) => TodayRead.cases.Read.make({ today }),
-      }),
-    });
-  });

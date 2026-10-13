@@ -8,8 +8,6 @@ import { Result } from "effect";
 
 export const ASKS_PATH = "/asks";
 
-export const HOME_PATH = "/home";
-
 export const IMPORT_PATH = "/import";
 
 export const EXPLORE_PATH = "/explore";
@@ -17,8 +15,8 @@ export const EXPLORE_PATH = "/explore";
 /** The setup page answers at `/agents` until it moves to `/install`. */
 export const INSTALL_PATH = "/agents";
 
-/** A reader's decisions and claims, the account's inbox. */
-export const INBOX_PATH = "/today";
+/** A reader's own page: the decisions waiting on them, their claims, the asks to take next. */
+export const INBOX_PATH = "/inbox";
 
 export const PRIVACY_PATH = "/privacy";
 

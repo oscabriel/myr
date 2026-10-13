@@ -42,11 +42,12 @@ import {
   readDraft,
 } from "../src/features/proposal/live-draft.ts";
 import { RefusalView } from "../src/features/shared/refusal.tsx";
+import { InboxView } from "../src/features/inbox/inbox-page.tsx";
 import {
-  readOfCause,
-  TodayRead,
-  TodayView,
-} from "../src/features/today/today-page.tsx";
+  Decisions,
+  InboxRead,
+  Takeable,
+} from "../src/features/inbox/read.ts";
 import { ContractsClient, webContracts } from "../src/surfaces.ts";
 
 const markupOf = (element: ReactElement) => renderToStaticMarkup(element);
@@ -59,15 +60,17 @@ const plainTextOf = (markup: string) =>
     .replaceAll("&amp;", "&")
     .replaceAll(/\s+/gu, " ");
 
-const readOf = (result: AsyncResult.AsyncResult<Today, unknown>): TodayRead => {
-  if (AsyncResult.isSuccess(result)) {
-    return TodayRead.cases.Read.make({ today: result.value });
-  }
-
-  return AsyncResult.isFailure(result)
-    ? readOfCause(result.cause)
-    : TodayRead.cases.Unreachable.make({});
-};
+const readOf = (result: AsyncResult.AsyncResult<Today, unknown>): InboxRead =>
+  InboxRead.cases.Read.make({
+    asks: Takeable.cases.Listed.make({ asks: [] }),
+    decisions: AsyncResult.isSuccess(result)
+      ? Decisions.cases.Decides.make({ today: result.value })
+      : Decisions.cases.Unreachable.make({}),
+    handle: Handle.make("okonkwo"),
+    held: 0,
+    running: 0,
+    work: [],
+  });
 
 const now = DateTime.makeUnsafe("2026-10-07T12:00:00Z");
 
@@ -271,7 +274,7 @@ describe("the decide atom", () => {
         }).toStrictEqual({ listAsks: 2, today: 2 });
         expect(
           markupOf(
-            <TodayView now={now} onDecide={() => {}} read={readOf(today)} />
+            <InboxView now={now} onDecide={() => {}} read={readOf(today)} />
           )
         ).not.toContain('data-decision="dec-000002"');
       })
@@ -289,7 +292,7 @@ describe("the decide atom", () => {
         );
 
         const markup = markupOf(
-          <TodayView
+          <InboxView
             decided={decided}
             now={now}
             onDecide={() => {}}

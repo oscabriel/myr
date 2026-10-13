@@ -28,7 +28,7 @@ import { describeSubject } from "../decision/subject.ts";
 import { CommandLine } from "../shared/command.tsx";
 import { FactBlock, GateFacts } from "../shared/facts.tsx";
 import { AppLink } from "../shared/link.tsx";
-import { askPath } from "../shared/paths.ts";
+import { askPath, INBOX_PATH } from "../shared/paths.ts";
 import { GUTTER } from "../shared/shell/gutter.ts";
 import { Workspace } from "../shared/shell/workspace.tsx";
 import { StatusLine } from "../shared/status-line.tsx";
@@ -614,7 +614,7 @@ export const FinishView = ({
     <Workspace
       crumbs={[
         { label: decision.project, to: `/${decision.project}` },
-        { label: "Today", to: "/today" },
+        { label: "Inbox", to: INBOX_PATH },
         { label: decision.id, mono: true },
       ]}
       facts={<FinishFacts {...props} {...shared} />}

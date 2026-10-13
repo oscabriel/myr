@@ -9,7 +9,7 @@ import {
 import type { LocationRewrite } from "@tanstack/react-router";
 import { Option, Schema } from "effect";
 
-import { segmentsOf } from "../features/shared/paths.ts";
+import { INBOX_PATH, segmentsOf } from "../features/shared/paths.ts";
 import { KEPT_NOWHERE } from "./edge-cache.ts";
 
 const isSourceHost = (segment: string) =>
@@ -101,6 +101,25 @@ const bareHost = (url: URL, isRead: boolean): Option.Option<Response> => {
   );
 };
 
+// Pages the web served once and folded into another (ADR 0041). The query goes along as it was spelled, so a filter holds.
+const MOVED_PAGES: ReadonlyMap<string, string> = new Map([
+  ["home", INBOX_PATH],
+  ["today", INBOX_PATH],
+]);
+
+const movedPage = (
+  segments: readonly string[],
+  search: string
+): Option.Option<Response> => {
+  const [first, ...rest] = segments;
+
+  return rest.length > 0 || first === undefined
+    ? Option.none()
+    : Option.map(Option.fromUndefinedOr(MOVED_PAGES.get(first)), (to) =>
+        movedTo(to + search)
+      );
+};
+
 export const canonicalAddress = (request: Request): Option.Option<Response> => {
   const url = new URL(request.url);
   const isRead = request.method === "GET" || request.method === "HEAD";
@@ -112,9 +131,10 @@ export const canonicalAddress = (request: Request): Option.Option<Response> => {
 
   const segments = segmentsOf(url.pathname);
   const [first] = segments;
+  const moved = movedPage(segments, url.search);
 
-  if (first === undefined || isReserved(first)) {
-    return Option.none();
+  if (Option.isSome(moved) || first === undefined || isReserved(first)) {
+    return moved;
   }
 
   return Option.flatMap(projectAddressOf(segments), (address) =>

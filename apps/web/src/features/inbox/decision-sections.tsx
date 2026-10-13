@@ -8,7 +8,6 @@ import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 import type { ReactNode } from "react";
 
-import { signInHref } from "../auth/session-slot.tsx";
 import { commitHref, shortSha } from "../code/paths.ts";
 import { stuckAboveBar } from "../decision/choices.tsx";
 import { DecisionCard } from "../decision/decision-card.tsx";
@@ -17,44 +16,25 @@ import {
   consequenceOf,
   decisionHref,
   decisionKey,
-  describeDefault,
   describeSubject,
   subjectKind,
   takenWords,
   tookEffect,
 } from "../decision/subject.ts";
-import { CommandLine } from "../shared/command.tsx";
 import { EmptyState } from "../shared/empty.tsx";
-import { FactBlock } from "../shared/facts.tsx";
 import { useListKeys } from "../shared/keys.tsx";
-import { AppLink } from "../shared/link.tsx";
 import { personPath } from "../shared/paths.ts";
-import { UnreachableNotice } from "../shared/pending.tsx";
-import { RefusalView } from "../shared/refusal.tsx";
 import { MetaCode, MetaLine, Row, RowGroup } from "../shared/row.tsx";
-import { Workspace } from "../shared/shell/workspace.tsx";
-import { StatusLine } from "../shared/status-line.tsx";
 import { distanceInWords, When } from "../shared/time.tsx";
-import { expiringSoon, expiryOrder, readOfCause, TodayRead } from "./read.ts";
-
-export {
-  findDecision,
-  orderDecisions,
-  readOfCause,
-  TodayPageData,
-  TodayRead,
-} from "./read.ts";
+import { expiringSoon, expiryOrder } from "./decisions.ts";
 
 const counted = (count: number) => (count === 0 ? "none" : String(count));
 
 export const budgetSentence = (budget: Today["budget"]) =>
   `Decisions: ${budget.used} taken, ${counted(Math.max(0, budget.total - budget.used))} left today. Finishes are counted apart: ${counted(budget.finishes)} taken.`;
 
-const budgetShort = (budget: Today["budget"]) =>
+export const budgetShort = (budget: Today["budget"]) =>
   `${counted(Math.max(0, budget.total - budget.used))} left today`;
-
-const WHAT_TODAY_IS =
-  "Today is a maintainer's page: the decisions you owe your projects each day, each with its evidence and a safe default if you leave it.";
 
 interface Listed {
   readonly decision: Decision;
@@ -321,95 +301,6 @@ const Unattended = ({
     </Section>
   );
 
-const SelectedFacts = ({
-  busy,
-  listed,
-  now,
-  onDecide,
-  stamped,
-}: {
-  readonly busy: boolean;
-  readonly listed: Listed;
-  readonly now: DateTime.Utc;
-  readonly onDecide: (input: DecideInput) => void;
-  readonly stamped: boolean;
-}) => (
-  <>
-    <FactBlock label="State">
-      <AppLink
-        className="text-want decoration-rule font-semibold text-balance [overflow-wrap:anywhere] underline-offset-4 hover:underline"
-        to={decisionHref(listed.decision)}
-      >
-        {describeSubject(listed.decision.subject)}
-      </AppLink>
-      <StatusLine
-        subject={{
-          decision: listed.decision,
-          kind: "decision",
-          now,
-          viewerDecides: true,
-        }}
-      />
-      <p className="text-label text-muted-foreground font-normal">
-        {describeDefault(listed.decision)}
-      </p>
-    </FactBlock>
-    <FactBlock label="Evidence and choices">
-      <DecisionCard
-        busy={busy}
-        decision={listed.decision}
-        expiry={false}
-        layout="stack"
-        now={now}
-        onDecide={onDecide}
-        soon={listed.soon}
-        stamp={stamped}
-      />
-    </FactBlock>
-  </>
-);
-
-const SignedOutNotice = ({ here }: { readonly here: string }) => (
-  <div className="flex max-w-[70ch] flex-col items-start gap-3">
-    <p className="text-body">{WHAT_TODAY_IS}</p>
-    <p className="text-ui">
-      <a
-        className="decoration-rule font-medium underline hover:decoration-current"
-        href={signInHref(here)}
-      >
-        Sign in
-      </a>{" "}
-      to see yours, or read it from a terminal:
-    </p>
-    <CommandLine command={`${Brand.cli} today`} />
-  </div>
-);
-
-const DecidedFailure = ({
-  decided,
-}: {
-  readonly decided: AsyncResult.AsyncResult<unknown, unknown>;
-}) => {
-  if (!AsyncResult.isFailure(decided)) {
-    return null;
-  }
-
-  const read = readOfCause(decided.cause);
-
-  return TodayRead.match(read, {
-    Read: () => null,
-    Refused: ({ refusal }) => <RefusalView refusals={[refusal]} />,
-    SignedOut: () => <SignedOutNotice here="/today" />,
-    Unreachable: () => <UnreachableNotice />,
-  });
-};
-
-const Unlisted = ({ children }: { readonly children: ReactNode }) => (
-  <Workspace crumbs={[{ label: "Today" }]} title="Today" variant="list">
-    {children}
-  </Workspace>
-);
-
 const listedOf = (
   today: Today,
   taken: ReadonlyMap<string, Listed>
@@ -459,7 +350,13 @@ const takenNow = (
     ({ decided: record }) => record !== undefined
   );
 
-const ListedToday = ({
+export type Decided = AsyncResult.AsyncResult<
+  { readonly decision: Decision },
+  unknown
+>;
+
+/** The decisions waiting on the reader, each decided in its row; a choice taken stays in its row after the next read leaves it out. */
+export const DecisionGroups = ({
   decided,
   now,
   onDecide,
@@ -469,10 +366,7 @@ const ListedToday = ({
   readonly today: Today;
   readonly now: DateTime.Utc;
   readonly onDecide: (input: DecideInput) => void;
-  readonly decided: AsyncResult.AsyncResult<
-    { readonly decision: Decision },
-    unknown
-  >;
+  readonly decided: Decided;
   readonly selected: string | undefined;
 }) => {
   const [kept, setKept] = useState<ReadonlyMap<string, Listed>>(new Map());
@@ -480,7 +374,6 @@ const ListedToday = ({
   const soon = expiringSoon(today);
   const fresh = takenNow(decided);
 
-  // A choice taken stays on the page after the next read leaves it out.
   if (
     Option.isSome(fresh) &&
     kept.get(decisionKey(fresh.value))?.decision.decided === undefined
@@ -494,12 +387,7 @@ const ListedToday = ({
   });
 
   const listed = listedOf(today, taken);
-  const keys = listed.map(({ decision }) => decisionKey(decision));
-  useListKeys(keys);
-
-  const shown =
-    listed.find(({ decision }) => decisionKey(decision) === selected) ??
-    listed[0];
+  useListKeys(listed.map(({ decision }) => decisionKey(decision)));
 
   const stamped = new Set(
     [...kept.keys()].filter((key) => {
@@ -526,96 +414,34 @@ const ListedToday = ({
   };
 
   return (
-    <div className="contents [&_[data-facts=inline]]:hidden">
-      <Workspace
-        count={budgetShort(today.budget)}
-        crumbs={[{ label: "Today" }]}
-        facts={
-          shown === undefined ? undefined : (
-            <SelectedFacts
-              busy={decided.waiting}
-              listed={shown}
-              now={now}
-              onDecide={onDecide}
-              stamped={stamped.has(decisionKey(shown.decision))}
+    <>
+      {listed.length === 0 ? (
+        <Section name="Decisions waiting">
+          <li className="pt-3">
+            <EmptyState
+              command={`${Brand.cli} today`}
+              title="Nothing to decide today. Undecided decisions expire to their safe default."
             />
-          )
-        }
-        factsHeading="Selected decision"
-        {...(shown === undefined
-          ? {}
-          : { factsKey: decisionKey(shown.decision) })}
-        status={
-          <p
-            className="text-want max-w-[70ch]"
-            data-budget={`${today.budget.used}/${today.budget.total}`}
-          >
-            {budgetSentence(today.budget)}
-          </p>
-        }
-        title="Today"
-        variant="list"
-      >
-        <div aria-live="polite" className="empty:hidden">
-          <DecidedFailure decided={decided} />
-        </div>
-        {listed.length === 0 ? (
-          <EmptyState
-            command={`${Brand.cli} today`}
-            title="Nothing to decide today. Undecided decisions expire to their safe default."
-          />
-        ) : (
-          <DecisionSections listed={listed} props={props} />
-        )}
-        <Tomorrow overflow={today.overflow} />
-        <Newcomers newcomers={today.newcomers} />
-        <Unattended landings={today.unattended} now={now} />
-      </Workspace>
-    </div>
+          </li>
+        </Section>
+      ) : (
+        <DecisionSections listed={listed} props={props} />
+      )}
+      <Tomorrow overflow={today.overflow} />
+    </>
   );
 };
 
-export const TodayView = ({
-  decided = AsyncResult.initial(),
+/** What happened lately in the projects the reader decides for. */
+export const RecentGroups = ({
   now,
-  onDecide,
-  read,
-  selected,
+  today,
 }: {
-  readonly read: TodayRead;
   readonly now: DateTime.Utc;
-  readonly onDecide: (input: DecideInput) => void;
-  readonly decided?: AsyncResult.AsyncResult<
-    { readonly decision: Decision },
-    unknown
-  >;
-  readonly selected?: string | undefined;
-}) =>
-  TodayRead.match(read, {
-    Read: ({ today }) => (
-      <ListedToday
-        decided={decided}
-        now={now}
-        onDecide={onDecide}
-        selected={selected}
-        today={today}
-      />
-    ),
-    Refused: ({ refusal }) => (
-      <Unlisted>
-        <p className="text-body max-w-[70ch]">{WHAT_TODAY_IS}</p>
-        <RefusalView refusals={[refusal]} />
-        <CommandLine command={`${Brand.cli} today`} />
-      </Unlisted>
-    ),
-    SignedOut: () => (
-      <Unlisted>
-        <SignedOutNotice here="/today" />
-      </Unlisted>
-    ),
-    Unreachable: () => (
-      <Unlisted>
-        <UnreachableNotice />
-      </Unlisted>
-    ),
-  });
+  readonly today: Today;
+}) => (
+  <>
+    <Newcomers newcomers={today.newcomers} />
+    <Unattended landings={today.unattended} now={now} />
+  </>
+);

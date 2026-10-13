@@ -13,41 +13,45 @@ import {
   RequestId,
 } from "@repo/protocol/ids";
 import { ClaimLapsed } from "@repo/protocol/refusal";
+import { isRedirect } from "@tanstack/react-router";
 import { DateTime, Effect, Schema } from "effect";
 
-import { HomeView } from "../src/features/home/home-page.tsx";
+import { InboxView } from "../src/features/inbox/inbox-page.tsx";
 import {
   askKey,
   Decisions,
-  HomePageData,
-  HomeRead,
+  InboxPageData,
+  InboxRead,
   pairWork,
-  readHome,
+  readInbox,
   Takeable,
-} from "../src/features/home/read.ts";
-import { homeHeaders, Route } from "../src/routes/home.tsx";
+} from "../src/features/inbox/read.ts";
+import { movedToInbox } from "../src/features/inbox/moved.ts";
+import { Route as HomeRoute } from "../src/routes/home.tsx";
+import { inboxHeaders, Route } from "../src/routes/inbox.tsx";
 import { fixturesClient } from "./dev-client.ts";
 import { textIn } from "./markup.ts";
 import { renderAt } from "./render.tsx";
 
 const NOW = "2026-10-07T12:00:00.000Z";
 
-const pageFrom = (encoded: typeof HomePageData.Encoded) =>
+const pageFrom = (encoded: typeof InboxPageData.Encoded) =>
   Effect.gen(function* () {
-    const data = yield* Schema.decodeEffect(HomePageData)(encoded);
+    const data = yield* Schema.decodeEffect(InboxPageData)(encoded);
 
     return yield* renderAt(
-      "/home",
-      <HomeView now={data.now} read={data.read} />
+      "/inbox",
+      <InboxView now={data.now} onDecide={() => {}} read={data.read} />
     );
   });
 
-const pageOf = (read: Partial<typeof HomeRead.cases.Read.Type>) =>
+const pageOf = (read: Partial<typeof InboxRead.cases.Read.Type>) =>
   renderAt(
-    "/home",
-    <HomeView
+    "/inbox",
+    <InboxView
       now={DateTime.makeUnsafe(NOW)}
-      read={HomeRead.cases.Read.make({
+      onDecide={() => {}}
+      read={InboxRead.cases.Read.make({
         asks: Takeable.cases.Listed.make({ asks: [] }),
         decisions: Decisions.cases.NotDecider.make({}),
         handle: Handle.make("bram"),
@@ -133,7 +137,7 @@ const takeable = Schema.decodeSync(FrontPageEntry)({
   takeable: true,
 });
 
-describe(HomeView, () => {
+describe("the inbox, for the asks a reader holds and may take", () => {
   it.effect(
     "shows a running claim by its want, with its check command, and a refused answer with its next command",
     () =>
@@ -175,7 +179,56 @@ describe(HomeView, () => {
   );
 
   it.effect(
-    "orders its blocks: your work, the decisions waiting, then the asks to take",
+    "draws an answer's progress through the seven stages under its claim",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* pageOf({
+          held: 1,
+          running: 1,
+          work: [
+            {
+              answer: refused("parse-iso-week"),
+              claim: claim({
+                ask: "parse-iso-week",
+                fork: "datekit--parse-iso-week--bram",
+              }),
+              stage: "heldBack",
+            },
+          ],
+        });
+
+        const stages = [
+          ...markup.matchAll(
+            /data-stage="(?<stage>[^"]+)" data-state="(?<state>[^"]+)"/gu
+          ),
+        ].map((found) => `${found.groups?.stage} ${found.groups?.state}`);
+
+        expect(stages).toStrictEqual([
+          "parse passed",
+          "shape passed",
+          "merge passed",
+          "cheap passed",
+          "checks passed",
+          "heldBack refused",
+          "human pending",
+        ]);
+      })
+  );
+
+  it.effect("draws no stages for a claim with no answer pushed yet", () =>
+    Effect.gen(function* () {
+      const markup = yield* pageOf({
+        held: 1,
+        running: 1,
+        work: [{ claim: claim() }],
+      });
+
+      expect(markup).not.toContain("data-stage=");
+    })
+  );
+
+  it.effect(
+    "orders its blocks: the decisions waiting, your claims, then the asks to take",
     () =>
       Effect.gen(function* () {
         const markup = yield* pageOf({
@@ -184,15 +237,15 @@ describe(HomeView, () => {
         });
 
         expect(sectionsOf(markup)).toStrictEqual([
-          "Your work",
-          "Decisions waiting",
+          "Within your budget",
+          "Your claims",
           "Asks you may take",
         ]);
-        expect(textIn(markup)).toContain("2 waiting");
         expect(markup).toMatch(
           /data-decision="dec-000001"[\s\S]*data-decision="dec-000002"/u
         );
-        expect(markup).toContain('href="/today"');
+        expect(markup).not.toContain('href="/today"');
+        expect(markup).not.toContain('href="/home"');
       })
   );
 
@@ -201,7 +254,7 @@ describe(HomeView, () => {
       const markup = yield* pageOf({});
 
       expect(sectionsOf(markup)).toStrictEqual([
-        "Your work",
+        "Your claims",
         "Asks you may take",
       ]);
     })
@@ -328,15 +381,15 @@ describe(pairWork, () => {
   });
 });
 
-describe("home, read on the server with the reader's session", () => {
+describe("the inbox, read on the server with the reader's session", () => {
   it.live(
-    "gives a contributor their work by its wants, the asks they may take and their record, and no decisions",
+    "gives a contributor their claims by their wants, the asks they may take and their record, and no decisions",
     () =>
       Effect.gen(function* () {
-        const markup = yield* pageFrom(yield* readHome);
+        const markup = yield* pageFrom(yield* readInbox({}));
 
         expect(sectionsOf(markup)).toStrictEqual([
-          "Your work",
+          "Your claims",
           "Asks you may take",
         ]);
         expect(markup).toMatch(
@@ -349,18 +402,29 @@ describe("home, read on the server with the reader's session", () => {
   );
 
   it.live(
-    "gives a maintainer the decisions waiting for them, each linking its page, and Today",
+    "draws a contributor's answered claim with its stages and its next command",
     () =>
       Effect.gen(function* () {
-        const markup = yield* pageFrom(yield* readHome);
+        const markup = yield* pageFrom(yield* readInbox({}));
 
-        expect(sectionsOf(markup)).toStrictEqual([
-          "Your work",
-          "Decisions waiting",
-          "Asks you may take",
-        ]);
+        expect(markup).toMatch(/<li[^>]*data-claim="[^"]+"/u);
+        expect(markup).toContain('aria-label="Gate stages"');
+        expect(markup).toMatch(/Copy (?:next|check) command/u);
+      }).pipe(Effect.provide(fixturesClient("bram")), Effect.scoped),
+    60_000
+  );
+
+  it.live(
+    "gives a maintainer the decisions waiting for them, each linking its page",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* pageFrom(yield* readInbox({}));
+
+        expect(sectionsOf(markup)).toStrictEqual(
+          expect.arrayContaining(["Your claims", "Asks you may take"])
+        );
+        expect(markup).toMatch(/<li[^>]*data-decision="dec-[^"]+"/u);
         expect(markup).toMatch(/href="\/[a-z-]+\/[a-z-]+\/decisions\/[^"]+"/u);
-        expect(markup).toContain('href="/today"');
       }).pipe(Effect.provide(fixturesClient("ines-v")), Effect.scoped),
     60_000
   );
@@ -369,21 +433,48 @@ describe("home, read on the server with the reader's session", () => {
     "signed out, says what the page is, how to sign in and come back, and the command",
     () =>
       Effect.gen(function* () {
-        const markup = yield* pageFrom(yield* readHome);
+        const markup = yield* pageFrom(yield* readInbox({}));
 
         expect(textIn(markup)).toContain(`${Brand.cli} status`);
         expect(markup).toContain(
-          `href="/auth/signin?return=${encodeURIComponent("/home")}"`
+          `href="/auth/signin?return=${encodeURIComponent("/inbox")}"`
         );
         expect(sectionsOf(markup)).toStrictEqual([]);
       }).pipe(Effect.provide(fixturesClient()), Effect.scoped),
     60_000
   );
 
-  it("is kept by no cache: its response is private and never stored", () => {
-    expect(Route.options.headers).toBe(homeHeaders);
-    expect(homeHeaders()).toStrictEqual({
+  it("is a personal page, kept by no cache: its response is private and never stored", () => {
+    expect(Route.options.headers).toBe(inboxHeaders);
+    expect(inboxHeaders()).toStrictEqual({
       "Cache-Control": "private, no-store",
     });
   });
+
+  it("is drawn in the project shell", () => {
+    expect(Route.options.staticData?.shell).toBe("project");
+  });
+});
+
+const movedFrom = (searchStr: string) =>
+  Effect.tryPromise({
+    catch: (thrown) =>
+      isRedirect(thrown)
+        ? [thrown.status, thrown.headers.get("location")]
+        : ["not a redirect"],
+    try: () => movedToInbox({ location: { searchStr } }),
+  }).pipe(Effect.flip);
+
+describe("/home, once the reader's own page", () => {
+  // The worker answers a document load with its 301 (legacy-redirect.test.ts); a page kept before the move may still link here.
+  it.effect("sends a navigation on to /inbox, the query kept", () =>
+    Effect.gen(function* () {
+      expect(HomeRoute.options.beforeLoad).toBe(movedToInbox);
+      expect(yield* movedFrom("")).toStrictEqual([301, "/inbox"]);
+      expect(yield* movedFrom("?decision=dec-000001")).toStrictEqual([
+        301,
+        "/inbox?decision=dec-000001",
+      ]);
+    })
+  );
 });
