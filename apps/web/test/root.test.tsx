@@ -6,9 +6,12 @@ import {
   PendingPage,
   RouteError,
 } from "../src/features/shared/pending.tsx";
-import { themeColors } from "../src/features/shared/theme.ts";
+import {
+  THEME_SCRIPT,
+  themeColors,
+} from "../src/features/shared/theme.ts";
 import { getRouter } from "../src/router.tsx";
-import { rootHead, ThemeColors } from "../src/routes/__root.tsx";
+import { rootHead, ThemeHead } from "../src/routes/__root.tsx";
 
 // The source as text: what the root imports, read without running it.
 const [rootSource = ""] = Object.values(
@@ -28,11 +31,21 @@ describe("the document's head", () => {
     expect(names).toStrictEqual([...new Set(names)]);
   });
 
-  it("carries the light and the dark theme colour, each for its own scheme", () => {
-    const markup = renderToStaticMarkup(<ThemeColors />);
+  // ADR 0042: the metas name each scheme's paper for a page whose script
+  // never runs; the script then colours both for the resolved theme.
+  it("carries each scheme's theme colour, then the theme script, verbatim", () => {
+    const markup = renderToStaticMarkup(<ThemeHead />);
 
     expect(markup).toBe(
-      `<meta content="${themeColors.light}" media="(prefers-color-scheme: light)" name="theme-color"/><meta content="${themeColors.dark}" media="(prefers-color-scheme: dark)" name="theme-color"/>`
+      `<meta content="${themeColors.light}" media="(prefers-color-scheme: light)" name="theme-color"/><meta content="${themeColors.dark}" media="(prefers-color-scheme: dark)" name="theme-color"/><script>${THEME_SCRIPT}</script>`
+    );
+  });
+
+  // The script writes `data-theme` and the metas' colour before React
+  // hydrates, so those elements accept what they find.
+  it("puts the theme in the document's head, and lets hydration find it changed", () => {
+    expect(rootSource).toMatch(
+      /<html lang="en" suppressHydrationWarning>\s*<head>[^]*<ThemeHead \/>[^]*<\/head>/u
     );
   });
 
