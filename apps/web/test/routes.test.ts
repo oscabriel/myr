@@ -58,7 +58,7 @@ const segments = [
   .toSorted();
 
 // Reserved before their page exists (ADR 0041), so no project takes the name meanwhile; each leaves this list with its route.
-const AHEAD_OF_THEIR_PAGE = ["settings"];
+const AHEAD_OF_THEIR_PAGE: readonly string[] = [];
 
 describe("the web's own paths", () => {
   it("are found: every page and file the web serves at its top", () => {
