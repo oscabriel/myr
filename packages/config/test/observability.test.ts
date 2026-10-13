@@ -31,7 +31,7 @@ const Wrangler = Schema.fromJsonString(
 );
 
 // What a Worker keeps of each invocation: its logs, its own line among them,
-// its trace and its Issues, none sampled away and none left unkept.
+// and its Issues, none sampled away and none left unkept.
 const Recorded = Schema.Struct({
   enabled: Schema.Literal(true),
   issues: Schema.Struct({ enabled: Schema.Literal(true) }),
@@ -41,14 +41,33 @@ const Recorded = Schema.Struct({
     invocation_logs: Schema.Literal(true),
     persist: Schema.optionalKey(Schema.Literal(true)),
   }),
-  traces: Schema.Struct({
-    enabled: Schema.Literal(true),
-    head_sampling_rate: Schema.Literal(1),
-    persist: Schema.optionalKey(Schema.Literal(true)),
-  }),
 });
 
 const isRecorded = Schema.is(Recorded);
+
+// Its trace: every invocation's, or none.
+const Traces = {
+  off: Schema.Struct({
+    traces: Schema.Struct({ enabled: Schema.Literal(false) }),
+  }),
+  unsampled: Schema.Struct({
+    traces: Schema.Struct({
+      enabled: Schema.Literal(true),
+      head_sampling_rate: Schema.Literal(1),
+      persist: Schema.optionalKey(Schema.Literal(true)),
+    }),
+  }),
+};
+
+// The runtime's own spans record each Durable Object SQL statement's bound
+// values and each fetch's full URL. The platform's Project DO holds layer
+// names and repos and sealed values, and the platform fetches layer repos,
+// so its traces stay off until the maintainer signs off (principle 7).
+const TRACING: Readonly<Record<Worker, keyof typeof Traces>> = {
+  platform: "off",
+  sandbox: "unsampled",
+  web: "unsampled",
+};
 
 const LOCAL = "local";
 
@@ -100,20 +119,34 @@ const each = <A>(all: readonly Staged[], read: (staged: Staged) => A) =>
   );
 
 describe("every Worker, in every stage", () => {
+  it.effect("logs each invocation and reports its Issues, unsampled", () =>
+    Effect.gen(function* () {
+      const all = yield* everyStage;
+
+      expect(
+        each(all, (staged) => isRecorded(inherited(staged, "observability")))
+      ).toStrictEqual(each(all, () => true));
+    })
+  );
+
   it.effect(
-    "logs each invocation, traces it and reports its Issues, unsampled",
+    "traces each invocation, unsampled, but the platform, which traces none",
     () =>
       Effect.gen(function* () {
         const all = yield* everyStage;
 
         expect(
-          each(all, (staged) => isRecorded(inherited(staged, "observability")))
+          each(all, (staged) =>
+            Schema.is(Traces[TRACING[staged.worker]])(
+              inherited(staged, "observability")
+            )
+          )
         ).toStrictEqual(each(all, () => true));
       })
   );
 
   it.effect(
-    "uploads its source maps, so a stack trace or an Issue names the source",
+    "uploads its source maps, so an uncaught exception's stack names the source",
     () =>
       Effect.gen(function* () {
         const all = yield* everyStage;

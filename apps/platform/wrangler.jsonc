@@ -26,15 +26,22 @@
   // Nothing here reads a name at run time: Effect's tagged errors
   // set `name` from their tag, services are keyed by strings, and the
   // runtime finds Durable Objects, Workflows and entrypoints by export name,
-  // which minifying keeps. A stack trace shows minified function names, and
-  // the source maps take it back to the source's files and lines.
+  // which minifying keeps. A stack trace shows minified names and positions.
+  // The uploaded source maps take an uncaught exception's stack back to the
+  // source, but a defect the platform reports itself is logged as thrown:
+  // the same commit's `wrangler deploy --dry-run --outdir` gives the map to
+  // read it by (README, Observability).
   "keep_names": false,
   "upload_source_maps": true,
   "workers_dev": true,
   "preview_urls": false,
-  // Every invocation's logs and trace, unsampled, and Issues, which groups
-  // what failed. Unlike bindings, wrangler gives `observability` and
-  // `upload_source_maps` to every stage that does not set its own
+  // Every invocation's logs, unsampled, and Issues, which groups what
+  // failed. Traces stay off: the runtime's own spans record each Durable
+  // Object SQL statement's bound values and each fetch's full URL, and the
+  // Project DO's rows hold layer names and repos and sealed values, which no
+  // trace may (principle 7). Turning them on needs the maintainer's sign-off.
+  // Unlike bindings, wrangler gives `observability` and `upload_source_maps`
+  // to every stage that does not set its own
   // (packages/config/test/observability.test.ts holds each stage to them).
   "observability": {
     "enabled": true,
@@ -43,7 +50,7 @@
       "head_sampling_rate": 1,
       "invocation_logs": true,
     },
-    "traces": { "enabled": true, "head_sampling_rate": 1 },
+    "traces": { "enabled": false },
     "issues": { "enabled": true },
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Project"] }],
