@@ -5,6 +5,7 @@ import { Effect, Layer, Logger, Option, Redacted } from "effect";
 import { scrubberOf } from "../src/logger.ts";
 import { annotateInvocation, withInvocation } from "../src/spans.ts";
 import { tracerOver } from "../src/spans/binding.ts";
+import type { Keeping } from "../src/spans/binding.ts";
 import {
   recordingTracing,
   ROOT,
@@ -20,9 +21,27 @@ const recorded = <A, E>(body: Effect.Effect<A, E>, traced = true) =>
     yield* Effect.exit(body);
 
     return yield* spans;
-  }).pipe(Effect.provide(SpansMemory(scrubberOf([]), traced)));
+  }).pipe(Effect.provide(SpansMemory({ traced })));
 
 const lineageOf = ({ name, parent }: RecordedSpan) => ({ name, parent });
+
+const whole = (secrets: readonly Redacted.Redacted[]): Keeping => ({
+  defects: "whole",
+  scrub: scrubberOf(secrets),
+});
+
+const died = (keeping: Keeping) =>
+  Effect.gen(function* () {
+    const recording = recordingTracing();
+
+    yield* Effect.die(new TypeError("no file at secret/plan.md")).pipe(
+      Effect.withSpan("Checker.Run"),
+      Effect.withTracer(tracerOver(recording.tracing, keeping)),
+      Effect.exit
+    );
+
+    return recording.spans()[1]?.exceptions;
+  });
 
 describe("the spans bridge", () => {
   it.effect(
@@ -43,7 +62,7 @@ describe("the spans bridge", () => {
             Effect.map(Effect.currentSpan, (outer) => [outer, inner] as const)
           ),
           Effect.withSpan("Lander.land"),
-          Effect.withTracer(tracerOver(recording.tracing, scrubberOf([])))
+          Effect.withTracer(tracerOver(recording.tracing, whole([])))
         );
 
         expect(recording.spans().map(lineageOf)).toStrictEqual([
@@ -112,10 +131,7 @@ describe("the spans bridge", () => {
               ),
             ]).pipe(
               Effect.withTracer(
-                tracerOver(
-                  recording.tracing,
-                  scrubberOf([Redacted.make(secret)])
-                )
+                tracerOver(recording.tracing, whole([Redacted.make(secret)]))
               )
             )
           );
@@ -123,19 +139,33 @@ describe("the spans bridge", () => {
           return recording.spans();
         });
 
-        const [, refused, died] = spans;
+        const [, refused, defect] = spans;
 
         expect(refused?.exceptions).toStrictEqual([
           { name: "VerifierBlocked" },
         ]);
         expect(
-          died?.exceptions.map(({ message, name }) => ({ message, name }))
+          defect?.exceptions.map(({ message, name }) => ({ message, name }))
         ).toStrictEqual([
           { message: "no fetch with <redacted>", name: "TypeError" },
         ]);
-        expect(died?.exceptions[0]?.stack).toMatch(
+        expect(defect?.exceptions[0]?.stack).toMatch(
           /^TypeError: no fetch with <redacted>\n\s+at /u
         );
+      })
+  );
+
+  it.effect(
+    "records a defect by its name alone where its text may quote what no trace may hold",
+    () =>
+      Effect.gen(function* () {
+        expect([
+          yield* died({ defects: "name", scrub: scrubberOf([]) }),
+          (yield* died(whole([])))?.map(({ message }) => message),
+        ]).toStrictEqual([
+          [{ name: "TypeError" }],
+          ["no file at secret/plan.md"],
+        ]);
       })
   );
 

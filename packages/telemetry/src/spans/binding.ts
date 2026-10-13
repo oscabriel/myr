@@ -20,12 +20,22 @@ const isSpanValue = (value: unknown): value is SpanValue =>
   Predicate.isNumber(value) ||
   Predicate.isBoolean(value);
 
+/** What a span keeps of what it carries. */
+export interface Keeping {
+  readonly scrub: Scrub;
+  /**
+   * All of a defect, scrubbed, or its name alone where its text may quote
+   * what no trace may hold (a held-back check's path).
+   */
+  readonly defects: "whole" | "name";
+}
+
 // A typed failure is a refusal or a port's error: its tag says what it was.
 // Only a defect brings its message and stack, scrubbed.
 const recordFailures = <A, E>(
   span: WorkerSpan,
   exit: Exit.Exit<A, E>,
-  scrub: Scrub
+  { defects, scrub }: Keeping
 ) => {
   if (Exit.isSuccess(exit)) {
     return;
@@ -46,11 +56,15 @@ const recordFailures = <A, E>(
 
     if (Cause.isDieReason(reason)) {
       for (const error of Cause.prettyErrors(Cause.fromReasons([reason]))) {
-        span.recordException({
-          message: scrub(error.message),
-          name: error.name,
-          stack: scrub(error.stack ?? ""),
-        });
+        span.recordException(
+          defects === "name"
+            ? { name: error.name }
+            : {
+                message: scrub(error.message),
+                name: error.name,
+                stack: scrub(error.stack ?? ""),
+              }
+        );
       }
     }
   }
@@ -59,7 +73,7 @@ const recordFailures = <A, E>(
 const mirrored = (
   span: Tracer.NativeSpan,
   mirror: WorkerSpan | undefined,
-  scrub: Scrub
+  keeping: Keeping
 ): Tracer.Span => {
   const traced = mirror?.isTraced === true ? mirror : undefined;
 
@@ -83,7 +97,7 @@ const mirrored = (
       span.end(endTime, exit);
 
       if (traced !== undefined) {
-        recordFailures(traced, exit, scrub);
+        recordFailures(traced, exit, keeping);
       }
 
       mirror?.end();
@@ -114,7 +128,7 @@ const mirrored = (
  */
 export const tracerOver = (
   tracing: WorkerTracing,
-  scrub: Scrub
+  keeping: Keeping
 ): Tracer.Tracer =>
   Tracer.make({
     span: (options) =>
@@ -123,7 +137,7 @@ export const tracerOver = (
         options.sampled && options.kind !== "client"
           ? tracing.startSpan(options.name)
           : undefined,
-        scrub
+        keeping
       ),
   });
 
@@ -145,9 +159,9 @@ const annotateRoot = (tracing: WorkerTracing) => (ids: InvocationIds) => {
 
 export const SpansBinding = (
   tracing: WorkerTracing,
-  scrub: Scrub
+  keeping: Keeping
 ): Layer.Layer<never> =>
   Layer.mergeAll(
-    Layer.succeed(Tracer.Tracer, tracerOver(tracing, scrub)),
+    Layer.succeed(Tracer.Tracer, tracerOver(tracing, keeping)),
     Layer.succeed(InvocationSpan, { annotate: annotateRoot(tracing) })
   );

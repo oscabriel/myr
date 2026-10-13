@@ -4,9 +4,9 @@
 import { Context, Effect, Layer } from "effect";
 import { constUndefined, constVoid, identity } from "effect/Function";
 
-import type { Scrub } from "../logger.ts";
 import type { SpanValue, WorkerSpan, WorkerTracing } from "../spans.ts";
 import { SpansBinding } from "./binding.ts";
+import type { Keeping } from "./binding.ts";
 
 export interface RecordedException {
   readonly name: string;
@@ -108,16 +108,20 @@ export class SpansRecorded extends Context.Service<
   { readonly spans: Effect.Effect<readonly RecordedSpan[]> }
 >()("telemetry/SpansRecorded") {}
 
-export const SpansMemory = (
-  scrub: Scrub = identity,
-  traced = true
-): Layer.Layer<SpansRecorded> =>
+export const SpansMemory = ({
+  keeping = { defects: "whole", scrub: identity },
+  traced = true,
+}: {
+  readonly keeping?: Keeping;
+  /** False: an invocation the head sampling left out. */
+  readonly traced?: boolean;
+} = {}): Layer.Layer<SpansRecorded> =>
   Layer.unwrap(
     Effect.sync(() => {
       const recording = recordingTracing(traced);
 
       return Layer.merge(
-        SpansBinding(recording.tracing, scrub),
+        SpansBinding(recording.tracing, keeping),
         Layer.succeed(
           SpansRecorded,
           SpansRecorded.of({ spans: Effect.sync(recording.spans) })

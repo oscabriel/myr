@@ -199,6 +199,10 @@ const runner = (tokens: Tokens) => {
             timeoutMs: step.remote === undefined ? LOCAL_MS : REMOTE_MS,
           })
           .pipe(
+            // By its subcommand alone: an argument may be a remote's URL.
+            Effect.withSpan("Lander.git", {
+              attributes: { step: subcommandOf(step) },
+            }),
             Effect.catchTag("BoxFailed", ({ reason }) => blocked(step, reason))
           );
 

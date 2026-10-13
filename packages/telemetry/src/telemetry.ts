@@ -9,13 +9,17 @@ import { defectReporter } from "./defects.ts";
 import { jsonLogger, scrubberOf } from "./logger.ts";
 import type { WorkerTracing } from "./spans.ts";
 import { SpansBinding } from "./spans/binding.ts";
+import type { Keeping } from "./spans/binding.ts";
 
 export interface TelemetryOptions {
   readonly secrets: readonly Redacted.Redacted[];
   readonly tracing: WorkerTracing;
+  /** What a span keeps of a defect; all of it, scrubbed, unless named. */
+  readonly defects?: Keeping["defects"];
 }
 
 export const Telemetry = ({
+  defects = "whole",
   secrets,
   tracing,
 }: TelemetryOptions): Layer.Layer<never> => {
@@ -24,6 +28,6 @@ export const Telemetry = ({
   return Layer.mergeAll(
     Logger.layer([jsonLogger(scrub)]),
     ErrorReporter.layer([defectReporter()]),
-    SpansBinding(tracing, scrub)
+    SpansBinding(tracing, { defects, scrub })
   );
 };

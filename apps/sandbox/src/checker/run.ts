@@ -604,6 +604,8 @@ const phases = (wire: CheckWire, run: RunBlock, kept: Kept) =>
 
     const key = plan.find(Phase.$is("Snapshot"))?.key ?? lockfileHash;
 
+    // Each phase its own span, named by its tag alone: a lane's command or a
+    // sealed check's area never names one.
     const ran = yield* Effect.forEach(plan, (phase) =>
       Effect.logInfo("checker phase").pipe(
         Effect.annotateLogs({ phase: phase._tag }),
@@ -638,7 +640,8 @@ const phases = (wire: CheckWire, run: RunBlock, kept: Kept) =>
                 onSome: (part) => Effect.as(writeHeldBack(job, part), []),
               }),
           })
-        )
+        ),
+        Effect.withSpan(`Checker.${phase._tag}`)
       )
     );
 
