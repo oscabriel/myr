@@ -13,9 +13,9 @@ import {
   markdownAlternateLink,
   markdownLink,
 } from "../features/front/markdown.ts";
+import { LandingNow } from "../features/landing/landing-now.ts";
 import { LandingView } from "../features/landing/landing-page.tsx";
-import { LandingProjects } from "../features/landing/projects.ts";
-import { readLandingProjects } from "../features/landing/read.ts";
+import { readLandingNow } from "../features/landing/read.ts";
 import { LEDE } from "../features/landing/words.ts";
 import { pageHead } from "../features/shared/head.ts";
 import { INBOX_PATH } from "../features/shared/paths.ts";
@@ -30,8 +30,8 @@ const MARKDOWN = "/llms.txt";
 // Read as nobody (no cookie reaches the platform): the list ignores the caller, so the page stays one the edge may keep.
 const landingData = createServerFn({ method: "GET" }).handler(() =>
   Effect.runPromise(
-    readLandingProjects.pipe(
-      Effect.flatMap(Schema.encodeEffect(LandingProjects)),
+    readLandingNow.pipe(
+      Effect.flatMap(Schema.encodeEffect(LandingNow)),
       Effect.provide(serverClient(env))
     )
   )
@@ -68,15 +68,15 @@ const Landing = () => {
   const { origin } = useRouter();
   const loaded = Route.useLoaderData();
 
-  const projects = useMemo(
-    () => Schema.decodeSync(LandingProjects)(loaded),
+  const landings = useMemo(
+    () => Schema.decodeSync(LandingNow)(loaded),
     [loaded]
   );
 
   return (
     <LandingView
+      landings={landings}
       platformUrl={platformUrl}
-      projects={projects}
       webUrl={origin}
     />
   );
