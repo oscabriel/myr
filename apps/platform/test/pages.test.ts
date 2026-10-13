@@ -485,6 +485,10 @@ const consentOf = (html: string) =>
   /<section class="consent"[^>]*>(?<body>.*?)<\/section>/su.exec(html)?.groups
     ?.body ?? "";
 
+const consentLabelOf = (html: string) =>
+  /<section class="consent" aria-label="(?<label>[^"]*)">/u.exec(html)?.groups
+    ?.label;
+
 const mayListOf = (html: string) =>
   /<ul class="may">.*?<\/ul>/su.exec(consentOf(html))?.[0];
 
@@ -498,11 +502,25 @@ describe("the sign-in page, as an MCP client's consent", () => {
     expect(consent.match(/<li>/gu)).toHaveLength(4);
     expect(consent).toContain("<li>Claim, release and answer asks");
     expect(consent).toContain("It never sees your password.");
+    expect(consent).toContain(
+      "finish answers, land changes, vouch for or denounce people"
+    );
   });
 
   it("lists the same on the sign-up page, where a newcomer allows it", () => {
     expect(mayListOf(PAGES["sign-up"])).toBeDefined();
     expect(mayListOf(PAGES["sign-up"])).toBe(mayListOf(PAGES["sign-in"]));
+  });
+
+  it("names the consent region for what it says", () => {
+    expect(consentLabelOf(PAGES["sign-in"])).toBe(
+      "Who asks and what it may do"
+    );
+    expect(consentLabelOf(PAGES["sign-up"])).toBe(
+      "Who asks and what it may do"
+    );
+    expect(consentLabelOf(PAGES["adding an email"])).toBe("Who asks");
+    expect(mayListOf(PAGES["adding an email"])).toBeUndefined();
   });
 
   it("escapes every value a client supplies, on every page that names it", () => {

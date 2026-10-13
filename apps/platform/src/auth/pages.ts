@@ -130,7 +130,7 @@ const MAY = `<p>As you, it may:</p>
 <li>Read what you can read: projects, asks, code, verdicts, and any layer whose audience you are in</li>
 <li>Claim, release and answer asks, and push to your forks</li>
 <li>Make projects, and propose and flag asks</li>
-<li>Open asks, take decisions and set write-only values where you are a maintainer; nobody can read a value back</li>
+<li>Open asks, take decisions, finish answers, land changes, vouch for or denounce people, and set write-only values where you are a maintainer; nobody can read a value back</li>
 </ul>
 <p>It never sees your password.</p>`;
 
@@ -148,7 +148,9 @@ const askerParagraphs = (asker: Asker, says: Says = "who") => {
     ? `<p class="warning"><strong class="warn">${WARNING_MARK}Warning</strong> This sends access to an app on your computer. Continue only if you just started signing in from it.</p>`
     : "";
 
-  return `<section class="consent" aria-label="Who asks">
+  const label = says === "who" ? "Who asks" : "Who asks and what it may do";
+
+  return `<section class="consent" aria-label="${label}">
 <p>${name}${domain} asks to act as you.</p>
 <p>Access goes to <strong>${escapeHtml(asker.redirectHost)}</strong>.</p>
 ${loopback}
