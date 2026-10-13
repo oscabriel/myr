@@ -552,7 +552,7 @@ The platform's own label, never rewritten, through the state badge: a lock and t
 ### The landing
 
 - **Where:** `/`, in the site shell (ADR 0041 amends ADR 0030's bare page). A reader who carries a session is sent to `/inbox`.
-- **Hero:** one primary action (the open asks) and the install command, then a two-panel comparison as inline SVG: on the left the usual flow by its mechanism (issue, branch, pull request, review comments, merge button) under an X mark; on the right an ask, an answer and the gate under a check mark. Two cards side by side, stacked on a phone; no product is named. It honours `prefers-reduced-motion`.
+- **Hero:** one primary action (the open asks) and the install command, then a two-panel comparison as inline SVG: on the left the usual flow by its mechanism (issue, branch, pull request, review comments, merge button) under an X mark; on the right an ask, an answer and the gate under a check mark. Two cards side by side from `diffsplit`, where both drawings fit at their own size, and stacked below it; no product is named. It honours `prefers-reduced-motion`.
 - **Below:** the seven-stage gate with a refused and a landed output beside it, the four words, landings as they happen, and every way in (linking `/install`). Its evidence is real output, set in mono as a terminal prints it. Until a read of landings across projects exists, "Landing now" lists the public projects by their last landing, the latest first, from `listProjects`, each with its posture.
 
 ### Install

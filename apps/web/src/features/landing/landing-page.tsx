@@ -49,7 +49,7 @@ const Part = ({
 }) => (
   <section aria-labelledby={id} className="flex flex-col gap-5">
     <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-      <h2 className="text-headline" id={id}>
+      <h2 className="text-title" id={id}>
         {title}
       </h2>
       {aside}

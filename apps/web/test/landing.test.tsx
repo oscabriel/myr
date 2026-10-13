@@ -1,8 +1,10 @@
 import { describe, expect, it } from "@effect/vitest";
 import { installCommand } from "@repo/agent-kit/install";
 import { Brand } from "@repo/brand";
+import { authorLine } from "@repo/git/trailers";
 import { Contracts } from "@repo/protocol/contracts";
 import { ProjectListing } from "@repo/protocol/domain/front-page";
+import { Handle } from "@repo/protocol/ids";
 import { DateTime, Effect, Schema } from "effect";
 
 import glossary from "../../../GLOSSARY.md?raw";
@@ -44,6 +46,13 @@ const pageWith = (landings: LandingNow) =>
     "/",
     <LandingView landings={landings} platformUrl={PLATFORM} webUrl={WEB} />
   );
+
+/** A credit line as the platform forms it, so the transcript cannot drift from it. */
+const credit = (handle: string) => {
+  const { email, name } = authorLine(Handle.make(handle));
+
+  return `${name} <${email}>`;
+};
 
 const mainOf = (markup: string) => markup.slice(markup.indexOf("<main"));
 
@@ -249,10 +258,8 @@ describe(LandingView, () => {
         expect(output).toContain(
           `remote: checking parse-iso at 1a2b3c4; follow with ${Brand.cli} status`
         );
-        expect(output).toContain(`Asked-by: dora <dora@users.${Brand.domain}>`);
-        expect(output).toContain(
-          `Signed-off-by: alice <alice@users.${Brand.domain}>`
-        );
+        expect(output).toContain(`Asked-by: ${credit("dora")}`);
+        expect(output).toContain(`Signed-off-by: ${credit("alice")}`);
       })
   );
 

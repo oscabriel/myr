@@ -1,8 +1,9 @@
 /**
  * The hero's two panels: the usual flow by its mechanism under an X, and an
  * ask landing through the gate under a check. Each flow is drawn as inline
- * SVG at its own size (never scaled, so its text keeps the type floor) and
- * named in full for a screen reader. No product is named.
+ * SVG at its own size, never scaled, so its text keeps the type floor: on a
+ * phone too narrow for it the drawing scrolls inside its panel. Each is named
+ * in full for a screen reader. No product is named.
  */
 import { Check, X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -30,14 +31,14 @@ const FLOWS: readonly Flow[] = [
     id: "usual",
     loop: { from: 3, to: 2 },
     mark: X,
-    says: "A person reads each change and decides by eye, as many rounds as it takes.",
+    says: "A person reads each change and approves it, as many rounds as it takes.",
     steps: [
       { name: "issue", says: "a change described in prose" },
       { name: "branch", says: "a contributor's copy to work on" },
       { name: "pull request", says: "the diff waits for a reader" },
-      { name: "review comments", says: "rounds until it looks right" },
+      { name: "review comments", says: "rounds until a reader approves" },
       { name: "merge button", says: "whoever has the right presses it" },
-      { name: "main", says: "what looked right to a reader" },
+      { name: "main", says: "what a reader approved" },
     ],
     title: "The usual flow",
   },
@@ -104,7 +105,7 @@ const FlowDrawing = ({ flow }: { readonly flow: Flow }) => {
   return (
     <svg
       aria-hidden="true"
-      className="h-auto max-w-full shrink-0"
+      className="shrink-0"
       height={height}
       viewBox={`0 0 ${WIDTH} ${height}`}
       width={WIDTH}
@@ -176,7 +177,9 @@ const Panel = ({ flow }: { readonly flow: Flow }) => {
       <p className="text-ui text-muted-foreground max-w-(--measure)">
         {flow.says}
       </p>
-      <FlowDrawing flow={flow} />
+      <div className="overflow-x-auto">
+        <FlowDrawing flow={flow} />
+      </div>
       <ol className="sr-only">
         {flow.steps.map((step) => (
           <li key={step.name}>
@@ -188,8 +191,14 @@ const Panel = ({ flow }: { readonly flow: Flow }) => {
   );
 };
 
+/**
+ * Side by side once two drawings fit at their own size (288 px each, inside
+ * a card's padding, beside the gap and the gutters: about 704 px), so only a
+ * phone, or a width just past one, stacks them. `tablet` (640 px) would be
+ * too soon: each drawing would scroll inside its panel.
+ */
 export const Comparison = () => (
-  <div className="columns:grid-cols-2 grid gap-5">
+  <div className="diffsplit:grid-cols-2 grid gap-5">
     {FLOWS.map((flow) => (
       <Panel flow={flow} key={flow.id} />
     ))}
