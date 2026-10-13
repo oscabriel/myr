@@ -41,7 +41,8 @@ import {
 import type { Waiver } from "@repo/gate/escapes";
 import { PushTarget } from "@repo/gate/facts";
 import type { PushFacts } from "@repo/gate/facts";
-import { pushStages, runGate } from "@repo/gate/gate";
+import { pushStages, refusingStage, runGate } from "@repo/gate/gate";
+import type { StageRefusal } from "@repo/gate/gate";
 import { scan } from "@repo/gate/stages/shape";
 import { verdictOf } from "@repo/gate/verdict";
 import { patchId } from "@repo/git/patch-id";
@@ -250,6 +251,13 @@ import {
 } from "./landing.ts";
 import type { LandingQueue, PendingDecision, Request } from "./landing.ts";
 import {
+  lanePoints,
+  MetricPoint,
+  Metrics,
+  millisBetween,
+  refusedPoints,
+} from "./metrics.ts";
+import {
   callerCountOf,
   callersIn,
   callersRatchet,
@@ -261,6 +269,7 @@ import {
 } from "./migrate.ts";
 import {
   isDue,
+  measuredRow,
   outboxRow,
   OutboxBody,
   projectedRows,
@@ -807,6 +816,8 @@ export const AnswerRecord = Schema.Struct({
   heldBack: Schema.optionalKey(HeldBackJudged),
   landing: LandingState,
   measured: Schema.optionalKey(Measured),
+  /** When the answer was queued: absent from an answer queued before it was kept. */
+  queuedAt: Schema.optionalKey(Schema.DateTimeUtcFromString),
   receipt: AnswerReceipt,
   verdict: Schema.optionalKey(Verdict),
   waived: Schema.optionalKey(Schema.Array(DecisionSubject.cases.Waiver)),
@@ -1681,24 +1692,112 @@ const weakness = (ask: Ask, files: readonly AskFile[]) => {
   );
 };
 
+const refusedAt = (
+  stage: StageName,
+  refusals: readonly Refusal[]
+): Option.Option<StageRefusal> =>
+  Option.map(
+    Option.liftPredicate(refusals, Array.isReadonlyArrayNonEmpty),
+    (all) => ({ refusals: all, stage })
+  );
+
+// A fork the host lacks is refused as parse would refuse it; a commit it lacks,
+// as a merge would.
 const gateOf = (
   facts: Effect.Effect<PushFacts, RepoNotFound | MissingCommit>,
   missing: readonly Refusal[],
   stale: readonly Refusal[]
-) =>
+): Effect.Effect<Option.Option<StageRefusal>> =>
   facts.pipe(
-    Effect.flatMap((each) => runGate(pushStages, each)),
-    Effect.map((found) =>
-      Option.getOrElse(
-        Option.map(found, (all): readonly Refusal[] => all),
-        () => []
-      )
-    ),
+    Effect.flatMap((each) => refusingStage(pushStages, each)),
     Effect.catchTags({
-      MissingCommit: () => Effect.succeed(stale),
-      RepoNotFound: () => Effect.succeed(missing),
+      MissingCommit: () => Effect.succeed(refusedAt("merge", stale)),
+      RepoNotFound: () => Effect.succeed(refusedAt("parse", missing)),
     })
   );
+
+/** The stage whose refusals moved an answer from `before` to `Refused`. */
+const refusingStageOf = (
+  before: LandingState,
+  report: AnswerReport | undefined
+): StageName =>
+  LandingState.matchOrElse<StageName>(
+    before,
+    {
+      AwaitingDecision: () => "human",
+      Checking: () => report?.stage ?? "checks",
+      Landing: () => "merge",
+      Merging: () => "merge",
+    },
+    () => "checks"
+  );
+
+const waitedPoints = (input: {
+  readonly before: LandingState;
+  readonly now: DateTime.Utc;
+  readonly project: ProjectName;
+  readonly queuedAt: DateTime.Utc | undefined;
+  readonly state: LandingState;
+}): readonly MetricPoint[] =>
+  LandingState.guards.Merging(input.before) &&
+  LandingState.guards.Checking(input.state) &&
+  input.state.remerges === 0 &&
+  input.queuedAt !== undefined
+    ? [
+        MetricPoint.cases.ChecksWaited.make({
+          project: input.project,
+          waitedMs: millisBetween(input.queuedAt, input.now),
+        }),
+      ]
+    : [];
+
+/**
+ * What one step of an answer's landing counts, each under the fact it counts:
+ * its refusal, its checked lanes, and the wait before its first checks. A
+ * report that changes nothing counts nothing, so a replay writes no row.
+ */
+const answerPoints = (input: {
+  readonly before: LandingState;
+  readonly command: LandingCommand;
+  readonly now: DateTime.Utc;
+  readonly project: ProjectName;
+  readonly queuedAt: DateTime.Utc | undefined;
+  readonly report: AnswerReport | undefined;
+  readonly requestId: RequestId;
+  readonly state: LandingState;
+}): Effect.Effect<readonly OutboxRow[]> => {
+  const { before, command, now, project, report, requestId, state } = input;
+
+  const refused =
+    LandingState.guards.Refused(state) && !LandingState.guards.Refused(before)
+      ? refusedPoints(project, refusingStageOf(before, report), state.refusals)
+      : [];
+
+  const checkedTree =
+    LandingCommand.$is("Checked")(command) &&
+    LandingState.guards.Checking(before) &&
+    before.tree === command.tree &&
+    state !== before
+      ? Option.some(before.tree)
+      : Option.none();
+
+  return Effect.map(
+    Effect.all([
+      measuredRow(`waited:${requestId}`, waitedPoints(input), now),
+      Option.match(checkedTree, {
+        onNone: () => Effect.succeed([]),
+        onSome: (tree) =>
+          measuredRow(
+            `lanes:${requestId}:${tree}`,
+            lanePoints(project, report?.lanes ?? []),
+            now
+          ),
+      }),
+      measuredRow(`refused:${requestId}`, refused, now),
+    ]),
+    (rows) => rows.flat()
+  );
+};
 
 const leaveIfDone = (
   writes: Writes,
@@ -1744,6 +1843,7 @@ export const projectService = (
     const visibility = yield* ProjectVisibility;
     const envPort = yield* ProjectEnv;
     const draftRuns = yield* DraftRuns;
+    const metrics = yield* Metrics;
     const lock = yield* Semaphore.make(1);
     const repo = RepoName.make(keyOf(name));
 
@@ -1947,7 +2047,16 @@ export const projectService = (
         const events = yield* numbered(h.lastSeq, writes.events);
         const projected = yield* projectedRows(name, events, now);
 
-        const outbox = [...writes.outbox, ...projected];
+        // A landing is kept once, by its SHA, whichever call made it.
+        const landed = yield* Effect.forEach(writes.landings, ({ sha }) =>
+          measuredRow(
+            `landed:${sha}`,
+            [MetricPoint.cases.Landed.make({ project: name })],
+            now
+          )
+        );
+
+        const outbox = [...writes.outbox, ...landed.flat(), ...projected];
 
         const queue = yield* Effect.forEach(writes.queue.values(), (each) =>
           storedQueue(each)
@@ -2022,7 +2131,8 @@ export const projectService = (
 
         if (Array.isReadonlyArrayNonEmpty(due)) {
           const ran = yield* withPorts(runOutbox(due, queue, now)).pipe(
-            Effect.provideService(DraftRuns, draftRuns)
+            Effect.provideService(DraftRuns, draftRuns),
+            Effect.provideService(Metrics, metrics)
           );
 
           yield* store.ackOutbox(ran.done);
@@ -3281,6 +3391,19 @@ export const projectService = (
             );
           }
 
+          writes.outbox.push(
+            ...(yield* answerPoints({
+              before,
+              command,
+              now,
+              project: name,
+              queuedAt: record.queuedAt,
+              report,
+              requestId,
+              state,
+            }))
+          );
+
           const settled = yield* Effect.reduce(
             effects,
             (): Settled => ({ queue: h.queue, steps: [] }),
@@ -4496,7 +4619,7 @@ export const projectService = (
             () => live.value.landed
           );
 
-          const refusals = yield* gateOf(
+          const refused = yield* gateOf(
             withLayerFacts(
               h,
               writes,
@@ -4542,7 +4665,23 @@ export const projectService = (
             ...field("before", input.before),
           });
 
-          return refusals;
+          // The store keeps no push event twice, so a push heard again counts nothing.
+          writes.outbox.push(
+            ...(yield* measuredRow(
+              `pushed:${input.eventId}`,
+              Option.match(refused, {
+                onNone: () => [],
+                onSome: ({ refusals, stage }) =>
+                  refusedPoints(name, stage, refusals),
+              }),
+              now
+            ))
+          );
+
+          return Option.match(refused, {
+            onNone: (): readonly Refusal[] => [],
+            onSome: ({ refusals }) => refusals,
+          });
         });
 
     /** A request id another person's answer holds is not the caller's to replay: `NotClaimed`. */
@@ -4607,7 +4746,11 @@ export const projectService = (
           head: request.head,
           requestId: request.requestId,
           state: yield* Effect.orDie(
-            encodeAnswer({ landing: started.state, receipt })
+            encodeAnswer({
+              landing: started.state,
+              queuedAt: input.now,
+              receipt,
+            })
           ),
           updatedAt: input.now,
           ...field("ask", request.ask),

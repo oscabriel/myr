@@ -134,6 +134,7 @@ export const fakeEnv = (): Env => ({
   LANDER_ADAPTER: "container",
   LOADER: untouchable("LOADER"),
   MASTER_KEY: masterKey,
+  METRICS: untouchable("METRICS"),
   OAUTH_KV: untouchable("OAUTH_KV"),
   ON_PUSH: untouchable("ON_PUSH"),
   OPERATOR_HANDLE: "oscabriel",

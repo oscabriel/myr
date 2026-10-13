@@ -17,6 +17,7 @@ import type { FrontPage } from "@repo/project/front-page";
 import { FrontPageMemory } from "@repo/project/front-page/memory";
 import type { Lander } from "@repo/project/lander";
 import { LanderIsogit } from "@repo/project/lander/isogit";
+import { MetricsBinding } from "@repo/project/metrics/binding";
 import { FinishersFromChecks } from "@repo/project/project";
 import type { Projection } from "@repo/project/projection";
 import { ProjectDescriptionsD1 } from "@repo/project/projection-d1/descriptions";
@@ -106,6 +107,7 @@ const corePorts = (config: PlatformConfig): Layer.Layer<WorkerPorts> =>
     EvidenceStoreR2(config.EVIDENCE),
     CodeCacheLive(CODE_READS_KEPT.light, CODE_READS_KEPT.heavy),
     CodeStoreR2(config.CODE_CACHE),
+    MetricsBinding(config.METRICS),
     // Without this entry a draft proposal starts no run, and stays drafting.
     DraftRunsWorkflow(config.ANSWER)
   ).pipe(
