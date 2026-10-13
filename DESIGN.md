@@ -22,7 +22,7 @@ colors:
   accent-dark: "oklch(0.3709 0.0248 153.9823)"
   muted: "oklch(0.5 0.0234 264.3637)"
   muted-dark: "oklch(0.7058 0 0)"
-  rule: "oklch(0.9251 0.0071 88.645)"
+  rule: "oklch(0.87 0.0071 88.645)"
   rule-dark: "oklch(0.285 0 0)"
   rule-strong: "oklch(0.2417 0.0298 269.8827)"
   rule-strong-dark: "oklch(0.9702 0 0)"
@@ -275,7 +275,7 @@ The maintainer's "sage garden": warm paper, navy ink, a sage primary, soft sage 
 | `background` | `--background` (paper) | As hex, `#f8f7f4` and `#0a0a0a`: the `theme-color` metas and the manifest repeat it |
 | `foreground` | `--foreground` (ink), `--rule-strong` | |
 | `muted` | `--surface` (field surface) | shadcn's `bg-muted` still resolves to the surface |
-| `border` | `--rule` (hairline) | Equal to the surface: a surface box reads by its fill, a hairline on paper by its line |
+| `border` | `--rule` (hairline) | Nudged 0.9251 to 0.87 in light: pasted, it equalled the surface, so a surface box's hairline vanished; now 1.19:1 on the surface and 1.38:1 on paper (1.21:1 and 1.38:1 in dark, as pasted) |
 | `muted-foreground` | `--muted` | Nudged 0.551 to 0.5 in light, for 4.5:1 on the surfaces |
 | `card`, `popover` | `--card`, `--popover` | White in light, 0.1822 in dark |
 | `primary`, `ring` | `--primary`, `--ring` | Nudged 0.6333 to 0.56 in light, so white on it measures 4.58:1 |
@@ -310,7 +310,7 @@ Not taken from the paste: `--spacing` (it rescales every utility), `--font-serif
 - **Pressed Surface** (`--surface-2`): one step past the field surface, for a selected thing under the pointer only. It measures 1.22:1 against paper in both schemes and every state role keeps at least 5:1 on it (the floor is refused at 5.12:1 in dark). Never a third step, never a zone.
 - **Popover** (`--popover`): the one raised layer's ground (dialogs, sheets, menus, popovers, tooltips): white in light, 0.1822 in dark.
 - **Muted Grey** (`--muted`, as `text-muted-foreground`): labels, metadata lines, stages not reached or not needed, the `$` of a command line, `Assisted-by` lines. At least 4.6:1 on every ground.
-- **Hairline** (`--rule`): every border and rule, and the underline of links in running text.
+- **Hairline** (`--rule`): every border and rule, and the underline of links in running text. At least 1.15:1 on paper and on the field surface in both schemes, so a surface box's border shows.
 - **Control Border** (`--input`): a form control's border at 3:1 on paper and on the surface (3.7:1 and 3.2:1 in light, 3.6:1 and 3.2:1 in dark).
 - **Skeleton Stroke** (`--skeleton`): the outlined bars of a placeholder row or fact (1.6:1 in light, 1.8:1 in dark), with no fill.
 - **Strong Rule** (`--rule-strong`, ink): the 2 px underline of the current tab or filter.

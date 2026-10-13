@@ -22,7 +22,9 @@
   test/tokens.test.ts holds: --muted 0.551 to 0.5 (4.5:1 on the surface),
   --primary 0.6333 to 0.56 in light (white on it at 4.5:1), --refused
   0.5624 to 0.49 in light and 0.6368 to 0.68 in dark (5:1 on the pressed
-  surface). --surface-2, --input and --skeleton are new steps in the
+  surface), --rule 0.9251 to 0.87 in light (the paste's border equals its
+  muted, so a hairline vanished on the surface; now 1.19:1 there and
+  1.38:1 on paper). --surface-2, --input and --skeleton are new steps in the
   palette's own hues, measured the same way.
 
   Colour carries state and nothing else, always beside a word and a mark:
@@ -44,14 +46,17 @@
   never reads as a refusal or an addition as a landing.
 
   Light and dark follow the system setting (no toggle, no script, no flash):
-  shadcn's `dark:` variant is the media query, not a class.
+  shadcn's `dark:` variant is the media query, not a class, until issue 14
+  adds ADR 0042's preference and attribute.
 */
 @custom-variant dark (@media (prefers-color-scheme: dark));
 
 /*
   The faces: IBM Plex Sans (variable, 100 to 700) for the UI and IBM Plex
   Mono for what a terminal prints, both from fontsource, latin and
-  latin-ext only, with fontsource's own unicode ranges, so a page fetches
+  latin-ext only, with fontsource's own unicode ranges (copied from each
+  package's unicode.json, so this file stays the one place a face is
+  declared; check them when the packages move), so a page fetches
   the latin file alone unless it sets an accented letter. Mono comes at the
   three weights the UI sets it in (400, 500, 600).
 
@@ -202,7 +207,7 @@
      (DESIGN.md "Pressed Surface"); every state role keeps 5:1 on it. */
   --surface-2: oklch(0.91 0.0071 88.645);
   --muted: oklch(0.5 0.0234 264.3637);
-  --rule: oklch(0.9251 0.0071 88.645);
+  --rule: oklch(0.87 0.0071 88.645);
   --rule-strong: var(--foreground);
 
   /* State roles: text-safe on paper, on surface and on surface-2 (at least 5:1). */

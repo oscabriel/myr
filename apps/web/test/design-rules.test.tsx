@@ -20,8 +20,13 @@ const sources: Readonly<Record<string, string>> = import.meta.glob(
   { eager: true, import: "default", query: "?raw" }
 );
 
-/** A small, tracked line above a headline, by any of its usual names. */
-const EYEBROW = /eyebrow|kicker|overline/giu;
+/**
+ * A small, tracked line above a headline, by any of its usual names, as a
+ * whole word or one part of an identifier (`SectionEyebrow`, `hero-kicker`,
+ * `KICKER`), never inside a longer word such as "kickers".
+ */
+const EYEBROW =
+  /(?<![A-Za-z])(?:eyebrow|kicker|overline|EYEBROW|KICKER|OVERLINE)(?![A-Za-z])|(?<![A-Z])(?:Eyebrow|Kicker|Overline)(?![a-z])/gu;
 
 const eyebrowsIn = (source: string) =>
   [...source.matchAll(EYEBROW)].map(([name]) => name);
@@ -32,13 +37,25 @@ const EDGE_COLOURS =
 const thickEdge =
   /(?<![\w-])(?:[\w-]+:)*border-(?<edge>[lrtbse])-(?<width>\d+|\[[\d.]+(?:px|rem)\])(?![\w-])/gu;
 
+/** A state or primary colour as a class's name or an arbitrary `var(--…)`. */
+const EDGE_COLOUR = `(?:(?:${EDGE_COLOURS})(?:/\\d+)?|\\[(?:color:)?var\\(--(?:${EDGE_COLOURS})\\)\\])`;
+
 const colouredEdge = new RegExp(
-  `(?<![\\w-])(?:[\\w-]+:)*border-(?<edge>[lrtbse])-(?:${EDGE_COLOURS})(?:/\\d+)?(?![\\w-])`,
+  `(?<![\\w-])(?:[\\w-]+:)*border-(?<edge>[lrtbse])-${EDGE_COLOUR}(?![\\w-])`,
   "gu"
 );
 
 const colouredBorder = new RegExp(
-  `(?<![\\w-])(?:[\\w-]+:)*border-(?:${EDGE_COLOURS})(?:/\\d+)?(?![\\w-])`,
+  `(?<![\\w-])(?:[\\w-]+:)*border-${EDGE_COLOUR}(?![\\w-])`,
+  "u"
+);
+
+/** An inset shadow offset past a hairline on one axis, the other way to draw a strip. */
+const insetStrip =
+  /(?<![\w-])(?:[\w-]+:)*shadow-\[inset_(?<x>-?[\d.]+)(?:px)?_(?<y>-?[\d.]+)(?:px)?[^\]]*\]/gu;
+
+const stateColour = new RegExp(
+  `var\\(--(?:${EDGE_COLOURS})\\)|(?<![\\w-])(?:[\\w-]+:)*shadow-(?:${EDGE_COLOURS})(?![\\w-])`,
   "u"
 );
 
@@ -52,7 +69,9 @@ const pixels = (width: string) => {
 /**
  * A fingernail: one edge of a card, row or panel drawn thicker than a
  * hairline in a state's colour or the primary's, in the same string of
- * classes or on the same edge anywhere in the file.
+ * classes or on the same edge anywhere in the file; or an inset shadow
+ * offset past a hairline in such a colour. A `before:` pseudo-element drawn
+ * as a strip is left to review.
  */
 const fingernailsIn = (source: string) => {
   const literals = source.match(/"[^"]*"|'[^']*'|`[^`]*`/gu) ?? [];
@@ -61,14 +80,22 @@ const fingernailsIn = (source: string) => {
     [...source.matchAll(colouredEdge)].map(({ groups }) => groups?.edge)
   );
 
-  return literals.flatMap((literal) =>
-    [...literal.matchAll(thickEdge)].flatMap(({ 0: found, groups }) =>
+  return literals.flatMap((literal) => [
+    ...[...literal.matchAll(thickEdge)].flatMap(({ 0: found, groups }) =>
       pixels(groups?.width ?? "0") > 1 &&
       (coloured.has(groups?.edge) || colouredBorder.test(literal))
         ? [found]
         : []
-    )
-  );
+    ),
+    ...[...literal.matchAll(insetStrip)].flatMap(({ 0: found, groups }) =>
+      Math.max(
+        Math.abs(Number(groups?.x ?? 0)),
+        Math.abs(Number(groups?.y ?? 0))
+      ) > 1 && stateColour.test(literal)
+        ? [found]
+        : []
+    ),
+  ]);
 };
 
 const spacing = (name: string) =>
@@ -220,13 +247,25 @@ describe("the overrides' two Don'ts", () => {
       )
     ).toStrictEqual(["Eyebrow", "kicker", "overline"]);
     expect(
+      eyebrowsIn("// the kickers kicked; overlined and Overlines are words")
+    ).toStrictEqual([]);
+    expect(
       fingernailsIn(
         '"border-l-4 border-l-landed" "border-t-2 border-refused" "md:border-l-[3px] border-l-primary/60"'
       )
     ).toStrictEqual(["border-l-4", "border-t-2", "md:border-l-[3px]"]);
     expect(
       fingernailsIn(
-        '"border-b-2 border-rule-strong" "border-t border-t-refused" "border-l-2 border-rule"'
+        '"border-l-4 border-l-[var(--landed)]" "shadow-[inset_4px_0_0_var(--waiting)]" "hover:shadow-[inset_0_-3px_0] shadow-primary"'
+      )
+    ).toStrictEqual([
+      "border-l-4",
+      "shadow-[inset_4px_0_0_var(--waiting)]",
+      "hover:shadow-[inset_0_-3px_0]",
+    ]);
+    expect(
+      fingernailsIn(
+        '"border-b-2 border-rule-strong" "border-t border-t-refused" "border-l-2 border-rule" "shadow-[inset_0_-2px_0_var(--rule-strong)]" "shadow-[inset_0_0_0_1px_var(--refused)]"'
       )
     ).toStrictEqual([]);
   });

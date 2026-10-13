@@ -199,6 +199,13 @@ describe.each(["light", "dark"] as const)("the %s scheme", (scheme) => {
     expect(contrast(scheme, "input", "surface")).toBeGreaterThanOrEqual(3);
   });
 
+  // A hairline borders surface boxes (the command line, every `pre`) as
+  // well as cards on paper, so it must be seen on both grounds.
+  it("draws a hairline at 1.15:1 on paper and on the surface", () => {
+    expect(contrast(scheme, "rule", "background")).toBeGreaterThanOrEqual(1.15);
+    expect(contrast(scheme, "rule", "surface")).toBeGreaterThanOrEqual(1.15);
+  });
+
   it("strokes a skeleton at 1.5:1 on paper, so a placeholder can be seen", () => {
     expect(contrast(scheme, "skeleton", "background")).toBeGreaterThanOrEqual(
       1.5
@@ -283,7 +290,6 @@ const SAGE_GARDEN = {
     card: "1.0000 0 0",
     foreground: "0.2417 0.0298 269.8827",
     popover: "1.0000 0 0",
-    rule: "0.9251 0.0071 88.6450",
     secondary: "0.8596 0.0291 119.9919",
     surface: "0.9251 0.0071 88.6450",
   },
@@ -301,6 +307,7 @@ const SAGE_NUDGED = {
     muted: "0.5510 0.0234 264.3637",
     primary: "0.6333 0.0309 154.9039",
     refused: "0.5624 0.1743 26.1433",
+    rule: "0.9251 0.0071 88.6450",
   },
 } as const;
 
