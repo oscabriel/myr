@@ -96,11 +96,13 @@ describe("a sandbox job", () => {
         expect([
           spans.map(({ name }) => name),
           Object.fromEntries(spans[0]?.attributes ?? []),
+          Object.fromEntries(spans[1]?.attributes ?? []),
           spans[1]?.exceptions,
         ]).toStrictEqual([
           [ROOT, "Checker.check"],
           { project, sha },
-          [{ name: "VerifierBlocked" }],
+          { failure: "VerifierBlocked" },
+          [],
         ]);
       })
   );

@@ -114,7 +114,7 @@ describe("the spans bridge", () => {
   );
 
   it.effect(
-    "records a typed failure by its tag alone, and a defect by its name, message and stack, scrubbed",
+    "keeps a typed failure's tag as an attribute, never an exception workerd would log as an error, and records a defect by its name, message and stack, scrubbed",
     () =>
       Effect.gen(function* () {
         const secret = "tok_0123456789abcdef0123456789abcdef";
@@ -146,9 +146,11 @@ describe("the spans bridge", () => {
 
         const [, refused, defect] = spans;
 
-        expect(refused?.exceptions).toStrictEqual([
-          { name: "VerifierBlocked" },
-        ]);
+        expect(refused?.exceptions).toStrictEqual([]);
+        expect(Object.fromEntries(refused?.attributes ?? [])).toStrictEqual({
+          failure: "VerifierBlocked",
+        });
+        expect(Object.fromEntries(defect?.attributes ?? [])).toStrictEqual({});
         expect(
           defect?.exceptions.map(({ message, name }) => ({ message, name }))
         ).toStrictEqual([
