@@ -82,7 +82,7 @@ const ledger = Schema.decodeSync(Ledger)({
 });
 
 /** The Visibility tab as an environment test reads it, beside a ledger with nothing held back. */
-const tabWith = (schema: EnvSchemaView | undefined, at: DateTime.Utc = now) => (
+const tabWith = (schema?: EnvSchemaView, at: DateTime.Utc = now) => (
   <VisibilityView env={schema} ledger={ledger} now={at} />
 );
 
