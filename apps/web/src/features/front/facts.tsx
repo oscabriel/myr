@@ -1,7 +1,5 @@
-import { installCommand } from "@repo/agent-kit/install";
 import { Brand } from "@repo/brand";
 import type { Ask, AskListing } from "@repo/protocol/domain/ask";
-import type { ProjectListing } from "@repo/protocol/domain/front-page";
 import type { AskId, ProjectName } from "@repo/protocol/ids";
 import type { Posture } from "@repo/protocol/posture";
 import { ArrowRight } from "lucide-react";
@@ -15,7 +13,7 @@ import {
   TerritoryFacts,
 } from "../shared/facts.tsx";
 import { AppLink } from "../shared/link.tsx";
-import { askPath, projectPath } from "../shared/paths.ts";
+import { askPath } from "../shared/paths.ts";
 import { MetaCode } from "../shared/row.tsx";
 import { FactsSkeleton } from "../shared/skeleton.tsx";
 import { StatusLine } from "../shared/status-line.tsx";
@@ -61,51 +59,8 @@ export const ForAgents = ({ href }: { readonly href: string }) => (
   </p>
 );
 
-export const StartHere = ({ webUrl }: { readonly webUrl: string }) => (
-  <FactBlock label="Take an ask">
-    <Step command={installCommand(webUrl)} label="Install the command line" />
-    <Step command={`${Brand.cli} front`} label="List every open ask" />
-    <Step
-      command={`${Brand.cli} claim <ask> --project <owner>/<name>`}
-      label="Claim one you may take"
-    />
-    <ForAgents href="/llms.txt" />
-  </FactBlock>
-);
-
 export const plural = (count: number, one: string, many: string) =>
   `${count} ${count === 1 ? one : many}`;
-
-export const ProjectsFacts = ({
-  projects,
-}: {
-  readonly projects: readonly ProjectListing[] | undefined;
-}) =>
-  projects === undefined ? (
-    <FactsSkeleton labels={["Projects"]} />
-  ) : (
-    <FactBlock label="Projects">
-      <ul className="flex flex-col">
-        {projects.map((listing) => (
-          <li
-            className="flex min-h-8 min-w-0 items-baseline justify-between gap-3 py-1"
-            data-project={listing.project}
-            key={listing.project}
-          >
-            <AppLink
-              className="text-ui decoration-rule truncate font-semibold no-underline hover:underline"
-              to={projectPath(listing.project)}
-            >
-              {listing.project}
-            </AppLink>
-            <span className="text-label text-muted-foreground shrink-0 tabular-nums">
-              {plural(listing.openAsks, "open ask", "open asks")}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </FactBlock>
-  );
 
 const whoMayTake = (
   listing: AskListing,

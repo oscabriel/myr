@@ -1,6 +1,7 @@
 import { Brand } from "@repo/brand";
 import type { ProjectEvent } from "@repo/protocol/domain/event";
 
+import { pushCommand } from "./install.ts";
 import { refusalCatalog } from "./refusals.ts";
 import { code, table } from "./text.ts";
 
@@ -8,7 +9,7 @@ const cli = (...words: readonly string[]) => [Brand.cli, ...words].join(" ");
 
 const notesRef = `refs/notes/${Brand.slug}`;
 
-export const pushAnswer = () => code(`git push ${Brand.slug} HEAD:main`);
+export const pushAnswer = () => code(pushCommand);
 
 const signIn = (reason: string) => `${reason}; sign in with ${cli("login")}`;
 

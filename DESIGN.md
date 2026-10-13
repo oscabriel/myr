@@ -123,6 +123,7 @@ spacing:
   column-tree: "17.5rem"
   column-docs-nav: "15rem"
   column-docs-toc: "13.75rem"
+  column-filters: "15rem"
   measure: "72ch"
   top-bar: "3.5rem"
   toolbar: "2.5rem"
@@ -376,7 +377,7 @@ Every route names exactly one shell in its `staticData` (`shell: "site" | "proje
 
 | Shell | Routes | Container | Header | Side columns |
 | --- | --- | --- | --- | --- |
-| `site` | `/`, `/explore`, `/asks`, `/install`, `/privacy`, `/terms` | centred, `--container-site` (1360 px), `--gutter-site` (32 px) | framed top bar | none |
+| `site` | `/`, `/explore`, `/asks`, `/install`, `/privacy`, `/terms` | centred, `--container-site` (1360 px), `--gutter-site` (32 px) | framed top bar | only the filters on `/asks` (`--column-filters`, 240 px), left of the list |
 | `project` | `/:owner/:project/**`, `/inbox`, `/settings`, `/people/:handle` | fluid to `--container-project` (1600 px), `--gutter-project` (28 px) | full-bleed top bar, then the page header | only the about column on Overview (`--column-about`, 340 px) and the file tree on Code (`--column-tree`, 280 px) |
 | `docs` | `/docs/**` | centred, `--container-site` (1360 px) | the site's top bar | nav tree `--column-docs-nav` (240 px), the article at `--measure` (72ch), "on this page" `--column-docs-toc` (220 px) |
 | `focus` | sign-in, MCP consent, new project, new proposal | a centred card, `--container-focus` (400 px) | the wordmark only | none |
@@ -388,7 +389,7 @@ From `columns` (1100 px, `--breakpoint-columns`) a side column stands beside its
 **The four rules (ADR 0041):**
 
 - **No global left rail.** The project list moves to Explore and the account menu; a project's navigation is its tabs.
-- **No generic right rail.** A side column exists only where it holds facts about what is on screen (a project's about column, a doc's headings), 220 to 340 px wide, and stacks under 1100 px.
+- **No generic right rail.** A side column exists only where it holds facts about what is on screen (a project's about column, a doc's headings), 220 to 340 px wide, and stacks under 1100 px. The asks board's filters are the one column that is not facts: they narrow the list beside them, and stand above it under 1100 px.
 - **A command at most once per screen.** As content, a command sits in a popover, a single strip or a card. Never a column of code blocks.
 - **Prose stops at 72 to 80ch.** Lists and tables run to the container; prose, a README and a doc's article stop at `--measure` (72ch).
 
@@ -445,6 +446,14 @@ Square. The radius is 2 px (`--radius: 0.125rem`), and shadcn's base-lyra compon
 - **States:** hover is the surface at half strength; focus is the 2 px sage outline inside the row; never a coloured edge. A click on the want navigates. An ask's standing is read in this order: held for newcomers first ("Held for newcomers"), then open to take, then "Not open to you" only for a viewer the policy refuses with no reserve on the ask. One ask has one state word on every page.
 - **Group header:** 32 px, sticky under the toolbar, paper fill, a hairline below: the group's name at 600 as a link, its facts (a project's posture, once per group, never per row), its counts at the end in label type ("7 open · 6 to take").
 - **Data:** every `data-*` a list carries sits on the row's `<li>` (`data-ask`, `data-takeable`, `data-project`, `data-decision`, `data-soon`, `data-entry`, `data-fork`), and `data-list-key` on its link for `j` and `k`.
+
+### The asks board (`/asks`)
+
+- **Shape:** the page's title and its one line, then one strip, then the filters in `--column-filters` on the left and the list running to the container on the right. Under 1100 px the filters stand above the list, their three groups side by side from `tablet`.
+- **Strip:** "How to take an ask", a plain bordered card with three numbered steps, each a `CommandLine` (claim, check, push), and a line onward to Install and `llms.txt`. A ghost X button dismisses it; the dismissal is kept in `localStorage`, never a cookie, and "How to take an ask" at the foot of the filters brings it back. The server always draws it, so a reader who dismissed it sees it go once the page reads the storage.
+- **Filters:** a `nav` landmark ("Filter the asks") of three groups, Kind, State (who may take it: any, open to take, held for newcomers or for people) and Project, each a list of links with its count, the current one on the field surface at 600 with `aria-current="page"`. Every filter is an address (`/asks?kind=fix&take=open`), each link keeps the other filters, and "Reset filters" shows once one is set. Sticky under the top bar from 1100 px.
+- **List:** rows in a `RowGroup` per project, sticky under the top bar; a migrate family is its parent row with the family fan, its children listed under it.
+- **Open asks only:** the board lists the asks still open, as the `frontPage` contract gives them, so it has no filter to show landed asks. Listing those needs a read of landed asks across every project, which no contract gives yet.
 
 ### Copy action (`CopyAction`, `CommandChip`) and command line (`CommandLine`)
 

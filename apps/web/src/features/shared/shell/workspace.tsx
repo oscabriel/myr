@@ -24,7 +24,11 @@ export interface WorkspaceProps {
   readonly factsHeading?: string;
   readonly factsSummary?: ReactNode;
   readonly factsKey?: string;
-  readonly variant?: "code" | "document" | "list";
+  /**
+   * `board` is a list that runs to its shell's container, beside its own
+   * filters (the asks board); its head still stops at the measure.
+   */
+  readonly variant?: "board" | "code" | "document" | "list";
   readonly children: ReactNode;
 }
 
@@ -120,6 +124,7 @@ const WorkspaceView = ({
 }) => {
   const hasFacts = facts !== undefined && facts !== null;
   const code = variant === "code";
+  const board = variant === "board";
   const focus = useShellFrame() === "focus";
 
   return (
@@ -175,7 +180,7 @@ const WorkspaceView = ({
         )}
         <div
           className={`flex flex-1 flex-col gap-8 pb-16 ${
-            code ? "" : `${GUTTER} ${MEASURE}`
+            code ? "" : `${GUTTER} ${board ? "" : MEASURE}`
           } ${toolbar === undefined ? "" : "pt-6"}`}
         >
           {children}

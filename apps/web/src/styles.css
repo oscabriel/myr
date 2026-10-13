@@ -358,6 +358,8 @@
   docs     the site's container: a 240 px nav tree, the article at the
            measure, a 220 px "on this page"
   focus    one 400 px card
+  filters  the asks board's filters (240 px), the one side column in the
+           site, left of the list
   measure  prose stops at 72ch (DESIGN.md allows 72 to 80ch; 72 is the
            docs article's cap, so one measure serves every page)
 
@@ -377,6 +379,7 @@
   --column-tree: 17.5rem;
   --column-docs-nav: 15rem;
   --column-docs-toc: 13.75rem;
+  --column-filters: 15rem;
   --gutter-site: 2rem;
   --gutter-project: 1.75rem;
   --measure: 72ch;
