@@ -53,9 +53,34 @@ bun run bootstrap -- --stage dev-<you>   # makes the stage's resources; deletes 
 bun run deploy -- --stage dev-<you>      # runs verify, deploys the three Workers, runs smoke
 ```
 
-Smoke ends by reading the stage's Workers Logs through Cloudflare's SQL API, and fails on any exception or error-level line logged since the first upload, naming each Worker and its count, so the token needs Account Analytics Read.
-
 [AGENTS.md](AGENTS.md) covers secrets, smoke, seeding, releases and teardown, and its principles table names the check that holds each rule.
+
+### Observability
+
+Each stage keeps, for every invocation of all three Workers and unsampled:
+
+- **Logs**: one JSON object per line, its ids (`project`, `requestId`, `lane` and the rest) fields to filter on, in Workers Logs. A typed refusal is the product working and is never logged as an error; a defect is logged once, at error level, with its stack.
+- **Issues**: exceptions, failed invocations and error-level lines, grouped; each line keeps its ids.
+- **Traces**, in the sandbox and the web. The platform's are off: the runtime's own spans would record each Project Durable Object statement's bound values (layer rows and sealed values among them) and each fetch's full URL. Turning them on needs the maintainer's sign-off.
+- **Source maps**, uploaded by each deploy. Cloudflare remaps an uncaught exception's stack with them, but a defect the platform reports itself is logged as thrown, minified, and by its name and frames alone, never its text. To read its frames, build the deployed commit's map with `bunx wrangler deploy --dry-run --outdir <dir> --env <stage>` in `apps/platform`.
+- **Metrics**: landings, refusals by tag and stage, checked lanes, the wait before checks and draft rounds, written by the platform's `METRICS` binding to the stage's Workers Analytics Engine dataset, `metrics_<stage>` with `_` for `-`. `packages/project/src/metrics/binding.ts` lays out its columns.
+
+A Checker container's own logs are off, since held-back checks run there; the Lander's are on. Nothing logged, traced or counted names a layer, a held-back check, a path or a value (principle 7).
+
+Read them in the dashboard, under each Worker's Observability tab and under Issues, or through the SQL API with `bun run ops`. Its token needs Account › Account Analytics › Read, and so does smoke: after a deploy it fails on any exception or error-level line the stage's Workers logged since the first upload, naming each Worker and its count.
+
+```sh
+# Errors by Worker since an instant
+bun run ops -- analytics sql post --scope-account-tag <account id> \
+  --time-range-start 2026-10-13T00:00:00Z \
+  --query "SELECT scriptName, count() AS errors FROM logs.workersLogs WHERE scriptName IN ('platform-demo', 'sandbox-demo', 'web-demo') AND (level = 'error' OR error != '') GROUP BY scriptName"
+
+# Refusals by tag and stage
+bun run ops -- analytics sql post --scope-account-tag <account id> \
+  --query "SELECT blob2 AS tag, blob3 AS stage, count() AS refusals FROM events.analyticsEngine.\"metrics_demo\" WHERE blob1 = 'Refused' GROUP BY tag, stage ORDER BY refusals DESC"
+```
+
+`bun run ops -- analytics sql introspection get --account-tag <account id> --include-columns --include-wae` lists the datasets and their columns.
 
 ### Alerts
 
