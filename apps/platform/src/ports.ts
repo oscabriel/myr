@@ -19,6 +19,7 @@ import { LanderIsogit } from "@repo/project/lander/isogit";
 import { FinishersFromChecks } from "@repo/project/project";
 import type { Projection } from "@repo/project/projection";
 import { FrontPageD1 } from "@repo/project/projection-d1/front-page";
+import { ProjectDescriptionsD1 } from "@repo/project/projection-d1/descriptions";
 import { StandingPosturesD1 } from "@repo/project/projection-d1/postures";
 import { ProjectionD1 } from "@repo/project/projection-d1/projection";
 import { ProjectionMemory } from "@repo/project/projection/memory";
@@ -76,7 +77,12 @@ const corePorts = (config: PlatformConfig): Layer.Layer<WorkerPorts> =>
     memoryFrontPage,
     // The D1 cartridge: delete this entry and the platform falls back to the memory
     // front page.
-    Layer.mergeAll(FrontPageD1, ProjectionD1, StandingPosturesD1).pipe(
+    Layer.mergeAll(
+      FrontPageD1,
+      ProjectionD1,
+      StandingPosturesD1,
+      ProjectDescriptionsD1
+    ).pipe(
       Layer.provide(D1Client.layer({ db: config.FRONT_PAGE })),
       Layer.orDie
     ),

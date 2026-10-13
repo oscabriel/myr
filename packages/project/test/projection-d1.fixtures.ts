@@ -9,6 +9,8 @@ export const projectsMigration = "0004_projects_credits.sql";
 
 export const posturesMigration = "0005_standing_postures.sql";
 
+export const descriptionsMigration = "0007_project_descriptions.sql";
+
 export const migration = (file: string) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;

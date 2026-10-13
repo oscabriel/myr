@@ -16,6 +16,7 @@ import { FrontPage } from "@repo/project/front-page";
 import { GatewayUrl } from "@repo/project/project";
 import type { ProjectApi } from "@repo/project/project";
 import { Projects } from "@repo/project/projects";
+import { withDescriptions } from "@repo/project/description";
 import { withStandingPosture } from "@repo/project/standing-posture";
 import { Contracts, EnvSchemaOf } from "@repo/protocol/contracts";
 import type { AnswerView } from "@repo/protocol/domain/answer";
@@ -276,6 +277,14 @@ export const Handlers: Layer.Layer<
         frontPage.projects().pipe(
           Effect.flatMap(withStandingPosture),
           Effect.provideService(Projects, projects),
+          Effect.flatMap((listed) =>
+            withDescriptions(listed, (project) =>
+              Effect.map(projects.get(project), (api) =>
+                codeProjectOf(api, project)
+              )
+            )
+          ),
+          Effect.provideService(RepoHost, host),
           Effect.map((listed) => ({ projects: listed }))
         ),
       listRefs: ({ project }) => code(project, refsOf),
