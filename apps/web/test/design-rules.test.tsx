@@ -135,6 +135,7 @@ const LAYOUT = [
   "measure",
   "top-bar",
   "toolbar",
+  "tabs",
 ] as const;
 
 /** Every class the shell draws at an address, the page itself left empty. */

@@ -3,7 +3,61 @@ import { Option } from "effect";
 
 import { segmentsOf } from "../paths.ts";
 
+/** A project's eight tabs (ADR 0041), in the header's order. */
 export type ProjectTab =
+  | "asks"
+  | "code"
+  | "landings"
+  | "overview"
+  | "people"
+  | "policy"
+  | "proposals"
+  | "visibility";
+
+export interface Section {
+  readonly label: string;
+  readonly tab: ProjectTab;
+  readonly to: string;
+  /** A tab whose own page has not been built yet opens the region of Overview that holds it. */
+  readonly hash?: string;
+}
+
+/**
+ * Each tab opens a page that exists today: Asks and People open their
+ * regions of Overview, Proposals the page that starts one, Policy the
+ * policy at the address it has always had, and Visibility the ledger.
+ */
+export const projectSections = (project: string): readonly Section[] => [
+  { label: "Overview", tab: "overview", to: `/${project}` },
+  { label: "Code", tab: "code", to: `/${project}/tree/main` },
+  { hash: "open-asks", label: "Asks", tab: "asks", to: `/${project}` },
+  { label: "Landings", tab: "landings", to: `/${project}/commits/main` },
+  { label: "Proposals", tab: "proposals", to: `/${project}/proposals/new` },
+  { hash: "who-decides", label: "People", tab: "people", to: `/${project}` },
+  { label: "Policy", tab: "policy", to: `/${project}/people` },
+  { label: "Visibility", tab: "visibility", to: `/${project}/ledger` },
+];
+
+/** The tab each page of a project sits under, by its first segment. */
+const TAB_OF = {
+  answers: "landings",
+  asks: "asks",
+  blob: "code",
+  commit: "landings",
+  commits: "landings",
+  decisions: "asks",
+  env: "visibility",
+  ledger: "visibility",
+  people: "policy",
+  proposals: "proposals",
+  raw: "code",
+  refs: "code",
+  tree: "code",
+  why: "code",
+} as const satisfies Record<string, ProjectTab>;
+
+/** A crumb names the page itself, which may be narrower than its tab. */
+type PageSection =
   | "code"
   | "env"
   | "landings"
@@ -12,21 +66,16 @@ export type ProjectTab =
   | "people"
   | "refs";
 
-export interface Section {
-  readonly label: string;
-  readonly tab: ProjectTab;
-  readonly to: string;
-}
-
-export const projectSections = (project: string): readonly Section[] => [
-  { label: "Asks", tab: "overview", to: `/${project}` },
-  { label: "Code", tab: "code", to: `/${project}/tree/main` },
-  { label: "Landings", tab: "landings", to: `/${project}/commits/main` },
-  { label: "Refs", tab: "refs", to: `/${project}/refs` },
-  { label: "Policy", tab: "people", to: `/${project}/people` },
-  { label: "Ledger", tab: "ledger", to: `/${project}/ledger` },
-  { label: "Env shape", tab: "env", to: `/${project}/env` },
-];
+const PAGE_TO = (project: string) =>
+  ({
+    code: `/${project}/tree/main`,
+    env: `/${project}/env`,
+    landings: `/${project}/commits/main`,
+    ledger: `/${project}/ledger`,
+    overview: `/${project}`,
+    people: `/${project}/people`,
+    refs: `/${project}/refs`,
+  }) as const satisfies Record<PageSection, string>;
 
 const SECTION_OF = {
   answers: "overview",
@@ -40,7 +89,7 @@ const SECTION_OF = {
   refs: "refs",
   tree: "code",
   why: "code",
-} as const satisfies Record<string, ProjectTab>;
+} as const satisfies Record<string, PageSection>;
 
 const SITE = new Set([
   "agents",
@@ -64,7 +113,22 @@ const addressOf = (pathname: string) => {
 export const projectOf = (pathname: string): string | undefined =>
   addressOf(pathname)?.spelled;
 
-const sectionOf = (pathname: string): ProjectTab | undefined => {
+/** The tab a project's page sits under; Overview for the project's own address. */
+export const projectTabOf = (pathname: string): ProjectTab | undefined => {
+  const address = addressOf(pathname);
+
+  if (address === undefined) {
+    return undefined;
+  }
+
+  const [page] = address.rest;
+
+  return page === undefined
+    ? "overview"
+    : Object.entries(TAB_OF).find(([segment]) => segment === page)?.[1];
+};
+
+const sectionOf = (pathname: string): PageSection | undefined => {
   const address = addressOf(pathname);
 
   if (address === undefined) {
@@ -92,22 +156,21 @@ const SECTION_LABEL = {
   overview: "Asks",
   people: "Policy",
   refs: "Refs",
-} as const satisfies Record<ProjectTab, string>;
+} as const satisfies Record<PageSection, string>;
 
 const sectionCrumb = (
   project: string,
-  tab: ProjectTab,
+  tab: PageSection,
   below: boolean
 ): Crumb => {
   const label = SECTION_LABEL[tab];
-  const section = projectSections(project).find((each) => each.tab === tab);
 
-  return below && section !== undefined ? { label, to: section.to } : { label };
+  return below ? { label, to: PAGE_TO(project)[tab] } : { label };
 };
 
 const projectCrumbs = (
   project: string,
-  tab: ProjectTab,
+  tab: PageSection,
   below: boolean
 ): readonly Crumb[] => [
   { label: project, to: `/${project}` },

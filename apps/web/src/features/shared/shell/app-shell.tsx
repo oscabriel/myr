@@ -12,28 +12,17 @@ import { GUTTER } from "./gutter.ts";
 import { LazyOverlays } from "./lazy-overlays.ts";
 import { ShellNameContext, useShellName } from "./shells.ts";
 import type { ShellName } from "./shells.ts";
-import { SideColumnOutlet, useSideColumn } from "./side-column.tsx";
 import { TopBar } from "./top-bar.tsx";
 
 /**
- * A project page's side column, beside its main column from `columns`.
- * Below it the column is hidden rather than stacked: the Files button's
- * sheet is the file tree's narrow form until issue 04 decides the Code tab.
+ * The project's container. A project's own pages draw their header and
+ * side column inside it, from the project's route (`ProjectFrame`).
  */
-const ProjectFrame = ({ children }: { readonly children: ReactNode }) => {
-  const column = useSideColumn() !== undefined;
-
-  return (
-    <div className="max-w-project mx-auto flex w-full flex-1">
-      {column ? (
-        <div className="border-rule columns:flex sticky top-(--top-bar) hidden h-[calc(100dvh-var(--top-bar))] w-(--column-tree) shrink-0 flex-col border-r">
-          <SideColumnOutlet />
-        </div>
-      ) : null}
-      <div className="flex min-w-0 flex-1 flex-col">{children}</div>
-    </div>
-  );
-};
+const ProjectContainer = ({ children }: { readonly children: ReactNode }) => (
+  <div className="max-w-project mx-auto flex w-full flex-1 flex-col">
+    {children}
+  </div>
+);
 
 /** The article first, so it is read first; from `columns` the tree stands to its left. */
 const DocsFrame = ({ children }: { readonly children: ReactNode }) => (
@@ -56,7 +45,7 @@ const FRAMES = {
       {children}
     </div>
   ),
-  project: ProjectFrame,
+  project: ProjectContainer,
   site: ({ children }: { readonly children: ReactNode }) => (
     <div className="max-w-site mx-auto flex w-full flex-1 flex-col">
       {children}

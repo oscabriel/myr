@@ -126,6 +126,7 @@ spacing:
   measure: "72ch"
   top-bar: "3.5rem"
   toolbar: "2.5rem"
+  tabs: "2.75rem"
   row-phone: "88px"
 components:
   top-bar:

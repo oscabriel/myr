@@ -1,9 +1,10 @@
 import { Client, PolicyOf } from "@repo/protocol/contracts";
 import { Ask, AskListing } from "@repo/protocol/domain/ask";
-import { FileView, TreeListing } from "@repo/protocol/domain/code";
+import { FileView, TagName, TreeListing } from "@repo/protocol/domain/code";
 import { ProjectEvent } from "@repo/protocol/domain/event";
 import { Ledger } from "@repo/protocol/domain/visibility";
-import { ProjectName } from "@repo/protocol/ids";
+import { Handle, ProjectName } from "@repo/protocol/ids";
+import { Posture } from "@repo/protocol/posture";
 import { UnknownProject } from "@repo/protocol/refusal";
 import { notFound } from "@tanstack/react-router";
 import {
@@ -17,7 +18,9 @@ import {
 } from "effect";
 
 import { wantsMarkdown } from "../features/ask/markdown.ts";
-import { familiesIn } from "../features/front/families.ts";
+import { familiesIn, stillWaiting } from "../features/front/families.ts";
+import { ledeOf } from "../features/front/head.ts";
+import { openAsks, openToTake } from "../features/project/asks.tsx";
 import { variedByAccept } from "../features/front/markdown.ts";
 import { readFolderWithReadme } from "./folder.ts";
 import { projectLlmsHandler } from "./llms.ts";
@@ -121,6 +124,113 @@ export const readProjectPage = (name: string) =>
       }),
       now: yield* DateTime.now,
       parents: Arr.getSomes(parents),
+      project,
+    }).pipe(Effect.orDie);
+  }).pipe(Effect.catchTag("NoSuchElementError", () => Effect.fail(notFound())));
+
+/**
+ * What a project's header says on every one of its pages: only the facts it
+ * shows, so the header's read stays small in each page's HTML.
+ */
+export const ProjectHeaderData = Schema.Struct({
+  deciders: Schema.optionalKey(Schema.Array(Handle)),
+  landedAt: Schema.optionalKey(Schema.DateTimeUtcFromString),
+  latestTag: Schema.optionalKey(TagName),
+  lede: Schema.optionalKey(Schema.String),
+  now: Schema.DateTimeUtcFromString,
+  open: Schema.optionalKey(
+    Schema.Struct({ asks: Schema.Int, takeable: Schema.Int })
+  ),
+  posture: Schema.optionalKey(
+    Schema.Struct({ label: Schema.String, posture: Posture })
+  ),
+  project: ProjectName,
+});
+
+export type ProjectHeaderData = typeof ProjectHeaderData.Type;
+
+const byNewest = (a: TagName, b: TagName) =>
+  b.localeCompare(a, "en", { numeric: true });
+
+const onlySome = <K extends string, A>(key: K, read: Option.Option<A>) =>
+  Option.match(read, {
+    onNone: () => ({}),
+    onSome: (value) => ({ [key]: value }) as Record<K, A>,
+  });
+
+/**
+ * Every read at once and none waiting on another, beside the page's own
+ * reads: the asks it counts, the ledger's posture, who decides, the newest
+ * tag, main's last landing and the README's first sentence.
+ */
+export const readProjectHeader = (name: string) =>
+  Effect.gen(function* () {
+    const project = yield* Effect.fromOption(decodeName(name));
+    const client = yield* Client;
+
+    const read = yield* Effect.all(
+      {
+        asks: optional(client.listAsks({ project })),
+        code: optional(
+          readFolderWithReadme({ path: Option.none(), project, rev: "main" })
+        ),
+        ledger: optional(client.ledger({ project })),
+        log: optional(client.log({ limit: 1, project })),
+        policy: optional(client.projectPolicy({ project })),
+        refs: optional(client.listRefs({ project })),
+      },
+      { concurrency: "unbounded" }
+    );
+
+    const open = Option.map(read.asks, ({ asks }) => {
+      const waiting = openAsks(stillWaiting(asks));
+
+      return {
+        asks: waiting.length,
+        takeable: waiting.filter(openToTake).length,
+      };
+    });
+
+    const deciders = Option.flatMapNullishOr(read.policy, ({ policy }) =>
+      policy === undefined
+        ? undefined
+        : [...new Set(policy.deciders.flatMap(({ handles }) => handles))]
+    );
+
+    const lede = Option.flatMapNullishOr(read.code, ({ readme }) =>
+      Option.match(readme, {
+        onNone: () => undefined,
+        onSome: ({ text }) => (text === undefined ? undefined : ledeOf(text)),
+      })
+    );
+
+    // What the platform sent decoded, so it encodes; a failure is a defect.
+    return yield* Schema.encodeEffect(ProjectHeaderData)({
+      ...onlySome("open", open),
+      ...onlySome("deciders", deciders),
+      ...onlySome(
+        "landedAt",
+        Option.flatMapNullishOr(
+          read.log,
+          ({ commits }) => commits[0]?.landing?.landedAt
+        )
+      ),
+      ...onlySome(
+        "latestTag",
+        Option.flatMapNullishOr(
+          read.refs,
+          ({ tags }) => tags.map((tag) => tag.name).toSorted(byNewest)[0]
+        )
+      ),
+      ...onlySome("lede", lede),
+      ...onlySome(
+        "posture",
+        Option.map(read.ledger, ({ posture, postureLabel }) => ({
+          label: postureLabel,
+          posture,
+        }))
+      ),
+      now: yield* DateTime.now,
       project,
     }).pipe(Effect.orDie);
   }).pipe(Effect.catchTag("NoSuchElementError", () => Effect.fail(notFound())));
