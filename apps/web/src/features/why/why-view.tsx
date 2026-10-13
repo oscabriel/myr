@@ -100,6 +100,7 @@ export const WhyLines = ({
           {...(file === undefined ? {} : { file })}
         />
       }
+      quietHead
       variant="code"
     >
       <PermalinkKey href={whyHref(project, view.at, view.path)} />

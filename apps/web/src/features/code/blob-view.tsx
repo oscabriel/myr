@@ -154,6 +154,7 @@ export const BlobView = ({
         rev={rev}
       />
     }
+    quietHead
     variant="code"
   >
     <PermalinkKey href={blobHref(project, file.at, file.path)} />

@@ -144,7 +144,7 @@ export const CodeFiles = ({
 
   return project === undefined ? null : (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="min-h-0 flex-1 pt-1">
+      <div className="min-h-0 flex-1 pt-3">
         <ClientOnly fallback={null}>
           <ProjectTree
             kind={kind}
@@ -195,7 +195,7 @@ export const CommitFiles = ({
   useCodeFileKeys(paths, current, open);
 
   return always || wide ? (
-    <div className="min-h-0 flex-1 pt-1">
+    <div className="min-h-0 flex-1 pt-3">
       <ClientTree
         counts={counts}
         current={current}

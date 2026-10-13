@@ -21,6 +21,7 @@ export const filesMatching = (
     }
 
     const name = nameOf(lower);
+
     const inName =
       words.length > 0 && words.every((word) => name.includes(word));
 

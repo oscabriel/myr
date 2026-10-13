@@ -853,14 +853,14 @@ describe("a code page in the Code tab", () => {
   );
 
   it.effect(
-    "opens the file tree from the bar's Files button below the columns, and offers Go to file and Clone",
+    "opens the file tree from the bar's Tree button below the columns, and offers Go to file and Clone",
     () =>
       Effect.gen(function* () {
         const [tree] = yield* treeAndBlob;
         const bar = codeBarOf(tree);
 
         expect(bar).toMatch(
-          /class="columns:hidden[^"]*"><button[^>]*aria-haspopup="dialog"[^>]*>[\s\S]*?Files<\/button>/u
+          /class="columns:hidden[^"]*"><button[^>]*aria-haspopup="dialog"[^>]*>[\s\S]*?Tree<\/button>/u
         );
         expect(bar).toMatch(/title="Go to file \(t\)"/u);
         expect(bar).toContain('data-action="clone-here"');
@@ -1809,7 +1809,7 @@ describe("a missing path", () => {
   });
 
   it.effect(
-    "keeps the code bar's Files button over the folder it lands on, so a phone still reaches the tree",
+    "keeps the code bar's Tree button over the folder it lands on, so a phone still reaches the tree",
     () =>
       Effect.gen(function* () {
         const data = Schema.encodeSync(SoftLanding)({
@@ -1831,7 +1831,7 @@ describe("a missing path", () => {
 
         expect(
           pages.map((markup) =>
-            /aria-haspopup="dialog"[^>]*>[\s\S]*?Files<\/button>/u.test(
+            /aria-haspopup="dialog"[^>]*>[\s\S]*?Tree<\/button>/u.test(
               codeBarOf(markup)
             )
           )

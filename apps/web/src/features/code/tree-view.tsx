@@ -164,6 +164,7 @@ export const TreeView = ({
           </AppLink>
         </>
       }
+      quietHead
       variant="code"
     >
       <div className={`${GUTTER} ${MEASURE} flex flex-col gap-8`}>

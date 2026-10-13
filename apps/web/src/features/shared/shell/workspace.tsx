@@ -29,6 +29,12 @@ export interface WorkspaceProps {
    * filters (the asks board); its head still stops at the measure.
    */
   readonly variant?: "board" | "code" | "document" | "list";
+  /**
+   * A file or folder of the Code tab: the project's header, the code bar and
+   * the path in the toolbar already say where the reader is, so no crumbs,
+   * and the title is for screen readers.
+   */
+  readonly quietHead?: boolean;
   readonly children: ReactNode;
 }
 
@@ -38,11 +44,14 @@ const LONG_TITLE = 80;
 
 const PageHead = ({
   meta,
+  quiet = false,
   said = false,
   status,
   title,
-}: Pick<WorkspaceProps, "meta" | "said" | "status" | "title">) => (
-  <div className="flex flex-col gap-4 pt-6 pb-6">
+}: Pick<WorkspaceProps, "meta" | "said" | "status" | "title"> & {
+  readonly quiet?: boolean;
+}) => (
+  <div className={quiet ? "sr-only" : "flex flex-col gap-4 pt-6 pb-6"}>
     <h1
       data-said={said ? "" : undefined}
       className={`text-balance break-words ${
@@ -118,6 +127,7 @@ const WorkspaceView = ({
   title,
   toolbar,
   pathname,
+  quietHead = false,
   variant = "document",
 }: WorkspaceProps & {
   readonly pathname: string;
@@ -136,7 +146,7 @@ const WorkspaceView = ({
       tabIndex={-1}
     >
       <CommandSlotProvider slot="main">
-        {focus ? null : (
+        {focus || quietHead ? null : (
           <ContextBar
             count={count}
             crumbs={crumbs ?? crumbsFor(pathname)}
@@ -144,8 +154,17 @@ const WorkspaceView = ({
             state={state}
           />
         )}
-        <div className={`${GUTTER} ${code ? "" : MEASURE}`}>
-          <PageHead meta={meta} said={said} status={status} title={title} />
+        {/* A quiet head draws nothing, but keeps a region's gap under the code bar. */}
+        <div
+          className={`${GUTTER} ${code ? "" : MEASURE} ${quietHead ? "pt-6" : ""}`}
+        >
+          <PageHead
+            meta={meta}
+            quiet={quietHead}
+            said={said}
+            status={status}
+            title={title}
+          />
         </div>
         {hasFacts ? (
           <CommandSlotProvider slot="facts">
