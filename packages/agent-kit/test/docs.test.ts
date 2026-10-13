@@ -33,7 +33,13 @@ const cliSpans = (markdown: string) =>
     ...markdown.split("\n"),
   ].flatMap((span) =>
     span.startsWith(`${Brand.cli} `)
-      ? [span.slice(Brand.cli.length + 1).split(/\s+/u)]
+      ? [
+          span
+            .slice(Brand.cli.length + 1)
+            .split(/\s+/u)
+            // A synopsis writes an optional flag as `[--flag]`.
+            .map((word) => word.replaceAll(/^\[|\]$/gu, "")),
+        ]
       : []
   );
 
