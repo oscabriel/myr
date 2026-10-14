@@ -441,7 +441,7 @@ const verify = (url: string, token: Redacted.Redacted) =>
     Effect.gen(function* () {
       const client = yield* (yield* PlatformClient).connect({ token, url });
 
-      return (yield* client.status({})).handle;
+      return (yield* client.whoami({})).handle;
     })
   ).pipe(
     Effect.mapError(

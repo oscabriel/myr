@@ -162,7 +162,7 @@ const handleOf = (
   token: string
 ) =>
   Effect.service(Client).pipe(
-    Effect.flatMap((client) => client.status({})),
+    Effect.flatMap((client) => client.whoami({})),
     Effect.map(({ handle }) => handle),
     Effect.provide(
       clientFor(

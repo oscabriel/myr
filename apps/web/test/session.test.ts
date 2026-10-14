@@ -140,7 +140,7 @@ const replyingWith = (exit: string) => {
   });
 };
 
-const statusReply = (exit: string) => (request: Request) =>
+const whoamiReply = (exit: string) => (request: Request) =>
   new Response(
     (request.clone().body ?? new Blob().stream())
       .pipeThrough(new TextDecoderStream())
@@ -149,8 +149,7 @@ const statusReply = (exit: string) => (request: Request) =>
     { headers: { "content-type": "application/json" } }
   );
 
-const STATUS_OF_INES =
-  '{"_tag":"Success","value":{"answers":[],"claims":[],"handle":"ines-v"}}';
+const INES = '{"_tag":"Success","value":{"handle":"ines-v"}}';
 
 const UNAUTHENTICATED =
   '{"_tag":"Failure","cause":[{"_tag":"Fail","error":{"_tag":"Unauthenticated"}}]}';
@@ -389,15 +388,13 @@ const signInAndBack = (
   path: string,
   code: string,
   answer: () => Response = () => Response.json(TOKEN_ANSWER),
-  status: (request: Request) => Response = statusReply(STATUS_OF_INES)
+  who: (request: Request) => Response = whoamiReply(INES)
 ) =>
   Effect.gen(function* () {
     const { location, state } = yield* signIn(path);
 
     const platform = recorder((request) =>
-      new URL(request.url).pathname.startsWith("/rpc")
-        ? status(request)
-        : answer()
+      new URL(request.url).pathname.startsWith("/rpc") ? who(request) : answer()
     );
 
     const env = envWith(platform.fetch);
@@ -483,14 +480,15 @@ describe("the callback", () => {
         const [exchange, ...more] = seen;
         const form = new URLSearchParams(exchange?.body);
 
-        // Then once, with the new token, `status`: the handle it names is
-        // kept beside the session, so no page asks the platform again.
+        // Then once, with the new token, `whoami`: the handle it names is
+        // kept beside the session, so no page asks the platform again, and
+        // no project is woken to learn it.
         expect(
           more.map(({ authorization, body, cookie, url }) => [
             new URL(url).pathname.replace(/\/$/u, ""),
             authorization,
             cookie,
-            body.includes('"tag":"status"'),
+            body.includes('"tag":"whoami"'),
           ])
         ).toStrictEqual([
           ["/rpc", `Bearer ${TOKEN_ANSWER.access_token}`, null, true],
@@ -711,10 +709,10 @@ describe("whoami", () => {
   );
 
   it.effect(
-    "answers the handle the platform's status names for the session",
+    "answers the handle the platform's whoami names for the session",
     () =>
       Effect.gen(function* () {
-        const platform = recorder(statusReply(STATUS_OF_INES));
+        const platform = recorder(whoamiReply(INES));
 
         const response = yield* whoami(envWith(platform.fetch), {
           cookie: `${SESSION_COOKIE}=tok123`,
@@ -726,7 +724,7 @@ describe("whoami", () => {
               authorization,
               cookie,
               path: new URL(url).pathname.replace(/\/$/u, ""),
-              status: body.includes('"tag":"status"'),
+              whoami: body.includes('"tag":"whoami"'),
             })
           )
         ).toStrictEqual([
@@ -734,7 +732,7 @@ describe("whoami", () => {
             authorization: "Bearer tok123",
             cookie: null,
             path: "/rpc",
-            status: true,
+            whoami: true,
           },
         ]);
         expect(response.headers.get("cache-control")).toBe("no-store");
@@ -767,7 +765,7 @@ describe("whoami", () => {
         const platform = recorder((request) =>
           request.headers.has("authorization")
             ? new Response(null, { status: 401 })
-            : statusReply(UNAUTHENTICATED)(request)
+            : whoamiReply(UNAUTHENTICATED)(request)
         );
 
         const response = yield* whoami(envWith(platform.fetch), {
@@ -852,7 +850,7 @@ describe("the handle kept beside the session", () => {
         ({ name }) => name === HANDLE_COOKIE
       );
 
-      const platform = recorder(statusReply(STATUS_OF_INES));
+      const platform = recorder(whoamiReply(INES));
 
       const who = yield* whoami(envWith(platform.fetch), {
         cookie: `${SESSION_COOKIE}=another-token; ${handle?.pair ?? ""}`,

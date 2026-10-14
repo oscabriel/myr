@@ -108,11 +108,11 @@ const gitConfig = (env: Record<string, string>, ...args: string[]) =>
 
 const isPerson = Schema.is(Person);
 
-const statusHandler = Contracts.toLayerHandler("status", () =>
+const whoamiHandler = Contracts.toLayerHandler("whoami", () =>
   Effect.flatMap(Effect.service(CurrentPrincipal), (principal) =>
     isPerson(principal)
-      ? Effect.succeed({ answers: [], claims: [], handle: principal.handle })
-      : Effect.die("status is for people signed in")
+      ? Effect.succeed({ handle: principal.handle })
+      : Effect.die("whoami is for people signed in")
   )
 );
 
@@ -141,7 +141,7 @@ const seams = (server: Layer.Layer<Authenticated>) =>
               { token: Redacted.value(token), url: at },
             ]),
             RpcTest.makeClient(Contracts).pipe(
-              Effect.provide(Layer.mergeAll(unanswered, statusHandler, server))
+              Effect.provide(Layer.mergeAll(unanswered, whoamiHandler, server))
             )
           ),
       }),
