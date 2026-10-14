@@ -497,3 +497,9 @@
 {"deletedAt":"2026-10-14T01:05:00.000Z","kind":"repo","name":"kilo","namespace":"projects-demo","stage":"demo"}
 {"deletedAt":"2026-10-14T01:05:00.000Z","kind":"repo","name":"sinatra","namespace":"projects-demo","stage":"demo"}
 {"deletedAt":"2026-10-14T01:05:00.000Z","kind":"repo","name":"nvm","namespace":"projects-demo","stage":"demo"}
+{"deletedAt":"2026-10-14T03:17:08.427Z","kind":"repo","name":"oscabriel__smoke-20261013-234909--parse-year--bram","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"deletedAt":"2026-10-14T03:17:09.947Z","kind":"repo","name":"oscabriel__smoke-20261013-234909","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"deletedAt":"2026-10-14T03:17:11.506Z","kind":"repo","name":"oscabriel__smoke-20261013-225323--parse-year--bram","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"deletedAt":"2026-10-14T03:17:12.959Z","kind":"repo","name":"oscabriel__smoke-20261013-225323","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"deletedAt":"2026-10-14T03:17:14.440Z","kind":"repo","name":"oscabriel__smoke-20261013-224510--parse-year--bram","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"deletedAt":"2026-10-14T03:17:17.496Z","kind":"repo","name":"oscabriel__smoke-20261013-224510","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
