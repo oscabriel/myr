@@ -205,35 +205,46 @@ const claimsOn = (project: ProjectName, json: boolean) =>
     );
   });
 
-/** The gateway diffs a fork push from the claim's base, so an answer committed on the clone's own main is still seen. */
+/**
+ * The gateway diffs a fork push from the claim's base, so an answer committed
+ * on the clone's own main is still seen; from the newest landing the answer
+ * contains since, so one that merged a moved main is judged on its own
+ * change. `--base` names main as the caller has it; without it, the claim's
+ * base stands for main, and the diff starts there.
+ */
 const baseOf = (
   root: string,
   given: Option.Option<string>,
   claim: Option.Option<ClaimView>
 ) =>
   Effect.gen(function* () {
+    const held = yield* Option.match(claim, {
+      onNone: () => Effect.succeedNone,
+      onSome: ({ base }) =>
+        Effect.map(Effect.exit(commitOf(root, base)), (exit) =>
+          Exit.isSuccess(exit) ? Option.some(base) : Option.none()
+        ),
+    });
+
     if (Option.isSome(given)) {
-      return given.value;
+      return { claimBase: held, given: given.value };
     }
 
     if (Option.isNone(claim)) {
-      return "main";
+      return { claimBase: held, given: "main" };
     }
 
-    const { base } = claim.value;
-    const held = yield* Effect.exit(commitOf(root, base));
-
-    if (Exit.isSuccess(held)) {
-      return base;
+    if (Option.isSome(held)) {
+      return { claimBase: held, given: held.value };
     }
 
     yield* Output.use((output) =>
       output.note(
-        `Your claim was made at ${base}, which this repo doesn't have, so the diff starts at main; fetch the project's main, or pass --base.`
+        `Your claim was made at ${claim.value.base}, which this repo doesn't have, so the diff starts at main; fetch the project's main, or pass --base.`
       )
     );
 
-    return "main";
+    return { claimBase: held, given: "main" };
   });
 
 const syntheticClaim = (input: {
@@ -562,7 +573,11 @@ export const check = Command.make(
         () => SOMEONE
       );
 
-      const base = yield* baseOf(context.root, flags.base, claim);
+      const { claimBase, given: base } = yield* baseOf(
+        context.root,
+        flags.base,
+        claim
+      );
 
       const bundler = yield* Effect.serviceOption(ConfigBundler);
 
@@ -614,6 +629,7 @@ export const check = Command.make(
               })
             )
           : claim,
+        claimBase,
         claimsHeld: Option.match(claims, {
           onNone: () => 1,
           onSome: (held) => held.filter(isLive).length,

@@ -48,10 +48,14 @@ const notesRef = `refs/notes/${Brand.slug}`;
 
 const parseIso = AskId.make("parse-iso");
 
+/** A sibling ask whose opening lands under `packages/b`, moving main under a claim. */
+const parseB = AskId.make("parse-b");
+
 const fresh = ProjectName.make("alice/fresh");
 
 const scenario = aProject({ name: datekit, people: ["bob"] }).pipe(
   withAsk({ id: parseIso, territory: "packages/parser" }),
+  withAsk({ id: parseB, territory: "packages/b" }),
   withVouches(["bob"])
 );
 
@@ -340,6 +344,127 @@ describe("git through the platform", () => {
           " ! [remote rejected] HEAD -> main (OutOfScope)"
         );
         expect(listed).toBe(`${wide}\trefs/heads/main`);
+      }).pipe(Effect.provide(NodeServices.layer)),
+    30_000
+  );
+
+  it.live(
+    "5a. an answer that merged a main moved by a sibling's landing is judged on its own change: the push passes, and its base is that main",
+    () =>
+      Effect.gen(function* () {
+        const { api, landed, openAsk, root, urlOf } = yield* withDatekit;
+        const { claim } = yield* api.claim(alice, parseIso).pipe(Effect.orDie);
+        const clone = `${root}/alices`;
+
+        // The sibling lands after the claim, so the claim's base stays main₀.
+        const { landed: moved } = yield* openAsk(api, landed, askOf(parseB));
+
+        yield* gitOk(
+          root,
+          ...as(tokens.alice),
+          "clone",
+          "--quiet",
+          urlOf(claim.fork),
+          clone
+        );
+
+        const own = yield* commit(clone, "parse the year", {
+          "packages/parser/src/parse.ts":
+            "export const parse = (s) => ({ year: 2026 });\n",
+        });
+
+        yield* gitOk(
+          clone,
+          "pull",
+          "--quiet",
+          "--no-rebase",
+          urlOf(datekit),
+          "main"
+        );
+
+        const head = CommitSha.make(yield* gitOk(clone, "rev-parse", "HEAD"));
+
+        const pushed = yield* git(
+          clone,
+          ...as(tokens.alice),
+          "push",
+          "origin",
+          "HEAD:main"
+        );
+
+        const receipt = yield* api
+          .submitAnswer(alice, {
+            ask: parseIso,
+            base: claim.base,
+            head,
+            requestId: pushRequestId(alice.handle, head),
+          })
+          .pipe(Effect.orDie);
+
+        expect({
+          base: claim.base,
+          exitCode: pushed.exitCode,
+          merged: head !== own,
+          remote: remoteLines(pushed.stderr),
+        }).toStrictEqual({
+          base: landed,
+          exitCode: 0,
+          merged: true,
+          remote: [
+            `remote: checking ${parseIso} at ${head.slice(0, 7)}; follow with ${Brand.cli} status`,
+          ],
+        });
+        expect(receipt.base).toBe(moved);
+      }).pipe(Effect.provide(NodeServices.layer)),
+    30_000
+  );
+
+  it.live(
+    "5b. an answer that merged the moved main and edits the sibling's territory too is OutOfScope for its own path alone",
+    () =>
+      Effect.gen(function* () {
+        const { api, landed, openAsk, root, urlOf } = yield* withDatekit;
+        const { claim } = yield* api.claim(alice, parseIso).pipe(Effect.orDie);
+        const clone = `${root}/alices`;
+
+        yield* openAsk(api, landed, askOf(parseB));
+
+        yield* gitOk(
+          root,
+          ...as(tokens.alice),
+          "clone",
+          "--quiet",
+          urlOf(claim.fork),
+          clone
+        );
+        yield* commit(clone, "parse the year, and b too", {
+          "packages/b/src/b.ts": "export const b = 2;\n",
+          "packages/parser/src/parse.ts":
+            "export const parse = (s) => ({ year: 2026 });\n",
+        });
+        yield* gitOk(
+          clone,
+          "pull",
+          "--quiet",
+          "--no-rebase",
+          urlOf(datekit),
+          "main"
+        );
+
+        const pushed = yield* git(
+          clone,
+          ...as(tokens.alice),
+          "push",
+          "origin",
+          "HEAD:main"
+        );
+
+        expect(pushed.exitCode).toBe(1);
+        expect(remoteLines(pushed.stderr)).toStrictEqual(
+          explain([
+            new OutOfScope({ paths: [RepoPath.make("packages/b/src/b.ts")] }),
+          ]).map((line) => `remote: ${line}`)
+        );
       }).pipe(Effect.provide(NodeServices.layer)),
     30_000
   );
