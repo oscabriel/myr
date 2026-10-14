@@ -225,7 +225,7 @@ const narrowingDecision = (input: {
             },
           ]),
     ],
-    expireDays: input.after.budget.expireDays + noticeDays,
+    expireDays: input.after.decisions.expireDays + noticeDays,
     id: nextDecisionId(input.snapshot.decisions, new Map()),
     now: input.now,
     project: input.project,
@@ -271,22 +271,43 @@ const reach = (
 };
 
 const judgeHeldBack: VisibilityPort["judgeHeldBack"] = (input, snapshot) => {
-  const checks = Option.flatMap(visibilityIn(snapshot), ({ checks: sealed }) =>
-    Option.fromUndefinedOr(sealed)
+  const sealed = Option.flatMap(policyIn(snapshot), (policy) =>
+    Option.map(Option.fromUndefinedOr(policy.visibility?.checks), (checks) => ({
+      checks,
+      policy,
+    }))
   );
 
-  if (Option.isNone(checks)) {
+  if (Option.isNone(sealed)) {
     return { refusals: [], trailer: Option.none(), writes: {} };
   }
+
+  const { checks, policy } = sealed.value;
+
+  // The sealing layer's own readers and writers may read the checks anyway:
+  // their attempts are counted by nobody.
+  const throttled = Option.match(
+    Arr.findFirst(
+      policy.visibility?.layers ?? [],
+      ({ name }) => name === checks.layer
+    ),
+    {
+      onNone: () => true,
+      onSome: (layer) =>
+        reach(policy, layer, Person.make({ handle: input.claimant })) ===
+        "none",
+    }
+  );
 
   const judged = judgeAttempts({
     ask: input.ask,
     attempts: snapshot.attempts,
-    checks: checks.value,
+    checks,
     claimant: input.claimant,
     now: input.now,
     results: input.results,
     suite: input.pinned.suite,
+    throttled,
   });
 
   return {

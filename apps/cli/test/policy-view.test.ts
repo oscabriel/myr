@@ -16,13 +16,13 @@ const decodeSuccess = Schema.decodeSync(PolicyOf.successSchema);
 const datekitPolicy = {
   agents: "trailer",
   at: sha,
-  budget: { decisionsPerDay: 5, expireDays: 14 },
   caps: { claimsPerPerson: 3, proposalsPerPerson: 2 },
   claims: { lapseAfterMs: 86_400_000, warnAfterMs: 7_200_000 },
   deciders: [
     { handles: ["ines-v"], paths: "**" },
     { handles: ["okonkwo", "bram"], paths: "src/tz.ts" },
   ],
+  decisions: { expireDays: 14 },
   judge: { paths: [`${Brand.configDir}/**`], pointers: [] },
   kinds: [],
   modules: [],
@@ -110,13 +110,13 @@ describe("policy's text view", () => {
     );
   });
 
-  it("shows the caps, the budget, the claim timing and the record window", () => {
+  it("shows the caps, the decision expiry, the claim timing and the record window", () => {
     const lines = linesOf(textOf(datekit));
 
     for (const line of [
-      "Claims 3 claims per person at once",
-      "Proposals 2 proposals per person at once",
-      "Budget 5 decisions a day per maintainer; an undecided one takes its default after 14 days",
+      "Claims 3 claims at once for a person nobody has vouched for; a vouched person and a maintainer are never held",
+      "Proposals 2 proposals open at once for a person nobody has vouched for",
+      "Decisions an undecided one takes its default after 14 days",
       "Claim timing warned after 2 hours without a push; lapses after 24 hours",
       "Record a landing counts once it has stood 30 days, for 365 days",
     ]) {

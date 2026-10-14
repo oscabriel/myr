@@ -5,8 +5,6 @@ import { sameHandle } from "@repo/protocol/ids";
 import type { Handle } from "@repo/protocol/ids";
 import { Array as Arr, DateTime, Order } from "effect";
 
-import type { Budget } from "./budget.ts";
-
 const soon = { hours: 24 } as const;
 
 const welcome = { days: 7 } as const;
@@ -35,10 +33,10 @@ const isUnattended = (landing: LandingView) =>
   landing.ask !== undefined &&
   !landing.credits.some(({ role }) => attended.has(role));
 
+/** Every open decision the decider holds, soonest to expire first: nothing is held back. */
 export const today = (input: {
   readonly decider: Handle;
   readonly decisions: readonly Decision[];
-  readonly budget: Budget;
   readonly firstClaims: readonly {
     readonly handle: Handle;
     readonly at: DateTime.Utc;
@@ -46,7 +44,7 @@ export const today = (input: {
   readonly landings: readonly LandingView[];
   readonly now: DateTime.Utc;
 }): Today => {
-  const { budget, decider, now } = input;
+  const { decider, now } = input;
 
   const theirs = Arr.sort(
     input.decisions.filter(
@@ -58,15 +56,12 @@ export const today = (input: {
     byExpiry
   );
 
-  const room = Math.max(0, budget.total - budget.used);
-  const shown = theirs.slice(0, room);
   const until = DateTime.add(now, soon);
   const since = DateTime.subtract(now, welcome);
 
   return {
-    budget,
     decider,
-    decisions: shown,
+    decisions: theirs,
     expiringSoon: theirs
       .filter(({ expiresAt }) => DateTime.isLessThanOrEqualTo(expiresAt, until))
       .map(({ id }) => id),
@@ -75,7 +70,6 @@ export const today = (input: {
         .filter(({ at }) => DateTime.isGreaterThanOrEqualTo(at, since))
         .map(({ handle }) => handle)
     ),
-    overflow: theirs.length - shown.length,
     unattended: Arr.sort(
       input.landings.filter(isUnattended),
       newestFirst

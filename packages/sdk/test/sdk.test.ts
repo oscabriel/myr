@@ -52,9 +52,9 @@ describe("the config folder's project file", () => {
 
     const definition = project({
       agents: "trailer",
-      budget: { decisionsPerDay: 5, expire: "14 days" },
       caps: { claimsPerPerson: 3, proposalsPerPerson: 2 },
       deciders: { "**": "owners", "src/public/**": ["priya"] },
+      decisions: { expire: "14 days" },
       kinds: [fixBug],
       record: { countsAfter: "30 days", window: "365 days" },
       vouch: "forCode",
@@ -66,13 +66,13 @@ describe("the config folder's project file", () => {
     expect(policy).toStrictEqual({
       agents: "trailer",
       asks: [],
-      budget: { decisionsPerDay: 5, expireDays: 14 },
       caps: { claimsPerPerson: 3, proposalsPerPerson: 2 },
       claims: { lapseAfterMs: 86_400_000, warnAfterMs: 7_200_000 },
       deciders: [
         { handles: "owners", paths: "**" },
         { handles: ["priya"], paths: "src/public/**" },
       ],
+      decisions: { expireDays: 14 },
       functions: { admit: false, opensAlone: true },
       kinds: [
         {
@@ -199,8 +199,8 @@ describe("the config folder's project file", () => {
       toPolicyInput(
         project({
           agents: "none",
-          budget: { decisionsPerDay: 3, expire: "3 weeks" },
           caps: { claimsPerPerson: 1, proposalsPerPerson: 4 },
+          decisions: { expire: "3 weeks" },
           record: { countsAfter: "1 week", window: "180 days" },
           vouch: { file: "MAINTAINERS/vouched.td", mode: "all" },
         })
@@ -209,8 +209,8 @@ describe("the config folder's project file", () => {
 
     expect(written).toMatchObject({
       agents: "none",
-      budget: { decisionsPerDay: 3, expireDays: 21 },
       caps: { claimsPerPerson: 1, proposalsPerPerson: 4 },
+      decisions: { expireDays: 21 },
       record: { countsAfterDays: 7, windowDays: 180 },
       vouch: { file: "MAINTAINERS/vouched.td", mode: "all" },
     });
@@ -222,16 +222,40 @@ describe("the config folder's project file", () => {
     });
   });
 
+  it("reads the old `budget` key's expiry as the decisions' expiry, and drops its count of a day", () => {
+    const old = decodePolicy(
+      toPolicyInput(
+        // oxlint-disable-next-line typescript/no-deprecated -- a config written before `decisions` existed
+        project({ budget: { decisionsPerDay: 3, expire: "3 weeks" } })
+      )
+    );
+
+    expect(old.decisions).toStrictEqual({ expireDays: 21 });
+    expect(old).not.toHaveProperty("budget");
+
+    const both = decodePolicy(
+      toPolicyInput(
+        project({
+          // oxlint-disable-next-line typescript/no-deprecated -- the old key beside the new, to see which wins
+          budget: { expire: "3 weeks" },
+          decisions: { expire: "7 days" },
+        })
+      )
+    );
+
+    expect(both.decisions).toStrictEqual({ expireDays: 7 });
+  });
+
   it("encodes a project with no config folder to the defaults: one fix kind, the run block from CI", () => {
     const policy = decodePolicy(toPolicyInput(defaults));
 
     expect(policy).toStrictEqual({
       agents: "trailer",
       asks: [],
-      budget: { decisionsPerDay: 5, expireDays: 14 },
-      caps: { claimsPerPerson: 3, proposalsPerPerson: 2 },
+      caps: { claimsPerPerson: 20, proposalsPerPerson: 20 },
       claims: { lapseAfterMs: 86_400_000, warnAfterMs: 7_200_000 },
       deciders: [{ handles: "owners", paths: "**" }],
+      decisions: { expireDays: 14 },
       functions: { admit: false, opensAlone: false },
       kinds: [
         {

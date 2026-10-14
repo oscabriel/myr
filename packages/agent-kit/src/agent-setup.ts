@@ -232,22 +232,24 @@ export interface Limit {
 const policyDefaults = () =>
   Schema.decodeSync(
     Schema.Struct({
-      budget: PolicyInput.fields.budget,
       caps: PolicyInput.fields.caps,
       claims: PolicyInput.fields.claims,
+      decisions: PolicyInput.fields.decisions,
     })
   )({});
 
 export const agentLimits = (): readonly Limit[] => {
-  const { budget, caps, claims } = policyDefaults();
+  const { caps, claims, decisions } = policyDefaults();
 
   return [
     {
-      limit: "Claims one person holds at once, in a project",
-      value: `${caps.claimsPerPerson} by default`,
+      limit:
+        "Claims one person nobody has vouched for holds at once, in a project",
+      value: `${caps.claimsPerPerson} by default; a vouched person and a maintainer are never held`,
     },
     {
-      limit: "Open proposals one person holds, in a project",
+      limit:
+        "Open proposals one person nobody has vouched for holds, in a project",
       value: `${caps.proposalsPerPerson} by default; 0 turns proposals off`,
     },
     {
@@ -255,12 +257,8 @@ export const agentLimits = (): readonly Limit[] => {
       value: `Warned after ${span(claims.warnAfterMs)}, lapses after ${span(claims.lapseAfterMs)}, by default`,
     },
     {
-      limit: "Decisions a maintainer takes a day",
-      value: `${budget.decisionsPerDay} by default`,
-    },
-    {
       limit: "A decision nobody takes",
-      value: `${span(budget.expireDays * 86_400_000)} by default, then it takes its default`,
+      value: `${span(decisions.expireDays * 86_400_000)} by default, then it takes its default`,
     },
     {
       limit: "Claims, proposals and drafts across the platform, per person",

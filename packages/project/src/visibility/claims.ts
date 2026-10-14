@@ -58,6 +58,12 @@ export interface AttemptsJudged {
   readonly trailer: Option.Option<string>;
 }
 
+/**
+ * A failing area is refused as `HeldBackFailed`, and counted against the
+ * claimant's attempts when they are `throttled`: a layer's own readers and
+ * writers may read the checks anyway, so their failures are counted by nobody
+ * and never exhausted.
+ */
 export const judgeAttempts = (input: {
   readonly attempts: readonly AttemptRow[];
   readonly ask: AskId;
@@ -66,6 +72,7 @@ export const judgeAttempts = (input: {
   readonly now: DateTime.Utc;
   readonly results: readonly HeldBackResult[];
   readonly suite: SuiteRoot;
+  readonly throttled: boolean;
 }): AttemptsJudged => {
   const week = isoWeek(input.now);
 
@@ -89,6 +96,14 @@ export const judgeAttempts = (input: {
     const results = ran.filter((result) => result.area === area);
 
     if (results.length === 0) {
+      continue;
+    }
+
+    if (!input.throttled) {
+      if (!results.every(({ passed, total }) => passed >= total)) {
+        refusals.push(new HeldBackFailed({ area, suite: input.suite }));
+      }
+
       continue;
     }
 

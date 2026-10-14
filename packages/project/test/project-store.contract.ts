@@ -21,7 +21,6 @@ import {
   AnswerRow,
   AskRow,
   AttemptRow,
-  BudgetDayRow,
   ClaimRow,
   DecisionRow,
   EnvValueRow,
@@ -77,7 +76,7 @@ const project = {
   createdAt: at(0),
   initializer: "alice",
   landed: sha(1),
-  policy: { budget: { decisionsPerDay: 5 } },
+  policy: { decisions: { expireDays: 14 } },
   policyAt: sha(1),
   project: "alice/datekit",
   state: "live",
@@ -162,13 +161,6 @@ const decision = {
     proposal: ProposalId.make("prop-000001"),
   }),
 } satisfies (typeof DecisionRow)["Encoded"];
-
-const budgetDay = {
-  day: "2026-10-07",
-  decider: "alice",
-  finishes: 0,
-  used: 1,
-} satisfies (typeof BudgetDayRow)["Encoded"];
 
 const ratchet = {
   at: sha(1),
@@ -278,7 +270,6 @@ const EncodedSnapshot = Schema.Struct({
   answers: Schema.Array(AnswerRow),
   asks: Schema.Array(AskRow),
   attempts: Schema.Array(AttemptRow),
-  budgetDays: Schema.Array(BudgetDayRow),
   claims: Schema.Array(ClaimRow),
   decisions: Schema.Array(DecisionRow),
   envValues: Schema.Array(EnvValueRow),
@@ -297,7 +288,6 @@ const empty = {
   answers: [],
   asks: [],
   attempts: [],
-  budgetDays: [],
   claims: [],
   decisions: [],
   envValues: [],
@@ -382,29 +372,25 @@ export const describeProjectStore = (
       }).pipe(Effect.provide(layer))
     );
 
-    it.effect(
-      "loads landings, proposals, decisions, budget days and ratchets",
-      () =>
-        Effect.gen(function* () {
-          const store = yield* ProjectStore;
+    it.effect("loads landings, proposals, decisions and ratchets", () =>
+      Effect.gen(function* () {
+        const store = yield* ProjectStore;
 
-          yield* store.commit({
-            budgetDays: decodedAll(BudgetDayRow, [budgetDay]),
-            decisions: decodedAll(DecisionRow, [decision]),
-            landings: decodedAll(LandingRow, [landingOf(1), landingOf(2)]),
-            proposals: decodedAll(ProposalRow, [proposal]),
-            ratchets: decodedAll(RatchetRow, [ratchet]),
-          });
+        yield* store.commit({
+          decisions: decodedAll(DecisionRow, [decision]),
+          landings: decodedAll(LandingRow, [landingOf(1), landingOf(2)]),
+          proposals: decodedAll(ProposalRow, [proposal]),
+          ratchets: decodedAll(RatchetRow, [ratchet]),
+        });
 
-          expect(yield* loaded).toStrictEqual({
-            ...empty,
-            budgetDays: [budgetDay],
-            decisions: [decision],
-            landings: [landingOf(2), landingOf(1)],
-            proposals: [proposal],
-            ratchets: [ratchet],
-          });
-        }).pipe(Effect.provide(layer))
+        expect(yield* loaded).toStrictEqual({
+          ...empty,
+          decisions: [decision],
+          landings: [landingOf(2), landingOf(1)],
+          proposals: [proposal],
+          ratchets: [ratchet],
+        });
+      }).pipe(Effect.provide(layer))
     );
 
     it.effect("replaces a row written again under its key, in its place", () =>
@@ -421,20 +407,17 @@ export const describeProjectStore = (
         };
 
         const released = { ...claim, state: json('{"_tag":"Released"}') };
-        const spent = { ...budgetDay, used: 2 };
         const lowered = { ...ratchet, count: 11 };
         const retried = { ...firstOutbox, attempts: 1 };
 
         yield* store.commit({
           ...everything,
-          budgetDays: decodedAll(BudgetDayRow, [budgetDay]),
           ratchets: decodedAll(RatchetRow, [ratchet]),
         });
 
         yield* store.commit({
           answers: decodedAll(AnswerRow, [later]),
           asks: decodedAll(AskRow, [renamed]),
-          budgetDays: decodedAll(BudgetDayRow, [spent]),
           claims: decodedAll(ClaimRow, [released]),
           outbox: decodedAll(OutboxRow, [retried]),
           project: decoded(ProjectRow, { ...project, landed: sha(9) }),
@@ -446,7 +429,6 @@ export const describeProjectStore = (
           ...empty,
           answers: [later],
           asks: [renamed, askB],
-          budgetDays: [spent],
           claims: [released],
           lastSeq: 2,
           outbox: [retried, secondOutbox],

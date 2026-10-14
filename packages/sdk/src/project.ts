@@ -56,12 +56,18 @@ export interface ProjectConfig {
   readonly admit?: Admit;
   /** Whether landings carry `Assisted-by:` trailers for the agents people worked through. Default `"trailer"`. */
   readonly agents?: PolicyInputEncoded["agents"];
-  /** How many decisions a maintainer takes a day, and how long one waits before its default. Default 5 a day, `"14 days"`. */
+  /**
+   * @deprecated A maintainer's day has no budget; `decisions` sets the expiry.
+   * `expire` still sets how long a decision waits, and `decisionsPerDay` is ignored.
+   */
   readonly budget?: {
-    readonly decisionsPerDay: number;
+    readonly decisionsPerDay?: number;
     readonly expire: Days;
   };
-  /** How many claims and open proposals one person may hold at once. Default 3 claims, 2 proposals. */
+  /**
+   * How many claims and open proposals one person nobody has vouched for may hold at once;
+   * a vouched person and a maintainer are never held. Default 20 claims, 20 proposals.
+   */
   readonly caps?: {
     readonly claimsPerPerson: number;
     readonly proposalsPerPerson: number;
@@ -75,6 +81,10 @@ export interface ProjectConfig {
   readonly deciders?: Readonly<
     Record<string, readonly [string, ...string[]] | "owners">
   >;
+  /** How long an undecided decision waits before it takes its default. Default `"14 days"`. */
+  readonly decisions?: {
+    readonly expire: Days;
+  };
   /** The ask kinds the project's asks are made from. Default `[kinds.fix]`. */
   readonly kinds?: readonly DeclaredKind[];
   readonly modules?: ModulesInput;
@@ -100,7 +110,7 @@ export type ProjectDefinition = PolicyInputEncoded &
 
 type Settings = Pick<
   PolicyInputEncoded,
-  "agents" | "budget" | "caps" | "claims" | "record" | "vouch"
+  "agents" | "caps" | "claims" | "decisions" | "record" | "vouch"
 >;
 
 // Only what the config writes: a key it leaves out stays out, and decoding
@@ -112,11 +122,13 @@ const settingsOf = (config: ProjectConfig): Settings => {
     settings.agents = config.agents;
   }
 
-  if (config.budget !== undefined) {
-    settings.budget = {
-      decisionsPerDay: config.budget.decisionsPerDay,
-      expireDays: Duration.toDays(config.budget.expire),
-    };
+  // The old `budget` key still sets the expiry, so a config written before
+  // `decisions` evaluates as it did; `decisions` wins when both are given.
+  // oxlint-disable-next-line typescript/no-deprecated -- this is the one read that carries the deprecated key over
+  const expire = config.decisions?.expire ?? config.budget?.expire;
+
+  if (expire !== undefined) {
+    settings.decisions = { expireDays: Duration.toDays(expire) };
   }
 
   if (config.caps !== undefined) {

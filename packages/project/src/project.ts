@@ -282,7 +282,6 @@ import type { ProjectSnapshot, ProjectWrites } from "./project-store.ts";
 import type {
   AnswerRow,
   AttemptRow,
-  BudgetDayRow,
   ClaimRow,
   EnvValueRow,
   LayerRead,
@@ -928,7 +927,6 @@ interface Answered {
 interface Hydrated {
   readonly answers: readonly Answered[];
   readonly asks: ReadonlyMap<AskId, Ask>;
-  readonly budgetDays: readonly BudgetDayRow[];
   readonly claims: readonly Claimed[];
   readonly decisions: readonly Decision[];
   readonly landings: readonly LandingView[];
@@ -947,7 +945,6 @@ interface Writes {
   readonly answers: Map<RequestId, AnswerRow>;
   readonly asks: Map<AskId, Ask>;
   readonly attempts: Map<string, AttemptRow>;
-  readonly budgetDays: Map<string, BudgetDayRow>;
   readonly claims: Map<string, ClaimRow>;
   readonly decisions: Map<DecisionId, Decision>;
   readonly envValues: Map<EnvKey, EnvValueRow>;
@@ -968,7 +965,6 @@ const writesOf = (): Writes => ({
   answers: new Map(),
   asks: new Map(),
   attempts: new Map(),
-  budgetDays: new Map(),
   claims: new Map(),
   decisions: new Map(),
   envValues: new Map(),
@@ -990,7 +986,6 @@ const isEmpty = (writes: Writes) =>
     writes.answers.size,
     writes.asks.size,
     writes.attempts.size,
-    writes.budgetDays.size,
     writes.claims.size,
     writes.decisions.size,
     writes.envValues.size,
@@ -1052,11 +1047,6 @@ const snapshotNow = (h: Hydrated, writes: Writes): ProjectSnapshot => {
       Tables.attempts,
       held.attempts,
       writes.attempts.values()
-    ),
-    budgetDays: overlaid(
-      Tables.budgetDays,
-      held.budgetDays,
-      writes.budgetDays.values()
     ),
     claims: overlaid(Tables.claims, held.claims, writes.claims.values()),
     decisions: overlaid(
@@ -1881,7 +1871,6 @@ export const projectService = (
       return {
         answers,
         asks: new Map(snapshot.asks.map((ask) => [ask.id, ask])),
-        budgetDays: snapshot.budgetDays,
         claims,
         decisions: snapshot.decisions,
         landings: snapshot.landings,
@@ -2067,7 +2056,6 @@ export const projectService = (
           answers: [...writes.answers.values()],
           asks: [...writes.asks.values()],
           attempts: [...writes.attempts.values()],
-          budgetDays: [...writes.budgetDays.values()],
           claims: [...writes.claims.values()],
           decisions: [...writes.decisions.values()],
           envValues: [...writes.envValues.values()],
@@ -3254,7 +3242,7 @@ export const projectService = (
               initializer
             ),
             evidence: evidenceFor(request, subject),
-            expireDays: policy.budget.expireDays,
+            expireDays: policy.decisions.expireDays,
             id: nextDecisionId(h.decisions, writes.decisions),
             now,
             project: name,

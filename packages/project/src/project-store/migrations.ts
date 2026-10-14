@@ -82,9 +82,17 @@ const visibility = Effect.gen(function* () {
   )`;
 });
 
+// A maintainer's day has no budget: Today shows every open decision.
+const dropBudgetDays = Effect.gen(function* () {
+  const sql = yield* SqlClient;
+
+  yield* sql`DROP TABLE budget_days`;
+});
+
 const migrations = {
   "1_project_state": projectState,
   "2_visibility": visibility,
+  "3_drop_budget_days": dropBudgetDays,
 };
 
 export const migrate: Effect.Effect<

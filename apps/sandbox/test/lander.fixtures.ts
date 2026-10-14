@@ -295,7 +295,7 @@ export const configFolder = {
     "",
     "export default project({",
     "  admit: (claimant) => claimant.vouched && claimant.record > 1,",
-    '  budget: { decisionsPerDay: 3, expire: "7 days" },',
+    '  decisions: { expire: "7 days" },',
     "  deciders,",
     "});",
     "",

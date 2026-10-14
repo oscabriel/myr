@@ -16,8 +16,8 @@ Three kinds of people, and the agents that work for them. The words below are pr
 
 1. **Maintainers** keep a project. Their jobs:
    - say what the project wants, as asks: a file on main with a want, a territory and a check that fails on main, which opens only when the check is red first;
-   - set how the project takes changes, as typed code in its config folder on main (maintainers, ask kinds, budgets, vouches, ratchets, the run block, visibility), read from the platform's last landing;
-   - spend a daily budget of decisions on Today: open or decline a proposal, waive an escape, accept a posture change, finish a passing answer; doing nothing lets nothing in;
+   - set how the project takes changes, as typed code in its config folder on main (maintainers, ask kinds, decision expiry, vouches, ratchets, the run block, visibility), read from the platform's last landing;
+   - take the decisions on Today: open or decline a proposal, waive an escape, accept a posture change, finish a passing answer; doing nothing lets nothing in;
    - vouch for the people who may claim, each vouch a line that may say why and name the landing it followed, and denounce those who may not propose; a vouch is read as its line, never counted;
    - keep checks of their own in a layer only they read, and set write-only env values from a terminal;
    - land their own changes through the same gate as anyone else.
@@ -29,7 +29,7 @@ Three kinds of people, and the agents that work for them. The words below are pr
    - own what lands: their name is on the commit, and their record is built from those commits.
 3. **Their harnesses**, the coding agents a person works through (Claude Code, OpenCode, Amp, pi, others). Their jobs: read the project's AGENTS.md block or skill, an ask as Markdown, `llms.txt` and the MCP tools; act only through their person's token; read refusals as typed JSON and run each one's `next`. An agent holds no account and no credit: the person's claim carries identity, and a landing discloses the agent apart (`Assisted-by`).
 
-Contributors meet four nouns, and only four: **ask**, **answer**, **check** and **refusal**. Everything else (budget, layer, ledger, posture, ratchet) is maintainer or platform vocabulary.
+Contributors meet four nouns, and only four: **ask**, **answer**, **check** and **refusal**. Everything else (decision, layer, ledger, posture, ratchet) is maintainer or platform vocabulary.
 
 ## Product Purpose
 
@@ -82,7 +82,7 @@ What it declines:
   - **Person** (`/people/$handle`): their credits by role and area, in words, never a number or a score.
   - **Policy** (`/$project/people`): who decides which paths, who is vouched for or denounced, the limits and the agent rules, read from the config folder at the landed commit, with the commands that change them.
   - **Proposals** (`/$project/proposals/new`, `/$project/proposals/$proposal`): a want proposed from the web or the CLI, the platform's agent's draft if one was asked for (the ask file, the check, its red-first runs), and the decision it waits on.
-  - **Inbox** (`/inbox`; `/home` and `/today` move here): the reader's own page. A maintainer's decisions in sections (due today, within the budget, waiting for tomorrow), each with its evidence, safe default, expiry and one-tap choices whose consequence is written under each, against the budget said as a sentence; the asks the reader holds and where each answer stands in the gate; the asks they may take next. Each decision has its own page (`/$project/decisions/$decision`), where a finish shows the answer's diff with refusals marked at their lines.
+  - **Inbox** (`/inbox`; `/home` and `/today` move here): the reader's own page. A maintainer's decisions in sections (due today, later), every open one, each with its evidence, safe default, expiry and one-tap choices whose consequence is written under each, with how many wait said as a sentence; the asks the reader holds and where each answer stands in the gate; the asks they may take next. Each decision has its own page (`/$project/decisions/$decision`), where a finish shows the answer's diff with refusals marked at their lines.
   - **Visibility** (`/$project/visibility`; `/$project/ledger` and `/$project/env` move here): the posture, each declared layer with its reason, each sealed area's count, authors, committed root and admission; the Environment, every item the project's committed `.env.schema` declares, parsed at the landed commit and never resolved, with who set a sensitive item's value and when, never a value; and the ledger, newest first.
   - **Settings** (`/settings`): the theme, the system's or its opposite, kept in this browser's `localStorage`, never a cookie.
   - **Sign-in** (`/auth/signin`): through the platform's own accounts; the session lives in an HttpOnly cookie the browser cannot read.

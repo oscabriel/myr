@@ -120,7 +120,6 @@ const decision = (id: string, handle: string, expiresAt: string) => ({
 });
 
 const today = Schema.decodeSync(Today)({
-  budget: { finishes: 0, total: 5, used: 1 },
   decider: "ines-v",
   decisions: [
     decision("dec-000002", "lin-h", "2026-10-09T12:00:00.000Z"),
@@ -128,7 +127,6 @@ const today = Schema.decodeSync(Today)({
   ],
   expiringSoon: [],
   newcomers: [],
-  overflow: 0,
   unattended: [],
 });
 
@@ -284,7 +282,7 @@ describe("the inbox, for the asks a reader holds and may take", () => {
         });
 
         expect(sectionsOf(markup)).toStrictEqual([
-          "Within your budget",
+          "Later",
           "Your claims",
           "Asks you may take",
         ]);

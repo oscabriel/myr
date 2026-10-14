@@ -79,7 +79,6 @@ import type { Redacted } from "effect";
 
 import type { Advanced, AnswerQueue, AnswerRun } from "./answer-runs.ts";
 import { isStep, runStep } from "./answer-runs/steps.ts";
-import { budgetFor, spend } from "./attention/budget.ts";
 import { creditsByArea } from "./attention/credits.ts";
 import {
   decide,
@@ -126,7 +125,6 @@ import {
 } from "./outbox.ts";
 import type {
   AnswerRow,
-  BudgetDayRow,
   ClaimRow,
   OutboxRow,
   ProjectRow,
@@ -251,7 +249,6 @@ export interface DeciderState {
     readonly row: AnswerRow;
   }[];
   readonly asks: ReadonlyMap<AskId, Ask>;
-  readonly budgetDays: readonly BudgetDayRow[];
   readonly claims: readonly {
     readonly row: ClaimRow;
     readonly state: ClaimState;
@@ -264,7 +261,6 @@ export interface DeciderState {
 }
 
 export interface DeciderWrites {
-  readonly budgetDays: Map<string, BudgetDayRow>;
   readonly decisions: Map<DecisionId, Decision>;
   readonly events: ProjectEventInput[];
   readonly landings: LandingView[];
@@ -597,7 +593,7 @@ export const strayDecision = (input: {
   openDecision({
     deciders: decidersOn(input.policy, [], input.initializer),
     evidence: [],
-    expireDays: input.policy.budget.expireDays,
+    expireDays: input.policy.decisions.expireDays,
     id: input.id,
     now: input.now,
     project: input.project,
@@ -675,20 +671,6 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
   const decisionsNow = (h: H, writes: W) =>
     overlaid(h.decisions, writes.decisions);
 
-  const spent = (
-    h: H,
-    writes: W,
-    input: {
-      readonly decider: Handle;
-      readonly now: DateTime.Utc;
-      readonly on: "decision" | "finish";
-    }
-  ) => {
-    const row = spend([...writes.budgetDays.values(), ...h.budgetDays], input);
-
-    writes.budgetDays.set(`${row.day}|${row.decider}`, row);
-  };
-
   const recordLanding = (
     h: H,
     writes: W,
@@ -747,7 +729,7 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
     const decision = openDecision({
       deciders: decidersOn(policy, input.paths, input.row.initializer),
       evidence: input.evidence,
-      expireDays: policy.budget.expireDays,
+      expireDays: policy.decisions.expireDays,
       id: DecisionId.make(minted("dec", decisionsNow(h, writes).length)),
       now,
       project: name,
@@ -958,7 +940,7 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
         const decision = openDecision({
           deciders: decidedBy,
           evidence,
-          expireDays: live.policy.budget.expireDays,
+          expireDays: live.policy.decisions.expireDays,
           id: DecisionId.make(minted("dec", decisionsNow(h, writes).length)),
           now,
           project: name,
@@ -1674,7 +1656,6 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
         );
 
         writes.decisions.set(taken.decision.id, taken.decision);
-        spent(h, writes, { decider: by, now, on: "decision" });
 
         yield* settleDecided(h, writes, now, taken);
 
@@ -1735,7 +1716,7 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
         const { landed: main, policy } = live.value;
 
         // The maintainer as the policy spells them, as `decide` and Today do:
-        // the budget row and the credit name one person however they sign in.
+        // the credit names one person however they sign in.
         const by = Option.getOrElse(
           asDecider(policy, caller.handle),
           () => caller.handle
@@ -1784,8 +1765,6 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
 
         const { record, row } = waiting.value;
         const { request } = record.landing;
-
-        spent(h, writes, { decider: by, now, on: "finish" });
 
         if (input.head === request.head) {
           const advanced = yield* advanceAndRun(
@@ -2133,22 +2112,16 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
       const h = yield* kernel.read;
       const now = yield* DateTime.now;
 
-      const found = Option.flatMap(h.policy, (policy) =>
-        Option.map(asDecider(policy, caller.handle), (decider) => ({
-          decider,
-          policy,
-        }))
+      const decider = Option.flatMap(h.policy, (policy) =>
+        asDecider(policy, caller.handle)
       );
 
-      if (Option.isNone(found)) {
+      if (Option.isNone(decider)) {
         return yield* new NotDecider({});
       }
 
-      const { decider, policy } = found.value;
-
       return today({
-        budget: budgetFor(policy, decider, h.budgetDays, now),
-        decider,
+        decider: decider.value,
         decisions: h.decisions,
         firstClaims: firstClaimsOf(h.claims),
         landings: h.landings,

@@ -383,10 +383,10 @@ describe("the gateway's own reading of a path", () => {
     agents: "trailer",
     asks: [askWire],
     at: landedSha,
-    budget: { decisionsPerDay: 5, expireDays: 14 },
     caps: { claimsPerPerson: 3, proposalsPerPerson: 2 },
     claims: { lapseAfterMs: 86_400_000, warnAfterMs: 7_200_000 },
     deciders: [{ handles: ["bob"], paths: "**" }],
+    decisions: { expireDays: 14 },
     functions: { admit: false, opensAlone: false },
     judge: judgeClosure(
       Schema.decodeSync(RunBlock)({

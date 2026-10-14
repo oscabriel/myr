@@ -15,7 +15,7 @@
       "territory": { "module": ".", "paths": ["**"] }
     }
   ],
-  "budget": { "decisionsPerDay": 3, "expireDays": 7 },
+  "decisions": { "expireDays": 7 },
   "deciders": [{ "handles": "owners", "paths": "**" }],
   "functions": { "admit": false, "opensAlone": false },
   "kinds": [

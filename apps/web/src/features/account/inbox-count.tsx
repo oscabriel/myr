@@ -9,7 +9,7 @@ const InboxCount = () => {
   const today = useAtomValue(todayAtom());
 
   const waiting = AsyncResult.isSuccess(today)
-    ? today.value.decisions.length + today.value.overflow
+    ? today.value.decisions.length
     : 0;
 
   return (

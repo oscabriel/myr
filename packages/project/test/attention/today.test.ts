@@ -9,14 +9,12 @@ import { at } from "@repo/testkit/clock";
 import { aProject, ids, sha, withAsk } from "@repo/testkit/scenarios";
 import { Array as Arr, DateTime, Option, Result } from "effect";
 
-import { budgetFor, spend } from "../../src/attention/budget.ts";
 import {
   decide,
   decidersFor,
   openDecision,
 } from "../../src/attention/decisions.ts";
 import { today } from "../../src/attention/today.ts";
-import type { BudgetDayRow } from "../../src/project-store/rows.ts";
 
 const scenario = aProject({
   deciders: ["alice", "dana"],
@@ -63,15 +61,12 @@ const p8 = vouchFor("p8", 200);
 
 const eight = [p5, p1, p8, p3, p2, p7, p4, p6];
 
-const fresh = { finishes: 0, total: 5, used: 0 };
-
 const todayFor = (
   input: Partial<Parameters<typeof today>[0]> & {
     readonly decisions: readonly Decision[];
   }
 ) =>
   today({
-    budget: fresh,
     decider: alice,
     firstClaims: [],
     landings: [],
@@ -80,51 +75,23 @@ const todayFor = (
   });
 
 describe("a maintainer's Today", () => {
-  it("holds the decisions that expire first to the budget, and counts the overflow", () => {
+  it("shows every open decision, the ones that expire first first, and holds none back", () => {
     const page = todayFor({ decisions: eight });
 
-    expect(page.decisions).toStrictEqual([p1, p2, p3, p4, p5]);
-    expect(page.overflow).toBe(3);
-    expect(page.budget).toStrictEqual(fresh);
+    expect(page.decisions).toStrictEqual([p1, p2, p3, p4, p5, p6, p7, p8]);
     expect(page.decider).toBe(alice);
   });
 
   it("shows a maintainer their decisions however sign-in cases the handle", () => {
     const page = todayFor({ decider: handle("ALICE"), decisions: eight });
 
-    expect(page.decisions).toStrictEqual([p1, p2, p3, p4, p5]);
+    expect(page.decisions).toStrictEqual([p1, p2, p3, p4, p5, p6, p7, p8]);
   });
 
-  it("shows only what is left of the budget once some of it is used", () => {
-    const page = todayFor({
-      budget: { finishes: 0, total: 5, used: 2 },
-      decisions: eight,
-    });
+  it("calls out every decision expiring within 24 hours", () => {
+    const page = todayFor({ decisions: eight });
 
-    expect(page.decisions).toStrictEqual([p1, p2, p3]);
-    expect(page.overflow).toBe(5);
-  });
-
-  it("shows none when more was used than the day's budget now allows", () => {
-    // The policy lowered decisionsPerDay after the maintainer had spent more.
-    const page = todayFor({
-      budget: { finishes: 0, total: 3, used: 5 },
-      decisions: eight,
-    });
-
-    expect(page.decisions).toStrictEqual([]);
-    expect(page.overflow).toBe(8);
-  });
-
-  it("calls out every decision expiring within 24 hours, over the budget too", () => {
-    const spent = todayFor({
-      budget: { finishes: 0, total: 5, used: 5 },
-      decisions: eight,
-    });
-
-    expect(spent.decisions).toStrictEqual([]);
-    expect(spent.overflow).toBe(8);
-    expect(spent.expiringSoon).toStrictEqual([p1.id, p2.id]);
+    expect(page.expiringSoon).toStrictEqual([p1.id, p2.id]);
   });
 
   it("leaves out decisions already taken, and those past their expiry", () => {
@@ -146,8 +113,7 @@ describe("a maintainer's Today", () => {
       now: DateTime.add(now, { hours: 20 }),
     });
 
-    expect(page.decisions).toStrictEqual([p3, p4, p5, p6, p7]);
-    expect(page.overflow).toBe(1);
+    expect(page.decisions).toStrictEqual([p3, p4, p5, p6, p7, p8]);
   });
 
   it("leaves out decisions for paths the maintainer does not own", () => {
@@ -248,97 +214,5 @@ describe("a maintainer's Today", () => {
     expect(page.unattended).toStrictEqual(
       [1, 2, 3, 4, 5].map((hoursAgo) => unattended(hoursAgo))
     );
-  });
-});
-
-const spendAll = (
-  spends: readonly {
-    readonly decider: Handle;
-    readonly on: "decision" | "finish";
-    readonly now: DateTime.Utc;
-  }[]
-) => {
-  let days: readonly BudgetDayRow[] = [];
-
-  for (const each of spends) {
-    const row = spend(days, each);
-
-    days = [
-      ...days.filter(
-        ({ day, decider }) => !(day === row.day && decider === row.decider)
-      ),
-      row,
-    ];
-  }
-
-  return days;
-};
-
-describe("the budget", () => {
-  const thursday = now;
-  const wednesday = at("2026-10-07T18:00:00Z");
-
-  it("counts the decisions a maintainer already took today against used", () => {
-    const days = spendAll([
-      { decider: alice, now: wednesday, on: "decision" },
-      { decider: alice, now: thursday, on: "decision" },
-      { decider: dana, now: thursday, on: "decision" },
-      {
-        decider: alice,
-        now: DateTime.add(thursday, { hours: 1 }),
-        on: "decision",
-      },
-    ]);
-
-    expect(budgetFor(scenario.policy, alice, days, thursday)).toStrictEqual({
-      finishes: 0,
-      total: 5,
-      used: 2,
-    });
-  });
-
-  it("counts what a maintainer spent under any casing of their handle", () => {
-    const days = spendAll([{ decider: alice, now: thursday, on: "decision" }]);
-
-    expect(
-      budgetFor(scenario.policy, handle("Alice"), days, thursday).used
-    ).toBe(1);
-  });
-
-  it("counts a finish apart from the decisions", () => {
-    const days = spendAll([
-      { decider: alice, now: thursday, on: "finish" },
-      { decider: alice, now: thursday, on: "decision" },
-    ]);
-
-    expect(budgetFor(scenario.policy, alice, days, thursday)).toStrictEqual({
-      finishes: 1,
-      total: 5,
-      used: 1,
-    });
-  });
-
-  it("starts each UTC day fresh, at the policy's decisions per day", () => {
-    const policy = {
-      ...scenario.policy,
-      budget: { ...scenario.policy.budget, decisionsPerDay: 3 },
-    };
-
-    const days = spendAll([{ decider: alice, now: wednesday, on: "decision" }]);
-
-    expect(budgetFor(policy, alice, days, thursday)).toStrictEqual({
-      finishes: 0,
-      total: 3,
-      used: 0,
-    });
-
-    expect(
-      spend(days, { decider: alice, now: wednesday, on: "decision" })
-    ).toStrictEqual({
-      day: "2026-10-07",
-      decider: alice,
-      finishes: 0,
-      used: 2,
-    });
   });
 });

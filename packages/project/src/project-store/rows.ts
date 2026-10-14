@@ -85,15 +85,6 @@ export const DecisionRow = Decision;
 
 export type DecisionRow = typeof DecisionRow.Type;
 
-export const BudgetDayRow = Schema.Struct({
-  day: Schema.String,
-  decider: Handle,
-  finishes: Schema.Int,
-  used: Schema.Int,
-});
-
-export type BudgetDayRow = typeof BudgetDayRow.Type;
-
 export const RatchetRow = Schema.Struct({
   at: LandedSha,
   count: Schema.Int,

@@ -38,8 +38,7 @@
           }
         ],
         "at": "4444444444444444444444444444444444444444",
-        "budget": {
-          "decisionsPerDay": 5,
+        "decisions": {
           "expireDays": 14
         },
         "caps": {
@@ -158,8 +157,7 @@
           }
         ],
         "at": "4444444444444444444444444444444444444444",
-        "budget": {
-          "decisionsPerDay": 5,
+        "decisions": {
           "expireDays": 14
         },
         "caps": {
@@ -1463,8 +1461,7 @@
           }
         ],
         "at": "4444444444444444444444444444444444444444",
-        "budget": {
-          "decisionsPerDay": 5,
+        "decisions": {
           "expireDays": 14
         },
         "caps": {
@@ -1585,8 +1582,7 @@
             }
           }
         ],
-        "budget": {
-          "decisionsPerDay": 5,
+        "decisions": {
           "expireDays": 14
         },
         "caps": {
@@ -1674,8 +1670,7 @@
             }
           }
         ],
-        "budget": {
-          "decisionsPerDay": 5,
+        "decisions": {
           "expireDays": 14
         },
         "caps": {
@@ -2018,11 +2013,6 @@
     ],
     "Today": [
       {
-        "budget": {
-          "finishes": 1,
-          "total": 5,
-          "used": 2
-        },
         "decider": "alice",
         "decisions": [
           {
@@ -2053,7 +2043,6 @@
         ],
         "expiringSoon": ["dec-000001"],
         "newcomers": ["dave"],
-        "overflow": 0,
         "unattended": [
           {
             "ask": "iso-week",

@@ -137,15 +137,12 @@ One choice put to a project's maintainers, with its evidence and a safe default 
 _Avoid_: approval, vote, review request, quorum
 
 **Today**:
-A maintainer's daily list of open decisions, ordered by expiry and held to their budget; the overflow waits for a later day. The CLI prints it as `today`; the web shows it in the inbox.
+A maintainer's list of open decisions, ordered by expiry: every one shows, and each takes its default if nobody decides before it expires. The CLI prints it as `today`; the web shows it in the inbox.
 _Avoid_: queue, dashboard
 
 **Inbox**:
 A person's own page on the web: the decisions waiting for them (their Today), the asks they hold with where each answer stands in the gate, and the asks they may take next. It is read with their session and kept by no cache.
 _Avoid_: home, notifications, dashboard
-
-**Budget**:
-The number of decisions a maintainer takes per day; a decision past it waits, and one that expires undecided takes its default.
 
 **Vouch**:
 A line in the project's vouch file by which a member admits a person to claim and to submit sealed answers; it may carry the member's reason and the landing it followed, and it is read as a line, never counted.

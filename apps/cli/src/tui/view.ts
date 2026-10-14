@@ -65,24 +65,16 @@ const firstLine = (value: string) => {
     : `${first} (${plural(rest.length, "more line", "more lines")})`;
 };
 
-const Budget = ({ state }: { readonly state: TodayViewState }) => {
-  const { budget, decider, overflow } = state.today;
-  const left = Math.max(0, budget.total - budget.used);
+const Heading = ({ state }: { readonly state: TodayViewState }) => {
+  const { decider, decisions, expiringSoon } = state.today;
 
   return box(
     { flexDirection: "column" },
     line(`Today for ${decider}`, { attributes: TextAttributes.BOLD }),
     line(
-      `Budget: ${budget.used} of ${budget.total} decisions used, ${left} left today · ${plural(budget.finishes, "finish", "finishes")}, counted apart`
+      `${plural(decisions.length, "decision", "decisions")} waiting${expiringSoon.length === 0 ? "" : ` · ${expiringSoon.length} due within a day`}`
     ),
-    ...(overflow === 0
-      ? []
-      : [
-          line(
-            `${overflow} more ${overflow === 1 ? "waits" : "wait"} for tomorrow; each expires to its default if nobody decides first.`,
-            muted
-          ),
-        ])
+    line("Each expires to its default if nobody decides first.", muted)
   );
 };
 
@@ -180,7 +172,7 @@ export const TodayView = ({
 }): JSX.Element =>
   box(
     { flexDirection: "column", gap: 1 },
-    createElement(Budget, { state }),
+    createElement(Heading, { state }),
     createElement(Decisions, { state }),
     createElement(Newcomers, { state }),
     createElement(Keys, { state })

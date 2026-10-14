@@ -352,7 +352,7 @@ export const ProjectEnvLive: Layer.Layer<
                   landed.row.initializer
                 ),
                 evidence,
-                expireDays: policy.budget.expireDays,
+                expireDays: policy.decisions.expireDays,
                 id,
                 now,
                 project: landed.row.project,

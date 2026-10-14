@@ -46,7 +46,6 @@ import {
 import type { FixtureRecord } from "./fixtures/record.ts";
 import type { Story } from "./fixtures/story.ts";
 import {
-  decisionsPerDay,
   fixturesNow,
   landLintChild,
   tellVellum,
@@ -347,9 +346,9 @@ const overlay: Layer.Layer<
         Effect.map(current, (record) => statusIn(record, caller.handle)),
       today: (caller) =>
         Effect.flatMap(Effect.zip(current, now), ([record, at]) =>
-          Effect.fromOption(
-            todayIn(record, caller.handle, at, decisionsPerDay)
-          ).pipe(Effect.mapError(() => new NotDecider({})))
+          Effect.fromOption(todayIn(record, caller.handle, at)).pipe(
+            Effect.mapError(() => new NotDecider({}))
+          )
         ),
       verdict: (_caller, input) =>
         Effect.flatMap(current, (record) =>
