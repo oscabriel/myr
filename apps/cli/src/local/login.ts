@@ -244,7 +244,7 @@ const platformOf = (
     }
 
     return yield* new LoginUsage({
-      reason: `no platform to log in to for profile ${name}: run ${Brand.cli} login --url https://<platform host>${Option.isSome(profile) ? ` --profile ${name}` : ""}`,
+      reason: `no platform to log in to for profile ${name}: run ${Brand.cli} login --url https://git.${Brand.domain}${Option.isSome(profile) ? ` --profile ${name}` : ""}`,
     });
   });
 
