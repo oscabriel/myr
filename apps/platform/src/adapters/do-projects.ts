@@ -138,17 +138,30 @@ export const DoProjects = (
     Effect.gen(function* () {
       const frontPage = yield* FrontPage;
       const known = yield* Ref.make<ReadonlySet<ProjectName>>(new Set());
+      const seeded = yield* Ref.make(false);
 
-      // Every project the front page lists was made, so its listing, read once
-      // per isolate on the first name not yet known, stands in for a probe of
-      // each: a fan-out over every listed project then wakes each DO once, for
-      // its own call alone. A name the listing lacks is probed, as before.
-      const listed = yield* Effect.cached(
-        Effect.map(
-          frontPage.projects(),
-          (listing) => new Set(listing.map(({ project }) => project))
-        )
-      );
+      // Every project the front page lists was made, so its listing, kept once
+      // per isolate when a name is not yet known, stands in for a probe of each:
+      // a fan-out over every listed project then wakes each DO once, for its own
+      // call alone. A name the listing lacks is probed, as before. Each request
+      // reads the listing itself until one has kept it, and never joins another
+      // request's read: the runtime takes a request that awaits another's I/O
+      // for hung and cancels it, and a request whose client leaves is cancelled
+      // where it stands, so a read it started may never end.
+      const listed = Effect.gen(function* () {
+        if (yield* Ref.get(seeded)) {
+          return yield* Ref.get(known);
+        }
+
+        const listing = yield* frontPage.projects();
+
+        yield* Ref.set(seeded, true);
+
+        return yield* Ref.updateAndGet(
+          known,
+          (all) => new Set([...all, ...listing.map(({ project }) => project)])
+        );
+      });
 
       const isMade = (project: ProjectName) =>
         Effect.gen(function* () {
@@ -158,12 +171,7 @@ export const DoProjects = (
 
           const names = yield* listed;
 
-          const seeded = yield* Ref.updateAndGet(
-            known,
-            (all) => new Set([...all, ...names])
-          );
-
-          if (seeded.has(project)) {
+          if (names.has(project)) {
             return true;
           }
 
