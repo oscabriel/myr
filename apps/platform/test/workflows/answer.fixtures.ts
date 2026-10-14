@@ -2,7 +2,11 @@ import { RefName, RepoHost } from "@repo/artifacts/repo-host";
 import { RepoHostMemory } from "@repo/artifacts/repo-host/memory";
 import { memoryFs } from "@repo/artifacts/repo-host/memory-fs";
 import { CheckAt, CheckRunner, shaOf } from "@repo/checks/check-runner";
-import type { CheckJob, LaneEvidence } from "@repo/checks/check-runner";
+import type {
+  CheckJob,
+  LaneEvidence,
+  LaneOutput,
+} from "@repo/checks/check-runner";
 import { EvidenceStoreMemory } from "@repo/checks/evidence-store/memory";
 import { AlarmsMemory } from "@repo/project/alarms/memory";
 import { AnswerRuns } from "@repo/project/answer-runs";
@@ -145,6 +149,12 @@ export class Checker extends Context.Service<
       runs: readonly ScriptedRun[]
     ) => Effect.Effect<void>;
     readonly jobs: Effect.Effect<readonly CheckJob[]>;
+    /** What a lane prints on its stdout at a tree, for a ratchet's count. */
+    readonly print: (
+      at: CheckAt,
+      lane: LaneName,
+      stdout: string
+    ) => Effect.Effect<void>;
   }
 >()("test/Checker") {}
 
@@ -158,6 +168,7 @@ const checker = Layer.effectContext(
 
     const served = yield* Ref.make<ReadonlyMap<string, number>>(new Map());
     const jobs = yield* Ref.make<readonly CheckJob[]>([]);
+    const printed = yield* Ref.make<ReadonlyMap<string, string>>(new Map());
 
     const next = (
       key: string,
@@ -215,12 +226,36 @@ const checker = Layer.effectContext(
             : [{ lane: lane.lane, signature: one.signature }];
         });
 
-        return { durationMs: lanes.length, evidence, heldBack: [], lanes };
+        const outputs = yield* Effect.map(Ref.get(printed), (texts) =>
+          ran.flatMap(({ lane }): LaneOutput[] =>
+            lane.output === "stdout"
+              ? [
+                  {
+                    lane: lane.lane,
+                    stdout: texts.get(keyOf(job.at, lane.lane)) ?? "",
+                  },
+                ]
+              : []
+          )
+        );
+
+        const result = {
+          durationMs: lanes.length,
+          evidence,
+          heldBack: [],
+          lanes,
+        };
+
+        return outputs.length === 0 ? result : { ...result, outputs };
       });
 
     return Context.make(CheckRunner, { run }).pipe(
       Context.add(Checker, {
         jobs: Ref.get(jobs),
+        print: (at, lane, stdout) =>
+          Ref.update(printed, (texts) =>
+            new Map(texts).set(keyOf(at, lane), stdout)
+          ),
         script: (at, lane, runs) =>
           Ref.update(scripts, (known) =>
             new Map(known).set(keyOf(at, lane), runs)
