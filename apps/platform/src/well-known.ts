@@ -1,4 +1,4 @@
-import { describedIn } from "@repo/agent-kit/generated-file";
+import { contentHash, describedIn } from "@repo/agent-kit/generated-file";
 import {
   contributeDescription,
   contributeSkillName,
@@ -11,6 +11,7 @@ import { CodeCache } from "@repo/project/code/cache";
 import { FrontPage } from "@repo/project/front-page";
 import { landedRef } from "@repo/project/lander";
 import { Projects } from "@repo/project/projects";
+import type { ProjectListing } from "@repo/protocol/domain/front-page";
 import {
   keyOf,
   nameOfKey,
@@ -24,6 +25,7 @@ import {
   Array as Arr,
   Cause,
   Context,
+  DateTime,
   Effect,
   Option,
   Order,
@@ -151,34 +153,97 @@ const landedSkill = (
 
 const decodeKey = Schema.decodeUnknownOption(ProjectKey);
 
+const INDEX_VERSION = 1;
+
+const KeptIndex = Schema.fromJsonString(
+  Schema.Struct({ content: Schema.String })
+);
+
+const decodeKeptIndex = Schema.decodeOption(KeptIndex);
+
+const encodeKeptIndex = Schema.encodeEffect(KeptIndex);
+
+const indexOf = (projects: readonly ProjectName[]) =>
+  Effect.gen(function* () {
+    const found = yield* Effect.forEach(
+      projects,
+      (project) =>
+        Effect.map(
+          landedSkill(project),
+          Option.map((content) => ({
+            content,
+            description: Option.getOrElse(describedIn(content), () =>
+              contributeDescription(project)
+            ),
+            name: contributeSkillName(project),
+            url: skillUrl(project),
+          }))
+        ),
+      { concurrency: FAN_OUT }
+    );
+
+    return (yield* wellKnownSkills(Arr.getSomes(found))).content;
+  });
+
+// A project's main moves by a landing alone, and each listing carries the
+// instant of its project's last one, so the index is the same while no listed
+// project lands. It is kept under the listing's digest: a request then reads
+// one listing and one kept file, and wakes no project. No project's key holds
+// `--`, so the kept index shares no key with a project's.
+const indexKey = (listed: readonly ProjectListing[]) =>
+  Effect.map(
+    contentHash(
+      JSON.stringify(
+        listed.map(({ landedAt, project }) => [
+          project,
+          landedAt === undefined ? null : DateTime.formatIso(landedAt),
+        ])
+      )
+    ),
+    (digest) => `agent-skills--index/v${INDEX_VERSION}/${digest}`
+  );
+
+const byProject = Order.mapInput(
+  Order.String,
+  ({ project }: ProjectListing) => project
+);
+
 const index = Effect.gen(function* () {
-  const listed = yield* FrontPage.use((frontPage) => frontPage.projects());
-
-  const projects = Arr.sort(
-    Arr.dedupe(listed.map(({ project }) => project)),
-    Order.String
+  const listed = Arr.sort(
+    Arr.dedupeWith(
+      yield* FrontPage.use((frontPage) => frontPage.projects()),
+      (a, b) => a.project === b.project
+    ),
+    byProject
   );
 
-  const found = yield* Effect.forEach(
-    projects,
-    (project) =>
-      Effect.map(
-        landedSkill(project),
-        Option.map((content) => ({
-          content,
-          description: Option.getOrElse(describedIn(content), () =>
-            contributeDescription(project)
-          ),
-          name: contributeSkillName(project),
-          url: skillUrl(project),
-        }))
-      ),
-    { concurrency: FAN_OUT }
+  const cache = yield* CodeCache;
+  const store = yield* CodeStore;
+  const key = yield* indexKey(listed);
+
+  const content = yield* cache.through(
+    key,
+    Effect.gen(function* () {
+      const kept = Option.flatMap(yield* store.get(key), decodeKeptIndex);
+
+      if (Option.isSome(kept)) {
+        return kept.value.content;
+      }
+
+      const built = yield* indexOf(listed.map(({ project }) => project));
+
+      yield* encodeKeptIndex({ content: built }).pipe(
+        Effect.flatMap((text) => store.put(key, text)),
+        Effect.catch((error) =>
+          Effect.logWarning("the agent skills index was not kept", error)
+        )
+      );
+
+      return built;
+    })
   );
 
-  const file = yield* wellKnownSkills(Arr.getSomes(found));
-
-  return new Response(file.content, {
+  return new Response(content, {
     headers: { "cache-control": BRIEFLY, "content-type": "application/json" },
   });
 });
