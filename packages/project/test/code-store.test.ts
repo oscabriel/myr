@@ -5,7 +5,7 @@ import { Effect, Exit, Layer, Logger, Option } from "effect";
 
 import { CodeStore } from "../src/code-store.ts";
 import { CodeStoreR2 } from "../src/code-store/binding.ts";
-import type { BucketLike } from "../src/code-store/binding.ts";
+import type { BucketLike, EdgeCacheLike } from "../src/code-store/binding.ts";
 import { CodeStoreCounts, CodeStoreMemory } from "../src/code-store/memory.ts";
 import { fileOf, treeOf } from "../src/code.ts";
 import { datekit } from "./code-fixtures.ts";
@@ -51,6 +51,56 @@ const bucketOf = (fails: {
   };
 
   return bucket;
+};
+
+/** A colo's cache, each URL it is asked for and each entry it keeps written down. */
+const edgeOf = (fails: {
+  readonly match?: boolean;
+  readonly put?: boolean;
+}) => {
+  const entries = new Map<string, string>();
+  const matched: string[] = [];
+
+  const edge: EdgeCacheLike = {
+    match: (url) => {
+      matched.push(url);
+
+      return fails.match === true
+        ? Promise.reject(new Error("the cache is down"))
+        : Promise.resolve(
+            Option.getOrUndefined(
+              Option.map(
+                Option.fromUndefinedOr(entries.get(url)),
+                (text) => new Response(text)
+              )
+            )
+          );
+    },
+    put: (url, response) =>
+      fails.put === true
+        ? Promise.reject(new Error("the cache is down"))
+        : response.text().then((text) => {
+            entries.set(url, text);
+          }),
+  };
+
+  return { edge: () => edge, entries, matched };
+};
+
+/** A bucket whose every get is written down. */
+const countedBucket = (bucket: BucketLike) => {
+  const got: string[] = [];
+
+  const counted: BucketLike = {
+    ...bucket,
+    get: (name) => {
+      got.push(name);
+
+      return bucket.get(name);
+    },
+  };
+
+  return { bucket: counted, got };
 };
 
 const logged = <A, E>(effect: Effect.Effect<A, E>) =>
@@ -130,10 +180,89 @@ describe("the code store", () => {
     )
   );
 
+  it.effect("over R2 behind the colo's cache, keeps a put in both", () =>
+    Effect.gen(function* () {
+      const bucket = countedBucket(bucketOf({}));
+      const front = edgeOf({});
+
+      const got = yield* putThenGet.pipe(
+        Effect.provide(CodeStoreR2(bucket.bucket, front.edge))
+      );
+
+      expect({
+        got,
+        kept: [...front.entries.values()],
+        r2Gets: bucket.got,
+      }).toStrictEqual({
+        got: Option.some('{"lines":[]}'),
+        kept: ['{"lines":[]}'],
+        r2Gets: [],
+      });
+      expect(front.matched[0]).toMatch(/^https:\/\/code-store\.invalid\//u);
+    })
+  );
+
+  it.effect(
+    "over R2 behind the colo's cache, fills the cache from an R2 hit, then reads it without R2",
+    () =>
+      Effect.gen(function* () {
+        const bucket = countedBucket(bucketOf({}));
+
+        yield* Effect.flatMap(CodeStore, (store) => store.put(key, "{}")).pipe(
+          Effect.provide(CodeStoreR2(bucket.bucket))
+        );
+
+        const layer = CodeStoreR2(bucket.bucket, edgeOf({}).edge);
+        const read = Effect.flatMap(CodeStore, (store) => store.get(key));
+
+        const first = yield* read.pipe(Effect.provide(layer));
+        const second = yield* read.pipe(Effect.provide(layer));
+
+        expect({ first, r2Gets: bucket.got.length, second }).toStrictEqual({
+          first: Option.some("{}"),
+          r2Gets: 1,
+          second: Option.some("{}"),
+        });
+      })
+  );
+
+  it.effect(
+    "over R2 behind a colo's cache that is down, reads and keeps through R2 alone",
+    () =>
+      Effect.map(
+        putThenGet.pipe(
+          Effect.provide(
+            CodeStoreR2(bucketOf({}), edgeOf({ match: true, put: true }).edge)
+          )
+        ),
+        (got) => {
+          expect(got).toStrictEqual(Option.some('{"lines":[]}'));
+        }
+      )
+  );
+
+  it.effect(
+    "over R2 behind a colo's cache it cannot reach at all, reads through R2 alone",
+    () =>
+      Effect.map(
+        putThenGet.pipe(
+          Effect.provide(
+            CodeStoreR2(bucketOf({}), () => {
+              throw new Error("no caches here");
+            })
+          )
+        ),
+        (got) => {
+          expect(got).toStrictEqual(Option.some('{"lines":[]}'));
+        }
+      )
+  );
+
   it.effect.each([
     ["the default", Layer.empty],
     ["memory", CodeStoreMemory],
     ["R2", CodeStoreR2(bucketOf({}))],
+    ["R2 behind the colo's cache", CodeStoreR2(bucketOf({}), edgeOf({}).edge)],
   ] as const)(
     "%s refuses a key over 1,024 bytes as a defect, so callers hash paths",
     ([, layer]) =>
