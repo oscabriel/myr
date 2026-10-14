@@ -299,6 +299,7 @@ import type { Projection } from "./projection.ts";
 import { askToLand, holdsSlot, leave, queueOf, storedQueue } from "./queue.ts";
 import { afterLanding, decideRaise } from "./ratchets.ts";
 import type { RatchetBaseline } from "./ratchets.ts";
+import { bundleKeyAt, bundleThrough } from "./rules-bundle.ts";
 import {
   AdmissionPlan,
   AdmissionReport,
@@ -2284,7 +2285,13 @@ export const projectService = (
           () => RepoPath.make(`${Brand.configDir}/vouched.td`)
         );
 
-        const bundle = yield* Effect.option(lander.bundleRules({ at, repo }));
+        // Bundled once per change to the config folder: a landing that leaves
+        // the folder's tree as it was reads the bundle the last one kept.
+        const bundle = yield* Effect.option(
+          Effect.flatMap(withPorts(bundleKeyAt(repo, at)), (key) =>
+            bundleThrough(key, lander.bundleRules({ at, repo }))
+          )
+        );
 
         if (Option.isNone(bundle)) {
           yield* Effect.logWarning(
