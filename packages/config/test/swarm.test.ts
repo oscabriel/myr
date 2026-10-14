@@ -887,12 +887,12 @@ describe("the swarm's flags", () => {
   );
 
   it.effect(
-    "refuses demo without --allow-demo, a view it doesn't have, no stage, and a flag it doesn't know",
+    "refuses prod, a view it doesn't have, no stage, and a flag it doesn't know",
     () =>
       Effect.gen(function* () {
         const reasons = yield* Effect.forEach(
           [
-            ["--stage", "demo", "--dry-run"],
+            ["--stage", "prod", "--dry-run"],
             ["--stage", "dev-oscabriel", "--view", "tmux"],
             ["--dry-run"],
             ["--stage", "dev-oscabriel", "--yes"],
@@ -905,7 +905,7 @@ describe("the swarm's flags", () => {
           reasons.map((reason, at) =>
             reason.includes(
               [
-                "--allow-demo",
+                "--stage prod: the swarm's contributors are fictional",
                 "--view tmux: headless or herdr",
                 "no --stage",
                 "unknown flag --yes",
@@ -914,9 +914,6 @@ describe("the swarm's flags", () => {
             )
           )
         ).toStrictEqual([true, true, true, true, true]);
-        expect(
-          (yield* optionsOf(["--stage", "demo", "--allow-demo"])).stage
-        ).toBe("demo");
       })
   );
 

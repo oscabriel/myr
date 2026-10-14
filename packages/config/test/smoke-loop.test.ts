@@ -17,7 +17,7 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import { LedgerFile, readLedger } from "../../../infra/created.ts";
 import { servedWorld } from "../../../scripts/lib/seed.ts";
 import {
-  DemoStageRefused,
+  PublicStageRefused,
   smokeLoop,
 } from "../../../scripts/lib/smoke/loop.ts";
 import { DraftNeedsLoop, main } from "../../../scripts/smoke.ts";
@@ -288,7 +288,7 @@ const loopOnScripted = (listed: readonly string[]) =>
       run: "r1",
       stage: "dev-example",
     }).pipe(
-      Effect.catchTag("DemoStageRefused", Effect.die),
+      Effect.catchTag("PublicStageRefused", Effect.die),
       Effect.flip,
       Effect.provide(platform.layer),
       Effect.provideService(LedgerFile, ledger)
@@ -363,20 +363,20 @@ describe("smoke --loop's throwaway ledger", () => {
   );
 });
 
-describe("smoke --loop on demo", () => {
+describe("smoke --loop on prod", () => {
   it.live(
-    "is refused with DemoStageRefused before any request or process: a throwaway project would show on demo's front page",
+    "is refused with PublicStageRefused before any request or process: a throwaway project would show on prod's front page",
     () =>
       Effect.gen(function* () {
         const fetched: string[] = [];
         const spawner = yield* refusing;
 
-        const result = yield* main(["--stage", "demo", "--loop"]).pipe(
+        const result = yield* main(["--stage", "prod", "--loop"]).pipe(
           Effect.provide(spawner.layer),
           Effect.provideService(FetchHttpClient.Fetch, (input) => {
             fetched.push(new Request(input).url);
 
-            return Promise.reject(new Error("smoke --loop on demo fetched"));
+            return Promise.reject(new Error("smoke --loop on prod fetched"));
           }),
           Effect.result
         );
@@ -387,7 +387,7 @@ describe("smoke --loop on demo", () => {
           spawned: yield* spawner.asked,
         }).toStrictEqual({
           fetched: [],
-          result: Result.fail(new DemoStageRefused({ stage: "demo" })),
+          result: Result.fail(new PublicStageRefused({ stage: "prod" })),
           spawned: [],
         });
       }).pipe(Effect.provide(NodeServices.layer))
@@ -401,9 +401,9 @@ describe("smoke --loop on demo", () => {
         smokeLoop({
           answerer: tokens.answerer,
           decider: tokens.decider,
-          origin: "https://platform-demo.example.workers.dev",
+          origin: "https://platform-prod.example.workers.dev",
           run: "r1",
-          stage: "demo",
+          stage: "prod",
         })
       ).pipe(Effect.provide(spawner.layer));
 
@@ -412,9 +412,9 @@ describe("smoke --loop on demo", () => {
         message: failure.message,
         spawned: yield* spawner.asked,
       }).toStrictEqual({
-        failure: new DemoStageRefused({ stage: "demo" }),
+        failure: new PublicStageRefused({ stage: "prod" }),
         message:
-          "--loop makes a throwaway project, which would show on demo's front page: run it on a dev stage",
+          "--loop makes a throwaway project, which would show on prod's front page: run it on a dev stage",
         spawned: [],
       });
     }).pipe(Effect.provide(NodeServices.layer))

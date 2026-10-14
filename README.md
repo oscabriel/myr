@@ -2,7 +2,7 @@
 
 A Git platform for the boundary between a project and everyone else. Everything a project ships is public, its contribution process is typed code on `main`, and a push lands only by passing a typed gate.
 
-Anyone's agent can now offer a change at any hour, and projects answer by closing the door or hand-building a vouch gate in front of it. Myr puts that boundary in the platform, so it is held at the push rather than in a maintainer's evening. Live demo: <https://web-demo.oscargabriel.workers.dev>.
+Anyone's agent can now offer a change at any hour, and projects answer by closing the door or hand-building a vouch gate in front of it. Myr puts that boundary in the platform, so it is held at the push rather than in a maintainer's evening. It runs live at <https://myr.technology>.
 
 A platform can do what a setting on a code host cannot:
 
@@ -74,11 +74,11 @@ Read them in the dashboard, under each Worker's Observability tab and under Issu
 # Errors by Worker since an instant
 bun run ops -- analytics sql post --scope-account-tag <account id> \
   --time-range-start 2026-10-13T00:00:00Z \
-  --query "SELECT scriptName, count() AS errors FROM logs.workersLogs WHERE scriptName IN ('platform-demo', 'sandbox-demo', 'web-demo') AND (level = 'error' OR error != '') GROUP BY scriptName"
+  --query "SELECT scriptName, count() AS errors FROM logs.workersLogs WHERE scriptName IN ('platform-prod', 'sandbox-prod', 'web-prod') AND (level = 'error' OR error != '') GROUP BY scriptName"
 
 # Refusals by tag and stage
 bun run ops -- analytics sql post --scope-account-tag <account id> \
-  --query "SELECT blob2 AS tag, blob3 AS stage, count() AS refusals FROM events.analyticsEngine.\"metrics_demo\" WHERE blob1 = 'Refused' GROUP BY tag, stage ORDER BY refusals DESC"
+  --query "SELECT blob2 AS tag, blob3 AS stage, count() AS refusals FROM events.analyticsEngine.\"metrics_prod\" WHERE blob1 = 'Refused' GROUP BY tag, stage ORDER BY refusals DESC"
 ```
 
 `bun run ops -- analytics sql introspection get --account-tag <account id> --include-columns --include-wae` lists the datasets and their columns.
@@ -104,7 +104,7 @@ apps/        the platform, sandbox and web Workers, and the CLI
 packages/    the protocol (one schema for every surface), gate, rules, checks, lifecycles, git and the rest
 infra/       bootstrap, deploy, the stage table, teardown
 scripts/     brand and byte checks, seed, smoke, swarm, release
-examples/    datekit and burrow, fictional projects for the demo
+examples/    datekit and burrow, fictional projects seeded on dev stages
 tools/       the vendored lint plugins
 ```
 

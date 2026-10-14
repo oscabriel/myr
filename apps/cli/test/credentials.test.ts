@@ -33,7 +33,7 @@ const defaultProfile: Profile = {
 const aliceProfile: Profile = {
   handle: Handle.make("alice"),
   token: Redacted.make("tok-alice-0123456789abcdefghijklmnopqrstuvwxyz"),
-  url: "https://platform-demo.example.workers.dev",
+  url: "https://platform-dev-oscabriel.example.workers.dev",
 };
 
 const configHome = Effect.map(
@@ -134,7 +134,11 @@ describe("stored credentials", () => {
       yield* credentials.put("alice", aliceProfile);
 
       expect(
-        seen(yield* credentials.forHost("platform-demo.example.workers.dev"))
+        seen(
+          yield* credentials.forHost(
+            "platform-dev-oscabriel.example.workers.dev"
+          )
+        )
       ).toStrictEqual(seen(Option.some(aliceProfile)));
       expect(yield* credentials.forHost("elsewhere.example.com")).toStrictEqual(
         Option.none()

@@ -92,8 +92,8 @@ const listed: readonly Listed[] = [
   repo("datekit-805--maintainers", layers),
   namespace(projects),
   namespace(layers),
-  namespace("projects-demo"),
-  namespace("layers-demo"),
+  namespace("projects-prod"),
+  namespace("layers-prod"),
   namespace("witness"),
 ];
 
@@ -144,8 +144,8 @@ describe("the teardown plan", () => {
     const stageNames: readonly Created[] = [
       made("smoke", "namespace", "witness"),
       made("smoke", "repo", "smoke-r9", "witness"),
-      made("smoke", "namespace", "projects-demo"),
-      made("smoke", "namespace", "layers-demo"),
+      made("smoke", "namespace", "projects-prod"),
+      made("smoke", "namespace", "layers-prod"),
       made("smoke", "namespace", projects),
       made("smoke", "namespace", layers),
       made("seed", "repo", "datekit", projects),
@@ -162,9 +162,9 @@ describe("the teardown plan", () => {
           "swarm",
           "repo",
           "burrow--drop-legacy-fetch-burrow-kit--marisol",
-          "projects-demo"
+          "projects-prod"
         ),
-        stage: "demo",
+        stage: "prod",
       },
       made("seed", "repo", "datekit--add-months-clamp--bram", projects),
     ];
@@ -178,16 +178,16 @@ describe("the teardown plan", () => {
           repo("burrow--drop-legacy-fetch-burrow-auth--wren"),
           repo(
             "burrow--drop-legacy-fetch-burrow-kit--marisol",
-            "projects-demo"
+            "projects-prod"
           ),
           repo("datekit--add-months-clamp--bram"),
         ],
-        stages: [dev, "demo"],
+        stages: [dev, "prod"],
       }),
       unrecorded: teardownPlan({
         ledger: [],
         listed,
-        stages: [dev, "demo"],
+        stages: [dev, "prod"],
       }),
     }).toStrictEqual({ everyStage: [], unrecorded: [] });
   });
@@ -207,28 +207,28 @@ describe("the teardown plan", () => {
   });
 
   it("acts only on the stages named, and still guards every declared stage's namespaces", () => {
-    const onDemo: Created = {
-      ...made("smoke", "repo", "smoke-d1", "projects-demo"),
-      stage: "demo",
+    const onProd: Created = {
+      ...made("smoke", "repo", "smoke-d1", "projects-prod"),
+      stage: "prod",
     };
 
-    const demoNamespace: Created = {
-      ...made("smoke", "namespace", "projects-demo"),
+    const prodNamespace: Created = {
+      ...made("smoke", "namespace", "projects-prod"),
       stage: dev,
     };
 
     expect({
-      demo: teardownPlan({
-        ledger: [onDemo],
-        listed: [repo("smoke-d1", "projects-demo")],
-        stages: ["demo"],
-      }),
       dev: teardownPlan({
-        ledger: [onDemo, demoNamespace],
-        listed: [repo("smoke-d1", "projects-demo"), namespace("projects-demo")],
+        ledger: [onProd, prodNamespace],
+        listed: [repo("smoke-d1", "projects-prod"), namespace("projects-prod")],
         stages: [dev],
       }),
-    }).toStrictEqual({ demo: [repo("smoke-d1", "projects-demo")], dev: [] });
+      prod: teardownPlan({
+        ledger: [onProd],
+        listed: [repo("smoke-d1", "projects-prod")],
+        stages: ["prod"],
+      }),
+    }).toStrictEqual({ dev: [], prod: [repo("smoke-d1", "projects-prod")] });
   });
 
   it("deletes a ledger namespace only after the repos in it", () => {
@@ -257,7 +257,7 @@ describe("the teardown plan", () => {
     expect(
       teardownPlan({
         ledger: [made("smoke", "repo", "smoke-r3", projects)],
-        listed: [repo("smoke-r3", "projects-demo"), repo("smoke-r3", layers)],
+        listed: [repo("smoke-r3", "projects-prod"), repo("smoke-r3", layers)],
         stages: [dev],
       })
     ).toStrictEqual([]);
@@ -362,21 +362,21 @@ describe("a deleted ledger entry", () => {
     expect({
       deleted: isRecorded([{ ...fork, deletedAt }], fork),
       live: isRecorded([fork], fork),
-      otherStage: isRecorded([fork], { ...fork, stage: "demo" }),
+      otherStage: isRecorded([fork], { ...fork, stage: "prod" }),
     }).toStrictEqual({ deleted: false, live: true, otherStage: false });
   });
 });
 
 describe("the protected names", () => {
   it("are witness and both namespaces of every stage named", () => {
-    expect([...protectedNames([dev, "demo"])].toSorted()).toStrictEqual([
+    expect([...protectedNames([dev, "prod"])].toSorted()).toStrictEqual([
       "burrow",
       "datekit",
       "datekit--maintainers",
-      "layers-demo",
       "layers-dev-oscabriel",
-      "projects-demo",
+      "layers-prod",
       "projects-dev-oscabriel",
+      "projects-prod",
       "witness",
     ]);
   });

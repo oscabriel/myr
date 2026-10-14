@@ -88,25 +88,25 @@ const everything: Existing = {
       id: "11111111-1111-4111-8111-111111111111",
       name: "front-page-dev-oscabriel",
     },
-    { id: "22222222-2222-4222-8222-222222222222", name: "front-page-demo" },
+    { id: "22222222-2222-4222-8222-222222222222", name: "front-page-prod" },
   ],
   kv: [
     { id: "33333333333333333333333333333333", title: "oauth-dev-oscabriel" },
-    { id: "44444444444444444444444444444444", title: "oauth-demo" },
+    { id: "44444444444444444444444444444444", title: "oauth-prod" },
   ],
   namespaces: [
     "projects-dev-oscabriel",
     "layers-dev-oscabriel",
-    "projects-demo",
-    "layers-demo",
+    "projects-prod",
+    "layers-prod",
   ],
   r2: [
     "evidence-dev-oscabriel",
-    "evidence-demo",
+    "evidence-prod",
     "releases-dev-oscabriel",
-    "releases-demo",
+    "releases-prod",
     "code-cache-dev-oscabriel",
-    "code-cache-demo",
+    "code-cache-prod",
   ],
 };
 
@@ -205,13 +205,13 @@ describe("the bootstrap plan", () => {
 
   it("creates nothing on a second run", () => {
     expect(plan("dev-oscabriel", everything)).toStrictEqual([]);
-    expect(plan("demo", everything)).toStrictEqual([]);
+    expect(plan("prod", everything)).toStrictEqual([]);
   });
 
   it("creates only what is missing, and never counts another stage's", () => {
-    const demoOnly: Existing = {
+    const prodOnly: Existing = {
       d1: [
-        { id: "22222222-2222-4222-8222-222222222222", name: "front-page-demo" },
+        { id: "22222222-2222-4222-8222-222222222222", name: "front-page-prod" },
       ],
       kv: [
         {
@@ -219,11 +219,11 @@ describe("the bootstrap plan", () => {
           title: "oauth-dev-oscabriel",
         },
       ],
-      namespaces: ["projects-demo", "layers-demo", "layers-dev-oscabriel"],
-      r2: ["evidence-dev-oscabriel", "releases-demo", "code-cache-demo"],
+      namespaces: ["projects-prod", "layers-prod", "layers-dev-oscabriel"],
+      r2: ["evidence-dev-oscabriel", "releases-prod", "code-cache-prod"],
     };
 
-    expect(plan("dev-oscabriel", demoOnly)).toStrictEqual([
+    expect(plan("dev-oscabriel", prodOnly)).toStrictEqual([
       Step.CreateNamespace({ name: "projects-dev-oscabriel" }),
       Step.CreateD1({ name: "front-page-dev-oscabriel" }),
       Step.CreateR2({ name: "releases-dev-oscabriel" }),
@@ -234,18 +234,18 @@ describe("the bootstrap plan", () => {
 
 describe("a dry run", () => {
   it("lists each step the plan would take, the private namespace among them, and says nothing changed", () => {
-    expect(planLines("demo", plan("demo", nothing))).toStrictEqual([
-      "bootstrap demo (dry run): create Artifacts namespace projects-demo",
-      "bootstrap demo (dry run): create Artifacts namespace layers-demo",
-      "bootstrap demo (dry run): create D1 front-page-demo",
-      "bootstrap demo (dry run): create KV oauth-demo",
-      "bootstrap demo (dry run): create R2 evidence-demo",
-      "bootstrap demo (dry run): create R2 releases-demo",
-      "bootstrap demo (dry run): create R2 code-cache-demo",
-      "bootstrap demo (dry run): would create 7; nothing was changed",
+    expect(planLines("prod", plan("prod", nothing))).toStrictEqual([
+      "bootstrap prod (dry run): create Artifacts namespace projects-prod",
+      "bootstrap prod (dry run): create Artifacts namespace layers-prod",
+      "bootstrap prod (dry run): create D1 front-page-prod",
+      "bootstrap prod (dry run): create KV oauth-prod",
+      "bootstrap prod (dry run): create R2 evidence-prod",
+      "bootstrap prod (dry run): create R2 releases-prod",
+      "bootstrap prod (dry run): create R2 code-cache-prod",
+      "bootstrap prod (dry run): would create 7; nothing was changed",
     ]);
-    expect(planLines("demo", [])).toStrictEqual([
-      "bootstrap demo (dry run): would create 0; nothing was changed",
+    expect(planLines("prod", [])).toStrictEqual([
+      "bootstrap prod (dry run): would create 0; nothing was changed",
     ]);
   });
 });
@@ -278,12 +278,12 @@ describe("writing ids into wrangler.jsonc", () => {
           line.includes('"dev-oscabriel": {')
         );
 
-        const demoBlock = lines.findIndex((line) => line.includes('"demo": {'));
+        const prodBlock = lines.findIndex((line) => line.includes('"prod": {'));
 
         const lineOf = (needle: string) =>
           lines.findIndex(
             (line, index) =>
-              index > devBlock && index < demoBlock && line.includes(needle)
+              index > devBlock && index < prodBlock && line.includes(needle)
           ) + 1;
 
         expect(written.split("\n")).toHaveLength(lines.length);
@@ -297,10 +297,10 @@ describe("writing ids into wrangler.jsonc", () => {
   it.effect("changes nothing when the ids are already written", () =>
     Effect.gen(function* () {
       const text = yield* rootText("apps/platform/wrangler.jsonc");
-      const written = writeIds(text, "demo", ids);
+      const written = writeIds(text, "prod", ids);
 
-      expect(writeIds(written, "demo", ids)).toBe(written);
-      expect(writeIds(text, "demo", {})).toBe(text);
+      expect(writeIds(written, "prod", ids)).toBe(written);
+      expect(writeIds(text, "prod", {})).toBe(text);
     })
   );
 
@@ -308,7 +308,7 @@ describe("writing ids into wrangler.jsonc", () => {
     Effect.gen(function* () {
       const text = yield* rootText("apps/platform/wrangler.jsonc");
 
-      const written = writeIds(text, "demo", { oauth: ids.oauth });
+      const written = writeIds(text, "prod", { oauth: ids.oauth });
 
       expect(changed(text, written)).toHaveLength(1);
       expect(written).toContain(`"id": "${ids.oauth}"`);
@@ -319,15 +319,15 @@ describe("writing ids into wrangler.jsonc", () => {
     const text = [
       "{",
       '  "env": {',
-      '    "demo": {',
-      "      // the KV namespace `oauth-demo`, {braces} and all",
+      '    "prod": {',
+      "      // the KV namespace `oauth-prod`, {braces} and all",
       '      "kv_namespaces": [{ "binding": "OAUTH_KV", /* new */ "id": "0", },],',
       "    },",
       "  },",
       "}",
     ].join("\n");
 
-    expect(writeIds(text, "demo", { oauth: "abc" })).toBe(
+    expect(writeIds(text, "prod", { oauth: "abc" })).toBe(
       text.replace('"id": "0"', '"id": "abc"')
     );
   });
@@ -386,7 +386,7 @@ describe("the push-event trigger, read back", () => {
     Effect.gen(function* () {
       const live = yield* fixture;
 
-      expect(Result.isFailure(checkTriggers("demo", live))).toBeTruthy();
+      expect(Result.isFailure(checkTriggers("prod", live))).toBeTruthy();
     })
   );
 
@@ -568,10 +568,10 @@ describe("what a failed bootstrap prints", () => {
     expect(
       new MissingSecrets({
         names: ["OPERATOR_TOKEN", "COOKIE_KEY"],
-        stage: "demo",
+        stage: "prod",
       }).message
     ).toBe(
-      "demo's platform lacks OPERATOR_TOKEN, COOKIE_KEY: set them by name, from the stage's secrets file (STAGE_SECRETS_FILE)"
+      "prod's platform lacks OPERATOR_TOKEN, COOKIE_KEY: set them by name, from the stage's secrets file (STAGE_SECRETS_FILE)"
     );
     expect(
       new CloudflareRefused({ route: "/workers/subdomain", status: 403 })

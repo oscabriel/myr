@@ -67,11 +67,10 @@ const FLAGS = new Set([
   "--tokens-env",
   "--url",
   "--world",
-  "--yes",
 ]);
 
 const USAGE =
-  "bun scripts/seed.ts --world node | --stage <dev-…|demo> [--url <origin>] [--tokens-env SESSION_TOKENS] [--operator-env OPERATOR_TOKEN] [--only <project> [--as <copy>]] [--json] [--yes]";
+  "bun scripts/seed.ts --world node | --stage <dev-…> [--url <origin>] [--tokens-env SESSION_TOKENS] [--operator-env OPERATOR_TOKEN] [--only <project> [--as <copy>]] [--json]";
 
 const failed = (reason: string) => new SeedFailed({ reason });
 
@@ -83,13 +82,7 @@ const stageFrom = (argv: readonly string[]) =>
 
     if (stage === "prod") {
       return yield* failed(
-        "--stage prod is the real platform: the examples are fictional, so seed them on a dev stage or demo"
-      );
-    }
-
-    if (stage === "demo" && !argv.includes("--yes")) {
-      return yield* failed(
-        "--stage demo is the stage the user records on (H7): seed it only between takes, with --yes"
+        "--stage prod is the real platform: the examples are fictional, so seed them on a dev stage"
       );
     }
 

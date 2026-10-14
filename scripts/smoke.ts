@@ -32,7 +32,7 @@ import {
   stageOf,
   subdomainFile,
 } from "../infra/stages.ts";
-import { DemoStageRefused, LoopFailed, smokeLoop } from "./lib/smoke/loop.ts";
+import { PublicStageRefused, LoopFailed, smokeLoop } from "./lib/smoke/loop.ts";
 
 export class DraftNeedsLoop extends Schema.TaggedError<DraftNeedsLoop>()(
   "DraftNeedsLoop",
@@ -57,7 +57,7 @@ export {
 
 export type { LogsCheck, SmokeReport } from "../infra/smoke.ts";
 
-export { DemoStageRefused, LoopFailed, smokeLoop } from "./lib/smoke/loop.ts";
+export { PublicStageRefused, LoopFailed, smokeLoop } from "./lib/smoke/loop.ts";
 
 export type { SmokeLoopReport } from "./lib/smoke/loop.ts";
 
@@ -135,7 +135,7 @@ const loopMain = (argv: readonly string[]) =>
     const stage = yield* stageOf(argv);
 
     yield* publicStages.has(stage)
-      ? Effect.fail(new DemoStageRefused({ stage }))
+      ? Effect.fail(new PublicStageRefused({ stage }))
       : Effect.void;
 
     const answerer = Option.getOrElse(flagValue(argv, "--as"), () => ANSWERER);

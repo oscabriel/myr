@@ -114,7 +114,7 @@ const printedBy = (argv: readonly string[], lock: string) =>
 describe("a deploy while a take is being recorded", () => {
   it.live.each([
     [["--stage", "dev-oscabriel"]],
-    [["--stage", "demo"]],
+    [["--stage", "prod"]],
     [[]],
   ] as const)(
     "is refused with RecordingInProgress for %j, naming the lock, before any step runs",
