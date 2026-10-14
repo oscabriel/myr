@@ -260,7 +260,7 @@ export class NotRedFirst extends Schema.TaggedError<NotRedFirst>()(
 
 export class WeakCheck extends Schema.TaggedError<WeakCheck>()("WeakCheck", {
   ...Final,
-  ...nextIs(cli("check")),
+  ...nextIs(cli("ask", "open", ASK, "--project", PROJECT)),
   weakness: Label,
 }) {}
 
