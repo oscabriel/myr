@@ -115,6 +115,7 @@ typography:
     fontWeight: 600
     letterSpacing: "-0.04em"
     lineHeight: "0.9"
+    fontSize: "12.131cqi"
 rounded:
   none: "0px"
   sm: "1px"
@@ -446,7 +447,7 @@ Square. The radius is 2 px (`--radius: 0.125rem`), and shadcn's base-lyra compon
 ### Footer
 
 - **Where:** the site and docs shells; the project and focus shells have none.
-- **Shape:** a hairline above, rail to rail, a row of plain links (Docs, Install, Privacy, Terms), then **the brand's domain in upper case** across the container's full width as one line of display text in the UI sans: read from `@repo/brand` (`Brand.domain`), upper-cased with CSS, never typed (`brand:check` fails on the name outside `packages/brand`). It is sized to the container with container query units so the line fills the width without wrapping, at 600 with -0.04em tracking and a 0.9 line, in ink. It is the one type that scales with its box. No mark beside it.
+- **Shape:** a hairline above, rail to rail, a row of plain links (Docs, Install, Settings, Privacy, Terms), then **the brand's domain in upper case** as a watermark: one line of display text in the UI sans, read from `@repo/brand` (`Brand.domain`), upper-cased with CSS, never typed (`brand:check` fails on the name outside `packages/brand`). It is drawn in the ink at a tenth of its strength (`text-foreground/10`), centred, and sized with container query units to fill the content's width exactly, at 600 with -0.04em tracking and a 0.9 line, its lower part cut by the page's edge (the footer clips it, and the line's bottom margin is negative), so the page ends in the name rather than under it. It is the one type that scales with its box. No mark beside it. The size (12.131cqi) is the width over the line's measured width per em, noted in `footer.tsx`; measure again if the domain changes.
 
 ### Project header and tabs
 
