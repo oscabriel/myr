@@ -43,13 +43,14 @@ export const ownerOfNamespace = (
 export const ownerOfHandle = (handle: Handle): Option.Option<Owner> =>
   decodeOwner(handle.toLowerCase());
 
+/** The handle first, so an import is the importer's own by default; the source namespace stays on offer. */
 export const ownerChoices = (
   handle: Option.Option<Handle>,
   url: string
 ): readonly Owner[] =>
   Array.dedupe([
-    ...Option.toArray(Option.flatMap(prefillFrom(url).owner, ownerOfNamespace)),
     ...Option.toArray(Option.flatMap(handle, ownerOfHandle)),
+    ...Option.toArray(Option.flatMap(prefillFrom(url).owner, ownerOfNamespace)),
   ]);
 
 export const sourceUrlOf = (project: ProjectName) => `https://${project}`;

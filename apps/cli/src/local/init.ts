@@ -96,7 +96,7 @@ const flags = {
   ),
   project: Flag.String("project").pipe(
     Flag.withDescription(
-      "The project's name, <owner>/<name>; a bare name is yours (<your handle>/<name>). By default this repo's folder, or an import's source path."
+      "The project's name, <owner>/<name>; a bare name is yours (<your handle>/<name>). By default this repo's folder, or an import's last URL segment, under your handle."
     ),
     Flag.optional
   ),
@@ -196,9 +196,11 @@ const projectNamed = (
     const word = Option.getOrElse(given, () => fallback.short);
     const known = yield* profileOwner;
 
+    // An import is yours by default; its source namespace names it only
+    // when no handle is known here, or when --project spells it out.
     const owner = Option.isSome(given)
       ? known
-      : Option.orElse(fallback.owner, () => known);
+      : Option.orElse(known, () => fallback.owner);
 
     const spelled = word.includes("/")
       ? word

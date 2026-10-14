@@ -942,7 +942,7 @@ describe(`${Brand.cli} init's project name`, () => {
   );
 
   it.live(
-    "names an import from a known host by its source path, and any other by the handle",
+    "names an import under the handle, after the URL's last segment, whatever its host",
     () =>
       Effect.gen(function* () {
         const known = yield* importSends(
@@ -957,9 +957,49 @@ describe(`${Brand.cli} init's project name`, () => {
           []
         );
 
-        expect(known).toStrictEqual(["github.com/pallets/click"]);
+        expect(known).toStrictEqual(["bob/click"]);
         expect(other).toStrictEqual(["bob/widgets"]);
       }),
+    { timeout: 30_000 }
+  );
+
+  it.live(
+    "keeps the source namespace when --project spells it, or when no handle is known",
+    () =>
+      Effect.gen(function* () {
+        const spelled = yield* importSends(
+          "bob",
+          "https://github.com/pallets/click",
+          ["--project", "github.com/pallets/click"]
+        );
+
+        const machine = yield* aMachine;
+
+        const platform = yield* aPlatform(
+          Effect.succeed({
+            project: ProjectName.make("github.com/pallets/click"),
+            remote:
+              "https://platform.example.test/github.com/pallets/click.git",
+          })
+        );
+
+        yield* cli(machine, platform.layer, [
+          "init",
+          "--import",
+          "https://github.com/Pallets/click.git",
+          "--yes",
+          "--json",
+        ]);
+
+        const unknown = (yield* decodeCalls(yield* platform.calls)).map(
+          ({ project }) => project
+        );
+
+        expect({ spelled, unknown }).toStrictEqual({
+          spelled: ["github.com/pallets/click"],
+          unknown: ["github.com/pallets/click"],
+        });
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
     { timeout: 30_000 }
   );
 

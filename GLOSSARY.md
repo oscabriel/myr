@@ -89,7 +89,7 @@ The commit the platform itself last landed on main; the only commit a project's 
 _Avoid_: HEAD, tip of main
 
 **Import**:
-A project adopted from a public repo: a read-only copy, not run by its upstream maintainers, whose first `main` is the source branch's tip. The source, its address and branch, stays on the project's record and is shown as where it was imported from; by default the project is named after its source namespace (the Run a project guide has the whole rule). It is made from the CLI's `init --import` or the web's `/import`.
+A project adopted from a public repo: a read-only copy, not run by its upstream maintainers, whose first `main` is the source branch's tip. The source, its address and branch, stays on the project's record and is shown as where it was imported from; by default the project is named under the importer's handle, after the URL's last segment, with the source namespace on offer instead (the Run a project guide has the whole rule). It is made from the CLI's `init --import` or the web's `/import`.
 _Avoid_: mirror, fork (of the source), sync
 
 **Outcome**:
