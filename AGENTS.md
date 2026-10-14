@@ -2,7 +2,7 @@
 
 Myr is a Git platform on Cloudflare. Everything a project ships is public, its contribution process is typed code on main, and a push lands only by passing a typed gate. It was built as an entry to Cloudflare's "Build the next GitHub" competition.
 
-The core loop runs on Cloudflare today: a person claims an ask, pushes an answer through the platform's git gateway, and the platform checks it and lands it, or refuses it: the cheap stages answer in git's own output, and the rest arrive later in `status`, `watch`, MCP and the verdict note. The CLI, MCP and the web all serve the same contracts, and typed visibility (layers, held-back checks, posture, the ledger and write-only env values) plugs in as one cartridge. `README.md` says how to run it and deploy it; `GLOSSARY.md` defines the words.
+The core loop runs on Cloudflare today: a person claims an ask, pushes an answer through the platform's git gateway, and the platform checks it and lands it, or refuses it: the cheap stages answer in git's own output, and the rest arrive later in `status`, the web's live answer page, MCP and the verdict note. The CLI, MCP and the web all serve the same contracts, and typed visibility (layers, held-back checks, posture, the ledger and write-only env values) plugs in as one cartridge. `README.md` says how to run it and deploy it; `GLOSSARY.md` defines the words.
 
 `bun run verify` is the gate. The principles table names the check that holds each rule; a rule marked "No fence" is held by review.
 

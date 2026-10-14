@@ -33,13 +33,13 @@ bun run --cwd apps/web dev          # the web over a dev world seeded with two f
 bun run seed -- --world node        # both examples, seeded onto a platform running in Node
 ```
 
-The CLI comes from the platform itself; `myr login` signs you in through the browser and sets up git's credential helper, so plain `git clone` and `git push` work:
+The CLI comes from the platform itself: the web at `https://myr.technology` serves the installer, and `myr login` signs you in to the platform at `https://git.myr.technology` through the browser and sets up git's credential helper, so plain `git clone` and `git push` work:
 
 ```sh
-curl -fsSL <origin>/install.sh | sh
-myr login --url <origin>
+curl -fsSL https://myr.technology/install.sh | sh
+myr login --url https://git.myr.technology
 myr asks --project oscabriel/datekit
-myr claim <ask>
+myr claim <ask> --project oscabriel/datekit
 ```
 
 The web's `/docs` holds the guides and the full reference; `/llms.txt` and `myr mcp` serve the same to agents.
