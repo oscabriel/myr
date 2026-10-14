@@ -2,6 +2,7 @@ import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { LogRef } from "@repo/checks/evidence-store";
 import { envSchemaMethod } from "@repo/project/deciders";
 import { DraftResult } from "@repo/project/draft-runs";
+import { FrontPage } from "@repo/project/front-page";
 import { FrontPageMemory } from "@repo/project/front-page/memory";
 import { LandingCommand } from "@repo/project/landing";
 import type { ProjectApi } from "@repo/project/project";
@@ -25,7 +26,7 @@ import {
   UnknownProject,
 } from "@repo/protocol/refusal";
 import { advanceTo } from "@repo/testkit/clock";
-import { Effect, Layer, Option, Redacted, Schema } from "effect";
+import { Effect, Fiber, Layer, Option, Redacted, Ref, Schema } from "effect";
 
 import { DoProjects } from "../src/adapters/do-projects.ts";
 import type { ProjectNamespace } from "../src/adapters/do-projects.ts";
@@ -330,6 +331,62 @@ describe("Projects over the Project DO namespace", () => {
           `${keyOf(project)} status`,
           `${keyOf(other)} listAsks`,
         ]);
+      }).pipe(Effect.provide(world))
+  );
+
+  // On Workers a request that awaits another request's I/O is cancelled as hung,
+  // and one whose client left is cancelled where it stands: its read never ends.
+  it.live(
+    "never has a request wait on the listing another request is reading",
+    () =>
+      Effect.gen(function* () {
+        const { namespace } = yield* namespaceOf;
+        const reads = yield* Ref.make(0);
+
+        const listing = Layer.effect(
+          FrontPage,
+          Effect.gen(function* () {
+            const page = yield* FrontPage;
+
+            return FrontPage.of({
+              ...page,
+              projects: () =>
+                Effect.flatMap(
+                  Ref.getAndUpdate(reads, (count) => count + 1),
+                  (count) => (count === 0 ? Effect.never : page.projects())
+                ),
+            });
+          })
+        ).pipe(
+          Layer.provide(
+            FrontPageMemory.layer({
+              credits: [],
+              entries: [],
+              projects: [{ openAsks: 0, posture: "open", project }],
+            })
+          )
+        );
+
+        const outcome = yield* Effect.gen(function* () {
+          const projects = yield* Projects;
+          const abandoned = yield* Effect.forkChild(projects.get(project));
+
+          yield* Effect.yieldNow;
+
+          const later = yield* Effect.timeoutOption(
+            Effect.as(projects.get(project), "answered"),
+            "2 seconds"
+          );
+
+          yield* Fiber.interrupt(abandoned);
+
+          return later;
+        }).pipe(
+          Effect.provide(DoProjects(namespace).pipe(Layer.provide(listing)))
+        );
+
+        expect(outcome).toStrictEqual(Option.some("answered"));
+        expect(yield* Ref.get(reads)).toBe(2);
       }).pipe(Effect.provide(world))
   );
 
