@@ -6,6 +6,9 @@
 // under `annotations`, and write every level through `console.log`.
 import { Array, Logger, Predicate, Redacted } from "effect";
 
+import { unquoted } from "./defects.ts";
+import type { DefectKeeping } from "./defects.ts";
+
 /** Takes every secret a Worker holds out of a text it is about to log. */
 export type Scrub = (text: string) => string;
 
@@ -39,10 +42,25 @@ export const scrubberOf = (secrets: readonly Redacted.Redacted[]): Scrub => {
 const workersLevel = (level: string) =>
   level === "FATAL" ? "error" : level.toLowerCase();
 
-export const jsonLogger = (scrub: Scrub): Logger.Logger<unknown, void> =>
+// A cause rides on a warning as well as on a report: where a defect is kept by
+// its name, it is kept so on every line, whichever call logs it.
+const structuredKeeping = (defects: DefectKeeping) =>
+  defects === "name"
+    ? Logger.make((options) =>
+        Logger.formatStructured.log({
+          ...options,
+          cause: unquoted(options.cause),
+        })
+      )
+    : Logger.formatStructured;
+
+export const jsonLogger = (
+  scrub: Scrub,
+  defects: DefectKeeping = "whole"
+): Logger.Logger<unknown, void> =>
   Logger.withLeveledConsole(
     Logger.map(
-      Logger.formatStructured,
+      structuredKeeping(defects),
       ({ annotations, cause, level, message, spans }) => {
         const scrubbed = <A>(value: A) =>
           Predicate.isString(value) ? scrub(value) : value;

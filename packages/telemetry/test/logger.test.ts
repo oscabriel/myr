@@ -1,12 +1,14 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Cause, Effect, Layer, Logger, Redacted } from "effect";
 
+import type { DefectKeeping } from "../src/defects.ts";
 import { jsonLogger, scrubberOf } from "../src/logger.ts";
 import { recordingConsole } from "../src/logger/memory.ts";
 
 const logged = <A, E>(
   body: Effect.Effect<A, E>,
-  secrets: readonly Redacted.Redacted[] = []
+  secrets: readonly Redacted.Redacted[] = [],
+  defects: DefectKeeping = "whole"
 ) =>
   Effect.gen(function* () {
     const console = recordingConsole();
@@ -14,7 +16,7 @@ const logged = <A, E>(
     yield* body.pipe(
       Effect.provide(
         Layer.merge(
-          Logger.layer([jsonLogger(scrubberOf(secrets))]),
+          Logger.layer([jsonLogger(scrubberOf(secrets), defects)]),
           console.layer
         )
       ),
@@ -123,6 +125,38 @@ describe(jsonLogger, () => {
           "cause",
           expect.stringContaining("token <redacted> refused")
         );
+      })
+  );
+
+  it.effect(
+    "keeps a defect by its name and frames alone on every line where defects are kept so, a warning that carries one included",
+    () =>
+      Effect.gen(function* () {
+        const repo = "alice--datekit--private";
+
+        const written = yield* logged(
+          Effect.logWarning(
+            "a visibility effect did not settle",
+            Cause.die(new Error(`the layer repo ${repo} lost a blob`))
+          ),
+          [],
+          "name"
+        );
+
+        expect(written).toMatchObject([
+          {
+            line: {
+              level: "warn",
+              message: "a visibility effect did not settle",
+            },
+            method: "warn",
+          },
+        ]);
+        expect(written[0]?.line).toHaveProperty(
+          "cause",
+          expect.stringMatching(/^Error: <withheld>\n\s+at /u)
+        );
+        expect(JSON.stringify(written)).not.toContain(repo);
       })
   );
 });

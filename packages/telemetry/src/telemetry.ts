@@ -14,7 +14,7 @@ import { SpansBinding } from "./spans/binding.ts";
 export interface TelemetryOptions {
   readonly secrets: readonly Redacted.Redacted[];
   readonly tracing: WorkerTracing;
-  /** What a report and a span keep of a defect; all of it, scrubbed, unless named. */
+  /** What a line, a report and a span keep of a defect; all of it, scrubbed, unless named. */
   readonly defects?: DefectKeeping;
 }
 
@@ -26,7 +26,7 @@ export const Telemetry = ({
   const scrub = scrubberOf(secrets);
 
   return Layer.mergeAll(
-    Logger.layer([jsonLogger(scrub)]),
+    Logger.layer([jsonLogger(scrub, defects)]),
     ErrorReporter.layer([defectReporter(defects)]),
     SpansBinding(tracing, { defects, scrub })
   );

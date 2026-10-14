@@ -11,7 +11,7 @@ import { recordingConsole } from "@repo/telemetry/logger/memory";
 import { recordingTracing, ROOT } from "@repo/telemetry/spans/memory";
 import { Telemetry } from "@repo/telemetry/telemetry";
 import { untouchable } from "@repo/testkit/untouchable";
-import { Effect, Exit, Layer, Redacted, Schema } from "effect";
+import { Cause, Effect, Exit, Layer, Redacted, Schema } from "effect";
 import { HttpRouter } from "effect/http";
 
 import { DoProjects } from "../src/adapters/do-projects.ts";
@@ -195,6 +195,30 @@ describe("the Worker's telemetry", () => {
           [repo, requestId].filter((text) => logged.includes(text))
         ).toStrictEqual([]);
       }).pipe(Effect.provide(world))
+  );
+
+  it.effect(
+    "keeps a defect a warning carries by its name and frames alone too, since a caught cause is logged as well as reported",
+    () =>
+      Effect.gen(function* () {
+        const config = yield* platformConfig();
+        const repo = "alice--datekit--private";
+        const console = recordingConsole();
+
+        yield* Effect.logWarning(
+          "a visibility effect did not settle",
+          Cause.die(new Error(`the layer repo ${repo} lost a blob`))
+        ).pipe(Effect.provide(Layer.merge(telemetryOf(config), console.layer)));
+
+        expect(console.written()).toMatchObject([
+          { line: { level: "warn" }, method: "warn" },
+        ]);
+        expect(console.written()[0]?.line).toHaveProperty(
+          "cause",
+          expect.stringMatching(/^Error: <withheld>\n\s+at /u)
+        );
+        expect(JSON.stringify(console.written())).not.toContain(repo);
+      })
   );
 });
 
