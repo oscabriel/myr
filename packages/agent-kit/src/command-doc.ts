@@ -4,6 +4,7 @@ import {
   NeedsApproval,
   ReadOnly,
   Surfaces,
+  TodayOf,
 } from "@repo/protocol/contracts";
 import type { Contracts } from "@repo/protocol/contracts";
 import { Array as Arr, Context, Order, Schema, SchemaAST } from "effect";
@@ -45,7 +46,8 @@ export const localCommandDocs: readonly CommandDoc[] = [
     positional: [],
     readOnly: false,
     source: "local",
-    summary: "Forget a platform's stored token.",
+    summary:
+      "Forget a profile's token, and stop git asking for a platform no profile is on.",
   },
   {
     contract: "initProject",
@@ -143,7 +145,7 @@ export const localCommandDocs: readonly CommandDoc[] = [
     positional: ["command"],
     readOnly: true,
     source: "local",
-    summary: "Print the JSON Schema of a command's payload.",
+    summary: "Print the JSON Schema of the payload a command sends.",
   },
   {
     contract: "today",
@@ -153,8 +155,7 @@ export const localCommandDocs: readonly CommandDoc[] = [
     positional: [],
     readOnly: true,
     source: "local",
-    summary:
-      "Show your Today: the decisions to take, each with its evidence and a safe default; --tui opens it full-screen at a terminal.",
+    summary: `${Context.get(TodayOf.annotations, Description)} It only reads, unless --tui opens it full-screen to take decisions at a terminal.`,
   },
 ];
 
