@@ -133,7 +133,8 @@ describe("a Project DO's shell", () => {
       Effect.gen(function* () {
         yield* advanceTo(noon);
 
-        const admitted = yield* Deferred.make<undefined>();
+        const admitted = yield* Deferred.make<string>();
+        const context = yield* Effect.context();
         const { instances, workflow } = answerWorkflow();
         const pending: Promise<unknown>[] = [];
 
@@ -141,8 +142,8 @@ describe("a Project DO's shell", () => {
         const slow: AnswerWorkflow = {
           ...workflow,
           create: (input) =>
-            Effect.runPromise(
-              Effect.andThen(Deferred.await(admitted), () =>
+            Effect.runPromiseWith(context)(
+              Effect.flatMap(Deferred.await(admitted), () =>
                 Effect.promise(() => workflow.create(input))
               )
             ),
@@ -188,7 +189,7 @@ describe("a Project DO's shell", () => {
 
         const alarmed = yield* instances.tries;
 
-        yield* Deferred.succeed(admitted);
+        yield* Deferred.succeed(admitted, "admitted");
         yield* Effect.promise(() => Promise.all(pending));
 
         const made = yield* instances.made;

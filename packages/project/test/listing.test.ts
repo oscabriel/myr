@@ -15,6 +15,7 @@ import {
 } from "effect";
 import { TestClock } from "effect/testing";
 
+import type { LandedProject } from "../src/description.ts";
 import { withProjectFacts } from "../src/listing.ts";
 import type { ProjectApi } from "../src/project.ts";
 import { Projects } from "../src/projects.ts";
@@ -28,7 +29,7 @@ describe(withProjectFacts, () => {
     "reads each project's posture and its description at once: neither read waits on the other's answer",
     () =>
       Effect.gen(function* () {
-        const described = yield* Deferred.make<undefined>();
+        const described = yield* Deferred.make<string>();
         const steps = yield* Ref.make<readonly string[]>([]);
 
         const seen = (step: string) =>
@@ -56,11 +57,13 @@ describe(withProjectFacts, () => {
           { landedAt, openAsks: 2, posture: "openCore", project: datekit },
         ];
 
-        const facts = withProjectFacts(listed, () =>
-          seen("description").pipe(
-            Effect.andThen(Deferred.succeed(described)),
-            Effect.andThen(Effect.fail("the repo is not read here"))
-          )
+        const facts = withProjectFacts(
+          listed,
+          (): Effect.Effect<LandedProject, string> =>
+            seen("description").pipe(
+              Effect.andThen(Deferred.succeed(described, "described")),
+              Effect.andThen(Effect.fail("the repo is not read here"))
+            )
         ).pipe(
           Effect.timeout(Duration.seconds(5)),
           Effect.provide(projects),
