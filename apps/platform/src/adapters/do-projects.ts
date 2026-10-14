@@ -95,8 +95,7 @@ const apiOf = (
     layerFacts: (caller) => on("layerFacts", [caller]),
     ledger: (caller) => assumingMade(on("ledger", [caller])),
     listAsks: (caller) => assumingMade(on("listAsks", [caller])),
-    listDiscussions: (caller) =>
-      assumingMade(on("listDiscussions", [caller])),
+    listDiscussions: (caller) => assumingMade(on("listDiscussions", [caller])),
     onAlarm: () => on("onAlarm", []),
     openAsk: (caller, input) => assumingMade(on("openAsk", [caller, input])),
     policy: () => on("policy", []),

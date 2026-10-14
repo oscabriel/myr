@@ -1,6 +1,7 @@
 import type {
   AskId,
   DecisionId,
+  DiscussionId,
   Handle,
   ProjectName,
 } from "@repo/protocol/ids";
@@ -38,6 +39,14 @@ export const answerPath = (project: ProjectName, ask: AskId) =>
 
 /** A handle is URL-safe by its schema. */
 export const personPath = (handle: Handle) => `/people/${handle}`;
+
+export const discussionsPath = (project: ProjectName) =>
+  `/${project}/discussions`;
+
+export const discussionPath = (
+  project: ProjectName,
+  discussion: DiscussionId
+) => `/${project}/discussions/${discussion}`;
 
 /** A project's Visibility tab (ADR 0041), and the regions on it a link may open. */
 export const visibilityPath = (project: ProjectName) =>

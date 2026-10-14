@@ -96,11 +96,7 @@ import {
   openDecision,
 } from "./attention/decisions.ts";
 import type { Decided } from "./attention/decisions.ts";
-import {
-  DiscussionCommand,
-  post,
-  promoted,
-} from "./attention/discussions.ts";
+import { DiscussionCommand, post, promoted } from "./attention/discussions.ts";
 import { AttentionEffect, platformHandle } from "./attention/effects.ts";
 import {
   draft,

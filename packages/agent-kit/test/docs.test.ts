@@ -186,7 +186,7 @@ describe("the reference", () => {
       "AskOpened",
       "Claimed",
       "Decided",
-  "DiscussionPosted",
+      "DiscussionPosted",
       "Judged",
       "Landed",
       "Lapsed",

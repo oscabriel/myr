@@ -20,6 +20,7 @@ const askOf = (event: ProjectEvent): readonly AskId[] =>
     Judged: ({ ask }) => [ask],
     Landed: () => [],
     Lapsed: ({ ask }) => [ask],
+    DiscussionPosted: () => [],
     LedgerAppended: () => [],
     ProposalDrafted: () => [],
     ProposalOpened: () => [],

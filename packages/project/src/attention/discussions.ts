@@ -1,7 +1,11 @@
 import type { Discussion } from "@repo/protocol/domain/discussion";
 import type { DiscussionId, ProjectName, ProposalId } from "@repo/protocol/ids";
 import type { Person } from "@repo/protocol/principal";
-import { CapReached, Denounced, DiscussionClosed } from "@repo/protocol/refusal";
+import {
+  CapReached,
+  Denounced,
+  DiscussionClosed,
+} from "@repo/protocol/refusal";
 import { Array, Data, Option, Result } from "effect";
 import type { DateTime } from "effect";
 

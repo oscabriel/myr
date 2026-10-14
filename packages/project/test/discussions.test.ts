@@ -227,59 +227,66 @@ describe.each<StoreKind>(["memory", "sqlite"])(
       Effect.provide(world)
     );
 
-    it.effect("take a thread from anyone not denounced, and a reply from them too", () =>
-      Effect.map(talked, (run) => {
-        expect(run.opened.discussion).toMatchObject({
-          id: first,
-          opener: Handle.make("dave"),
-          project,
-          state: "open",
-          title: "Which day starts a week?",
-        });
-        expect(run.opened.discussion.posts).toHaveLength(1);
-        expect(
-          run.replied.discussion.posts.map(({ body, by }) => [by, body])
-        ).toStrictEqual([
-          ["dave", "Weeks start on Monday in ISO 8601; which does parse assume?"],
-          ["carol", "ISO, always."],
-        ]);
-        // A thread opened with a title alone reads the title as its first post.
-        expect(
-          run.titleOnly.discussion.posts.map(({ body }) => body)
-        ).toStrictEqual(["Does format take a locale?"]);
-        expect(run.refused).toStrictEqual({
-          erinOpens: new Denounced({}),
-          erinReplies: new Denounced({}),
-          nowhere: new UnknownDiscussion({ discussion: unknown }),
-        });
-      })
+    it.effect(
+      "take a thread from anyone not denounced, and a reply from them too",
+      () =>
+        Effect.map(talked, (run) => {
+          expect(run.opened.discussion).toMatchObject({
+            id: first,
+            opener: Handle.make("dave"),
+            project,
+            state: "open",
+            title: "Which day starts a week?",
+          });
+          expect(run.opened.discussion.posts).toHaveLength(1);
+          expect(
+            run.replied.discussion.posts.map(({ body, by }) => [by, body])
+          ).toStrictEqual([
+            [
+              "dave",
+              "Weeks start on Monday in ISO 8601; which does parse assume?",
+            ],
+            ["carol", "ISO, always."],
+          ]);
+          // A thread opened with a title alone reads the title as its first post.
+          expect(
+            run.titleOnly.discussion.posts.map(({ body }) => body)
+          ).toStrictEqual(["Does format take a locale?"]);
+          expect(run.refused).toStrictEqual({
+            erinOpens: new Denounced({}),
+            erinReplies: new Denounced({}),
+            nowhere: new UnknownDiscussion({ discussion: unknown }),
+          });
+        })
     );
 
-    it.effect("list newest post first with the posts counted, show one whole, and tell each post", () =>
-      Effect.map(talked, (run) => {
-        expect(run.shown.discussion).toStrictEqual(run.replied.discussion);
-        expect(
-          run.listed.discussions.map(({ id, posts, state }) => [
-            id,
-            posts,
-            state,
-          ])
-        ).toStrictEqual([
-          ["disc-000002", 1, "open"],
-          ["disc-000001", 2, "open"],
-        ]);
-        expect(
-          run.events.flatMap(({ event }) =>
-            ProjectEvent.guards.DiscussionPosted(event)
-              ? [[event.discussion, event.by]]
-              : []
-          )
-        ).toStrictEqual([
-          ["disc-000001", "dave"],
-          ["disc-000001", "carol"],
-          ["disc-000002", "dave"],
-        ]);
-      })
+    it.effect(
+      "list newest post first with the posts counted, show one whole, and tell each post",
+      () =>
+        Effect.map(talked, (run) => {
+          expect(run.shown.discussion).toStrictEqual(run.replied.discussion);
+          expect(
+            run.listed.discussions.map(({ id, posts, state }) => [
+              id,
+              posts,
+              state,
+            ])
+          ).toStrictEqual([
+            ["disc-000002", 1, "open"],
+            ["disc-000001", 2, "open"],
+          ]);
+          expect(
+            run.events.flatMap(({ event }) =>
+              ProjectEvent.guards.DiscussionPosted(event)
+                ? [[event.discussion, event.by]]
+                : []
+            )
+          ).toStrictEqual([
+            ["disc-000001", "dave"],
+            ["disc-000001", "carol"],
+            ["disc-000002", "dave"],
+          ]);
+        })
     );
 
     it.effect("become a proposal only by a maintainer", () =>
@@ -297,29 +304,33 @@ describe.each<StoreKind>(["memory", "sqlite"])(
       })
     );
 
-    it.effect("once proposed, take no more posts and no second proposal, and are kept so", () =>
-      Effect.map(promoted, (run) => {
-        expect(run.closed).toStrictEqual({
-          again: new DiscussionClosed({ discussion: first }),
-          reply: new DiscussionClosed({ discussion: first }),
-        });
-        expect(run.stored).toStrictEqual([run.after.discussion]);
-      })
+    it.effect(
+      "once proposed, take no more posts and no second proposal, and are kept so",
+      () =>
+        Effect.map(promoted, (run) => {
+          expect(run.closed).toStrictEqual({
+            again: new DiscussionClosed({ discussion: first }),
+            reply: new DiscussionClosed({ discussion: first }),
+          });
+          expect(run.stored).toStrictEqual([run.after.discussion]);
+        })
     );
   }
 );
 
 describe("the cap on open discussions", () => {
-  it.effect("holds a person the project has not vouched for to twenty, and a vouched one to none", () =>
-    Effect.gen(function* () {
-      const run = yield* Effect.flatMap(made, filling);
+  it.effect(
+    "holds a person the project has not vouched for to twenty, and a vouched one to none",
+    () =>
+      Effect.gen(function* () {
+        const run = yield* Effect.flatMap(made, filling);
 
-      expect(run.daveAtCap).toStrictEqual(
-        new CapReached({ cap: DISCUSSIONS_PER_PERSON, limit: "discussions" })
-      );
-      // The cap is on threads held open, not on posts.
-      expect(run.daveReplies.discussion.posts).toHaveLength(2);
-      expect(run.carolBeyond).toBe("allowed");
-    }).pipe(Effect.provide(worldOf(scenario, "memory")))
+        expect(run.daveAtCap).toStrictEqual(
+          new CapReached({ cap: DISCUSSIONS_PER_PERSON, limit: "discussions" })
+        );
+        // The cap is on threads held open, not on posts.
+        expect(run.daveReplies.discussion.posts).toHaveLength(2);
+        expect(run.carolBeyond).toBe("allowed");
+      }).pipe(Effect.provide(worldOf(scenario, "memory")))
   );
 });

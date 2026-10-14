@@ -80,6 +80,7 @@ const step = (
     Judged: () => rows,
     Landed: () => rows,
     Lapsed: ({ ask }) => withClaims(rows, keyOf(project, ask), -1),
+    DiscussionPosted: () => rows,
     LedgerAppended: () => rows,
     ProposalDrafted: () => rows,
     ProposalOpened: () => rows,

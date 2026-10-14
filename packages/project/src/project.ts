@@ -99,6 +99,7 @@ import type { Evidence } from "@repo/protocol/domain/common";
 import type { AgentTrailer, Credit } from "@repo/protocol/domain/credit";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
 import type { Choice, Decision } from "@repo/protocol/domain/decision";
+import type { Discussion } from "@repo/protocol/domain/discussion";
 import { ProjectEvent } from "@repo/protocol/domain/event";
 import type { AskKind } from "@repo/protocol/domain/kind";
 import { LandingView } from "@repo/protocol/domain/landing";
@@ -106,7 +107,6 @@ import { Outcome } from "@repo/protocol/domain/outcome";
 import type { StageName } from "@repo/protocol/domain/outcome";
 import type { ImportSource, PublicPolicy } from "@repo/protocol/domain/policy";
 import { Policy } from "@repo/protocol/domain/policy";
-import type { Discussion } from "@repo/protocol/domain/discussion";
 import type { Proposal } from "@repo/protocol/domain/proposal";
 import {
   AskId,
