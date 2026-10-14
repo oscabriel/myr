@@ -162,6 +162,25 @@ const servedOn = {
 // tool's input needs; this is the form `Tool.EmptyParams` takes.
 const NoPayload = Schema.Record(Schema.String, Schema.Never);
 
+// What a flag takes, said once: `--help` and each MCP tool's input schema read it.
+const described = <S extends Schema.Top>(schema: S, description: string) =>
+  schema.annotate({ description });
+
+const baseField = described(
+  CommitSha,
+  "The commit your change is built on: main as the platform last landed it"
+);
+
+const headField = described(
+  CommitSha,
+  "The commit to check: the one you pushed to your fork"
+);
+
+const requestIdField = described(
+  RequestId,
+  "Any 8 to 64 letters, digits, - or _ you choose; sending the same one again returns the same receipt"
+);
+
 export class ListProjects extends Rpc.make("listProjects", {
   payload: NoPayload,
   success: Schema.Struct({ projects: Schema.Array(ProjectListing) }),
@@ -197,8 +216,12 @@ export class RecentLandingsOf extends Rpc.make("recentLandings", {
 
 export class FrontPage extends Rpc.make("frontPage", {
   payload: {
-    kind: Schema.optionalKey(KindName),
-    reserved: Schema.optionalKey(Reserve),
+    kind: Schema.optionalKey(
+      described(KindName, "Only asks of this kind, such as fix")
+    ),
+    reserved: Schema.optionalKey(
+      described(Reserve, "Only asks held for newcomers, or for people")
+    ),
   },
   success: Schema.Struct({ entries: Schema.Array(FrontPageEntry) }),
 })
@@ -253,7 +276,11 @@ export class ShowAsk extends Rpc.make("showAsk", {
 
 export class Status extends Rpc.make("status", {
   error: UnknownProject,
-  payload: { project: Schema.optionalKey(ProjectName) },
+  payload: {
+    project: Schema.optionalKey(
+      described(ProjectName, "The project to show; every project when absent")
+    ),
+  },
   success: Schema.Struct({
     answers: Schema.Array(AnswerView),
     claims: Schema.Array(ClaimView),
@@ -277,8 +304,9 @@ export class VerdictOf extends Rpc.make("verdict", {
   error: Schema.Union([UnknownProject, UnknownAsk]),
   payload: {
     ask: AskId,
-    /** The answer's head; its latest when absent. */
-    head: Schema.optionalKey(CommitSha),
+    head: Schema.optionalKey(
+      described(CommitSha, "The answer's head to show; its latest when absent")
+    ),
     project: ProjectName,
   },
   success: Schema.Struct({ verdict: Schema.optionalKey(Verdict) }),
@@ -315,7 +343,7 @@ export class LandingOf extends Rpc.make("landing", {
   .annotate(Surfaces, servedOn.landing) {}
 
 export class Credits extends Rpc.make("credits", {
-  payload: { handle: Handle },
+  payload: { handle: described(Handle, "The person whose credits to count") },
   success: Schema.Struct({ credits: Schema.Array(CreditSummary) }),
 })
   .annotate(
@@ -637,7 +665,10 @@ export class OpenAsk extends Rpc.make("openAsk", {
   ]),
   payload: {
     ask: AskId,
-    files: Schema.NonEmptyArray(ConfigFile),
+    files: described(
+      Schema.NonEmptyArray(ConfigFile),
+      "The ask file and its check, as JSON [{path, content}]; the CLI reads both from your working tree when it is left out"
+    ),
     project: ProjectName,
   },
   success: Schema.Struct({ ask: Ask, landed: LandedSha }),
@@ -670,12 +701,35 @@ const draftsAlone = Schema.makeFilter(
 export class ProposeAsk extends Rpc.make("proposeAsk", {
   error: Schema.Union([UnknownProject, Denounced, CapReached, NotVouched]),
   payload: Schema.Struct({
-    draft: Schema.optionalKey(Schema.Literal(true)),
-    files: Schema.optionalKey(Schema.NonEmptyArray(ConfigFile)),
+    draft: Schema.optionalKey(
+      described(
+        Schema.Literal(true),
+        "Have the platform's agent draft the ask file and its failing check"
+      )
+    ),
+    files: Schema.optionalKey(
+      described(
+        Schema.NonEmptyArray(ConfigFile),
+        "Your own ask file and check, as JSON [{path, content}]"
+      )
+    ),
     project: ProjectName,
-    sealed: Schema.optionalKey(Schema.Struct({ head: CommitSha })),
-    territory: Schema.optionalKey(Schema.NonEmptyString),
-    want: Schema.NonEmptyString,
+    sealed: Schema.optionalKey(
+      described(
+        Schema.Struct({ head: CommitSha }),
+        "An answer you already have, sealed until the ask opens, as JSON {head}"
+      )
+    ),
+    territory: Schema.optionalKey(
+      described(
+        Schema.NonEmptyString,
+        "The paths an answer may change, in your words"
+      )
+    ),
+    want: described(
+      Schema.NonEmptyString,
+      "What should be true once the ask is answered"
+    ),
   }).check(draftsAlone),
   success: Schema.Struct({ proposal: Proposal }),
 })
@@ -702,7 +756,9 @@ export class DraftAsk extends Rpc.make("draftAsk", {
     CapReached,
   ]),
   payload: {
-    note: Schema.optionalKey(DraftNote),
+    note: Schema.optionalKey(
+      described(DraftNote, "What the next round should change, for the agent")
+    ),
     project: ProjectName,
     proposal: ProposalId,
   },
@@ -726,7 +782,10 @@ export class FlagAsk extends Rpc.make("flagAsk", {
   payload: {
     ask: AskId,
     project: ProjectName,
-    reason: Schema.NonEmptyString,
+    reason: described(
+      Schema.NonEmptyString,
+      "What is wrong with the ask, for its maintainers"
+    ),
   },
   success: Schema.Struct({ proposal: Proposal }),
 })
@@ -753,9 +812,14 @@ export class Decide extends Rpc.make("decide", {
     StaleBase,
   ]),
   payload: {
-    choice: Choice,
-    decision: DecisionId,
-    note: Schema.optionalKey(Schema.String),
+    choice: described(
+      Choice,
+      "accept or decline it; for a stray push, adopt or revert it"
+    ),
+    decision: described(DecisionId, "The decision's id, as Today lists it"),
+    note: Schema.optionalKey(
+      described(Schema.String, "Why, kept with the decision")
+    ),
     project: ProjectName,
   },
   success: Schema.Struct({ decision: Decision }),
@@ -832,10 +896,10 @@ export class SubmitAnswer extends Rpc.make("submitAnswer", {
   ]),
   payload: {
     ask: AskId,
-    base: CommitSha,
-    head: CommitSha,
+    base: baseField,
+    head: headField,
     project: ProjectName,
-    requestId: RequestId,
+    requestId: requestIdField,
   },
   success: AnswerReceipt,
 })
@@ -862,10 +926,10 @@ export class Finish extends Rpc.make("finish", {
   ]),
   payload: {
     ask: AskId,
-    base: CommitSha,
-    head: CommitSha,
+    base: baseField,
+    head: headField,
     project: ProjectName,
-    requestId: RequestId,
+    requestId: requestIdField,
   },
   success: AnswerReceipt,
 })
@@ -885,11 +949,14 @@ export class Finish extends Rpc.make("finish", {
 export class Land extends Rpc.make("land", {
   error: Schema.Union([UnknownProject, NotDecider, StaleBase, RepoBusy]),
   payload: {
-    base: CommitSha,
-    head: CommitSha,
-    message: Schema.NonEmptyString,
+    base: baseField,
+    head: headField,
+    message: described(
+      Schema.NonEmptyString,
+      "The landing's commit message: what the change does"
+    ),
     project: ProjectName,
-    requestId: RequestId,
+    requestId: requestIdField,
   },
   success: LandReceipt,
 })
@@ -930,10 +997,15 @@ export class Fork extends Rpc.make("fork", {
 export class Vouch extends Rpc.make("vouch", {
   error: Schema.Union([UnknownProject, NotDecider, StaleBase]),
   payload: {
-    handle: Handle,
-    note: Schema.optionalKey(Schema.String),
+    handle: described(Handle, "The person's handle"),
+    note: Schema.optionalKey(
+      described(Schema.String, "Why, kept beside the line in the vouch file")
+    ),
     project: ProjectName,
-    verdict: Schema.Literals(["vouch", "denounce"]),
+    verdict: described(
+      Schema.Literals(["vouch", "denounce"]),
+      "vouch admits them to claim; denounce bars them from claiming and proposing"
+    ),
   },
   success: Schema.Struct({ landed: LandedSha }),
 })
@@ -954,7 +1026,10 @@ export class EvidenceOf extends Rpc.make("evidence", {
   error: Schema.Union([UnknownProject, NotDecider]),
   payload: {
     project: ProjectName,
-    ref: Schema.NonEmptyString,
+    ref: described(
+      Schema.NonEmptyString,
+      "The logRef a failing lane's verdict names"
+    ),
   },
   success: Schema.Struct({
     lane: LaneName,
