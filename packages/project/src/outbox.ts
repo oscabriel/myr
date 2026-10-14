@@ -138,8 +138,7 @@ export const measuredRow = (
 export const warmRow = (
   job: Omit<Extract<OutboxBody, { readonly _tag: "WarmSetup" }>, "_tag">,
   at: DateTime.Utc
-) =>
-  outboxRow(`warm:${job.at}`, OutboxBody.cases.WarmSetup.make(job), at);
+) => outboxRow(`warm:${job.at}`, OutboxBody.cases.WarmSetup.make(job), at);
 
 export const isDue = (row: OutboxRow, now: DateTime.Utc) =>
   DateTime.isLessThanOrEqualTo(row.notBefore, now);

@@ -33,7 +33,7 @@ const installing: Policy = {
   },
 };
 
-const shape = ({ at, lanes, project, repo: on, run }: CheckJob) => ({
+const summary = ({ at, lanes, project, repo: on, run }: CheckJob) => ({
   at,
   lanes,
   project,
@@ -66,12 +66,12 @@ describe("a landing's setup snapshot", () => {
       Effect.gen(function* () {
         const { api, first } = yield* firstLanding;
 
-        const afterLanding = (yield* jobs).map(shape);
+        const afterLanding = (yield* jobs).map(summary);
 
         yield* api.onAlarm();
         yield* api.onAlarm();
 
-        const afterAlarms = (yield* jobs).map(shape);
+        const afterAlarms = (yield* jobs).map(summary);
 
         expect({ afterAlarms, afterLanding }).toStrictEqual({
           afterAlarms: afterLanding,
