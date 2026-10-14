@@ -1,7 +1,15 @@
+/**
+ * The history of a revision: git's first-parent log, newest first, with the
+ * platform's landing record on each commit that has one. On main the landings
+ * run unbroken from the top down to the adoption, so the commits below the
+ * first one without a record came with the import, and one marker row says so
+ * in their place.
+ */
 import type { CommitView } from "@repo/protocol/domain/code";
 import type { ProjectName, RepoPath } from "@repo/protocol/ids";
 import { DateTime, Option } from "effect";
 import { LockKeyhole } from "lucide-react";
+import { Fragment } from "react";
 import type { ReactNode } from "react";
 
 import { CompactCredit } from "../shared/credits.tsx";
@@ -12,12 +20,13 @@ import { MetaCode, MetaLine, Row, RowGroup } from "../shared/row.tsx";
 import { Workspace } from "../shared/shell/workspace.tsx";
 import { When } from "../shared/time.tsx";
 import { askOf } from "../why/rows.ts";
-import { LOG_PAGE } from "./log-page.ts";
+import { defaultShowOf, LOG_PAGE } from "./log-page.ts";
+import type { LogShow } from "./log-page.ts";
 import { Pager } from "./pager.tsx";
 import { blobHref, commitHref, commitsHref, shortSha } from "./paths.ts";
-import { pinnedRev, revLabel } from "./rev.ts";
+import { isForkRev, pinnedRev, revLabel } from "./rev.ts";
 
-export type LogShow = "all" | "answers" | "openings";
+export type { LogShow } from "./log-page.ts";
 
 const dayWords = new Intl.DateTimeFormat("en", {
   dateStyle: "long",
@@ -46,9 +55,15 @@ const linkedOf = (commit: CommitView) =>
     ? undefined
     : Option.getOrUndefined(askOf(commit.landing));
 
+const isLanding = (commit: CommitView) => commit.landing !== undefined;
+
 export const shows = (show: LogShow, commit: CommitView) => {
   if (show === "all") {
     return true;
+  }
+
+  if (show === "landings") {
+    return isLanding(commit);
   }
 
   const linked = linkedOf(commit);
@@ -58,10 +73,34 @@ export const shows = (show: LogShow, commit: CommitView) => {
     : linked?.kind === "answers";
 };
 
+/**
+ * The commit the adoption's marker stands over: the first on the page with no
+ * landing record that follows one with. Landings run unbroken from main's top
+ * down to the adoption, and a fork's own commits sit above them, so the first
+ * break after a landing is where the import's history begins.
+ */
+export const adoptedAt = (
+  commits: readonly CommitView[]
+): CommitView | undefined =>
+  commits.find(
+    (commit, at) =>
+      !isLanding(commit) && at > 0 && isLanding(commits[at - 1] ?? commit)
+  );
+
 const LINK = "decoration-rule underline hover:decoration-current";
 
 const Raised = ({ children }: { readonly children: ReactNode }) => (
   <span className="relative z-[1]">{children}</span>
+);
+
+const AdoptedHere = ({ sha }: { readonly sha: string }) => (
+  <li
+    className="border-rule text-ui text-muted-foreground -mx-2 border-b px-2 py-2"
+    data-adopted={sha}
+  >
+    Adopted here. The commits below came with the import; no landing records
+    them.
+  </li>
 );
 
 const CommitRow = ({
@@ -93,7 +132,7 @@ const CommitRow = ({
       id={commit.sha}
       meta={
         landing === undefined ? (
-          <MetaLine parts={[commit.author.name, "before adoption"]} />
+          <MetaLine parts={[commit.author.name]} />
         ) : (
           <MetaLine
             parts={[
@@ -142,9 +181,10 @@ const newerPage = (from: number, path: RepoPath | undefined) =>
   path === undefined ? { from: Math.max(0, from - LOG_PAGE) } : { path };
 
 const FILTERS = [
-  { label: "All", show: "all" },
+  { label: "Landings", show: "landings" },
   { label: "Answers", show: "answers" },
   { label: "Ask openings", show: "openings" },
+  { label: "Every commit", show: "all" },
 ] as const satisfies readonly {
   readonly label: string;
   readonly show: LogShow;
@@ -153,24 +193,33 @@ const FILTERS = [
 const FILTER =
   "text-ui text-muted-foreground hover:text-foreground aria-[current]:text-foreground flex h-10 items-center border-b-2 border-transparent px-1 no-underline aria-[current]:border-current aria-[current]:font-semibold";
 
-const titleOf = (path: RepoPath | undefined, rev: string) => {
+/** "History of" a path, main or a fork, whose history moves; "History at" a tag or a commit, which stands still. */
+export const titleOf = (path: RepoPath | undefined, rev: string) => {
   if (path !== undefined) {
     return `History of ${path}`;
   }
 
-  return rev === "main" ? "Landings" : `Landings on ${revLabel(rev)}`;
+  return rev === "main" || isForkRev(rev)
+    ? `History of ${revLabel(rev)}`
+    : `History at ${revLabel(rev)}`;
 };
 
-const searchFor = (query: string, show: LogShow) => {
+const searchFor = (query: string, show: LogShow, fallback: LogShow) => {
   const search: Record<string, string> = Object.fromEntries(
     new URLSearchParams(query)
   );
 
-  if (show !== "all") {
+  if (show !== fallback) {
     search.show = show;
   }
 
   return search;
+};
+
+const countsOf = (ofDay: readonly CommitView[]) => {
+  const noun = ofDay.every(isLanding) ? "landing" : "commit";
+
+  return `${ofDay.length} ${ofDay.length === 1 ? noun : `${noun}s`}`;
 };
 
 export interface LogViewProps {
@@ -192,13 +241,22 @@ export const LogView = ({
   path,
   project,
   rev,
-  show = "all",
+  show = defaultShowOf(rev, path),
 }: LogViewProps) => {
+  const fallback = defaultShowOf(rev, path);
   const filter = path === undefined ? {} : { path };
-  const kind = show === "all" ? {} : { show };
+  const kind = show === fallback ? {} : { show };
   const shown = commits.filter((commit) => shows(show, commit));
+  const adopted = show === "all" ? adoptedAt(commits) : undefined;
   const base = commitsHref(project, rev, filter);
   const [to, query = ""] = base.split("?");
+
+  // The landings end at the adoption: once a page holds a commit no landing
+  // records, no older page holds one either.
+  const older =
+    next === undefined || (show === "landings" && !commits.every(isLanding))
+      ? undefined
+      : commitsHref(project, rev, { ...filter, ...kind, from: next });
 
   return (
     <Workspace
@@ -210,7 +268,7 @@ export const LogView = ({
               aria-current={show === each ? "page" : undefined}
               className={FILTER}
               key={each}
-              search={searchFor(query, each)}
+              search={searchFor(query, each, fallback)}
               to={to ?? base}
             >
               {label}
@@ -240,20 +298,24 @@ export const LogView = ({
           {byDay(shown).map(({ commits: ofDay, day }) => (
             <div data-day={day} key={day}>
               <RowGroup
-                counts={`${ofDay.length} ${ofDay.length === 1 ? "commit" : "commits"}`}
+                counts={countsOf(ofDay)}
                 label={day}
                 name={dayWords.format(
                   DateTime.toDateUtc(ofDay[0]?.committer.at ?? now)
                 )}
               >
                 {ofDay.map((commit) => (
-                  <CommitRow
-                    commit={commit}
-                    key={commit.sha}
-                    now={now}
-                    project={project}
-                    rev={rev}
-                  />
+                  <Fragment key={commit.sha}>
+                    {adopted?.sha === commit.sha ? (
+                      <AdoptedHere sha={commit.sha} />
+                    ) : null}
+                    <CommitRow
+                      commit={commit}
+                      now={now}
+                      project={project}
+                      rev={rev}
+                    />
+                  </Fragment>
                 ))}
               </RowGroup>
             </div>
@@ -266,11 +328,7 @@ export const LogView = ({
             ? commitsHref(project, rev, { ...newerPage(from, path), ...kind })
             : undefined
         }
-        older={
-          next === undefined
-            ? undefined
-            : commitsHref(project, rev, { ...filter, ...kind, from: next })
-        }
+        older={older}
       />
     </Workspace>
   );

@@ -99,9 +99,10 @@ const PROSE_BASE = [
   "prose-table:text-ui prose-th:font-semibold",
 ];
 
-/** A page's own Markdown: its `#` is the page's one h1. */
+/** A page's own Markdown: its `#` is the page's one h1, and a transcript's `remote:` lines wrap on a phone. */
 const PROSE = [
   ...PROSE_BASE,
+  "prose-pre:whitespace-pre-wrap prose-pre:[overflow-wrap:anywhere]",
   "prose-h1:text-title prose-h1:mb-3 prose-h1:border-b prose-h1:border-rule prose-h1:pb-2",
   "prose-h2:text-title prose-h2:mt-8 prose-h2:mb-3",
   "prose-h3:text-want prose-h4:text-want",

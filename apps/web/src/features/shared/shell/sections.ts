@@ -20,24 +20,27 @@ export interface Section {
   readonly to: string;
   /** A tab whose own page has not been built yet opens the region of Overview that holds it. */
   readonly hash?: string;
+  /** A tab that opens a page's filtered view carries the filter in the query. */
+  readonly search?: Readonly<Record<string, string>>;
 }
 
 /**
  * Each tab opens a page inside the project's frame that exists today: Asks,
- * Landings, Proposals and People open their regions of Overview (the history
- * of commits is the Code tab's), Policy the policy at the address it has
- * always had, and Visibility its own page. Starting a
- * proposal is a focused page of its own, so it is Contribute's, not a tab's.
+ * Proposals and People open their regions of Overview, Landings the history
+ * of main shown as its landings (the Code tab's History, filtered), Policy
+ * the policy at the address it has always had, and Visibility its own page.
+ * Starting a proposal is a focused page of its own, so it is Contribute's,
+ * not a tab's.
  */
 export const projectSections = (project: string): readonly Section[] => [
   { label: "Overview", tab: "overview", to: `/${project}` },
   { label: "Code", tab: "code", to: `/${project}/tree/main` },
   { hash: "open-asks", label: "Asks", tab: "asks", to: `/${project}` },
   {
-    hash: "recent-landings",
     label: "Landings",
+    search: { show: "landings" },
     tab: "landings",
-    to: `/${project}`,
+    to: `/${project}/commits/main`,
   },
   {
     hash: "proposals",
@@ -50,13 +53,13 @@ export const projectSections = (project: string): readonly Section[] => [
   { label: "Visibility", tab: "visibility", to: `/${project}/visibility` },
 ];
 
-/** The tab each page of a project sits under, by its first segment. */
+/** The tab each page of a project sits under, by its first segment: the history and a commit are the Landings tab's, as its crumb says. */
 const TAB_OF = {
   answers: "landings",
   asks: "asks",
   blob: "code",
-  commit: "code",
-  commits: "code",
+  commit: "landings",
+  commits: "landings",
   decisions: "asks",
   people: "policy",
   proposals: "proposals",

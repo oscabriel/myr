@@ -12,9 +12,12 @@ import {
   repoPathOf,
   revisionOf,
 } from "../../../../features/code/address.ts";
-import { LOG_PAGE } from "../../../../features/code/log-page.ts";
+import {
+  defaultShowOf,
+  LOG_PAGE,
+  LOG_SHOWS,
+} from "../../../../features/code/log-page.ts";
 import { LogView } from "../../../../features/code/log-view.tsx";
-import type { LogShow } from "../../../../features/code/log-view.tsx";
 import { CodeNotFound } from "../../../../features/code/not-found.tsx";
 import { pageHead } from "../../../../features/shared/head.ts";
 import { notFoundFor } from "../../../../features/shared/refusals.ts";
@@ -33,8 +36,6 @@ const LogPageData = Schema.Struct({
   project: ProjectName,
   rev: Schema.String,
 });
-
-const SHOWS: readonly LogShow[] = ["answers", "openings"];
 
 interface LogParams {
   readonly from?: number | undefined;
@@ -102,7 +103,7 @@ const LogPage = () => {
       path={read.path}
       project={read.project}
       rev={read.rev}
-      show={show ?? "all"}
+      show={show ?? defaultShowOf(read.rev, read.path)}
     />
   );
 };
@@ -116,13 +117,13 @@ export const Route = createFileRoute("/$owner/$project/commits/$rev")({
   }) => ({
     from: Option.getOrUndefined(offsetOf(search.from)),
     path: Predicate.isString(search.path) ? search.path : undefined,
-    show: SHOWS.find((each) => each === search.show),
+    show: LOG_SHOWS.find((each) => each === search.show),
   }),
   loaderDeps: ({ search }) => ({ from: search.from, path: search.path }),
   loader: ({ deps, params }) => logPage({ data: { ...params, ...deps } }),
   headers: () => branchPage,
   head: ({ params: { project, rev } }) =>
-    pageHead({ title: `${project}: landings on ${rev}` }),
+    pageHead({ title: `${project}: history of ${rev}` }),
   component: LogPage,
   notFoundComponent: CodeNotFound,
 });

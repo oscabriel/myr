@@ -3,6 +3,7 @@ import { Brand } from "@repo/brand";
 import { AppLink } from "../link.tsx";
 import {
   docsPath,
+  IMPORT_PATH,
   INSTALL_PATH,
   PRIVACY_PATH,
   SETTINGS_PATH,
@@ -10,9 +11,11 @@ import {
 } from "../paths.ts";
 import { GUTTER } from "./gutter.ts";
 
+/** Plain links, the maintainer's way in among them: the hero's "Run a project: bring a repo", shortened. */
 const LINKS = [
   { label: "Docs", to: docsPath() },
   { label: "Install", to: INSTALL_PATH },
+  { label: "Bring a repo", to: IMPORT_PATH },
   { label: "Settings", to: SETTINGS_PATH },
   { label: "Privacy", to: PRIVACY_PATH },
   { label: "Terms", to: TERMS_PATH },

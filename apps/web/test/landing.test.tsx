@@ -3,6 +3,7 @@ import { installCommand } from "@repo/agent-kit/install";
 import { Brand } from "@repo/brand";
 import { authorLine } from "@repo/git/trailers";
 import { Contracts } from "@repo/protocol/contracts";
+import { StageName } from "@repo/protocol/domain/outcome";
 import { RecentLanding } from "@repo/protocol/domain/recent-landing";
 import { AskId, Handle, LandedSha, ProjectName } from "@repo/protocol/ids";
 import { DateTime, Effect } from "effect";
@@ -13,7 +14,8 @@ import { LandingView } from "../src/features/landing/landing-page.tsx";
 import { REST, poseAt } from "../src/features/landing/music-box/model.ts";
 import { KEYS } from "../src/features/landing/music-box/words.ts";
 import { readLandingNow } from "../src/features/landing/read.ts";
-import { LEDE } from "../src/features/landing/words.ts";
+import { LEDE, RUN_A_PROJECT } from "../src/features/landing/words.ts";
+import { stageRuns } from "../src/features/shared/status-line.tsx";
 import { landingHead } from "../src/routes/index.tsx";
 import { allInOrder, textIn } from "./markup.ts";
 import { platformWith, unreachablePlatform } from "./platform.ts";
@@ -120,18 +122,53 @@ const defined = (word: string) =>
 
 describe(LandingView, () => {
   it.effect(
-    "has one primary action, to the open asks, beside the install command",
+    "has two actions under the hero, the open asks first and the maintainer's way in beside it, over the install command",
     () =>
       Effect.gen(function* () {
         const main = mainOf(yield* pageWith(landed));
 
-        expect(hrefsOf(main)[0]).toBe("/asks");
+        expect(hrefsOf(main).slice(0, 2)).toStrictEqual(["/asks", "/import"]);
         expect(
           [...main.matchAll(/data-action="(?<action>[^"]+)"/gu)].map(
             (found) => found.groups?.action
           )
-        ).toStrictEqual(["asks"]);
+        ).toStrictEqual(["asks", "import"]);
+        expect(main).toMatch(
+          new RegExp(
+            `<a\\b[^>]*data-action="import"[^>]*href="/import"[^>]*>${RUN_A_PROJECT}</a>`,
+            "u"
+          )
+        );
+        // Both actions stand over the install command, the hero's command line.
+        expect(main.indexOf('data-action="import"')).toBeLessThan(
+          main.indexOf("select-all")
+        );
         expect(textIn(main)).toContain(installCommand(WEB));
+      })
+  );
+
+  it.effect(
+    "captions each stage with what runs there, shown when the stages stack on a phone and in the wide columns alike",
+    () =>
+      Effect.gen(function* () {
+        const main = mainOf(yield* pageWith(landed));
+        const gate = main.slice(main.indexOf('aria-labelledby="gate"'));
+
+        for (const stage of StageName.literals) {
+          const caption =
+            /<span\b[^>]*class="(?<classes>[^"]*)"[^>]*data-caption="(?<stage>[^"]+)"[^>]*>(?<text>[^<]*)</u.exec(
+              gate.slice(gate.indexOf(`data-caption="${stage}"`) - 400)
+            );
+
+          expect(textIn(caption?.groups?.text ?? "")).toBe(stageRuns(stage));
+          // Shown stacked (no bare `hidden`), left out only between tablet and columns, where seven columns have no room.
+          const classes = (caption?.groups?.classes ?? "").split(" ");
+
+          expect(classes).not.toContain("hidden");
+          expect(classes).toStrictEqual(
+            expect.arrayContaining(["tablet:hidden", "columns:block"])
+          );
+        }
       })
   );
 
@@ -362,7 +399,7 @@ describe(LandingView, () => {
   );
 
   it.effect(
-    "names each by its ask's want, linking the landed commit or the refused ask, and a landing with no ask by its commit",
+    "names each by its ask's want, linking the landed commit or the refused ask, and a landing with no ask as the project's first",
     () =>
       Effect.gen(function* () {
         const [answered = "", refused = "", unasked = ""] = rowsOf(
@@ -378,13 +415,41 @@ describe(LandingView, () => {
         expect(hrefsOf(refused)).toContain(
           "/oscabriel/burrow/asks/drop-legacy-fetch-kit"
         );
-        // A commit is code, set in mono; only a want is sentence text.
-        expect(unasked).toContain(
-          `<span class="text-mono font-mono">${BURROW_SHA.slice(0, 7)}</span>`
-        );
+        // The adoption answered no ask: it is named as the first landing, never as a bare commit id.
+        expect([
+          textIn(unasked).includes("First landing"),
+          textIn(unasked).includes(BURROW_SHA.slice(0, 7)),
+        ]).toStrictEqual([true, false]);
         expect(hrefsOf(unasked)).toContain(
           `/oscabriel/burrow/commit/${BURROW_SHA}`
         );
+      })
+  );
+
+  it.effect(
+    "names a landing that opened an ask, with no want known, by the ask's id in mono",
+    () =>
+      Effect.gen(function* () {
+        const [opened = ""] = rowsOf(
+          yield* pageWith(
+            LandingNow.cases.Listed.make({
+              landings: [
+                RecentLanding.cases.Landed.make({
+                  at: DateTime.makeUnsafe("2026-10-12T11:58:00Z"),
+                  opened: AskId.make("iso-week"),
+                  project: datekit,
+                  sha: LandedSha.make(DATEKIT_SHA),
+                }),
+              ],
+              now: NOW,
+            })
+          )
+        );
+
+        expect(opened).toContain(
+          '<span class="text-mono font-mono">iso-week</span>'
+        );
+        expect(textIn(opened)).not.toContain("First landing");
       })
   );
 

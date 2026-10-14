@@ -96,7 +96,7 @@ const ClaimRow = ({
   readonly now: DateTime.Utc;
   readonly work: Work;
 }) => {
-  const { answer, claim, stage, want } = work;
+  const { answer, claim, holds, stage, want } = work;
   const next = nextOf(work);
 
   return (
@@ -138,7 +138,11 @@ const ClaimRow = ({
       strip={
         answer === undefined || stage === undefined ? undefined : (
           <div className="max-w-[44rem]">
-            <StageStrip outcome={answer.outcome} stage={stage} />
+            <StageStrip
+              outcome={answer.outcome}
+              stage={stage}
+              {...(holds === undefined ? {} : { holds })}
+            />
           </div>
         )
       }

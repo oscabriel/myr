@@ -10,11 +10,16 @@ import { stageNames, stageRuns } from "../shared/status-line.tsx";
 import { landedPush, refusedPush } from "./transcript.ts";
 import type { Transcript as Printed } from "./transcript.ts";
 
+/**
+ * Stacked below `tablet`, each stage's caption sits under its name; in seven
+ * columns the caption fits only from `columns`, so between the two it is
+ * left out.
+ */
 const Stages = () => (
   <ol className="tablet:grid-cols-7 grid grid-cols-1 gap-x-3 gap-y-3">
     {StageName.literals.map((stage, index) => (
       <li
-        className="tablet:flex-col tablet:items-center tablet:text-center flex items-baseline gap-x-3 gap-y-1"
+        className="tablet:flex-col tablet:items-center tablet:text-center flex flex-col gap-x-3 gap-y-1"
         data-stage={stage}
         key={stage}
       >
@@ -24,7 +29,10 @@ const Stages = () => (
           </span>
           {stageNames(stage).label}
         </span>
-        <span className="text-label text-muted-foreground columns:block hidden font-normal">
+        <span
+          className="text-label text-muted-foreground tablet:hidden columns:block block font-normal"
+          data-caption={stage}
+        >
           {stageRuns(stage)}
         </span>
       </li>

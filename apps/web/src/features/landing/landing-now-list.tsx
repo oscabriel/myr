@@ -1,10 +1,10 @@
 import { RecentLanding } from "@repo/protocol/domain/recent-landing";
 import type { ShownRefusal } from "@repo/protocol/domain/recent-landing";
 import type { ProjectName } from "@repo/protocol/ids";
-import { Array as Arr, DateTime } from "effect";
+import { Array as Arr, DateTime, Option } from "effect";
 import type { ReactNode } from "react";
 
-import { commitHref, shortSha } from "../code/paths.ts";
+import { commitHref } from "../code/paths.ts";
 import { AppLink } from "../shared/link.tsx";
 import { StateMarkIcon } from "../shared/marks.tsx";
 import { askPath, projectPath } from "../shared/paths.ts";
@@ -22,9 +22,12 @@ const RefusalLabel = ({ refusal }: { readonly refusal: ShownRefusal }) => (
   </span>
 );
 
-/** A row's title: the ask's want as sentence text, or, when the list does not know it, the ask's id or the commit in mono. */
+/** A row's title: the ask's want as sentence text, or, when the list does not know it, the ask's id in mono. */
 const titleOf = (want: string | undefined, code: string): ReactNode =>
   want ?? <span className="text-mono font-mono">{code}</span>;
+
+/** A landing that answered or opened no ask is the project's first: its adoption, which no ask records. */
+const FIRST_LANDING = "First landing";
 
 /**
  * One row: the mark, the project over what landed or was refused, why it was refused, and when. Below `tablet` why
@@ -86,7 +89,10 @@ const rowOf = (landing: RecentLanding, now: DateTime.Utc) =>
         key={keyOf(landing)}
         outcome="landed"
         project={project}
-        title={titleOf(want, answered ?? opened ?? shortSha(sha))}
+        title={Option.match(Option.fromUndefinedOr(answered ?? opened), {
+          onNone: () => want ?? FIRST_LANDING,
+          onSome: (ask) => titleOf(want, ask),
+        })}
         to={commitHref(project, sha)}
         when={
           <>

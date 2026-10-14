@@ -7,6 +7,7 @@ import { ExploreView } from "../src/features/explore/explore-page.tsx";
 import { exploreGroups } from "../src/features/explore/groups.ts";
 import { LandingProjects } from "../src/features/landing/projects.ts";
 import { readEveryProject } from "../src/features/landing/read.ts";
+import { RUN_A_PROJECT } from "../src/features/landing/words.ts";
 import { fixturesClient } from "./dev-client.ts";
 import { TEN_LISTED } from "./listings.ts";
 import { textIn } from "./markup.ts";
@@ -193,6 +194,22 @@ describe(ExploreView, () => {
         expect(textIn(markup)).toContain("No open asks");
         expect(textIn(markup)).toContain("No landing yet");
         expect(textIn(markup)).not.toMatch(/\d+ landings?/u);
+      })
+  );
+
+  it.effect(
+    "offers the maintainer's way in from its header, the hero's words, as the router's link to the import page",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* explored(TEN_LISTED);
+        const header = markup.slice(0, markup.indexOf('data-group="taking"'));
+
+        expect(header).toMatch(
+          new RegExp(
+            `<a\\b[^>]*data-action="import"[^>]*href="/import"[^>]*>${RUN_A_PROJECT}</a>`,
+            "u"
+          )
+        );
       })
   );
 

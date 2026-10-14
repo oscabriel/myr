@@ -38,7 +38,7 @@ import { CommitView } from "../src/features/code/commit-view.tsx";
 import { FileFacts } from "../src/features/code/file-facts.tsx";
 import { filesMatching } from "../src/features/code/file-match.ts";
 import { LOG_PAGE } from "../src/features/code/log-page.ts";
-import { LogView } from "../src/features/code/log-view.tsx";
+import { LogView, titleOf } from "../src/features/code/log-view.tsx";
 import { CodeNotFound } from "../src/features/code/not-found.tsx";
 import { SoftLanding } from "../src/features/code/soft-landing.ts";
 import { TreeView } from "../src/features/code/tree-view.tsx";
@@ -56,6 +56,7 @@ import {
   CodeColumn,
   CommitColumn,
 } from "../src/routes/$owner/$project/tree/-code-column.tsx";
+import { plainText } from "./ask-fixtures.ts";
 import { elementWith, elementsWith } from "./records.ts";
 import { renderAt } from "./render.tsx";
 import { reachingTransport } from "./transport.ts";
@@ -746,14 +747,14 @@ describe("a code page in the Code tab", () => {
   );
 
   it.effect(
-    "has the Files/Commits toggle, Files current, and the ref switcher on main",
+    "has the Files/History toggle, Files current, and the revision picker reading At main",
     () =>
       Effect.gen(function* () {
         const bars = (yield* treeAndBlob).map(codeBarOf);
 
         expect(
           bars.map((bar) =>
-            linksIn(navOf(bar, 'aria-label="Files or commits"'))
+            linksIn(navOf(bar, 'aria-label="Files or history"'))
           )
         ).toStrictEqual(
           bars.map(() => [
@@ -765,13 +766,23 @@ describe("a code page in the Code tab", () => {
             {
               current: false,
               href: "/oscabriel/datekit/commits/main",
-              text: "Commits",
+              text: "History",
             },
           ])
         );
         expect(
           bars.map((bar) => /<button\b[^>]*data-ref="main"[^>]*>/u.test(bar))
         ).toStrictEqual([true, true]);
+        expect(
+          bars.map((bar) =>
+            plainText(elementWith(bar, 'data-ref="main"'))
+              .replaceAll(/\s+/gu, " ")
+              .trim()
+          )
+        ).toStrictEqual(["At main", "At main"]);
+        expect(
+          bars.map((bar) => elementWith(bar, 'data-ref="main"'))
+        ).not.toContain("lucide-git-branch");
       })
   );
 
@@ -817,7 +828,7 @@ describe("a code page in the Code tab", () => {
   );
 
   it.effect(
-    "marks Commits on the history and on a commit, at the same revision, and nothing on the refs list",
+    "marks History on the history and on a commit, at the same revision, and nothing on the refs list",
     () =>
       Effect.gen(function* () {
         const pages = yield* Effect.forEach(
@@ -830,14 +841,14 @@ describe("a code page in the Code tab", () => {
         );
 
         const toggles = pages.map((markup) =>
-          linksIn(navOf(codeBarOf(markup), 'aria-label="Files or commits"'))
+          linksIn(navOf(codeBarOf(markup), 'aria-label="Files or history"'))
         );
 
         expect(
           toggles.map((links) =>
             links.flatMap(({ current, text }) => (current ? [text] : []))
           )
-        ).toStrictEqual([["Commits"], ["Commits"], []]);
+        ).toStrictEqual([["History"], ["History"], []]);
         expect(toggles[0]?.map(({ href }) => href)).toStrictEqual([
           `/oscabriel/datekit/tree/${TAG_SEGMENT}`,
           `/oscabriel/datekit/commits/${TAG_SEGMENT}`,
@@ -958,6 +969,19 @@ describe(checkoutCommand, () => {
 
 describe(LogView, () => {
   const page = (
+    <LogView
+      commits={commits}
+      from={0}
+      next={30}
+      now={now}
+      project={datekit}
+      rev="main"
+      show="all"
+    />
+  );
+
+  /** The same page as main's history opens: no filter named, so the landings alone. */
+  const landings = (
     <LogView
       commits={commits}
       from={0}
@@ -1110,17 +1134,121 @@ describe(LogView, () => {
       "/oscabriel/datekit/commits/main",
       "/oscabriel/datekit/commits/main?show=answers",
       "/oscabriel/datekit/commits/main?show=openings",
+      "/oscabriel/datekit/commits/main?show=all",
     ]);
-    expect(filters).toMatch(/aria-current="page"[^>]*>All</u);
+    expect(filters).toMatch(/aria-current="page"[^>]*>Every commit</u);
+    expect(
+      [...filters.matchAll(/<a\b[^>]*>(?<label>[^<]*)</gu)].map(
+        ({ groups }) => groups?.label
+      )
+    ).toStrictEqual(["Landings", "Answers", "Ask openings", "Every commit"]);
   });
 
-  it("says an imported commit came before adoption", () => {
-    const row = slice(markupOf(page), "data-commit", IMPORTED);
+  it("is titled History of main, of a fork, or at a tag", () => {
+    expect(
+      ["main", "@bram/parse-iso", TAG].map((rev) => titleOf(undefined, rev))
+    ).toStrictEqual([
+      "History of main",
+      "History of bram/parse-iso",
+      `History at ${TAG}`,
+    ]);
+    expect(titleOf(RepoPath.make("src/index.ts"), "main")).toBe(
+      "History of src/index.ts"
+    );
+    expect(markupOf(landings)).toMatch(/<h1\b[^>]*>History of main<\/h1>/u);
+  });
 
-    expect(row).toContain("before adoption");
-    expect(hrefsOf(row)).toContain(`/oscabriel/datekit/commit/${IMPORTED}`);
-    expect(slice(markupOf(page), "data-commit", LANDED)).not.toContain(
-      "before adoption"
+  it("shows main's landings alone by default, and counts them as landings", () => {
+    const markup = markupOf(landings);
+
+    expect(markup).toContain(`data-commit="${LANDED}"`);
+    expect(markup).not.toContain(`data-commit="${IMPORTED}"`);
+    expect(navOf(markup, 'aria-label="Show"')).toMatch(
+      /aria-current="page"[^>]*>Landings</u
+    );
+    expect(plainText(markup)).toContain("1 landing");
+    expect(plainText(markup)).not.toContain("commits");
+  });
+
+  it("pages the landings no further than the adoption, and a full page of them on", () => {
+    // The page holds a commit no landing records, so no older page holds one.
+    expect(markupOf(landings)).not.toContain('data-slot="pagination"');
+    // A full page of landings pages on, keeping the default out of the address.
+    const [landed] = commits;
+
+    expect(
+      hrefsOf(
+        markupOf(
+          <LogView
+            commits={landed === undefined ? [] : [landed]}
+            from={0}
+            next={30}
+            now={now}
+            project={datekit}
+            rev="main"
+          />
+        )
+      )
+    ).toContain("/oscabriel/datekit/commits/main?from=30");
+  });
+
+  it("marks the adoption once, over the first commit no landing records, in place of a word on every row", () => {
+    const markup = markupOf(page);
+
+    expect(markup.match(/data-adopted="/gu)).toHaveLength(1);
+    expect(markup.indexOf(`data-adopted="${IMPORTED}"`)).toBeGreaterThan(
+      markup.indexOf(`data-commit="${LANDED}"`)
+    );
+    expect(markup.indexOf(`data-adopted="${IMPORTED}"`)).toBeLessThan(
+      markup.indexOf(`data-commit="${IMPORTED}"`)
+    );
+    expect(plainText(markup)).toContain(
+      "Adopted here. The commits below came with the import; no landing records them."
+    );
+  });
+
+  it("says nothing on an imported commit's own row, which still opens the commit, and counts a mixed day as commits", () => {
+    const markup = markupOf(page);
+
+    expect(plainText(markup)).not.toContain("before adoption");
+    expect(plainText(markup)).toContain("2 commits");
+    expect(hrefsOf(slice(markup, "data-commit", IMPORTED))).toContain(
+      `/oscabriel/datekit/commit/${IMPORTED}`
+    );
+  });
+
+  it("marks no fork's own commit as the adoption: the first break after a landing is", () => {
+    const [own] = decodeCommits([
+      {
+        author: signature("Bob", "2026-10-07T09:00:00.000Z"),
+        body: "",
+        committer: signature("Bob", "2026-10-07T09:00:00.000Z"),
+        parents: [LANDED],
+        sha: "9".repeat(40),
+        subject: "Parse ISO weeks",
+        trailers: [],
+        tree: "a".repeat(40),
+      },
+    ]);
+
+    const markup = markupOf(
+      <LogView
+        commits={own === undefined ? commits : [own, ...commits]}
+        from={0}
+        now={now}
+        project={datekit}
+        rev="@bob/parse-iso"
+      />
+    );
+
+    expect(
+      [...markup.matchAll(/data-adopted="(?<sha>[^"]*)"/gu)].map(
+        ({ groups }) => groups?.sha
+      )
+    ).toStrictEqual([IMPORTED]);
+    expect(markup).toMatch(/<h1\b[^>]*>History of bob\/parse-iso<\/h1>/u);
+    expect(navOf(markup, 'aria-label="Show"')).toMatch(
+      /aria-current="page"[^>]*>Every commit</u
     );
   });
 
@@ -1128,7 +1256,7 @@ describe(LogView, () => {
     const pager = navOf(markupOf(page), 'data-slot="pagination"');
 
     expect(hrefsOf(pager)).toStrictEqual([
-      "/oscabriel/datekit/commits/main?from=30",
+      "/oscabriel/datekit/commits/main?from=30&show=all",
     ]);
   });
 
@@ -1971,7 +2099,7 @@ describe("an answer fork in the Code tab", () => {
   });
 
   it.effect(
-    "names the fork in the ref switcher, with Files and Commits kept at the fork",
+    "names the fork in the revision picker, with Files and History kept at the fork",
     () =>
       Effect.gen(function* () {
         const bar = codeBarOf(
@@ -1985,7 +2113,7 @@ describe("an answer fork in the Code tab", () => {
           "bob/parse-iso"
         );
         expect(
-          linksIn(navOf(bar, 'aria-label="Files or commits"')).map(
+          linksIn(navOf(bar, 'aria-label="Files or history"')).map(
             ({ href }) => href
           )
         ).toStrictEqual([

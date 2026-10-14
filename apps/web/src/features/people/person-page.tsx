@@ -8,7 +8,6 @@ import type { Handle, ProjectName } from "@repo/protocol/ids";
 import { Array, Order } from "effect";
 
 import { EmptyState } from "../shared/empty.tsx";
-import { PageShell } from "../shared/layout.tsx";
 import { AppLink } from "../shared/link.tsx";
 import { ASKS_PATH, projectPath } from "../shared/paths.ts";
 import { MetaCode, MetaLine, Row, RowGroup } from "../shared/row.tsx";
@@ -90,10 +89,11 @@ export const creditsByProject = (
     project: Array.headNonEmpty(inProject).project,
   }));
 
-/** The Landings tab's own address, its region of Overview included. */
+/** The Landings tab's own address, with the filter or region it opens. */
 const landingsOf = (project: ProjectName) =>
   projectSections(project).find(({ tab }) => tab === "landings") ?? {
     hash: undefined,
+    search: undefined,
     to: projectPath(project),
   };
 
@@ -108,6 +108,7 @@ const Project = ({ credit }: { readonly credit: ProjectCredit }) => (
         data={{ "data-area": area, "data-project": credit.project }}
         hash={landingsOf(credit.project).hash}
         href={landingsOf(credit.project).to}
+        search={landingsOf(credit.project).search}
         id={`${credit.project}/${area}`}
         key={area}
         meta={
@@ -160,11 +161,12 @@ export const PersonView = ({
   );
 };
 
+/** The 404 for an address under `/people` that names no handle, drawn as a project's is. */
 export const NoSuchPersonView = () => (
-  <PageShell title="No such person">
+  <Workspace crumbs={[{ label: "No such person" }]} title="No such person">
     <EmptyState
       onward={<AppLink to={ASKS_PATH}>Open asks</AppLink>}
       title="A handle is letters, digits and dashes, starting with a letter or digit, and this address names none."
     />
-  </PageShell>
+  </Workspace>
 );

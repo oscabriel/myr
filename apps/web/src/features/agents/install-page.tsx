@@ -29,7 +29,7 @@ const SIGN_IN_PATH = "/auth/signin";
 export const INSTALL_LEDE =
   "Every way in reaches the same gate and hears the same refusals. Install the CLI for a terminal, connect an agent over MCP, or point anything that reads text at llms.txt.";
 
-/** A config file or a sentence to paste: kept as written, scrolled sideways, never wrapped. */
+/** A config file kept as written and scrolled sideways; a sentence to paste wraps, its URLs anywhere, so a phone reads all of it. */
 const SnippetBlock = ({ snippet }: { readonly snippet: SetupSnippet }) => {
   const { copied, copy } = useCopy(snippet.text);
 
@@ -38,7 +38,9 @@ const SnippetBlock = ({ snippet }: { readonly snippet: SetupSnippet }) => {
       <pre
         aria-label={snippet.label}
         className={`text-mono leading-terminal min-w-0 flex-1 overflow-x-auto py-0.5 font-mono ${
-          snippet.language === "text" ? "whitespace-pre-wrap" : "whitespace-pre"
+          snippet.language === "text"
+            ? "[overflow-wrap:anywhere] whitespace-pre-wrap"
+            : "whitespace-pre"
         }`}
         // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a scrolling region must take focus to be scrolled without a pointer (WCAG 2.1.1)
         tabIndex={0}

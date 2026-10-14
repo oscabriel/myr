@@ -1,19 +1,15 @@
 /**
- * The code bar's ref switcher (ADR 0043): `main`, the project's tags, and the
- * answers in forks, each with its claimant, ask and claim state. A fork's
- * entry opens the same page in that fork, at its address
- * (`@<handle>/<ask>`), never its repo's name.
+ * The code bar's revision picker (ADR 0043): `main`, the project's tags, and
+ * the answers in claim forks, each with its claimant, ask and claim state. A
+ * fork's entry opens the same page in that fork, at its address
+ * (`@<handle>/<ask>`), never its repo's name. Its trigger reads "At main",
+ * "At v1.2.0" or "At <handle>/<ask>": a tag and a fork are revisions, not
+ * branches, so no branch is named and main carries no branch mark.
  */
 import { forkRev } from "@repo/protocol/domain/code";
 import type { ForkRef, RefsView } from "@repo/protocol/domain/code";
 import type { AskId, ProjectName } from "@repo/protocol/ids";
-import {
-  ChevronDown,
-  GitBranch,
-  GitCommitHorizontal,
-  GitFork,
-  Tag,
-} from "lucide-react";
+import { ChevronDown, GitCommitHorizontal, GitFork, Tag } from "lucide-react";
 import { useState } from "react";
 import type { ComponentType } from "react";
 
@@ -33,9 +29,10 @@ const SHOWN = 100;
 
 const ICON = "size-4 shrink-0";
 
+/** A tag's, a commit's or a fork's mark; main has none, since it is the project itself, not a ref among refs. */
 const RefMark = ({ rev }: { readonly rev: string }) => {
   if (rev === "main") {
-    return <GitBranch aria-hidden="true" className={ICON} strokeWidth={1.75} />;
+    return null;
   }
 
   if (isForkRev(rev)) {
@@ -137,7 +134,6 @@ export const RefChoices = ({
 
   return (
     <div className="flex max-h-80 flex-col overflow-y-auto overscroll-contain">
-      <p className={GROUP}>Branch</p>
       <ul>
         <li data-ref-choice="main">
           <AppLink
@@ -146,7 +142,6 @@ export const RefChoices = ({
             onClick={onPick}
             to={hrefAt("main")}
           >
-            <RefMark rev="main" />
             main
             <span className="text-label text-muted-foreground ml-auto">
               moves only by a landing
@@ -188,7 +183,7 @@ export const RefChoices = ({
       )}
       {forks.length === 0 ? null : (
         <>
-          <p className={GROUP}>Answers in forks</p>
+          <p className={GROUP}>Answers in claim forks</p>
           <ul>
             {forks.map((fork) => (
               <ForkEntry
@@ -237,11 +232,11 @@ export const RefSwitcher = ({
   return (
     <Popover onOpenChange={setOpen} open={open}>
       <PopoverTrigger
-        aria-label={`Revision: ${revLabel(rev)}. Switch revision`}
-        className="text-ui hover:bg-surface border-input flex h-8 max-w-[16rem] min-w-0 shrink-0 cursor-pointer items-center gap-2 border px-2"
+        aria-label={`At ${revLabel(rev)}. Switch revision`}
+        className="text-ui hover:bg-surface border-input flex h-8 max-w-[16rem] min-w-0 shrink-0 cursor-pointer items-center gap-1.5 border px-2"
         data-ref={rev}
       >
-        <RefMark rev={rev} />
+        <span className="shrink-0">At</span>
         <span
           className={`min-w-0 truncate ${rev === "main" ? "" : "text-mono font-mono"}`}
         >
@@ -255,12 +250,12 @@ export const RefSwitcher = ({
       </PopoverTrigger>
       <PopoverContent align="start" className="w-80 gap-1 p-1.5">
         <input
-          aria-label="Find a tag or fork"
+          aria-label="Find a tag or answer"
           className="border-input bg-background sm:text-ui h-9 w-full border px-2 text-base sm:h-8"
           onChange={(event) => {
             setFilter(event.currentTarget.value);
           }}
-          placeholder="Find a tag or fork"
+          placeholder="Find a tag or answer"
           value={filter}
         />
         {open ? (

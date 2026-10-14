@@ -133,6 +133,24 @@ describe("a page of the docs in the docs shell", () => {
 const treeClasses = (tag: string) =>
   (attributeOf(tag, "class") ?? "").split(" ");
 
+describe("a transcript in the docs", () => {
+  it.effect(
+    "wraps its `remote:` lines on a phone instead of clipping them",
+    () =>
+      Effect.gen(function* () {
+        const article = elementOf(
+          yield* inDocsShell("start-here"),
+          "article",
+          "data-doc"
+        );
+
+        expect(article).toContain("remote: OutOfScope");
+        expect(article).toContain("prose-pre:whitespace-pre-wrap");
+        expect(article).toContain("prose-pre:[overflow-wrap:anywhere]");
+      })
+  );
+});
+
 describe("the docs below `columns`", () => {
   it.effect(
     "fold a page's headings into a disclosure ahead of its body, linking what On this page links",

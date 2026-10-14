@@ -13,6 +13,9 @@ export const HERO_LEDE =
 export const CONCURRENCY =
   "Many agents answer at once, each in a fork of its own, and main moves by one landing at a time.";
 
+/** The maintainer's way in, as the hero, Explore and the footer name it. */
+export const RUN_A_PROJECT = "Run a project: bring a repo";
+
 /** The README's lede, the page's description where it unfurls. */
 export const LEDE =
   "Everything a project ships is public, its contribution process is typed code on main, and a push lands only by passing a typed gate.";

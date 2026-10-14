@@ -19,7 +19,7 @@ export const landingSubject = (landing: LandingView) =>
     onNone: () =>
       landing.parent === undefined ? "First landing" : "Landed without an ask",
     onSome: ({ ask, kind }) =>
-      kind === "opened" ? `Open ask ${ask}` : `Answer ${ask}`,
+      kind === "opened" ? `Opened ask ${ask}` : `Answer ${ask}`,
   });
 
 export const recentShown = (

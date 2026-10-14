@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
+import { commandDocs } from "@repo/agent-kit/command-doc";
 import { Brand } from "@repo/brand";
-import { ProposeAsk } from "@repo/protocol/contracts";
+import { Contracts, ProposeAsk } from "@repo/protocol/contracts";
 import { CommitSha, ProjectName, RepoPath } from "@repo/protocol/ids";
 import { Unauthenticated } from "@repo/protocol/principal";
 import { CapReached } from "@repo/protocol/refusal";
@@ -12,6 +13,7 @@ import { ProposalFailure } from "../src/features/proposal/failure.tsx";
 import {
   ProposeView,
   proposalPayload,
+  proposeCommand,
   territoryChoices,
 } from "../src/features/propose/propose-view.tsx";
 import type { About } from "../src/features/propose/propose-view.tsx";
@@ -79,8 +81,27 @@ describe(ProposeView, () => {
   it("gives the same proposal as a command, and what makes a good want", () => {
     const text = plainText(signedIn());
 
-    expect(text).toContain(`${Brand.cli} propose --draft "<want>"`);
+    expect(text).toContain(
+      `${Brand.cli} propose --want "<want>" --project oscabriel/datekit --draft`
+    );
     expect(text).toContain("not how to change the code");
+  });
+
+  it("gives the command with flags the CLI's propose takes, the want and the project among them", () => {
+    const doc = commandDocs(Contracts).find(
+      ({ path }) => path.join(" ") === "propose"
+    );
+
+    const command = proposeCommand(datekit);
+    const flags = command.split(" ").filter((word) => word.startsWith("--"));
+
+    expect(command.startsWith(`${Brand.cli} propose `)).toBeTruthy();
+    expect(flags).toStrictEqual(
+      expect.arrayContaining(["--want", "--project", "--draft"])
+    );
+    expect(
+      flags.filter((flag) => !(doc?.flags ?? []).includes(flag))
+    ).toStrictEqual([]);
   });
 
   it("starts the want at the line a why page names", () => {
@@ -106,9 +127,7 @@ describe(ProposeView, () => {
     expect(markup).not.toContain("<form");
     expect(markup).not.toContain("<textarea");
     expect(markup).toMatch(/<a[^>]*href="\/auth\/signin[^"]*"[^>]*>Sign in/u);
-    expect(plainText(markup)).toContain(
-      `${Brand.cli} propose --draft "<want>"`
-    );
+    expect(plainText(markup)).toContain(proposeCommand(datekit));
   });
 });
 

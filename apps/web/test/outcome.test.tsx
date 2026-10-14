@@ -201,6 +201,28 @@ describe(StageStrip, () => {
     expect(markup).not.toContain("text-xs");
   });
 
+  it("lays the seven stages in rows of four and three on a phone, each name whole: no hyphenation, no break inside a word", () => {
+    const markup = markupOf(<StageStrip outcome={landed} stage="checks" />);
+
+    const list = /<ol\b[^>]*>/u.exec(markup)?.[0] ?? "";
+
+    expect(list).toContain(" grid-cols-4");
+    expect(list).toContain("tablet:grid-cols-7");
+
+    const names = [...markup.matchAll(/<span\b[^>]*data-term=""[^>]*>/gu)].map(
+      ([tag]) => tag
+    );
+
+    expect(names).toHaveLength(7);
+    expect(
+      names.filter(
+        (tag) =>
+          !(tag.includes("[hyphens:none]") && tag.includes("whitespace-nowrap"))
+      )
+    ).toStrictEqual([]);
+    expect(names.some((tag) => tag.includes("break-words"))).toBeFalsy();
+  });
+
   it("draws a stage the answer never needed as not needed, given what the verdict holds", () => {
     expect(
       stagesOf(
