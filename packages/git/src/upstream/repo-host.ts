@@ -1,16 +1,7 @@
 import { Fetch } from "@repo/artifacts/fetch";
 import { RepoHost } from "@repo/artifacts/repo-host";
 import type { RepoName, TokenScope } from "@repo/artifacts/repo-host";
-import {
-  Cache,
-  Data,
-  DateTime,
-  Duration,
-  Effect,
-  Exit,
-  Layer,
-  Redacted,
-} from "effect";
+import { DateTime, Duration, Effect, Layer, Redacted, Ref } from "effect";
 
 import { Exchange, Upstream, UpstreamFailure } from "../upstream.ts";
 import type { Service } from "../upstream.ts";
@@ -22,10 +13,11 @@ const MARGIN = Duration.minutes(1);
 
 const CAPACITY = 1024;
 
-class TokenKey extends Data.Class<{
-  readonly repo: RepoName;
-  readonly scope: TokenScope;
-}> {}
+interface Credentials {
+  readonly authorization: string;
+  readonly remote: string;
+  readonly until: DateTime.Utc;
+}
 
 const scopeOf = (service: Service): TokenScope =>
   service === "git-receive-pack" ? "write" : "read";
@@ -62,47 +54,72 @@ const requestOf = (
   });
 };
 
-/** Tokens are cached per (repo, scope) in a cache made when the layer is built: one per isolate. */
+/**
+ * Tokens are kept per (repo, scope) in a map made when the layer is built: one
+ * per isolate. A token being minted is never shared: on Workers a request that
+ * awaits another request's I/O is cancelled as hung, and a request whose
+ * client leaves is cancelled where it stands, so its mint may never end. Two
+ * requests that miss at once each mint their own.
+ */
 export const UpstreamRepoHost: Layer.Layer<Upstream, never, RepoHost | Fetch> =
   Layer.effect(
     Upstream,
     Effect.gen(function* () {
       const host = yield* RepoHost;
       const client = yield* Fetch;
+      const kept = yield* Ref.make<ReadonlyMap<string, Credentials>>(new Map());
 
-      const credentials = yield* Cache.makeWith(
-        ({ repo, scope }: TokenKey) =>
-          Effect.gen(function* () {
-            const remote = yield* host.remote(repo);
-            const token = yield* host.mintToken(repo, scope, TOKEN_TTL);
-            const now = yield* DateTime.now;
+      const credentialsOf = (repo: RepoName, scope: TokenScope) =>
+        Effect.gen(function* () {
+          const key = `${scope}:${repo}`;
+          const found = (yield* Ref.get(kept)).get(key);
 
-            return {
-              authorization: basic(token.secret),
-              lasts: Duration.subtract(
-                DateTime.distance(now, token.expiresAt),
-                MARGIN
-              ),
-              remote,
-            };
-          }),
-        {
-          capacity: CAPACITY,
-          // A failed mint is not kept, nor a token too short-lived to use.
-          timeToLive: (exit) =>
-            Exit.isSuccess(exit) &&
-            Duration.isGreaterThan(exit.value.lasts, Duration.zero)
-              ? exit.value.lasts
-              : Duration.zero,
-        }
-      );
+          if (
+            found !== undefined &&
+            DateTime.isLessThan(yield* DateTime.now, found.until)
+          ) {
+            return found;
+          }
+
+          const remote = yield* host.remote(repo);
+          const token = yield* host.mintToken(repo, scope, TOKEN_TTL);
+          const now = yield* DateTime.now;
+
+          const fresh: Credentials = {
+            authorization: basic(token.secret),
+            remote,
+            until: DateTime.subtractDuration(token.expiresAt, MARGIN),
+          };
+
+          // A token too short-lived to use is not kept.
+          if (DateTime.isLessThan(now, fresh.until)) {
+            yield* Ref.update(kept, (all) => {
+              const next = new Map(all);
+
+              next.delete(key);
+              next.set(key, fresh);
+
+              for (const oldest of next.keys()) {
+                if (next.size <= CAPACITY) {
+                  break;
+                }
+
+                next.delete(oldest);
+              }
+
+              return next;
+            });
+          }
+
+          return fresh;
+        });
 
       return Upstream.of({
         exchange: (repo, exchange) =>
           Effect.gen(function* () {
-            const { authorization, remote } = yield* Cache.get(
-              credentials,
-              new TokenKey({ repo, scope: scopeOf(exchange.service) })
+            const { authorization, remote } = yield* credentialsOf(
+              repo,
+              scopeOf(exchange.service)
             );
 
             return yield* client
