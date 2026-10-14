@@ -51,7 +51,7 @@ export const answerAnAsk: DocSource = {
     "",
     "Every refusal says whether trying again can help and names the command to run next. Run it, fix what it names, and push again. [Refusals](/docs/refusals) lists each one with what to do.",
     "",
-    `When \`main\` moved under your answer and it no longer merges, the refusal is \`StaleBase\`. It names each conflicting path and, for each one the platform landed, the landing that last changed it. Rebase onto the new \`main\`, resolve, and push again: ${code(`git pull --rebase ${platformUrl}/<owner>/<name>.git main`)}.`,
+    `When \`main\` moved under your answer, the refusal is \`StaleBase\`. With no conflict, push again: the platform merges the answer onto the moved \`main\` itself. When it no longer merges, the refusal names each conflicting path and, for each one the platform landed, the landing that last changed it. Merge the project's \`main\` into your answer, resolve, and push again: ${code(`git fetch ${platformUrl}/<owner>/<name>.git main && git merge FETCH_HEAD`)}. Never rebase: the claim's base stays where it was granted, so a rebased answer carries every sibling's file as its own and is refused as \`OutOfScope\`.`,
     "",
     "## Credit",
     "",

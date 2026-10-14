@@ -26,7 +26,7 @@ describe("the refusal union", () => {
       base,
       conflicts: ["src/a.ts"],
       main,
-      next: "git pull --rebase",
+      next: `git push ${Brand.slug} HEAD:main`,
       retryable: true,
     });
   });
@@ -56,7 +56,7 @@ describe("the refusal union", () => {
       movedBy: [
         { ask: "fix-parser", author: "alice", landing, path: "src/a.ts" },
       ],
-      next: "git pull --rebase",
+      next: `git push ${Brand.slug} HEAD:main`,
       retryable: true,
     });
     expect(

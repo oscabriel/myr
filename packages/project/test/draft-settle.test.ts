@@ -359,7 +359,7 @@ describe("a proposal with a draft", () => {
             {
               label: "draft failed",
               value:
-                "NotRedFirst: the ask's check must fail on main twice in the same way, by an assertion",
+                "NotRedFirst: the ask's check must fail on main twice the same way, with a failing assertion, not a load or syntax error, on two runs; run the lane's command on it yourself, then open the ask again",
             },
           ],
         ]);
@@ -445,7 +445,7 @@ describe("a proposal with a draft", () => {
               {
                 label: "draft failed",
                 value:
-                  "NotRedFirst: the ask's check must fail on main twice in the same way, by an assertion",
+                  "NotRedFirst: the ask's check must fail on main twice the same way, with a failing assertion, not a load or syntax error, on two runs; run the lane's command on it yourself, then open the ask again",
               },
             ],
             id: firstDecision,

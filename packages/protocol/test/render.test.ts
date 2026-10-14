@@ -59,8 +59,8 @@ describe(explain, () => {
     expect(
       explain([new StaleBase({ base, conflicts: [path], main })])
     ).toStrictEqual([
-      "StaleBase: main moved to 2222222, past your base 1111111; conflicts in src/a.ts",
-      "  next: git pull --rebase",
+      "StaleBase: main moved to 2222222, past your base 1111111, at src/a.ts; merge main into your answer, never rebase, since the claim's base stays where it was granted: git fetch <platform>/<owner>/<name>.git main && git merge FETCH_HEAD, then push again",
+      `  next: git push ${Brand.slug} HEAD:main`,
       "  retryable: yes",
     ]);
   });
@@ -82,7 +82,7 @@ describe(explain, () => {
         }),
       ])[0]
     ).toBe(
-      "StaleBase: main moved to 2222222, past your base 1111111; conflicts in src/a.ts (last changed by alice in 3333333, for fix-parser), src/b.ts (last changed by dora in 3333333), src/c.ts"
+      "StaleBase: main moved to 2222222, past your base 1111111, at src/a.ts (last changed by alice in 3333333, for fix-parser), src/b.ts (last changed by dora in 3333333), src/c.ts; merge main into your answer, never rebase, since the claim's base stays where it was granted: git fetch <platform>/<owner>/<name>.git main && git merge FETCH_HEAD, then push again"
     );
   });
 
@@ -249,8 +249,8 @@ describe(explain, () => {
   it("tells a direct push to main where answers go instead", () => {
     expect(explain([new DirectPush({ ref: "refs/heads/main" })])).toStrictEqual(
       [
-        "DirectPush: main moves only by a landing, so refs/heads/main takes no direct push; push your answer to your claim's fork",
-        `  next: ${Brand.cli} asks`,
+        `DirectPush: main moves only by a landing, so refs/heads/main takes no direct push; a contributor pushes the answer to the claim's fork, and a maintainer makes a working fork with ${Brand.cli} fork and lands it with ${Brand.cli} land`,
+        `  next: ${Brand.cli} fork --project <owner>/<name>`,
         "  retryable: no",
       ]
     );
@@ -261,7 +261,7 @@ describe(explain, () => {
       explain([new DirectPush({ ref: `refs/notes/${Brand.slug}` })])
     ).toStrictEqual([
       `DirectPush: refs/notes/${Brand.slug} is written by the platform, not pushed; a fork takes branches only, so push your answer with git push ${Brand.slug} HEAD:main`,
-      `  next: ${Brand.cli} asks`,
+      `  next: ${Brand.cli} fork --project <owner>/<name>`,
       "  retryable: no",
     ]);
   });
@@ -332,7 +332,7 @@ describe(explain, () => {
     {
       lines: [
         "UnknownPath: 2222222 has no file or folder at src/a.ts",
-        "  next: git ls-tree",
+        '  next: readTree {"at":"main","project":"<owner>/<name>"}',
         "  retryable: no",
       ],
       refusal: new UnknownPath({ commit: main, path }),
@@ -340,7 +340,7 @@ describe(explain, () => {
     {
       lines: [
         "UnknownRevision: v9 is neither main, a commit this project holds, nor one of its tags",
-        "  next: git ls-remote",
+        '  next: listRefs {"project":"<owner>/<name>"}',
         "  retryable: no",
       ],
       refusal: new UnknownRevision({ rev: "v9" }),
@@ -418,7 +418,7 @@ describe(explain, () => {
     expect(
       explain([new ChecksFailed({ lane: "unit", logRef, next: "bun test" })])
     ).toStrictEqual([
-      `ChecksFailed: the unit checks failed on the answer; run bun test in a clone of the fork to see the failure; the log is kept as ${logRef}, which the answerer and the project's maintainers read with ${Brand.cli} evidence`,
+      `ChecksFailed: the unit checks failed on the answer; run bun test in a clone of the fork to see the failure; the log is kept as ${logRef}, which the answerer and the project's maintainers read with ${Brand.cli} evidence ${logRef} --project <owner>/<name>`,
       "  next: bun test",
       "  retryable: no",
     ]);
