@@ -3,7 +3,7 @@ import { RepoHost } from "@repo/artifacts/repo-host";
 import { RepoHostMemory } from "@repo/artifacts/repo-host/memory";
 import { Brand } from "@repo/brand";
 import { CommitDiff } from "@repo/protocol/domain/code";
-import { CommitSha, RepoName, RepoPath } from "@repo/protocol/ids";
+import { CommitSha, LandedSha, RepoName, RepoPath } from "@repo/protocol/ids";
 import {
   UnknownCommit,
   UnknownPath,
@@ -34,6 +34,7 @@ import {
 } from "../src/code.ts";
 import { CodeCache, CodeCacheLive } from "../src/code/cache.ts";
 import { commitKey, DIFF_TEXT } from "../src/code/commit.ts";
+import { commitKept, objectKey } from "../src/code/objects.ts";
 import { filesUnder } from "../src/code/paths.ts";
 import { compareTags } from "../src/code/refs.ts";
 import { READS_AT_ONCE } from "../src/code/tree.ts";
@@ -1059,5 +1060,189 @@ describe("reads by object id", () => {
 
         expect(yield* Fiber.join(next)).toStrictEqual(Option.some("read"));
       }).pipe(Effect.provide(CodeCacheLive(10, 10)))
+  );
+});
+
+const hostCountedBy = (reads: Ref.Ref<number>) =>
+  Layer.effect(
+    RepoHost,
+    Effect.gen(function* () {
+      const host = yield* RepoHost;
+      const counted = countedIn(reads);
+
+      return RepoHost.of({
+        ...host,
+        log: (name, at, limit, offset) =>
+          counted(host.log(name, at, limit, offset)),
+        readBlob: (name, blob) => counted(host.readBlob(name, blob)),
+        readCommit: (name, sha) => counted(host.readCommit(name, sha)),
+        readFile: (name, at, file) => counted(host.readFile(name, at, file)),
+        readTree: (name, tree) => counted(host.readTree(name, tree)),
+      });
+    })
+  ).pipe(Layer.provide(RepoHostMemory));
+
+const countedIn =
+  (reads: Ref.Ref<number>) =>
+  <A, E>(read: Effect.Effect<A, E>) =>
+    Ref.update(reads, (count) => count + 1).pipe(Effect.andThen(read));
+
+const onIsolate = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+  Effect.provide(effect, CodeCacheLive(100));
+
+const byText = (one: string, other: string) => one.localeCompare(other);
+
+const readme = RepoPath.make("README.md");
+
+describe("objects kept across isolates", () => {
+  it.effect(
+    "answer a folder, a file, a log page and a commit on a second isolate from the store, reaching the host no more",
+    () =>
+      Effect.gen(function* () {
+        const reads = yield* Ref.make(0);
+
+        yield* Effect.gen(function* () {
+          const { c4, code } = yield* datekit;
+
+          const views = Effect.all([
+            treeOf(code, main, Option.none()),
+            treeOf(code, main, path("src")),
+            fileOf(code, main, readme),
+            logOf(code, page),
+            commitOf(code, c4),
+          ]);
+
+          const first = yield* onIsolate(views);
+          const counted = yield* Ref.get(reads);
+
+          expect(counted).toBeGreaterThan(0);
+
+          const again = yield* onIsolate(views);
+
+          expect(again).toStrictEqual(first);
+          expect(yield* Ref.get(reads)).toBe(counted);
+        }).pipe(
+          Effect.provide(Layer.merge(hostCountedBy(reads), CodeStoreMemory))
+        );
+      })
+  );
+
+  it.effect(
+    "leave main resolved every time: a landing between two reads shows in the second, store and isolate warm",
+    () =>
+      Effect.gen(function* () {
+        const { c3, c4, code } = yield* datekit;
+        const head = yield* Ref.make(Option.some(LandedSha.make(c3)));
+        const asked = yield* Ref.make(0);
+
+        const moving = {
+          ...code,
+          head: Ref.update(asked, (count) => count + 1).pipe(
+            Effect.andThen(Ref.get(head))
+          ),
+        };
+
+        const before = yield* treeOf(moving, main, Option.none());
+
+        yield* Ref.set(head, Option.some(LandedSha.make(c4)));
+
+        const after = yield* treeOf(moving, main, Option.none());
+
+        expect([before.at, after.at, yield* Ref.get(asked)]).toStrictEqual([
+          c3,
+          c4,
+          2,
+        ]);
+      }).pipe(
+        Effect.provide(
+          Layer.mergeAll(RepoHostMemory, CodeStoreMemory, CodeCacheLive(100))
+        )
+      )
+  );
+
+  it.effect(
+    "read again a kept object that no longer decodes, or that names another id, and replace it",
+    () =>
+      Effect.gen(function* () {
+        const reads = yield* Ref.make(0);
+
+        yield* Effect.gen(function* () {
+          const { c3, c4, code } = yield* datekit;
+          const store = yield* CodeStore;
+          const key = objectKey(commitKept, code.repo, c4);
+
+          const fresh = yield* onIsolate(treeOf(code, main, Option.none()));
+
+          yield* onIsolate(treeOf(code, revision(c3), Option.none()));
+
+          const kept = yield* store.get(key);
+
+          const other = yield* store.get(objectKey(commitKept, code.repo, c3));
+
+          expect([Option.isSome(kept), Option.isSome(other)]).toStrictEqual([
+            true,
+            true,
+          ]);
+
+          for (const planted of [
+            '{"sha":"not a commit"}',
+            Option.getOrElse(other, () => ""),
+          ]) {
+            yield* store.put(key, planted);
+            yield* Ref.set(reads, 0);
+
+            expect(
+              yield* onIsolate(treeOf(code, main, Option.none()))
+            ).toStrictEqual(fresh);
+            expect(yield* Ref.get(reads)).toBeGreaterThan(0);
+            expect(yield* store.get(key)).toStrictEqual(kept);
+          }
+        }).pipe(
+          Effect.provide(Layer.merge(hostCountedBy(reads), CodeStoreMemory))
+        );
+      })
+  );
+
+  it.effect(
+    "are keyed under the project's own repo by kind, version and id, and hold no landing",
+    () =>
+      Effect.gen(function* () {
+        const kept = yield* Ref.make<ReadonlyMap<string, string>>(new Map());
+
+        const recording = Layer.succeed(CodeStore, {
+          get: (key) =>
+            Effect.map(Ref.get(kept), (all) =>
+              Option.fromUndefinedOr(all.get(key))
+            ),
+          put: (key, value) =>
+            Ref.update(kept, (all) => new Map([...all, [key, value]])),
+        });
+
+        const repo = yield* Effect.gen(function* () {
+          const { c4, code } = yield* datekit;
+
+          yield* treeOf(code, main, Option.none());
+          yield* fileOf(code, main, readme);
+          yield* logOf(code, page);
+          yield* commitOf(code, c4);
+
+          return code.repo;
+        }).pipe(Effect.provide(Layer.merge(RepoHostMemory, recording)));
+
+        const all = [...(yield* Ref.get(kept))];
+
+        const ownKey = new RegExp(
+          `^${repo}/(blob|commit|commit-object|file|log|tree)/v[1-9]\\d*/`,
+          "u"
+        );
+
+        expect(all.filter(([key]) => !ownKey.test(key))).toStrictEqual([]);
+        expect(
+          [...new Set(all.map(([key]) => key.split("/")[1]))].toSorted(byText)
+        ).toStrictEqual(["blob", "commit", "commit-object", "file", "log", "tree"]);
+        expect(
+          all.filter(([, value]) => value.includes("landedAt"))
+        ).toStrictEqual([]);
+      })
   );
 });

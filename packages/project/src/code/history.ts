@@ -35,7 +35,8 @@ export const StoredPathLog = Schema.Struct({
 
 export type StoredPathLog = typeof StoredPathLog.Type;
 
-const sha256 = (text: string) =>
+/** A path's SHA-256 in hex, so a key stays under the store's limit and names no path. */
+export const hashOf = (text: string) =>
   Effect.map(
     Effect.promise(() =>
       crypto.subtle.digest("SHA-256", new TextEncoder().encode(text))
@@ -74,7 +75,7 @@ export const keyOf = <A>(
   }
 ) =>
   Effect.map(
-    sha256(at.path),
+    hashOf(at.path),
     (hash) =>
       `${at.repo}/${kept.kind}/v${kept.version}/${at.commit}/${at.scan}/${hash}`
   );

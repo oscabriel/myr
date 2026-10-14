@@ -248,12 +248,12 @@ describe("code history kept across isolates", () => {
           const { blobs, commits, files, logs, trees } = yield* Ref.get(seen);
 
           expect(again).toStrictEqual(first);
-          // The commits it names come from one page of the log, not one read each.
+          // The commits it names come from the kept page of the log, not one read each.
           expect({ blobs, commits, files, logs, trees }).toStrictEqual({
             blobs: 0,
             commits: 0,
             files: 0,
-            logs: 1,
+            logs: 0,
             trees: 0,
           });
           expect(yield* Ref.get(asked)).toBe(1);

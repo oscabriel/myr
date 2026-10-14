@@ -1,10 +1,14 @@
 import { describe, expect, it } from "@effect/vitest";
+import { RepoHostMemory } from "@repo/artifacts/repo-host/memory";
+import { RepoPath } from "@repo/protocol/ids";
 import { Effect, Exit, Layer, Logger, Option } from "effect";
 
 import { CodeStore } from "../src/code-store.ts";
 import { CodeStoreR2 } from "../src/code-store/binding.ts";
 import type { BucketLike } from "../src/code-store/binding.ts";
 import { CodeStoreCounts, CodeStoreMemory } from "../src/code-store/memory.ts";
+import { fileOf, treeOf } from "../src/code.ts";
+import { datekit } from "./code-fixtures.ts";
 
 const key = "datekit/why/v1/1111111111111111111111111111111111111111/main/ab";
 
@@ -142,5 +146,66 @@ describe("the code store", () => {
           Exit.hasDies(yield* Effect.exit(store.get("k".repeat(1024)))),
         ]).toStrictEqual([true, true, false]);
       }).pipe(Effect.provide(layer))
+  );
+});
+
+const folderAndReadme = Effect.gen(function* () {
+  const { code } = yield* datekit;
+
+  return yield* Effect.all([
+    treeOf(code, Option.none(), Option.none()),
+    fileOf(code, Option.none(), RepoPath.make("README.md")),
+  ]);
+});
+
+describe("the code reads over the code store", () => {
+  it.effect(
+    "answer a folder and a file over R2 that is down as over a store that keeps nothing, and log it",
+    () =>
+      Effect.gen(function* () {
+        const plain = yield* folderAndReadme.pipe(
+          Effect.provide(RepoHostMemory)
+        );
+
+        const { exit, messages } = yield* logged(
+          folderAndReadme.pipe(
+            Effect.provide(
+              Layer.merge(
+                RepoHostMemory,
+                CodeStoreR2(bucketOf({ get: true, put: true }))
+              )
+            )
+          )
+        );
+
+        expect(exit).toStrictEqual(Exit.succeed(plain));
+        expect(messages.length).toBeGreaterThan(0);
+      })
+  );
+
+  it.effect("keep a folder's and a file's objects over R2 that is up", () =>
+    Effect.gen(function* () {
+      const objects = new Map<string, string>();
+      const bucket = bucketOf({});
+
+      const kept = {
+        ...bucket,
+        put: (name: string, value: string) => {
+          objects.set(name, value);
+
+          return bucket.put(name, value);
+        },
+      };
+
+      yield* folderAndReadme.pipe(
+        Effect.provide(Layer.merge(RepoHostMemory, CodeStoreR2(kept)))
+      );
+
+      expect(
+        [...objects.keys()]
+          .map((name) => name.split("/")[1])
+          .toSorted((one, other) => one.localeCompare(other))
+      ).toStrictEqual(["blob", "commit-object", "file", "tree"]);
+    })
   );
 });

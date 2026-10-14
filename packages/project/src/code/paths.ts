@@ -12,7 +12,9 @@ import { Array, Effect, Order } from "effect";
 
 import type { CodeProject } from "../code.ts";
 import { CodeCache } from "./cache.ts";
+import { keptOnlyIfCanonical } from "./history.ts";
 import { commitAt, resolveAt } from "./revision.ts";
+import type { Resolved } from "./revision.ts";
 import { entriesOf } from "./tree.ts";
 
 export const PATHS_CAP = 50_000;
@@ -82,12 +84,8 @@ export const filesUnder = (
     };
   });
 
-export const pathList = (
-  project: CodeProject,
-  at: Option.Option<Rev>
-): Effect.Effect<PathList, UnknownRevision, RepoHost> =>
+const pathsAt = ({ commit, repo }: Resolved) =>
   Effect.gen(function* () {
-    const { commit, repo } = yield* resolveAt(project, at);
     const cache = yield* CodeCache;
 
     const { tree } = yield* commitAt(repo, commit).pipe(
@@ -104,3 +102,14 @@ export const pathList = (
 
     return { at: commit, paths: files.map(({ path }) => path), truncated };
   });
+
+export const pathList = (
+  project: CodeProject,
+  at: Option.Option<Rev>
+): Effect.Effect<PathList, UnknownRevision, RepoHost> =>
+  Effect.gen(function* () {
+    const resolved = yield* resolveAt(project, at);
+
+    return yield* keptOnlyIfCanonical(resolved, pathsAt(resolved));
+  });
+

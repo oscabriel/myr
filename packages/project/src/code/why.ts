@@ -527,14 +527,15 @@ export const whyView = (
     const { commit, repo } = resolved;
     const key = yield* keyOf(whyKept, { commit, path, repo, scan });
 
-    const kept = yield* keptOnlyIfCanonical(
+    return yield* keptOnlyIfCanonical(
       resolved,
-      throughHistory(
-        whyKept,
-        key,
-        asOneView(computed(repo, commit, path, scan))
+      Effect.flatMap(
+        throughHistory(
+          whyKept,
+          key,
+          asOneView(computed(repo, commit, path, scan))
+        ),
+        (kept) => viewOf(project, repo, commit, path, kept, scan)
       )
     );
-
-    return yield* viewOf(project, repo, commit, path, kept, scan);
   }).pipe(inRepoSession, Effect.catchTag("RepoNotFound", Effect.die));

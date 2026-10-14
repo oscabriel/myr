@@ -1,4 +1,5 @@
 import { ObjectId, RepoHost } from "@repo/artifacts/repo-host";
+import type { RepoNotFound } from "@repo/artifacts/repo-host";
 import { Rev } from "@repo/protocol/domain/code";
 import { BlobSha, RepoPath } from "@repo/protocol/ids";
 import type { ProjectName } from "@repo/protocol/ids";
@@ -8,7 +9,9 @@ import { codeProjectOf } from "../code.ts";
 import type { CodeProject } from "../code.ts";
 import { Projects } from "../projects.ts";
 import { isBinary, unlessTooLarge } from "./file.ts";
+import { keptOnlyIfCanonical } from "./history.ts";
 import { commitAt, isFullSha, resolveAt } from "./revision.ts";
+import type { Resolved } from "./revision.ts";
 import { entryAt, segmentsOf } from "./tree.ts";
 
 /** Both origins hold a session cookie, so no raw file may run as script: every answer, a refusal too, carries `nosniff` and this CSP. */
@@ -67,14 +70,12 @@ const notFound = () => new Response(null, { headers: SAFE, status: 404 });
 
 const tooLarge = () => new Response(null, { headers: SAFE, status: 413 });
 
-export const rawOf = (
-  project: CodeProject,
+const rawAt = (
+  { commit, repo }: Resolved,
   rev: Rev,
   path: RepoPath
-): Effect.Effect<Response, never, RepoHost> =>
+): Effect.Effect<Response, RepoNotFound, RepoHost> =>
   Effect.gen(function* () {
-    const { commit, repo } = yield* resolveAt(project, Option.some(rev));
-
     const { tree } = yield* commitAt(repo, commit).pipe(
       Effect.flatMap(Effect.fromOption)
     );
@@ -106,11 +107,7 @@ export const rawOf = (
     });
   }).pipe(
     (read) => unlessTooLarge(read, tooLarge),
-    Effect.catchTags({
-      NoSuchElementError: () => Effect.succeed(notFound()),
-      RepoNotFound: () => Effect.succeed(notFound()),
-      UnknownRevision: () => Effect.succeed(notFound()),
-    })
+    Effect.catchTag("NoSuchElementError", () => Effect.succeed(notFound()))
   );
 
 const decodeRev = Schema.decodeUnknownOption(Rev);
@@ -161,3 +158,20 @@ export const rawFor = (
         Effect.catchTag("UnknownProject", () => Effect.succeed(notFound()))
       ),
   });
+
+export const rawOf = (
+  project: CodeProject,
+  rev: Rev,
+  path: RepoPath
+): Effect.Effect<Response, never, RepoHost> =>
+  Effect.gen(function* () {
+    const resolved = yield* resolveAt(project, Option.some(rev));
+
+    return yield* keptOnlyIfCanonical(resolved, rawAt(resolved, rev, path));
+  }).pipe(
+    Effect.catchTags({
+      RepoNotFound: () => Effect.succeed(notFound()),
+      UnknownRevision: () => Effect.succeed(notFound()),
+    })
+  );
+
