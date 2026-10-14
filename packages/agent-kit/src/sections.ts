@@ -19,8 +19,8 @@ export const loopSteps = () => [
   `1. Read the ask, then claim it: ${cli("ask", "<ask>")}, then ${cli("claim", "<ask>")}. The claim prints your fork's remote; add it with ${code(`git remote add ${remote} <remote>`)}.`,
   "2. Work inside the ask's territory until its check passes.",
   `3. Run ${cli("check")}. It gives the refusals a push would get, then runs the ask's check and the project's lanes; fix everything it reports.`,
-  `4. Push your answer to your fork: ${code(pushCommand)}. The push itself can be refused; follow the answer with ${cli("status")}.`,
-  `5. Read the verdict on your head: ${code(`git fetch ${remote} ${notesRef}:${notesRef}`)}, then ${code(`git notes --ref=${Brand.slug} show HEAD`)}. It is JSON: match on its \`_tag\`, and run a refusal's \`next\`.`,
+  `4. Push your answer to your fork: ${code(pushCommand)}. The push itself can be refused, on git's \`remote:\` lines.`,
+  `5. Wait for the verdict: the rest of the checks run on the platform after git returns. Run ${cli("status", "--json")} until your answer's \`outcome._tag\` is no longer \`Checking\`, then read the verdict on your head: ${code(`git fetch ${remote} ${notesRef}:${notesRef}`)}, then ${code(`git notes --ref=${Brand.slug} show HEAD`)}. It is JSON: match on its \`_tag\`, and run a refusal's \`next\`.`,
 ];
 
 const unitsOfTime = [

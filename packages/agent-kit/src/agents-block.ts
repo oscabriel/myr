@@ -47,6 +47,8 @@ const bodyOf = (project: ProjectName, policy: Policy) => {
     "",
     `This project takes changes through ${Brand.name}: an answer to one of its asks lands only by passing the gate. This block is generated from the config folder, and the gate decides what lands. The full guide is the ${code(contributeSkillName(project))} skill (${code(agentsPath)}).`,
     "",
+    `It needs the ${Brand.name} CLI (${code(`npm install -g ${Brand.cliPackage}`)}, or the platform's ${code("/install")} page) signed in with ${code(`${Brand.cli} login --url <platform>`)}, and runs in a clone of the project, ${code(`git clone <platform>/${project}.git`)}, where ${code("<platform>")} is the host this project lives on: in such a clone, ${code("git remote get-url origin")} names it.`,
+    "",
     ...loopSteps(),
     "",
     ...rules(policy),

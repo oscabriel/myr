@@ -23,8 +23,8 @@ Find an ask with `__CLI__ asks`, then, in the project's repo:
 1. Read the ask, then claim it: `__CLI__ ask <ask>`, then `__CLI__ claim <ask>`. The claim prints your fork's remote; add it with `git remote add __SLUG__ <remote>`.
 2. Work inside the ask's territory until its check passes.
 3. Run `__CLI__ check`. It gives the refusals a push would get, then runs the ask's check and the project's lanes; fix everything it reports.
-4. Push your answer to your fork: `git push __SLUG__ HEAD:main`. The push itself can be refused; follow the answer with `__CLI__ status`.
-5. Read the verdict on your head: `git fetch __SLUG__ refs/notes/__SLUG__:refs/notes/__SLUG__`, then `git notes --ref=__SLUG__ show HEAD`. It is JSON: match on its `_tag`, and run a refusal's `next`.
+4. Push your answer to your fork: `git push __SLUG__ HEAD:main`. The push itself can be refused, on git's `remote:` lines.
+5. Wait for the verdict: the rest of the checks run on the platform after git returns. Run `__CLI__ status --json` until your answer's `outcome._tag` is no longer `Checking`, then read the verdict on your head: `git fetch __SLUG__ refs/notes/__SLUG__:refs/notes/__SLUG__`, then `git notes --ref=__SLUG__ show HEAD`. It is JSON: match on its `_tag`, and run a refusal's `next`.
 
 A project's own `<key>-contribute` skill (its key: the name with each `/` as `__`, as in `oscabriel__foo-contribute`, or for a project made before owners its old one-word key, as in `datekit-contribute`) and the block in its AGENTS.md give its territories, its run block and its ask kinds.
 
