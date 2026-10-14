@@ -94,6 +94,13 @@ export const ProposalId = Schema.String.pipe(
 
 export type ProposalId = typeof ProposalId.Type;
 
+export const DiscussionId = Schema.String.pipe(
+  Schema.check(Schema.isPattern(Minted)),
+  Schema.brand("DiscussionId")
+);
+
+export type DiscussionId = typeof DiscussionId.Type;
+
 export const DecisionId = Schema.String.pipe(
   Schema.check(Schema.isPattern(Minted)),
   Schema.brand("DecisionId")

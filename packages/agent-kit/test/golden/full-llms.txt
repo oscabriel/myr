@@ -65,7 +65,7 @@ Every refusal the platform gives, in every group of its closed union. Each has a
 | `RepoBusy` | Push and claim | yes | 75 | `git push` | Push again. |
 | `DirectPush` | Push and claim | no | 77 | `__CLI__ asks` | Main moves only by a landing: push your answer to your claim's fork. |
 | `AskBlocked` | Push and claim | yes | 75 | `__CLI__ asks` | Wait for the asks it names to land, or answer one of them first. |
-| `Denounced` | Push and claim | no | 77 | `__CLI__ status` | The project's vouch file denounces you: it takes no claims or proposals from you. |
+| `Denounced` | Push and claim | no | 77 | `__CLI__ status` | The project's vouch file denounces you: it takes no claims, proposals or posts from you. |
 | `OutOfScope` | Shape | no | 65 | `__CLI__ check` | Undo your changes to the paths it names: they are outside the ask's territory. |
 | `TouchedJudge` | Shape | no | 65 | `__CLI__ check` | Undo your changes to the paths it names: they decide what the checks do. |
 | `Weakened` | Shape | no | 65 | `__CLI__ check` | Take the marker out; a marker without a reason may get one after ` -- ` for a maintainer to weigh, but one a maintainer declined stays out; never raise a ratchet. |
@@ -89,6 +89,7 @@ Every refusal the platform gives, in every group of its closed union. Each has a
 | `DecisionClosed` | Decision | no | 66 | `__CLI__ today` | Nothing to decide: it was taken already, or expired to its default. |
 | `ProposalClosed` | Decision | no | 66 | `__CLI__ today` | Nothing more is drafted for it: the proposal was accepted, declined or expired. |
 | `DraftInProgress` | Decision | yes | 75 | `__CLI__ proposal <proposal>` | Wait: the platform is drafting this proposal's ask already, and `next` shows when it settles. |
+| `DiscussionClosed` | Decision | no | 66 | `__CLI__ discussions` | Nothing more is posted there: the discussion was closed, or a maintainer turned it into a proposal; `next` lists the open ones. |
 | `UnknownProject` | Lookup | no | 66 | `__CLI__ asks` | Check the project's name: every project is listed in the index. |
 | `UnknownAsk` | Lookup | no | 66 | `__CLI__ asks` | Check the ask's name: `next` lists the project's open asks. |
 | `UnknownCommit` | Lookup | no | 66 | `git fetch` | Fetch the project, then name a commit it holds. |
@@ -96,6 +97,7 @@ Every refusal the platform gives, in every group of its closed union. Each has a
 | `UnknownPath` | Lookup | no | 66 | `git ls-tree` | Name a path the commit holds: `next` lists its files. |
 | `UnknownRevision` | Lookup | no | 66 | `git ls-remote` | Name `main`, a commit the project holds or one of its tags: `next` lists its refs. |
 | `UnknownProposal` | Lookup | no | 66 | `__CLI__ today` | Check the proposal's id: `next` lists the proposals waiting on you. |
+| `UnknownDiscussion` | Lookup | no | 66 | `__CLI__ discussions` | Check the discussion's id: `next` lists the project's discussions. |
 | `ProjectExists` | Setup | no | 65 | `__CLI__ asks` | Pick another name: that one is taken. |
 | `NotYourNamespace` | Setup | no | 77 |  | Make the project in your own namespace: `next` names it with your handle. |
 | `ImportFailed` | Setup | yes | 75 | `__CLI__ init` | Read `reason`, then import again. |
@@ -167,6 +169,7 @@ A project's page follows its events as they happen (the `watch` contract). Each 
 - `Landed`: A landing reached `main`, a project's adoption (its first push or its import) among them.
 - `Lapsed`: A claim lapsed: no push for too long.
 - `LedgerAppended`: The project's public ledger gained an entry.
+- `DiscussionPosted`: Someone posted in a discussion: opened one, or replied.
 - `ProposalDrafted`: A proposal's draft settled: ready for a maintainer, or failed.
 - `ProposalOpened`: A proposal opened.
 - `Pushed`: A claimant pushed to their fork.

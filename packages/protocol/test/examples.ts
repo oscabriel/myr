@@ -4,6 +4,7 @@ import {
   AskId,
   CommitSha,
   DecisionId,
+  DiscussionId,
   EnvKey,
   Handle,
   ProjectName,
@@ -20,6 +21,7 @@ import {
   DecisionClosed,
   Denounced,
   DirectPush,
+  DiscussionClosed,
   DraftInProgress,
   Flake,
   HeldBackFailed,
@@ -47,6 +49,7 @@ import {
   UnknownAsk,
   UnknownCommit,
   UnknownDecision,
+  UnknownDiscussion,
   UnknownEnvItem,
   UnknownPath,
   UnknownProject,
@@ -75,6 +78,8 @@ const decision = DecisionId.make("dec-000001");
 const key = EnvKey.make("PAYMENTS_KEY");
 
 const proposal = ProposalId.make("prop-000001");
+
+const discussion = DiscussionId.make("disc-000001");
 
 export const examples: readonly Refusal[] = [
   NotClaimed.of(ask),
@@ -124,6 +129,7 @@ export const examples: readonly Refusal[] = [
   new DecisionClosed({ decision }),
   new ProposalClosed({ proposal }),
   DraftInProgress.of(proposal),
+  new DiscussionClosed({ discussion }),
   new UnknownProject({ project }),
   new UnknownAsk({ ask }),
   new UnknownCommit({ sha: main }),
@@ -131,6 +137,7 @@ export const examples: readonly Refusal[] = [
   new UnknownPath({ commit: main, path }),
   new UnknownRevision({ rev: "v9.9.9" }),
   new UnknownProposal({ proposal }),
+  new UnknownDiscussion({ discussion }),
   new ProjectExists({ project }),
   NotYourNamespace.of(project, Handle.make("bob")),
   new ImportFailed({ reason: "the repo needs a sign-in to read" }),

@@ -125,7 +125,7 @@ describe("the refusal union", () => {
     ).toStrictEqual(Refusal.members.map((member) => member.identifier));
   });
 
-  it("lists all forty-five tags in union order, group by group", () => {
+  it("lists all forty-seven tags in union order, group by group", () => {
     expect(Refusal.members.map((member) => member.identifier)).toStrictEqual([
       "NotClaimed",
       "ClaimLapsed",
@@ -160,6 +160,7 @@ describe("the refusal union", () => {
       "DecisionClosed",
       "ProposalClosed",
       "DraftInProgress",
+      "DiscussionClosed",
       "UnknownProject",
       "UnknownAsk",
       "UnknownCommit",
@@ -167,6 +168,7 @@ describe("the refusal union", () => {
       "UnknownPath",
       "UnknownRevision",
       "UnknownProposal",
+      "UnknownDiscussion",
       "ProjectExists",
       "NotYourNamespace",
       "ImportFailed",
@@ -210,6 +212,7 @@ describe("the refusal union", () => {
       DecisionClosed: false,
       Denounced: false,
       DirectPush: false,
+      DiscussionClosed: false,
       DraftInProgress: true,
       Flake: true,
       HeldBackFailed: false,
@@ -237,6 +240,7 @@ describe("the refusal union", () => {
       UnknownAsk: false,
       UnknownCommit: false,
       UnknownDecision: false,
+      UnknownDiscussion: false,
       UnknownEnvItem: false,
       UnknownPath: false,
       UnknownProject: false,

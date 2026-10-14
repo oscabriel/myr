@@ -111,6 +111,7 @@ const eventTags: readonly ProjectEvent["_tag"][] = [
   "AskOpened",
   "Claimed",
   "Decided",
+  "DiscussionPosted",
   "Judged",
   "Landed",
   "Lapsed",
