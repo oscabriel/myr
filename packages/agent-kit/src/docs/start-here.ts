@@ -38,6 +38,7 @@ export const startHere: DocSource = {
     "",
     "## Where next",
     "",
+    "- [Take the tour](/tour): the loop in six steps, on an example project, each with its command.",
     "- [The open asks](/asks), across every project.",
     "- [Answer an ask](/docs/answer-an-ask), from finding one to reading its verdict.",
     "- [Run a project](/docs/run-a-project): make one, write its config folder, open asks and decide.",

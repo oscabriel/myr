@@ -5,9 +5,9 @@ import { EvidenceStoreMemory } from "@repo/checks/evidence-store/memory";
 import { cannedDrafter } from "@repo/drafting/draft-runs/canned";
 import { withDraftRunsInline } from "@repo/drafting/draft-runs/inline";
 import { AlarmsMemory } from "@repo/project/alarms/memory";
-import { AnswerRunsInline } from "@repo/project/answer-runs/inline";
 import { ProjectDescriptionsMemory } from "@repo/project/description/memory";
 import type { FrontPage } from "@repo/project/front-page";
+import type { Lander } from "@repo/project/lander";
 import { FinishersFromChecks } from "@repo/project/project";
 import type { Projects } from "@repo/project/projects";
 import { ProjectsMemory } from "@repo/project/projects/memory";
@@ -15,6 +15,8 @@ import { RulesEvaluatorJson } from "@repo/rules/rules-evaluator/json";
 import { Layer } from "effect";
 import type { DateTime } from "effect";
 
+import { DevAnswerRunsLayer } from "./answer-runs.ts";
+import type { DevAnswerRuns } from "./answer-runs.ts";
 import { DevChecker } from "./checker.ts";
 import { devClockAt, devStart } from "./clock.ts";
 import type { DevClock } from "./clock.ts";
@@ -24,7 +26,7 @@ import { DevProjection } from "./projection.ts";
 
 const ports = Layer.mergeAll(
   AlarmsMemory,
-  AnswerRunsInline,
+  DevAnswerRunsLayer,
   cannedDrafter,
   DevProjection,
   RulesEvaluatorJson.pipe(Layer.provide(FinishersFromChecks))
@@ -57,5 +59,12 @@ export const devWorldWith = <Out, E, In extends DevCore>(
 
 export const devWorldAt = (
   start: DateTime.Utc
-): Layer.Layer<Projects | FrontPage | EvidenceStore | RepoHost | DevClock> =>
-  devWorldWith(Layer.empty, start);
+): Layer.Layer<
+  | Projects
+  | FrontPage
+  | EvidenceStore
+  | RepoHost
+  | DevClock
+  | Lander
+  | DevAnswerRuns
+> => devWorldWith(Layer.empty, start);

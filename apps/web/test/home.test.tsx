@@ -402,14 +402,16 @@ describe("the inbox, read on the server with the reader's session", () => {
   );
 
   it.live(
-    "draws a contributor's answered claim with its stages and its next command",
+    "draws a contributor's answered claim with its stages, and no command while the gate still checks the latest push",
     () =>
       Effect.gen(function* () {
         const markup = yield* pageFrom(yield* readInbox({}));
 
         expect(markup).toMatch(/<li[^>]*data-claim="[^"]+"/u);
         expect(markup).toContain('aria-label="Gate stages"');
-        expect(markup).toMatch(/Copy (?:next|check) command/u);
+        // Bram's parse-iso-week: refused once, the second push at the merge, so nothing for him to run yet.
+        expect(markup).toContain("Checking");
+        expect(markup).not.toMatch(/Copy (?:next|check) command/u);
       }).pipe(Effect.provide(fixturesClient("bram")), Effect.scoped),
     60_000
   );

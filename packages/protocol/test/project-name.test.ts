@@ -156,6 +156,7 @@ describe("an owner", () => {
         "install",
         "settings",
         "today",
+        "tour",
       ])
     );
   });

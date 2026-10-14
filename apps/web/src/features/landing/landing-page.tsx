@@ -5,7 +5,13 @@ import { buttonVariants } from "../../components/ui/button.tsx";
 import { ID, LINK } from "../shared/classes.ts";
 import { CommandLine } from "../shared/command.tsx";
 import { AppLink } from "../shared/link.tsx";
-import { ASKS_PATH, EXPLORE_PATH, INSTALL_PATH } from "../shared/paths.ts";
+import {
+  ASKS_PATH,
+  EXPLORE_PATH,
+  INSTALL_PATH,
+  LANDING_NOW_ANCHOR,
+  TOUR_PATH,
+} from "../shared/paths.ts";
 import { GUTTER } from "../shared/shell/gutter.ts";
 import { GateDrawing } from "./gate-drawing.tsx";
 import { LandingNowList } from "./landing-now-list.tsx";
@@ -174,6 +180,9 @@ export const LandingView = ({
         <div className="max-w-full min-w-0">
           <CommandLine command={installCommand(webUrl)} />
         </div>
+        <AppLink className={`text-ui ${LINK}`} to={TOUR_PATH}>
+          Take the tour
+        </AppLink>
       </div>
       <div className="w-full max-w-(--container-figure)">
         <MusicBox />
@@ -190,7 +199,7 @@ export const LandingView = ({
 
     <Part
       aside={<More to={EXPLORE_PATH}>Explore projects</More>}
-      id="landing-now"
+      id={LANDING_NOW_ANCHOR}
       title="Landing now"
     >
       <LandingNowList landings={landings} />

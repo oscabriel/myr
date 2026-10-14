@@ -185,13 +185,19 @@ describe(LandingView, () => {
     })
   );
 
-  it.effect("links to every way in and to the projects", () =>
-    Effect.gen(function* () {
-      const hrefs = hrefsOf(mainOf(yield* pageWith(landed)));
+  it.effect(
+    "links to every way in, to the projects, and to the tour under the hero's action",
+    () =>
+      Effect.gen(function* () {
+        const main = mainOf(yield* pageWith(landed));
+        const hrefs = hrefsOf(main);
+        const hero = main.slice(0, main.indexOf('data-figure="music-box"'));
 
-      expect(hrefs).toContain("/install");
-      expect(hrefs).toContain("/explore");
-    })
+        expect(hrefs).toContain("/install");
+        expect(hrefs).toContain("/explore");
+        expect(hrefsOf(hero)).toStrictEqual(["/asks", "/tour"]);
+        expect(textIn(hero)).toContain("Take the tour");
+      })
   );
 
   it.effect(

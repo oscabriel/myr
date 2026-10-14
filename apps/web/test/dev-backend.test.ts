@@ -314,8 +314,12 @@ describe("the dev seed", seededWorlds, () => {
       Effect.gen(function* () {
         const { landing, landings, want } = yield* recentWithLast;
 
-        expect(landings[0]?._tag).toBe("Landed");
-        expect(landings[0]).toMatchObject({
+        // Bram's refused round on parse-iso-week came after the last landing.
+        expect(landings.map(({ _tag }) => _tag).slice(0, 2)).toStrictEqual([
+          "Refused",
+          "Landed",
+        ]);
+        expect(landings[1]).toMatchObject({
           at: landing.landedAt,
           project: landing.project,
           sha: landing.sha,

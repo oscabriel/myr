@@ -25,6 +25,12 @@ export const SETTINGS_PATH = "/settings";
 
 export const TERMS_PATH = "/terms";
 
+/** The guided walkthrough: the loop in six steps on an example project. */
+export const TOUR_PATH = "/tour";
+
+/** The landing's "Landing now", which the tour's "see it live" opens. */
+export const LANDING_NOW_ANCHOR = "landing-now";
+
 export const docsPath = (page?: string) =>
   page === undefined ? "/docs" : `/docs/${page}`;
 

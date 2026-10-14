@@ -178,7 +178,8 @@ const BriefList = ({ items }: { readonly items: readonly string[] }) => (
   </ul>
 );
 
-const Brief = ({ ask }: { readonly ask: Ask }) => {
+/** The ask's brief, as the tour reads it too. */
+export const Brief = ({ ask }: { readonly ask: Ask }) => {
   const { context, current, outOfScope, terms } = ask.brief;
 
   const parts = [

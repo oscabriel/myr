@@ -1,4 +1,6 @@
 import { RefName, RefOutcome, RepoHost } from "@repo/artifacts/repo-host";
+import { Lander } from "@repo/project/lander";
+import { LandingCommand } from "@repo/project/landing";
 import type { ProjectApi } from "@repo/project/project";
 import { Projects } from "@repo/project/projects";
 import type { HarnessAudit } from "@repo/protocol/audit";
@@ -7,8 +9,10 @@ import type { Decision } from "@repo/protocol/domain/decision";
 import { AskId, Handle, keyOf, RepoName, RequestId } from "@repo/protocol/ids";
 import type { CommitSha, ProjectName, ProposalId } from "@repo/protocol/ids";
 import { Anonymous, Person } from "@repo/protocol/principal";
+import { OutOfScope } from "@repo/protocol/refusal";
 import { Array, DateTime, Effect, Option } from "effect";
 
+import { DevAnswerRuns } from "./answer-runs.ts";
 import { DevClock, devMinute } from "./clock.ts";
 import {
   burrow,
@@ -150,6 +154,11 @@ export const opened = (
     { discard: true }
   );
 
+/**
+ * A push to the answerer's fork, recorded and submitted as the gateway does;
+ * a held one is queued but never driven, so it stays at the merge until the
+ * seed judges it.
+ */
 const answered = (
   api: ProjectApi,
   answerer: Handle,
@@ -157,6 +166,7 @@ const answered = (
     readonly ask: AskId;
     readonly audit: HarnessAudit;
     readonly files: Files;
+    readonly hold?: boolean;
     readonly message: string;
   }
 ) =>
@@ -167,19 +177,27 @@ const answered = (
       Array.findFirst(claims, ({ ask }) => ask === input.ask)
     );
 
-    const base = yield* filesOf(claim.fork, claim.base);
+    // A second round builds on the first: the fork's tip, which a first push finds at the claim's base.
+    const host = yield* RepoHost;
+
+    const tip = Option.getOrElse(
+      Option.fromNullishOr((yield* host.refs(claim.fork)).get(mainRef)),
+      () => claim.base
+    );
+
+    const base = yield* filesOf(claim.fork, tip);
 
     const head = yield* pushed(claim.fork, {
       author: answerer,
       files: overlay(textOf(base), input.files),
       message: input.message,
-      parent: Option.some(claim.base),
+      parent: Option.some(tip),
     });
 
     const refusals = yield* api.recordPush({
       after: head,
       audit: input.audit,
-      before: Option.some(claim.base),
+      before: Option.some(tip),
       eventId: `${claim.fork}@${head}`,
       pusher: as(answerer),
       ref: mainRef,
@@ -190,11 +208,86 @@ const answered = (
       return yield* Effect.die(refusals);
     }
 
-    return yield* api.submitAnswer(as(answerer), {
+    const requestId = RequestId.make(`push-${head}-${answerer}`);
+
+    if (input.hold === true) {
+      yield* (yield* DevAnswerRuns).hold(requestId);
+    }
+
+    const receipt = yield* api.submitAnswer(as(answerer), {
       ask: input.ask,
       base: claim.base,
       head,
-      requestId: RequestId.make(`push-${head}-${answerer}`),
+      requestId,
+    });
+
+    return { claim, head, receipt, requestId };
+  });
+
+const ROUNDS_MINUTE = 19;
+
+/**
+ * Bram's first answer to parse-iso-week, refused at Shape for a path outside
+ * the ask's territory, then his second, still at the merge. The platform's
+ * landing guard judges a merged tree's shape as stage 1 judges a push's and
+ * reports its refusals at that stage (`apps/platform/src/workflows/answer`);
+ * the dev world has no guard, so the seed reports the verdict one would.
+ */
+const refusedRound = (api: ProjectApi) =>
+  Effect.gen(function* () {
+    const { contributor } = datekitPeople;
+    const { ask, first, outside, second } = datekit.rounds;
+    const lander = yield* Lander;
+
+    yield* at(ROUNDS_MINUTE);
+
+    const held = yield* answered(api, contributor, {
+      ...first,
+      ask,
+      audit: bramsHarness,
+      hold: true,
+    });
+
+    const run = yield* Effect.flatMap(
+      api.answer(held.requestId),
+      Effect.fromOption
+    );
+
+    const main = yield* Effect.flatMap(api.head(), ({ landed }) =>
+      Effect.fromOption(Option.fromUndefinedOr(landed))
+    );
+
+    const { changes, tree } = yield* lander.merge({
+      base: held.claim.base,
+      fork: held.claim.fork,
+      head: held.head,
+      main,
+      repo: RepoName.make(keyOf(datekit.project)),
+    });
+
+    yield* api.advanceAnswer(
+      held.requestId,
+      LandingCommand.Merged({ changes, main, tree })
+    );
+
+    yield* api.advanceAnswer(
+      held.requestId,
+      LandingCommand.Checked({
+        decisions: [],
+        finish: run.finish,
+        refusals: [new OutOfScope({ paths: [outside] })],
+        tree,
+      }),
+      { heldBack: [], lanes: [], stage: "shape" }
+    );
+
+    yield* at(ROUNDS_MINUTE + 1);
+
+    yield* answered(api, contributor, {
+      ...second,
+      ask,
+      audit: bramsHarness,
+      hold: true,
     });
   });
 
@@ -310,10 +403,11 @@ const strayPush = (api: ProjectApi) =>
 export const seedDev: Effect.Effect<
   void,
   never,
-  Projects | RepoHost | DevClock
+  Projects | RepoHost | DevClock | Lander | DevAnswerRuns
 > = Effect.gen(function* () {
   const datekitApi = yield* seedDatekit;
 
   yield* seedBurrow;
+  yield* refusedRound(datekitApi);
   yield* strayPush(datekitApi);
 }).pipe(Effect.orDie);
