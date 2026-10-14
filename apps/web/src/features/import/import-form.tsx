@@ -175,7 +175,7 @@ const ownerHint = (fixed: boolean, choices: readonly Owner[]) => {
   }
 
   return choices.length > 1
-    ? "The URL's own account, or your handle."
+    ? "Your handle, or the URL's own account, which keeps the source's name."
     : "Your handle: this URL's host is not one a project may be owned by.";
 };
 

@@ -292,7 +292,10 @@ describe(`${Brand.cli} login --token-stdin`, () => {
         const { stderr, stdout } = yield* printed;
 
         expect(stdout.map((line) => line.trim())).toStrictEqual(
-          expect.arrayContaining(helperLines(url))
+          expect.arrayContaining([
+            ...helperLines(url),
+            `Next: ${Brand.cli} front to find an ask, or ${Brand.cli} init --project alice/<name> in a repo of yours.`,
+          ])
         );
         expect([...stdout, ...stderr].join("\n")).not.toContain(given);
       }).pipe(Effect.scoped, Effect.provide(testServices)),

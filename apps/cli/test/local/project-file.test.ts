@@ -39,8 +39,19 @@ const noTest = {
   ],
 } as const;
 
+const vouch = [
+  '  // Anyone not denounced in vouched.td may claim an ask; "forCode" admits',
+  "  // only the people vouched for there, which a maintainer lands with vouch.",
+  '  vouch: "bansOnly",',
+];
+
+const asksTrap = [
+  "      // An open ask's test fails on main until it is answered, so the suite",
+  "      // every answer must keep green leaves the asks' tests to their own lane.",
+];
+
 describe("the proposed project file", () => {
-  it("writes each command the finder found, with where it was found", () => {
+  it("writes each command the finder found, with where it was found, the unit lane without the asks' tests, and a vouch mode anyone may claim under", () => {
     expect(projectFile(found.run, found.sources)).toBe(
       [
         `import { project } from "${Brand.cliPackage}/rules";`,
@@ -55,17 +66,46 @@ describe("the proposed project file", () => {
         `    test: "vitest run {path}",`,
         "    checks: {",
         "      // checks.unit from package.json",
-        `      unit: "bun run test",`,
+        ...asksTrap,
+        `      unit: "vitest run --exclude 'test/asks/**'",`,
         "      // checks.lint from package.json",
         `      lint: "bun run lint",`,
         "      // checks.types from package.json",
         `      types: "bun run typecheck",`,
         "    },",
         "  },",
+        ...vouch,
         "});",
         "",
       ].join("\n")
     );
+  });
+
+  it("appends the skip to a unit lane that calls the runner itself, keeping its flags", () => {
+    expect(
+      projectFile(
+        { checks: { unit: "bun test --coverage" }, test: "bun test {path}" },
+        []
+      )
+    ).toContain(
+      `      unit: "bun test --coverage --path-ignore-patterns='test/asks/**'",`
+    );
+    expect(
+      projectFile({ checks: { unit: "npm test" }, test: "npx jest {path}" }, [])
+    ).toContain(
+      `      unit: "npx jest --testPathIgnorePatterns 'test/asks/'",`
+    );
+  });
+
+  it("explains the trap instead when the runner's skip flag is unknown", () => {
+    const text = projectFile(
+      { checks: { unit: "cargo test" }, test: "cargo test {path}" },
+      []
+    );
+
+    expect(text).toContain(`      unit: "cargo test",`);
+    expect(text).toContain("skips test/asks/**");
+    expect(text).not.toContain("--exclude");
   });
 
   it("is the same text for the same commands, in whatever order the keys come", () => {
@@ -88,8 +128,11 @@ describe("the proposed project file", () => {
         `//   setup: "npm install" (setup inferred from package.json)`,
         `//   checks.lint: "npm run lint" (checks.lint from package.json)`,
         "// skipped .github/workflows/broken.yml: not YAML",
+        "// A red-first ask needs a test command with {path}; once one is here, give the unit",
+        "// lane the runner's flag that skips test/asks/**, or every answer's unit lane is red while another ask is open.",
         "export default project({",
         "  run: run.fromCI,",
+        ...vouch,
         "});",
         "",
       ].join("\n")

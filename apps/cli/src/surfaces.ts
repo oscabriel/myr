@@ -9,6 +9,7 @@ import {
   surfaced,
   Surfaces,
 } from "@repo/protocol/contracts";
+import type { Contract } from "@repo/protocol/contracts";
 import { toToolkit } from "@repo/protocol/mcp";
 import {
   briefResources,
@@ -30,10 +31,17 @@ import {
 import { McpProtocol, McpServer } from "effect/ai";
 import { Argument, Command, Flag } from "effect/cli";
 import type { ChildProcessSpawner } from "effect/process";
+import type { Rpc } from "effect/rpc";
 
 import { local } from "./local/index.ts";
 import { Output } from "./output.ts";
-import { refusalsIn, views } from "./render.ts";
+import {
+  claimReceipt,
+  isClaimed,
+  placeOf,
+  refusalsIn,
+  views,
+} from "./render.ts";
 import { repoContext } from "./repo-context.ts";
 import { today } from "./tui/command.ts";
 import { cliVersion } from "./version.ts";
@@ -64,15 +72,29 @@ export interface CommandEntry {
   readonly command: Command.Command.Any;
 }
 
-/** `env set` reads the value from stdin so it never passes through an argument list or a transcript. */
-const wrapped = ["initProject", "setEnv", "today"];
+/** `env set` reads the value from stdin so it never passes through an argument list or a transcript; `ask open` reads its files from the working tree. */
+const wrapped = ["initProject", "openAsk", "setEnv", "today"];
+
+const remotesHere = Effect.map(
+  Effect.option(Effect.flatMap(WorkingDirectory, repoContext)),
+  Option.match({ onNone: () => [], onSome: ({ remotes }) => remotes })
+);
+
+const claim = (success: Rpc.Success<Contract>) =>
+  isClaimed(success)
+    ? Effect.map(remotesHere, (remotes) =>
+        Option.some(
+          claimReceipt(success.claim, placeOf(success.claim, remotes))
+        )
+      )
+    : Effect.succeedNone;
 
 const projected = toCommands(Contracts, Effect.service(Client), {
   defaults: fromRepoContext,
   exclude: wrapped,
   output: Effect.service(Output),
   refusalsIn,
-  views,
+  views: { ...views, claim },
 });
 
 const groups = new Map([

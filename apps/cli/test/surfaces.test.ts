@@ -188,8 +188,8 @@ describe("the CLI's command tree", () => {
 
     const paths = entries.map(({ path: words }) => words.join(" "));
 
-    // `init` and `env set` are the local commands that wrap their contracts.
-    expect(paths).toHaveLength(onCli.length - 2 + local.length + 1);
+    // `init`, `env set` and `ask open` are the local commands that wrap their contracts.
+    expect(paths).toHaveLength(onCli.length - 3 + local.length + 1);
     expect(new Set(paths).size).toBe(paths.length);
     expect(paths).toStrictEqual(
       expect.arrayContaining([
@@ -206,7 +206,7 @@ describe("the CLI's command tree", () => {
   });
 
   it("puts ask open, ask draft and ask flag under ask, and env shape beside env set", () => {
-    expect(subcommandsOf(top("ask"))).toStrictEqual(["open", "draft", "flag"]);
+    expect(subcommandsOf(top("ask"))).toStrictEqual(["draft", "flag", "open"]);
     expect(subcommandsOf(top("env"))).toStrictEqual(["shape", "set"]);
   });
 

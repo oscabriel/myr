@@ -89,7 +89,7 @@ describe("the import page", () => {
 
     expect(inputNamed(markup, "url")).toContain(`value="${CLICK}"`);
     expect(inputNamed(markup, "branch")).toContain('value=""');
-    expect(inputNamed(markup, "owner")).toContain('value="github.com/pallets"');
+    expect(inputNamed(markup, "owner")).toContain('value="oscabriel"');
     expect(inputNamed(markup, "name")).toContain('value="click"');
     expect(markup).toMatch(/<button[^>]*type="submit"[^>]*>Import<\/button>/u);
   });
@@ -148,10 +148,10 @@ describe(prefillFrom, () => {
 });
 
 describe(ownerChoices, () => {
-  it("puts the source namespace first when the host is on the list, then the handle", () => {
+  it("puts the handle first, then the source namespace when the host is on the list", () => {
     expect(ownerChoices(oscabriel, CLICK)).toStrictEqual([
-      "github.com/pallets",
       "oscabriel",
+      "github.com/pallets",
     ]);
   });
 
@@ -434,13 +434,11 @@ describe("pressing Import", () => {
         yield* Effect.tryPromise(() => router.load());
 
         expect(sent).toStrictEqual([
-          { import: { url: CLICK }, project: "github.com/pallets/click" },
+          { import: { url: CLICK }, project: "oscabriel/click" },
         ]);
         // Where the hook's `navigate` goes: a router with no window to
         // move only builds the location, as `navigate` does first.
-        expect(router.buildLocation(to).publicHref).toBe(
-          "/github.com/pallets/click"
-        );
+        expect(router.buildLocation(to).publicHref).toBe("/oscabriel/click");
       })
   );
 

@@ -568,6 +568,11 @@ describe("the install script", () => {
     });
   });
 
+  it("ends by naming the next step, login on the brand's own platform host", () => {
+    expect(script).toContain(`platform='https://git.${Brand.domain}'`);
+    expect(script).toContain('echo "next: $name login --url $platform"');
+  });
+
   const install = (files: Readonly<Record<string, string>>) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;

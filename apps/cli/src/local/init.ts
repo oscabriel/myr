@@ -1,6 +1,7 @@
 import { Brand } from "@repo/brand";
 import { findRunBlock } from "@repo/checks/finder";
 import type { RepoFile } from "@repo/checks/finder";
+import { PATH_PLACEHOLDER } from "@repo/checks/kinds";
 import { ApprovalNeeded } from "@repo/protocol/cli";
 import { Client } from "@repo/protocol/contracts";
 import type { InitProject } from "@repo/protocol/contracts";
@@ -22,7 +23,7 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import { Credentials, gitHelperConfig } from "../credentials.ts";
 import { endRefused, Output } from "../output.ts";
 import { parseRemote, repoContext } from "../repo-context.ts";
-import { projectFile } from "./project-file.ts";
+import { ASKS_DIR, projectFile } from "./project-file.ts";
 
 const COMMAND = "init";
 
@@ -31,6 +32,16 @@ const CONFIG = `${Brand.configDir}/project.ts`;
 const SUBJECT = `Add ${CONFIG}: the run block ${Brand.cli} ${COMMAND} found`;
 
 const PENDING = { origin: "<platform>", remote: "<remote>" } as const;
+
+const NEXT = `Next: write an ask in ${Brand.configDir}/asks/<ask>.ask.ts, with its failing test under ${ASKS_DIR}/, then ${Brand.cli} ask open <ask>; or ${Brand.cli} propose --want "<what should be true>" --draft.`;
+
+/** The CLI knows the platform's address alone; the web shows the project at the same path. */
+const pageLine = (project: string, remote: string) =>
+  Option.match(parseRemote(remote), {
+    onNone: () => `The web shows it at /${project}.`,
+    onSome: ({ origin }) =>
+      `Its address: ${origin}/${project} on the platform; the web shows it at /${project}.`,
+  });
 
 export class InitMisused extends Schema.TaggedError<InitMisused>()(
   "InitMisused",
@@ -85,7 +96,7 @@ const flags = {
   ),
   project: Flag.String("project").pipe(
     Flag.withDescription(
-      "The project's name, <owner>/<name>; a bare name is yours (<your handle>/<name>). By default this repo's folder, or an import's source path."
+      "The project's name, <owner>/<name>; a bare name is yours (<your handle>/<name>). By default this repo's folder, or an import's last URL segment, under your handle."
     ),
     Flag.optional
   ),
@@ -185,9 +196,11 @@ const projectNamed = (
     const word = Option.getOrElse(given, () => fallback.short);
     const known = yield* profileOwner;
 
+    // An import is yours by default; its source namespace names it only
+    // when no handle is known here, or when --project spells it out.
     const owner = Option.isSome(given)
       ? known
-      : Option.orElse(fallback.owner, () => known);
+      : Option.orElse(known, () => fallback.owner);
 
     const spelled = word.includes("/")
       ? word
@@ -303,6 +316,7 @@ const imported = (input: Input, url: string, payload: Payload) =>
     const output = yield* Output;
     const reply = yield* makeProject(payload, input.json);
     const clone = `git clone ${reply.remote}`;
+    const page = pageLine(reply.project, reply.remote);
 
     yield* output.success({
       command: COMMAND,
@@ -318,8 +332,8 @@ const imported = (input: Input, url: string, payload: Payload) =>
       ),
       json: input.json,
       view: {
-        markdown: `Imported ${url} as project **${reply.project}**. Clone it with:\n\n\`\`\`sh\n${clone}\n\`\`\``,
-        text: `Imported ${url} as project ${reply.project}. Clone it with:\n  ${clone}`,
+        markdown: `Imported ${url} as project **${reply.project}**. Clone it with:\n\n\`\`\`sh\n${clone}\n\`\`\`\n\n${page}\n\n${NEXT}`,
+        text: `Imported ${url} as project ${reply.project}. Clone it with:\n  ${clone}\n${page}\n${NEXT}`,
       },
     });
   });
@@ -353,7 +367,18 @@ const importing = (input: Input, url: string) =>
     }
   });
 
+const configLine = (atHead: boolean, inTree: boolean) => {
+  if (atHead) {
+    return `Kept ${CONFIG} as it is.`;
+  }
+
+  return inTree
+    ? `Committed ${CONFIG} as the work tree had it, alone.`
+    : `Wrote ${CONFIG} and committed it alone.`;
+};
+
 interface Found {
+  readonly atHead: boolean;
   readonly commits: readonly string[];
   readonly hasRemote: boolean;
   readonly payload: Payload;
@@ -366,9 +391,9 @@ const made = (input: Input, found: Found) =>
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     const output = yield* Output;
-    const { commits, hasRemote, payload, root, writes } = found;
+    const { atHead, commits, hasRemote, payload, root, writes } = found;
 
-    if (writes.length === 0) {
+    if (atHead) {
       yield* output.note(`kept ${CONFIG} as it is`);
     }
 
@@ -403,15 +428,16 @@ const made = (input: Input, found: Found) =>
       }
     }
 
-    const config =
-      writes.length === 0 ? `Kept ${CONFIG} as it is` : `Wrote ${CONFIG}`;
+    const config = configLine(atHead, writes.length === 0);
 
     const done = [
       `Made project ${reply.project} at ${reply.remote}.`,
-      commits.length === 0 ? `${config}.` : `${config} and committed it alone.`,
+      config,
       input.push
         ? `Pushed HEAD to its main through the remote ${Brand.slug}.`
         : `Push when ready: git push ${Brand.slug} HEAD:main`,
+      pageLine(reply.project, reply.remote),
+      NEXT,
     ];
 
     yield* output.success({
@@ -457,6 +483,17 @@ const inRepo = (input: Input) =>
         ? []
         : [{ content: projectFile(block.run, block.sources), path: CONFIG }];
 
+    if (
+      writes.length > 0 &&
+      block.run.test?.includes(PATH_PLACEHOLDER) !== true
+    ) {
+      yield* Output.use((output) =>
+        output.note(
+          `No command that runs one test file was found, so ${CONFIG} takes run.fromCI. A red-first ask needs a test command with ${PATH_PLACEHOLDER}, as in test: "vitest run ${PATH_PLACEHOLDER}": add it to run before you open one.`
+        )
+      );
+    }
+
     const commits: readonly string[] = atHead ? [] : [CONFIG];
 
     const hasRemote =
@@ -480,7 +517,7 @@ const inRepo = (input: Input) =>
     };
 
     if (yield* approved(input, plan)) {
-      yield* made(input, { commits, hasRemote, payload, root, writes });
+      yield* made(input, { atHead, commits, hasRemote, payload, root, writes });
     }
   });
 

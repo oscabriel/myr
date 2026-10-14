@@ -19,6 +19,7 @@ import {
 import type { Contract } from "@repo/protocol/contracts";
 import { LandReceipt } from "@repo/protocol/domain/answer";
 import type { AnswerReceipt } from "@repo/protocol/domain/answer";
+import type { ClaimView } from "@repo/protocol/domain/claim";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
 import { Outcome } from "@repo/protocol/domain/outcome";
 import type {
@@ -31,6 +32,9 @@ import type { Refusal } from "@repo/protocol/refusal";
 import { receiptLine } from "@repo/protocol/render";
 import { DateTime, Option, Result, Schema } from "effect";
 import type { Rpc } from "effect/rpc";
+
+import { parseRemote, parseRepoName } from "./repo-context.ts";
+import type { Remote } from "./repo-context.ts";
 
 const short = (sha: string) => sha.slice(0, 7);
 
@@ -194,11 +198,57 @@ const asks = viewOf(ListAsks.successSchema, ({ asks: listed }) =>
 
 const ask = viewOf(ShowAsk.successSchema, ({ brief }) => prose(brief));
 
-const claim = viewOf(Claim.successSchema, ({ claim: held }) => {
+/** Where the receipt is read: in a clone of the project or not, and what the fork's remote may be called. */
+export interface Place {
+  readonly inClone: boolean;
+  readonly remoteName: string;
+  /** False when a remote of that name already points at the fork. */
+  readonly addRemote: boolean;
+}
+
+const sameProject = (held: ClaimView, url: string) =>
+  Option.exists(parseRemote(url), ({ repo }) =>
+    Option.exists(parseRepoName(repo), (ref) => ref.project === held.project)
+  );
+
+/** Outside a repo, `remotes` is empty, so the receipt starts with a clone. */
+export const placeOf = (held: ClaimView, remotes: readonly Remote[]): Place => {
+  const named = remotes.find(({ name }) => name === Brand.slug);
+
+  if (named === undefined) {
+    return {
+      addRemote: true,
+      inClone: remotes.some(({ url }) => sameProject(held, url)),
+      remoteName: Brand.slug,
+    };
+  }
+
+  return named.url === held.remote
+    ? { addRemote: false, inClone: true, remoteName: Brand.slug }
+    : {
+        addRemote: true,
+        inClone: remotes.some(({ url }) => sameProject(held, url)),
+        remoteName: `${Brand.slug}-${held.ask}`,
+      };
+};
+
+const cloneOf = (held: ClaimView) =>
+  Option.map(parseRemote(held.remote), ({ origin, repo }) => {
+    const [canonical = repo] = repo.split("--");
+    const folder = canonical.slice(canonical.lastIndexOf("/") + 1);
+
+    return `git clone ${origin}/${canonical}.git && cd ${folder}`;
+  });
+
+export const claimReceipt = (held: ClaimView, place: Place): View => {
   const steps = [
-    `git remote add ${Brand.slug} ${held.remote}`,
+    ...(place.inClone ? [] : Option.toArray(cloneOf(held))),
+    ...(place.addRemote
+      ? [`git remote add ${place.remoteName} ${held.remote}`]
+      : []),
+    `git fetch ${place.remoteName}`,
     `${Brand.cli} check`,
-    `git push ${Brand.slug} HEAD:main`,
+    `git push ${place.remoteName} HEAD:main`,
   ];
 
   return {
@@ -222,7 +272,9 @@ const claim = viewOf(Claim.successSchema, ({ claim: held }) => {
       ...steps.map((step) => `  ${step}`),
     ].join("\n"),
   };
-});
+};
+
+export const isClaimed = Schema.is(Claim.successSchema);
 
 const status = viewOf(Status.successSchema, ({ answers, claims, handle }) =>
   joined(
@@ -516,8 +568,8 @@ export const refusalsIn = (
     ? success.outcome.refusals
     : [];
 
+/** `claim`'s receipt looks at the repo it is printed in, so the CLI's surfaces add it. */
 export const views = {
-  claim,
   credits,
   finish: finished,
   frontPage: front,

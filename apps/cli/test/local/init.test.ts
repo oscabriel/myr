@@ -315,9 +315,90 @@ describe(`${Brand.cli} init in an existing repo`, () => {
           remotes: Brand.slug,
           staged: "notes.md",
         });
+        expect({
+          kept: ran.err.filter((line) => line.includes("kept")),
+          subject: (yield* gitOk(
+            machine.repo,
+            "log",
+            "-1",
+            "--format=%s"
+          )).includes(CONFIG),
+        }).toStrictEqual({ kept: [], subject: true });
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+    { timeout: 30_000 }
+  );
+
+  it.live(
+    "ends with the project's address and the next step: an ask file, its test and ask open",
+    () =>
+      Effect.gen(function* () {
+        const machine = yield* aMachine;
+        const gateway = "https://platform.example.test/oscabriel/demo.git";
+
+        const platform = yield* aPlatform(
+          Effect.succeed({
+            project: ProjectName.make("oscabriel/demo"),
+            remote: gateway,
+          })
+        );
+
+        const ran = yield* cli(machine, platform.layer, [
+          "init",
+          "--project",
+          "oscabriel/demo",
+          "--yes",
+          "--no-push",
+        ]);
+
+        expect(ran.code).toBe(0);
+
+        const said = ran.out.join("\n");
+
+        expect(said).toContain("https://platform.example.test/oscabriel/demo");
+        expect(said).toContain(
+          `Next: write an ask in ${Brand.configDir}/asks/<ask>.ask.ts`
+        );
+        expect(said).toContain(`${Brand.cli} ask open <ask>`);
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+    { timeout: 30_000 }
+  );
+
+  it.live(
+    "warns that red-first asks need a test command with {path} when it writes run.fromCI",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const machine = yield* aMachine;
+
+        yield* fs.writeFileString(
+          path.join(machine.repo, "package.json"),
+          JSON.stringify({
+            name: "oscabriel/demo",
+            scripts: { lint: "oxlint" },
+          })
+        );
+        yield* gitOk(machine.repo, "commit", "--quiet", "-am", "No tests");
+
+        const platform = yield* aPlatform(created(machine));
+
+        const ran = yield* cli(machine, platform.layer, [
+          "init",
+          "--project",
+          "oscabriel/demo",
+          "--yes",
+          "--json",
+        ]);
+
+        expect(ran.code).toBe(0);
         expect(
-          yield* gitOk(machine.repo, "log", "-1", "--format=%s")
-        ).toContain(CONFIG);
+          ran.err.filter(
+            (line) => line.includes("{path}") && line.includes("run.fromCI")
+          )
+        ).toHaveLength(1);
+        expect((yield* state(machine)).config).toStrictEqual(
+          Option.some(expect.stringContaining("run: run.fromCI"))
+        );
       }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
     { timeout: 30_000 }
   );
@@ -537,9 +618,10 @@ describe(`${Brand.cli} init in an existing repo`, () => {
             "--format=",
             "HEAD"
           ),
+          kept: ran.err.filter((line) => line.includes("kept")),
           onPlatform: (yield* git(machine.bare, "show", `main:${CONFIG}`))
             .stdout,
-        }).toStrictEqual({ committed: CONFIG, onPlatform: mine });
+        }).toStrictEqual({ committed: CONFIG, kept: [], onPlatform: mine });
       }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
     { timeout: 30_000 }
   );
@@ -860,7 +942,7 @@ describe(`${Brand.cli} init's project name`, () => {
   );
 
   it.live(
-    "names an import from a known host by its source path, and any other by the handle",
+    "names an import under the handle, after the URL's last segment, whatever its host",
     () =>
       Effect.gen(function* () {
         const known = yield* importSends(
@@ -875,9 +957,49 @@ describe(`${Brand.cli} init's project name`, () => {
           []
         );
 
-        expect(known).toStrictEqual(["github.com/pallets/click"]);
+        expect(known).toStrictEqual(["bob/click"]);
         expect(other).toStrictEqual(["bob/widgets"]);
       }),
+    { timeout: 30_000 }
+  );
+
+  it.live(
+    "keeps the source namespace when --project spells it, or when no handle is known",
+    () =>
+      Effect.gen(function* () {
+        const spelled = yield* importSends(
+          "bob",
+          "https://github.com/pallets/click",
+          ["--project", "github.com/pallets/click"]
+        );
+
+        const machine = yield* aMachine;
+
+        const platform = yield* aPlatform(
+          Effect.succeed({
+            project: ProjectName.make("github.com/pallets/click"),
+            remote:
+              "https://platform.example.test/github.com/pallets/click.git",
+          })
+        );
+
+        yield* cli(machine, platform.layer, [
+          "init",
+          "--import",
+          "https://github.com/Pallets/click.git",
+          "--yes",
+          "--json",
+        ]);
+
+        const unknown = (yield* decodeCalls(yield* platform.calls)).map(
+          ({ project }) => project
+        );
+
+        expect({ spelled, unknown }).toStrictEqual({
+          spelled: ["github.com/pallets/click"],
+          unknown: ["github.com/pallets/click"],
+        });
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
     { timeout: 30_000 }
   );
 

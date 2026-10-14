@@ -90,6 +90,7 @@ describe("every command row", () => {
     expect(
       localCommandDocs.map(({ path }) => path.join(" ")).toSorted()
     ).toStrictEqual([
+      "ask open",
       "check",
       "credential",
       "env set",
@@ -175,5 +176,6 @@ describe(commandDocs, () => {
   it("gives a contract a hand-written command calls no row of its own", () => {
     expect(calling(docs, "initProject")).toStrictEqual(["init (local)"]);
     expect(calling(docs, "setEnv")).toStrictEqual(["env set (local)"]);
+    expect(calling(docs, "openAsk")).toStrictEqual(["ask open (local)"]);
   });
 });
