@@ -1,6 +1,6 @@
 import { Client, PolicyOf } from "@repo/protocol/contracts";
 import { Ask, AskListing } from "@repo/protocol/domain/ask";
-import { FileView, TagName, TreeListing } from "@repo/protocol/domain/code";
+import { FileView, TreeListing } from "@repo/protocol/domain/code";
 import { ProjectEvent } from "@repo/protocol/domain/event";
 import { Ledger } from "@repo/protocol/domain/visibility";
 import { Handle, ProjectName } from "@repo/protocol/ids";
@@ -30,12 +30,12 @@ export const decodeName = Schema.decodeUnknownOption(ProjectName);
 
 /**
  * What a project's header says on every one of its pages: only the facts it
- * shows, so the header's read stays small in each page's HTML.
+ * shows, so the header's read stays small in each page's HTML. Its newest tag
+ * is read in the browser: the refs are the slowest read a page would wait on.
  */
 export const ProjectHeaderData = Schema.Struct({
   deciders: Schema.optionalKey(Schema.Array(Handle)),
   landedAt: Schema.optionalKey(Schema.DateTimeUtcFromString),
-  latestTag: Schema.optionalKey(TagName),
   lede: Schema.optionalKey(Schema.String),
   now: Schema.DateTimeUtcFromString,
   open: Schema.optionalKey(
@@ -93,7 +93,6 @@ const headerReads = (client: Client["Service"], project: ProjectName) => ({
   ledger: optional(client.ledger({ project })),
   log: optional(client.log({ limit: 1, project })),
   policy: optional(client.projectPolicy({ project })),
-  refs: optional(client.listRefs({ project })),
 });
 
 type HeaderReads = ReturnType<typeof headerReads>;
@@ -102,16 +101,6 @@ type HeaderRead = {
   readonly [K in keyof HeaderReads]: Effect.Success<HeaderReads[K]>;
 };
 
-/**
- * Newest by name, not by date: a tag carries only its name and commit. Its
- * numbers sort as numbers (`v0.10.0` is newer than `v0.9.0`), but a
- * pre-release such as `v2.0.0-beta` reads as newer than `v2.0.0`, and a tag
- * of no version shape wins or loses by its letters. Once a tag is read with
- * its time, the header can say the newest in time.
- */
-const byNewest = (a: TagName, b: TagName) =>
-  b.localeCompare(a, "en", { numeric: true });
-
 /** A field only when its read gave it; the header never says what it was not told. */
 const onlySome = <A, B extends object>(
   read: Option.Option<A>,
@@ -119,8 +108,8 @@ const onlySome = <A, B extends object>(
 ) => Option.match(read, { onNone: () => ({}), onSome: field });
 
 /**
- * The asks it counts, the ledger's posture, who decides, the newest tag,
- * main's last landing and the README's first sentence.
+ * The asks it counts, the ledger's posture, who decides, main's last landing
+ * and the README's first sentence.
  */
 const headerOf = (
   project: ProjectName,
@@ -157,13 +146,6 @@ const headerOf = (
         ({ commits }) => commits[0]?.landing?.landedAt
       ),
       (landedAt) => ({ landedAt })
-    ),
-    ...onlySome(
-      Option.flatMapNullishOr(
-        read.refs,
-        ({ tags }) => tags.map((tag) => tag.name).toSorted(byNewest)[0]
-      ),
-      (latestTag) => ({ latestTag })
     ),
     ...onlySome(lede, (sentence) => ({ lede: sentence })),
     ...onlySome(read.ledger, ({ posture, postureLabel }) => ({

@@ -4,8 +4,10 @@
  * the same; only the current tab moves.
  */
 import { Brand } from "@repo/brand";
+import type { RefsView, TagName } from "@repo/protocol/domain/code";
 import type { Handle, ProjectName } from "@repo/protocol/ids";
 import type { Posture } from "@repo/protocol/posture";
+import { Option } from "effect";
 import type { DateTime } from "effect";
 import { ChevronDown, Tag } from "lucide-react";
 import type { ReactNode } from "react";
@@ -42,6 +44,27 @@ export interface ProjectHeaderFacts {
     | { readonly label: string; readonly posture: Posture }
     | undefined;
 }
+
+/**
+ * Newest by name, not by date: a tag carries only its name and commit. Its
+ * numbers sort as numbers (`v0.10.0` is newer than `v0.9.0`), but a
+ * pre-release such as `v2.0.0-beta` reads as newer than `v2.0.0`, and a tag
+ * of no version shape wins or loses by its letters. Once a tag is read with
+ * its time, the header can say the newest in time.
+ */
+const byNewest = (a: TagName, b: TagName) =>
+  b.localeCompare(a, "en", { numeric: true });
+
+/** The header's newest tag once the refs are read; none while they are not, or when there is none. */
+export const newestTag = (refs: Option.Option<RefsView>) =>
+  Option.match(refs, {
+    onNone: () => ({}),
+    onSome: ({ tags }) => {
+      const [latestTag] = tags.map((tag) => tag.name).toSorted(byNewest);
+
+      return latestTag === undefined ? {} : { latestTag };
+    },
+  });
 
 /** A source path's owner is everything before its last slash (`github.com/pallets`). */
 const ownerAndName = (project: ProjectName) => {
