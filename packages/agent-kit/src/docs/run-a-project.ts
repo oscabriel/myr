@@ -60,7 +60,7 @@ export const runAProject: DocSource = {
     "});",
     "```",
     "",
-    `${cli("ask open <ask> --project <owner>/<name>")} lands the ask, but only once its check fails on \`main\` twice the same way, by an assertion: a check that cannot fail, or fails by not loading, opens nothing. ${cli("schema ask open")} prints what it takes.`,
+    `${cli("ask open <ask> --project <owner>/<name>")}, run in the project's clone, reads ${code(`${dir}/asks/<ask>.ask.ts`)} and the check it names from the working tree and lands them, but only once the check fails on \`main\` twice the same way, by an assertion: a check that cannot fail, or fails by not loading, opens nothing. ${code("--files")} gives the files instead, as JSON; ${cli("schema ask open")} prints what it takes.`,
     "",
     "## Proposals and drafts",
     "",

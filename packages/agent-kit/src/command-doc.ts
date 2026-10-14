@@ -68,6 +68,17 @@ export const localCommandDocs: readonly CommandDoc[] = [
       "Make this repo, or a public HTTPS repo, a project: find its checks, write its config and push.",
   },
   {
+    contract: "openAsk",
+    flags: ["--files", "--project", "--yes", "--dry-run", "--json"],
+    needsApproval: true,
+    path: ["ask", "open"],
+    positional: ["ask"],
+    readOnly: false,
+    source: "local",
+    summary:
+      "Open an ask by landing its file and its check, read from the config folder's asks/<ask>.ask.ts and the path it names unless --files gives them, once the check fails on main by an assertion, twice in the same way.",
+  },
+  {
     flags: [
       "--ask",
       "--project",

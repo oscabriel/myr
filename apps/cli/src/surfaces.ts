@@ -64,8 +64,8 @@ export interface CommandEntry {
   readonly command: Command.Command.Any;
 }
 
-/** `env set` reads the value from stdin so it never passes through an argument list or a transcript. */
-const wrapped = ["initProject", "setEnv", "today"];
+/** `env set` reads the value from stdin so it never passes through an argument list or a transcript; `ask open` reads its files from the working tree. */
+const wrapped = ["initProject", "openAsk", "setEnv", "today"];
 
 const projected = toCommands(Contracts, Effect.service(Client), {
   defaults: fromRepoContext,
