@@ -63,12 +63,15 @@ import {
   LandingOf,
   LedgerOf,
   ListAsks,
+  ListDiscussions,
   OpenAsk,
   PolicyOf,
+  PostDiscussion,
   ProposeAsk,
   Release,
   SetEnv,
   ShowAsk,
+  ShowDiscussion,
   ShowProposal,
   Status,
   SubmitAnswer,
@@ -103,10 +106,12 @@ import { Outcome } from "@repo/protocol/domain/outcome";
 import type { StageName } from "@repo/protocol/domain/outcome";
 import type { ImportSource, PublicPolicy } from "@repo/protocol/domain/policy";
 import { Policy } from "@repo/protocol/domain/policy";
+import type { Discussion } from "@repo/protocol/domain/discussion";
 import type { Proposal } from "@repo/protocol/domain/proposal";
 import {
   AskId,
   CommitSha,
+  DiscussionId,
   EnvKey,
   Handle,
   LandedSha,
@@ -659,6 +664,11 @@ export const MethodSchemas = {
     error: ListAsks.errorSchema,
     success: ListAsks.successSchema,
   },
+  listDiscussions: {
+    args: [Principal],
+    error: Schema.Never,
+    success: ListDiscussions.successSchema,
+  },
   onAlarm: { args: [], error: Schema.Never, success: Schema.Void },
   openAsk: {
     args: [
@@ -672,6 +682,14 @@ export const MethodSchemas = {
     args: [],
     error: Schema.Never,
     success: PolicyOf.successSchema,
+  },
+  postDiscussion: {
+    args: [
+      Person,
+      PostDiscussion.payloadSchema.mapFields(Struct.omit(["project"])),
+    ],
+    error: PostDiscussion.errorSchema,
+    success: PostDiscussion.successSchema,
   },
   proposeAsk: {
     args: [
@@ -746,6 +764,11 @@ export const MethodSchemas = {
     args: [Principal, AskId],
     error: ShowAsk.errorSchema,
     success: ShowAsk.successSchema,
+  },
+  showDiscussion: {
+    args: [Principal, DiscussionId],
+    error: ShowDiscussion.errorSchema,
+    success: ShowDiscussion.successSchema,
   },
   showProposal: {
     args: [Principal, ProposalId],
@@ -930,6 +953,7 @@ interface Hydrated {
   readonly budgetDays: readonly BudgetDayRow[];
   readonly claims: readonly Claimed[];
   readonly decisions: readonly Decision[];
+  readonly discussions: readonly Discussion[];
   readonly landings: readonly LandingView[];
   readonly lastSeq: number;
   readonly outbox: readonly OutboxRow[];
@@ -949,6 +973,7 @@ interface Writes {
   readonly budgetDays: Map<string, BudgetDayRow>;
   readonly claims: Map<string, ClaimRow>;
   readonly decisions: Map<DecisionId, Decision>;
+  readonly discussions: Map<DiscussionId, Discussion>;
   readonly envValues: Map<EnvKey, EnvValueRow>;
   readonly events: ProjectEventInput[];
   readonly landings: LandingView[];
@@ -970,6 +995,7 @@ const writesOf = (): Writes => ({
   budgetDays: new Map(),
   claims: new Map(),
   decisions: new Map(),
+  discussions: new Map(),
   envValues: new Map(),
   events: [],
   landings: [],
@@ -992,6 +1018,7 @@ const isEmpty = (writes: Writes) =>
     writes.budgetDays.size,
     writes.claims.size,
     writes.decisions.size,
+    writes.discussions.size,
     writes.envValues.size,
     writes.events.length,
     writes.landings.length,
@@ -1062,6 +1089,11 @@ const snapshotNow = (h: Hydrated, writes: Writes): ProjectSnapshot => {
       Tables.decisions,
       held.decisions,
       writes.decisions.values()
+    ),
+    discussions: overlaid(
+      Tables.discussions,
+      held.discussions,
+      writes.discussions.values()
     ),
     envValues: overlaid(
       Tables.envValues,
@@ -1883,6 +1915,7 @@ export const projectService = (
         budgetDays: snapshot.budgetDays,
         claims,
         decisions: snapshot.decisions,
+        discussions: snapshot.discussions,
         landings: snapshot.landings,
         lastSeq: snapshot.lastSeq,
         outbox: snapshot.outbox,
@@ -2069,6 +2102,7 @@ export const projectService = (
           budgetDays: [...writes.budgetDays.values()],
           claims: [...writes.claims.values()],
           decisions: [...writes.decisions.values()],
+          discussions: [...writes.discussions.values()],
           envValues: [...writes.envValues.values()],
           events: writes.events,
           landings: writes.landings,
@@ -5371,6 +5405,12 @@ export const projectService = (
             ),
           }))
         ),
+      listDiscussions: (caller) =>
+        checked(
+          MethodSchemas.listDiscussions,
+          [caller],
+          decided.listDiscussions
+        ),
       onAlarm: () => checked(MethodSchemas.onAlarm, [], alarmed(api)),
       openAsk: (caller, input) =>
         checked(
@@ -5379,6 +5419,12 @@ export const projectService = (
           write(api, openBody(caller, input))
         ),
       policy: () => checked(MethodSchemas.policy, [], policyStatus),
+      postDiscussion: (caller, input) =>
+        checked(
+          MethodSchemas.postDiscussion,
+          [caller, input],
+          decided.postDiscussion(api, caller, input)
+        ),
       proposeAsk: (caller, input) =>
         checked(
           MethodSchemas.proposeAsk,
@@ -5479,6 +5525,12 @@ export const projectService = (
               onSome: (ask) => Effect.succeed({ ask, brief: briefOf(ask) }),
             })
           )
+        ),
+      showDiscussion: (caller, discussion) =>
+        checked(
+          MethodSchemas.showDiscussion,
+          [caller, discussion],
+          decided.showDiscussion(discussion)
         ),
       showProposal: (caller, proposal) =>
         checked(

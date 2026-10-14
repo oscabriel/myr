@@ -9,6 +9,7 @@ import {
   BudgetDayRow,
   ClaimRow,
   DecisionRow,
+  DiscussionRow,
   EnvValueRow,
   LandingRow,
   LayerReadRow,
@@ -79,6 +80,9 @@ export const Tables = {
     claimant: row.claimant,
   })),
   decisions: tableOf("decisions", DecisionRow, ["id"], (row) => ({
+    id: row.id,
+  })),
+  discussions: tableOf("discussions", DiscussionRow, ["id"], (row) => ({
     id: row.id,
   })),
   envValues: tableOf("env_values", EnvValueRow, ["key"], (row) => ({
@@ -172,6 +176,7 @@ export const writeAll = <E, R>(
     yield* upsert(Tables.landings, writes.landings ?? []);
     yield* upsert(Tables.proposals, writes.proposals ?? []);
     yield* upsert(Tables.decisions, writes.decisions ?? []);
+    yield* upsert(Tables.discussions, writes.discussions ?? []);
     yield* upsert(Tables.budgetDays, writes.budgetDays ?? []);
     yield* upsert(Tables.ratchets, writes.ratchets ?? []);
     yield* upsert(Tables.pushEvents, writes.pushEvents ?? []);

@@ -82,9 +82,16 @@ const visibility = Effect.gen(function* () {
   )`;
 });
 
+const discussions = Effect.gen(function* () {
+  const sql = yield* SqlClient;
+
+  yield* sql`CREATE TABLE discussions (id TEXT PRIMARY KEY, body TEXT NOT NULL)`;
+});
+
 const migrations = {
   "1_project_state": projectState,
   "2_visibility": visibility,
+  "3_discussions": discussions,
 };
 
 export const migrate: Effect.Effect<

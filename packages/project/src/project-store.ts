@@ -10,6 +10,7 @@ import type {
   BudgetDayRow,
   ClaimRow,
   DecisionRow,
+  DiscussionRow,
   EnvValueRow,
   EventRow,
   LandingRow,
@@ -36,6 +37,7 @@ export interface ProjectSnapshot {
   readonly budgetDays: readonly BudgetDayRow[];
   readonly claims: readonly ClaimRow[];
   readonly decisions: readonly DecisionRow[];
+  readonly discussions: readonly DiscussionRow[];
   readonly envValues: readonly EnvValueRow[];
   readonly landings: readonly LandingRow[];
   readonly lastSeq: number;
@@ -55,6 +57,7 @@ export interface ProjectWrites {
   readonly budgetDays?: readonly BudgetDayRow[];
   readonly claims?: readonly ClaimRow[];
   readonly decisions?: readonly DecisionRow[];
+  readonly discussions?: readonly DiscussionRow[];
   readonly envValues?: readonly EnvValueRow[];
   readonly events?: readonly ProjectEventInput[];
   readonly landings?: readonly LandingRow[];

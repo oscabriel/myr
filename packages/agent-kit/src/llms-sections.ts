@@ -105,12 +105,12 @@ const eventLines = {
   AskOpened: "A new ask opened.",
   Claimed: "Someone claimed an ask.",
   Decided: "A maintainer took a decision.",
+  DiscussionPosted: "Someone posted in a discussion: opened one, or replied.",
   Judged: "An answer was checked, with the outcome its verdict holds.",
   Landed:
     "A landing reached `main`, a project's adoption (its first push or its import) among them.",
   Lapsed: "A claim lapsed: no push for too long.",
   LedgerAppended: "The project's public ledger gained an entry.",
-  DiscussionPosted: "Someone posted in a discussion: opened one, or replied.",
   ProposalDrafted:
     "A proposal's draft settled: ready for a maintainer, or failed.",
   ProposalOpened: "A proposal opened.",

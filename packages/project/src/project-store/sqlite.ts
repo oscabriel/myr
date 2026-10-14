@@ -181,6 +181,7 @@ export const ProjectStoreSqlite = Layer.effect(
                 budgetDays: yield* all(Tables.budgetDays),
                 claims: yield* all(Tables.claims),
                 decisions: yield* all(Tables.decisions),
+                discussions: yield* all(Tables.discussions),
                 envValues: yield* all(Tables.envValues),
                 landings: yield* bodiesOf(
                   Tables.landings,

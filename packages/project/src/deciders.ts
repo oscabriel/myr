@@ -13,6 +13,11 @@ import type { ConfigFile, Evidence } from "@repo/protocol/domain/common";
 import type { AgentTrailer, Credit } from "@repo/protocol/domain/credit";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
 import type { Choice, Decision, Today } from "@repo/protocol/domain/decision";
+import { listingOf as discussionListingOf } from "@repo/protocol/domain/discussion";
+import type {
+  Discussion,
+  DiscussionListing,
+} from "@repo/protocol/domain/discussion";
 import type { EnvSchemaView } from "@repo/protocol/domain/env";
 import type { LandingView } from "@repo/protocol/domain/landing";
 import { Outcome } from "@repo/protocol/domain/outcome";
@@ -26,6 +31,7 @@ import {
   AskId,
   CommitSha,
   DecisionId,
+  DiscussionId,
   LandedSha,
   ProposalId,
   RepoName,
@@ -46,11 +52,13 @@ import {
   StaleBase,
   TouchedJudge,
   UnknownAsk,
+  UnknownDiscussion,
   UnknownProposal,
 } from "@repo/protocol/refusal";
 import type {
   CapReached,
   DecisionClosed,
+  DiscussionClosed,
   DraftInProgress,
   IncompleteBrief,
   NotRedFirst,
@@ -88,6 +96,11 @@ import {
   openDecision,
 } from "./attention/decisions.ts";
 import type { Decided } from "./attention/decisions.ts";
+import {
+  DiscussionCommand,
+  post,
+  promoted,
+} from "./attention/discussions.ts";
 import { AttentionEffect, platformHandle } from "./attention/effects.ts";
 import {
   draft,
@@ -189,9 +202,24 @@ export interface DeciderApi {
     }
   ) => Effect.Effect<LandReceipt, NotDecider | StaleBase | RepoBusy>;
   readonly ledger: (caller: Principal) => Effect.Effect<Ledger>;
+  readonly listDiscussions: (
+    caller: Principal
+  ) => Effect.Effect<{ readonly discussions: readonly DiscussionListing[] }>;
+  readonly postDiscussion: (
+    caller: Person,
+    input: {
+      readonly body?: string;
+      readonly discussion?: DiscussionId;
+      readonly title?: string;
+    }
+  ) => Effect.Effect<
+    { readonly discussion: Discussion },
+    UnknownDiscussion | DiscussionClosed | Denounced | CapReached
+  >;
   readonly proposeAsk: (
     caller: Person,
     input: {
+      readonly discussion?: DiscussionId;
       readonly draft?: true;
       readonly files?: Array.NonEmptyReadonlyArray<ComposedFile>;
       readonly sealed?: { readonly head: CommitSha };
@@ -200,7 +228,12 @@ export interface DeciderApi {
     }
   ) => Effect.Effect<
     { readonly proposal: Proposal },
-    Denounced | CapReached | NotVouched
+    | Denounced
+    | CapReached
+    | NotVouched
+    | NotDecider
+    | UnknownDiscussion
+    | DiscussionClosed
   >;
   readonly setEnv: (
     caller: Person,
@@ -224,6 +257,10 @@ export interface DeciderApi {
     { readonly proposal: Proposal },
     UnknownProposal | ProposalClosed | NotDecider | DraftInProgress | CapReached
   >;
+  readonly showDiscussion: (
+    caller: Principal,
+    discussion: DiscussionId
+  ) => Effect.Effect<{ readonly discussion: Discussion }, UnknownDiscussion>;
   readonly showProposal: (
     caller: Principal,
     proposal: ProposalId
@@ -257,6 +294,7 @@ export interface DeciderState {
     readonly state: ClaimState;
   }[];
   readonly decisions: readonly Decision[];
+  readonly discussions: readonly Discussion[];
   readonly landings: readonly LandingView[];
   readonly policy: Option.Option<Policy>;
   readonly project: Option.Option<ProjectRow>;
@@ -266,6 +304,7 @@ export interface DeciderState {
 export interface DeciderWrites {
   readonly budgetDays: Map<string, BudgetDayRow>;
   readonly decisions: Map<DecisionId, Decision>;
+  readonly discussions: Map<DiscussionId, Discussion>;
   readonly events: ProjectEventInput[];
   readonly landings: LandingView[];
   readonly outbox: OutboxRow[];
@@ -675,6 +714,9 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
   const decisionsNow = (h: H, writes: W) =>
     overlaid(h.decisions, writes.decisions);
 
+  const discussionsNow = (h: H, writes: W) =>
+    overlaid(h.discussions, writes.discussions);
+
   const spent = (
     h: H,
     writes: W,
@@ -1017,6 +1059,37 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
         const files = input.files ?? [];
         const territory = Option.fromUndefinedOr(input.territory);
 
+        const id = ProposalId.make(
+          minted("prop", proposalsNow(h, writes).length)
+        );
+
+        // Only a maintainer turns a thread into a proposal, and only an open one.
+        const fromThread = yield* Option.match(
+          Option.fromUndefinedOr(input.discussion),
+          {
+            onNone: () => Effect.succeedNone,
+            onSome: (named) =>
+              Effect.gen(function* () {
+                const thread = Array.findFirst(
+                  discussionsNow(h, writes),
+                  (each) => each.id === named
+                );
+
+                if (Option.isNone(thread)) {
+                  return yield* new UnknownDiscussion({ discussion: named });
+                }
+
+                if (!isDecider(policy, caller.handle)) {
+                  return yield* new NotDecider({});
+                }
+
+                return Option.some(
+                  yield* Effect.fromResult(promoted(thread.value, id))
+                );
+              }),
+          }
+        );
+
         const area = Option.map(territory, (named) =>
           Option.getOrElse(
             Option.map(moduleOf(policy, named), ({ module }) => module),
@@ -1043,9 +1116,7 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
               capped: capped(who),
               denounced: who === "denounced",
               files: files.map(({ path }) => path),
-              id: ProposalId.make(
-                minted("prop", proposalsNow(h, writes).length)
-              ),
+              id,
               openCount: openCountOf(h, writes, caller.handle),
               project: name,
               recordInArea,
@@ -1064,6 +1135,10 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
             now
           )
         );
+
+        if (Option.isSome(fromThread)) {
+          writes.discussions.set(fromThread.value.id, fromThread.value);
+        }
 
         if (input.draft === true) {
           // A proposal just opened drafts its first round: nothing refuses it.
@@ -1095,6 +1170,96 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
           row,
         });
       });
+
+  const openDiscussionsOf = (h: H, writes: W, handle: Handle) =>
+    discussionsNow(h, writes).filter(
+      ({ opener, state }) => state === "open" && sameHandle(opener, handle)
+    ).length;
+
+  const postBody =
+    (caller: Person, input: Parameters<DeciderApi["postDiscussion"]>[1]) =>
+    (h: H, writes: W, now: DateTime.Utc) =>
+      Effect.gen(function* () {
+        const live = liveOf(h);
+
+        // Before a policy, nobody is denounced and the public cap holds.
+        const who = Option.match(live, {
+          onNone: () => "unknown" as const,
+          onSome: ({ policy }) => standing(policy, [], caller.handle),
+        });
+
+        const command = yield* Option.match(
+          Option.fromUndefinedOr(input.discussion),
+          {
+            onNone: () =>
+              Effect.succeed(
+                DiscussionCommand.Open({
+                  body: Option.fromUndefinedOr(input.body),
+                  capped: capped(who),
+                  denounced: who === "denounced",
+                  id: DiscussionId.make(
+                    minted("disc", discussionsNow(h, writes).length)
+                  ),
+                  openCount: openDiscussionsOf(h, writes, caller.handle),
+                  project: name,
+                  // The contract's filter makes a title certain here.
+                  title: input.title ?? "",
+                  who: caller,
+                })
+              ),
+            onSome: (named) =>
+              Effect.map(
+                Effect.fromOption(
+                  Array.findFirst(
+                    discussionsNow(h, writes),
+                    (each) => each.id === named
+                  )
+                ).pipe(
+                  Effect.mapError(
+                    () => new UnknownDiscussion({ discussion: named })
+                  )
+                ),
+                (discussion) =>
+                  DiscussionCommand.Reply({
+                    // The contract's filter makes a body certain here.
+                    body: input.body ?? "",
+                    denounced: who === "denounced",
+                    discussion,
+                    who: caller,
+                  })
+              ),
+          }
+        );
+
+        const { discussion, effects } = yield* Effect.fromResult(
+          post(command, now)
+        );
+
+        writes.discussions.set(discussion.id, discussion);
+        emitted(writes, effects);
+
+        return { discussion };
+      });
+
+  const byLastPost = Order.mapInput(
+    Order.flip(DateTime.Order),
+    (listing: DiscussionListing) => listing.lastPostAt
+  );
+
+  const discussionsOf = Effect.map(kernel.read, (h) => ({
+    discussions: Array.sort(h.discussions.map(discussionListingOf), byLastPost),
+  }));
+
+  const discussionOf = (discussion: DiscussionId) =>
+    Effect.flatMap(kernel.read, (h) =>
+      Option.match(
+        Array.findFirst(h.discussions, ({ id }) => id === discussion),
+        {
+          onNone: () => Effect.fail(new UnknownDiscussion({ discussion })),
+          onSome: (found) => Effect.succeed({ discussion: found }),
+        }
+      )
+    );
 
   const flagBody =
     (caller: Person, input: Parameters<DeciderApi["flagAsk"]>[1]) =>
@@ -2197,11 +2362,18 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
       caller: Person,
       input: Parameters<DeciderApi["land"]>[1]
     ) => kernel.write(queue, landBody(queue, caller, input)),
+    listDiscussions: discussionsOf,
+    postDiscussion: (
+      queue: AnswerQueue,
+      caller: Person,
+      input: Parameters<DeciderApi["postDiscussion"]>[1]
+    ) => kernel.write(queue, postBody(caller, input)),
     proposeAsk: (
       queue: AnswerQueue,
       caller: Person,
       input: Parameters<DeciderApi["proposeAsk"]>[1]
     ) => kernel.write(queue, proposeBody(caller, input)),
+    showDiscussion: discussionOf,
     showProposal: proposalOf,
     today: todayOf,
     vouch: (
