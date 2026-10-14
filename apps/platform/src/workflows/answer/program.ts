@@ -245,15 +245,20 @@ const stage = (
       return { ran, refusals: [] };
     }
 
-    const onMain = yield* Effect.forEach(toCompareOnMain(ran), (lane) =>
-      Effect.map(
-        step(
-          `main:${ran.checked.main}:${lane.lane}`,
-          LaneOutcome,
-          laneOnMain(ran.checked, lane)
+    // Each lane's comparison is its own container job and its own step, so
+    // they run at once: a step's name is its lane's, replayed or not.
+    const onMain = yield* Effect.forEach(
+      toCompareOnMain(ran),
+      (lane) =>
+        Effect.map(
+          step(
+            `main:${ran.checked.main}:${lane.lane}`,
+            LaneOutcome,
+            laneOnMain(ran.checked, lane)
+          ),
+          (outcome) => [lane.lane, outcome] as const
         ),
-        (outcome) => [lane.lane, outcome] as const
-      )
+      { concurrency: "unbounded" }
     );
 
     return {

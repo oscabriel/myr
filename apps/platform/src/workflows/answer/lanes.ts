@@ -307,10 +307,23 @@ interface Counted {
   readonly uncounted: Option.Option<RatchetName>;
 }
 
-const countRatchets = <E, R>(
+/** What the lane running a command printed, or nothing. */
+const printedBy =
+  (lanes: readonly CheckLane[], ran: CheckRun) => (command: string) =>
+    Option.getOrElse(
+      Option.flatMap(
+        Option.fromUndefinedOr(lanes.find((lane) => lane.command === command)),
+        ({ lane }) => outputOf(ran, lane)
+      ),
+      () => ""
+    );
+
+/** The ratchets' counts, read from the lanes a run printed. */
+const countRatchets = (
   run: AnswerRun,
-  job: (lanes: readonly CheckLane[]) => Effect.Effect<CheckRun, E, R>
-): Effect.Effect<Counted, E, R> =>
+  lanes: readonly CheckLane[],
+  ran: CheckRun
+): Effect.Effect<Counted> =>
   Effect.gen(function* () {
     const specs = run.counts?.ratchets ?? [];
 
@@ -318,20 +331,7 @@ const countRatchets = <E, R>(
       return { counts: [], uncounted: Option.none() };
     }
 
-    const lanes = countLanes(specs);
-
-    const ran = yield* job(lanes);
-
-    const printed = (command: string) =>
-      Option.getOrElse(
-        Option.flatMap(
-          Option.fromUndefinedOr(
-            lanes.find((lane) => lane.command === command)
-          ),
-          ({ lane }) => outputOf(ran, lane)
-        ),
-        () => ""
-      );
+    const printed = printedBy(lanes, ran);
 
     const counts = yield* Effect.forEach(specs, (spec) =>
       measure(
@@ -346,6 +346,17 @@ const countRatchets = <E, R>(
       onSuccess: (all) => ({ counts: all.flat(), uncounted: Option.none() }),
     });
   });
+
+/** The ratchets' lanes, counted in the cheap stage. */
+const countingLanesOf = (run: AnswerRun, stage: Stage): readonly CheckLane[] =>
+  stage === "cheap" && run.counts !== undefined
+    ? countLanes(run.counts.ratchets)
+    : [];
+
+const namesApart = (
+  lanes: readonly CheckLane[],
+  counting: readonly CheckLane[]
+) => counting.every((count) => lanes.every(({ lane }) => lane !== count.lane));
 
 const countFields = (counted: Counted): Pick<Ran, "counts" | "uncounted"> =>
   Option.match(counted.uncounted, {
@@ -378,9 +389,12 @@ export const runStage = (
           ? run.state.remerges
           : 0;
 
-        const counting = stage === "cheap" && run.counts !== undefined;
+        const counting = countingLanesOf(run, stage);
 
-        if (!Array.isReadonlyArrayNonEmpty(lanes) && !counting) {
+        if (
+          !Array.isReadonlyArrayNonEmpty(lanes) &&
+          !Array.isReadonlyArrayNonEmpty(counting)
+        ) {
           return StageRun.cases.Ran.make({ checked, lanes: [] });
         }
 
@@ -398,8 +412,21 @@ export const runStage = (
             })
             .pipe(Effect.flatMap((ran) => countedAskLane(run, ran)));
 
-        const counts = counting
-          ? countFields(yield* countRatchets(run, job))
+        // The ratchets are counted in the stage's own job, one container for
+        // both, unless a ratchet is named as a lane is: then it runs apart.
+        const together =
+          !Array.isReadonlyArrayNonEmpty(lanes) || namesApart(lanes, counting);
+
+        const firstRun = yield* job(together ? [...lanes, ...counting] : lanes);
+
+        const counts = Array.isReadonlyArrayNonEmpty(counting)
+          ? countFields(
+              yield* countRatchets(
+                run,
+                counting,
+                together ? firstRun : yield* job(counting)
+              )
+            )
           : {};
 
         if (!Array.isReadonlyArrayNonEmpty(lanes)) {
@@ -410,7 +437,6 @@ export const runStage = (
           });
         }
 
-        const firstRun = yield* job(lanes);
         const first = byLane(firstRun);
 
         const troubled = lanes.filter(({ lane }) =>

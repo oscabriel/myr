@@ -279,6 +279,7 @@ import {
   projectedRows,
   runOutbox,
   startRow,
+  warmRow,
 } from "./outbox.ts";
 import { ProjectStore } from "./project-store.ts";
 import type { ProjectSnapshot, ProjectWrites } from "./project-store.ts";
@@ -302,6 +303,7 @@ import type { Projection } from "./projection.ts";
 import { askToLand, holdsSlot, leave, queueOf, storedQueue } from "./queue.ts";
 import { afterLanding, decideRaise } from "./ratchets.ts";
 import type { RatchetBaseline } from "./ratchets.ts";
+import { bundleKeyAt, bundleThrough } from "./rules-bundle.ts";
 import {
   AdmissionPlan,
   AdmissionReport,
@@ -2032,6 +2034,35 @@ export const projectService = (
         Effect.flatMap((found) => layered(snapshotNow(h, writes), found))
       );
 
+    /**
+     * One Checker job per landing whose policy has a setup, so the setup
+     * snapshot for the landed lockfiles is there before the next answer;
+     * nothing when the policy runs no setup, since no snapshot is kept then.
+     */
+    const warmRows = (h: Hydrated, writes: Writes, now: DateTime.Utc) =>
+      Effect.gen(function* () {
+        if (!Array.isReadonlyArrayNonEmpty(writes.landings)) {
+          return [];
+        }
+
+        const row = writes.project.get("row");
+
+        const policy =
+          row?.policy === undefined
+            ? h.policy
+            : Option.some(yield* Effect.orDie(decodePolicy(row.policy)));
+
+        if (Option.isNone(policy) || policy.value.run.setup === undefined) {
+          return [];
+        }
+
+        const { run } = policy.value;
+
+        return yield* Effect.forEach(writes.landings, ({ sha }) =>
+          warmRow({ at: sha, project: name, repo, run }, now)
+        );
+      });
+
     const commit = (h: Hydrated, writes: Writes, now: DateTime.Utc) =>
       Effect.gen(function* () {
         if (isEmpty(writes)) {
@@ -2050,7 +2081,14 @@ export const projectService = (
           )
         );
 
-        const outbox = [...writes.outbox, ...landed.flat(), ...projected];
+        const warmed = yield* warmRows(h, writes, now);
+
+        const outbox = [
+          ...writes.outbox,
+          ...landed.flat(),
+          ...warmed,
+          ...projected,
+        ];
 
         const queue = yield* Effect.forEach(writes.queue.values(), (each) =>
           storedQueue(each)
@@ -2347,7 +2385,13 @@ export const projectService = (
           () => RepoPath.make(`${Brand.configDir}/vouched.td`)
         );
 
-        const bundle = yield* Effect.option(lander.bundleRules({ at, repo }));
+        // Bundled once per change to the config folder: a landing that leaves
+        // the folder's tree as it was reads the bundle the last one kept.
+        const bundle = yield* Effect.option(
+          Effect.flatMap(withPorts(bundleKeyAt(repo, at)), (key) =>
+            bundleThrough(key, lander.bundleRules({ at, repo }))
+          )
+        );
 
         if (Option.isNone(bundle)) {
           yield* Effect.logWarning(

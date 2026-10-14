@@ -1,20 +1,23 @@
 import { RefName, RepoHost } from "@repo/artifacts/repo-host";
+import { CheckAt, CheckRunner } from "@repo/checks/check-runner";
 import { Verdict } from "@repo/protocol/domain/answer";
 import type { ProjectEvent } from "@repo/protocol/domain/event";
+import { RunBlock } from "@repo/protocol/domain/run";
 import {
   CommitSha,
   Handle,
   LandedSha,
+  ProjectName,
   RepoName,
   RequestId,
   TreeSha,
 } from "@repo/protocol/ids";
-import type { ProjectName } from "@repo/protocol/ids";
 import { Array, DateTime, Effect, Option, Order, Schema, Struct } from "effect";
 
 import { AnswerRuns } from "./answer-runs.ts";
 import type { AnswerQueue } from "./answer-runs.ts";
 import { DraftParams, DraftRuns } from "./draft-runs.ts";
+import { noRunEnv } from "./env-port.ts";
 import { Lander, Rebuild } from "./lander.ts";
 import { backoff } from "./landing.ts";
 import { MetricPoint, Metrics } from "./metrics.ts";
@@ -48,6 +51,17 @@ export const OutboxBody = Schema.Union([
   Schema.TaggedStruct("StartDraft", DraftParams.fields),
   Schema.TaggedStruct("Measured", {
     points: Schema.NonEmptyArray(MetricPoint),
+  }),
+  /**
+   * One Checker job with no lanes on a landed commit, so its setup snapshot
+   * is there before the next answer: the Checker keeps a snapshot only for
+   * the project's own commits, and an answer's tree alone never makes one.
+   */
+  Schema.TaggedStruct("WarmSetup", {
+    at: LandedSha,
+    project: ProjectName,
+    repo: RepoName,
+    run: RunBlock,
   }),
 ]).pipe(Schema.toTaggedUnion("_tag"));
 
@@ -119,6 +133,13 @@ export const measuredRow = (
         Array.of
       )
     : Effect.succeed([]);
+
+/** Kept in the commit that keeps the landing, under the landing's SHA: one job per landing, however often it is heard. */
+export const warmRow = (
+  job: Omit<Extract<OutboxBody, { readonly _tag: "WarmSetup" }>, "_tag">,
+  at: DateTime.Utc
+) =>
+  outboxRow(`warm:${job.at}`, OutboxBody.cases.WarmSetup.make(job), at);
 
 export const isDue = (row: OutboxRow, now: DateTime.Utc) =>
   DateTime.isLessThanOrEqualTo(row.notBefore, now);
@@ -204,7 +225,7 @@ export const runOutbox = (
 ): Effect.Effect<
   OutboxRun,
   never,
-  AnswerRuns | Lander | Projection | RepoHost
+  AnswerRuns | CheckRunner | Lander | Projection | RepoHost
 > =>
   Effect.gen(function* () {
     const decoded = yield* Effect.forEach(rows, (row) =>
@@ -275,6 +296,30 @@ export const runOutbox = (
         Effect.as(metrics.write(body.points), ran(row, true, now))
     );
 
+    // Best effort, once: a setup the Checker could not keep is installed
+    // again by the next answer, as it would have been.
+    const warmed = yield* Effect.forEach(of("WarmSetup"), ({ body, row }) =>
+      Effect.as(
+        CheckRunner.use((runner) =>
+          runner.run({
+            ...noRunEnv,
+            at: CheckAt.cases.Commit.make({ commit: body.at }),
+            lanes: [],
+            project: body.project,
+            repo: body.repo,
+            run: body.run,
+          })
+        ).pipe(
+          Effect.catchTag("VerifierBlocked", () =>
+            Effect.logWarning("the setup snapshot was not warmed").pipe(
+              Effect.annotateLogs({ landed: body.at, project: body.project })
+            )
+          )
+        ),
+        ran(row, true, now)
+      )
+    );
+
     const runs = yield* Effect.forEach(of("StartAnswer"), ({ body, row }) =>
       Effect.as(
         AnswerRuns.use((answers) => answers.start(body.requestId, queue)),
@@ -289,6 +334,7 @@ export const runOutbox = (
       ...planned,
       ...drafts,
       ...measured,
+      ...warmed,
       ...runs,
     ]);
   });

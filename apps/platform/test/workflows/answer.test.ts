@@ -15,9 +15,12 @@ import type { Lander } from "@repo/project/lander";
 import { LanderJob } from "@repo/project/lander/memory";
 import { Projects } from "@repo/project/projects";
 import { Verdict } from "@repo/protocol/domain/answer";
+import { RatchetMeasure } from "@repo/protocol/domain/check";
+import { Command, JsonPath } from "@repo/protocol/domain/common";
 import { ProjectEvent } from "@repo/protocol/domain/event";
 import { Outcome } from "@repo/protocol/domain/outcome";
-import { keyOf, LaneName, RequestId } from "@repo/protocol/ids";
+import type { Policy } from "@repo/protocol/domain/policy";
+import { keyOf, LaneName, RatchetName, RequestId } from "@repo/protocol/ids";
 import type { CommitSha, LandedSha } from "@repo/protocol/ids";
 import {
   ChecksFailed,
@@ -161,6 +164,24 @@ const parentsOf = (sha: CommitSha) =>
   });
 
 const landedAt = (sha: LandedSha) => Outcome.cases.Landed.make({ sha });
+
+const sized = RatchetName.make("bundle-bytes");
+
+const sizedLane = LaneName.make(sized);
+
+/** The project's policy with one ratchet, read as a metric off a command's JSON. */
+const withRatchet: Policy = {
+  ...policy,
+  ratchets: [
+    {
+      measure: RatchetMeasure.cases.Metric.make({
+        command: Command.make("bun run size"),
+        path: JsonPath.make("$.bytes"),
+      }),
+      name: sized,
+    },
+  ],
+};
 
 const cleanAnswer = Effect.tap(admitted(), (answer) => allGreen(answer.merged));
 
@@ -405,6 +426,34 @@ describe(runAnswer, () => {
           { lanes: [unit], on: bobFork },
         ]);
       }).pipe(Effect.provide(world))
+  );
+
+  it.effect(
+    "3. the cheap stage counts the policy's ratchets in its own job, one container for the lanes and the counts",
+    () =>
+      Effect.gen(function* () {
+        const answer = yield* admitted();
+
+        yield* allGreen(answer.merged);
+        yield* Checker.use((script) =>
+          Effect.andThen(
+            script.script(answer.merged, sizedLane, [{ result: "passed" }]),
+            script.print(answer.merged, sizedLane, '{ "bytes": 0 }')
+          )
+        );
+
+        const outcome = yield* run(answer, yield* freshSteps());
+
+        expect(outcome).toStrictEqual(landedAt(yield* mainTip));
+        expect(
+          (yield* jobsOn(answer.merged)).map(({ lanes }) =>
+            lanes.map(({ lane }) => lane)
+          )
+        ).toStrictEqual([
+          [lint, "types", sizedLane],
+          [askLane, unit],
+        ]);
+      }).pipe(Effect.provide(worldWith(withRatchet)))
   );
 
   it.effect(
