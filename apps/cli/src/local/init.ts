@@ -1,6 +1,7 @@
 import { Brand } from "@repo/brand";
 import { findRunBlock } from "@repo/checks/finder";
 import type { RepoFile } from "@repo/checks/finder";
+import { PATH_PLACEHOLDER } from "@repo/checks/kinds";
 import { ApprovalNeeded } from "@repo/protocol/cli";
 import { Client } from "@repo/protocol/contracts";
 import type { InitProject } from "@repo/protocol/contracts";
@@ -456,6 +457,17 @@ const inRepo = (input: Input) =>
       inTree || atHead
         ? []
         : [{ content: projectFile(block.run, block.sources), path: CONFIG }];
+
+    if (
+      writes.length > 0 &&
+      block.run.test?.includes(PATH_PLACEHOLDER) !== true
+    ) {
+      yield* Output.use((output) =>
+        output.note(
+          `No command that runs one test file was found, so ${CONFIG} takes run.fromCI. A red-first ask needs a test command with ${PATH_PLACEHOLDER}, as in test: "vitest run ${PATH_PLACEHOLDER}": add it to run before you open one.`
+        )
+      );
+    }
 
     const commits: readonly string[] = atHead ? [] : [CONFIG];
 

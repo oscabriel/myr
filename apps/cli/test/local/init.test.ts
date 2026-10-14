@@ -323,6 +323,46 @@ describe(`${Brand.cli} init in an existing repo`, () => {
   );
 
   it.live(
+    "warns that red-first asks need a test command with {path} when it writes run.fromCI",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const machine = yield* aMachine;
+
+        yield* fs.writeFileString(
+          path.join(machine.repo, "package.json"),
+          JSON.stringify({
+            name: "oscabriel/demo",
+            scripts: { lint: "oxlint" },
+          })
+        );
+        yield* gitOk(machine.repo, "commit", "--quiet", "-am", "No tests");
+
+        const platform = yield* aPlatform(created(machine));
+
+        const ran = yield* cli(machine, platform.layer, [
+          "init",
+          "--project",
+          "oscabriel/demo",
+          "--yes",
+          "--json",
+        ]);
+
+        expect(ran.code).toBe(0);
+        expect(
+          ran.err.filter(
+            (line) => line.includes("{path}") && line.includes("run.fromCI")
+          )
+        ).toHaveLength(1);
+        expect((yield* state(machine)).config).toStrictEqual(
+          Option.some(expect.stringContaining("run: run.fromCI"))
+        );
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+    { timeout: 30_000 }
+  );
+
+  it.live(
     "without --yes exits 2 with a line naming --yes, and writes, calls and adds nothing",
     () =>
       Effect.gen(function* () {
