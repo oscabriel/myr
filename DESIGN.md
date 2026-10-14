@@ -1,6 +1,6 @@
 ---
 name: Myr web
-description: Four shells on warm paper. What state a change is in, whose move it is, and the command that runs next.
+description: Four shells on warm paper, three of them ruled. What state a change is in, whose move it is, and the command that runs next.
 colors:
   paper: "#f8f7f4"
   paper-dark: "#0a0a0a"
@@ -50,6 +50,17 @@ colors:
   diff-del-sign: "oklch(0.51 0.12 345)"
   diff-del-sign-dark: "oklch(0.72 0.1 345)"
 typography:
+  display:
+    fontFamily: "IBM Plex Sans, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "clamp(2.5rem, 1.25rem + 3.5vw, 4.75rem)"
+    fontWeight: 500
+    lineHeight: "1.02"
+    letterSpacing: "-0.035em"
+  lede:
+    fontFamily: "IBM Plex Sans, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "1.1875rem"
+    fontWeight: 400
+    lineHeight: "1.75rem"
   headline:
     fontFamily: "IBM Plex Sans, ui-sans-serif, system-ui, sans-serif"
     fontSize: "1.5rem"
@@ -104,6 +115,7 @@ typography:
     fontWeight: 600
     letterSpacing: "-0.04em"
     lineHeight: "0.9"
+    fontSize: "12.131cqi"
 rounded:
   none: "0px"
   sm: "1px"
@@ -116,7 +128,10 @@ spacing:
   gutter-site: "2rem"
   gutter-project: "1.75rem"
   region: "32px"
-  container-site: "85rem"
+  container-site: "110rem"
+  container-figure: "76rem"
+  frame-inset: "1.5rem"
+  frame-gap: "1rem"
   container-project: "100rem"
   container-focus: "25rem"
   column-about: "21.25rem"
@@ -126,6 +141,7 @@ spacing:
   column-filters: "15rem"
   measure: "72ch"
   measure-page: "56rem"
+  measure-lede: "40rem"
   top-bar: "3.5rem"
   toolbar: "2.5rem"
   tabs: "2.75rem"
@@ -250,7 +266,7 @@ The rules here are ADR 0041 (four shells, Overview first, no logomark, a plain s
 
 **Creative North Star: "Four shells on warm paper"**
 
-The web serves four jobs, and each gets its own frame: a site that explains the platform and lists its projects, a project with one header and its tabs, a docs site, and a focused card for signing in. All four share the top bar's contents, so moving between them never reads as a different app. Every screen still answers three questions in this order: what state is it in, whose move is it, and what runs next. The answer to the last one is a command you can copy, shown once.
+The web serves four jobs, and each gets its own frame: a site that explains the platform and lists its projects, a project with one header and its tabs, a docs site, and a focused card for signing in. All four share the top bar's contents, so moving between them never reads as a different app. Three of them are ruled: two hairlines run down the container's edges the page's full height, the top bar is a box between them under a small gap, and every rule inside runs rail to rail, so the page reads as one sheet pinned to the bench, like the music box's own ruler. A project is full-bleed: its code and diffs want the whole window. Every screen still answers three questions in this order: what state is it in, whose move is it, and what runs next. The answer to the last one is a command you can copy, shown once.
 
 The pages are for operating, with one page that persuades: the landing at `/`, which draws the platform as a music box whose cylinder only its own press can pin, and leads to the open asks. Density is set by a maintainer clearing the inbox on a phone and a contributor reading a refusal beside a terminal: two-line rows (64 px), 14 px metadata, a 13 px floor. Colour means state, and always sits beside a word and a mark, so a page read in grayscale, by a screen reader or in a terminal says the same thing. In a list the colour sits on the mark and the word stays ink. The one colour that is not a state is the sage primary: the page's main action and the focus ring.
 
@@ -258,7 +274,7 @@ Rejected on purpose: the dashboard look (stat tiles, big numbers over small labe
 
 **Key Characteristics:**
 
-- Four shells (site, project, docs, focus), each named by its route, with no global rail and no generic right rail.
+- Four shells (site, project, docs, focus), each named by its route, with no global rail and no generic right rail. The site, the docs and a focused page are ruled (the rails); a project is full-bleed.
 - A project has one header and eight tabs, and opens on Overview.
 - State is a mark, then a word, then a colour; red belongs to refusals, violet to sealed things, green to what is on main, olive to waiting, blue to checking. In a row the colour is the mark's; the word is ink, except Refused and Landed.
 - Every action is a command to copy, shown once per screen. The only web controls that change anything are a maintainer's choices, proposing an ask (and asking the platform's agent to draft it), the theme preference, and signing in or out.
@@ -350,9 +366,11 @@ Each override is the face's metric over its `size-adjust`; the line gap is 0. Th
 
 ### Hierarchy
 
-A fixed rem scale, ratio about 1.15 to 1.2; product type does not float with the viewport (the footer's wordmark is the one exception, below). Numbers that can change (counts, times, line numbers, `+n −m`) are tabular. **Nothing is set below 13 px**; `apps/web/test/type-floor.test.ts` refuses the old 12 px and 11 px sizes and any arbitrary size.
+A fixed rem scale, ratio about 1.15 to 1.2; product type does not float with the viewport (the footer's wordmark and the landing's display headline are the two exceptions). Numbers that can change (counts, times, line numbers, `+n −m`) are tabular. **Nothing is set below 13 px**; `apps/web/test/type-floor.test.ts` refuses the old 12 px and 11 px sizes and any arbitrary size.
 
-- **Headline** (`text-headline`, 600, 1.5rem/2rem, -0.015em, balanced): one page title, or a project's name in its header.
+- **Display** (`text-display`, 500, clamp(2.5rem, 1.25rem + 3.5vw, 4.75rem), line 1.02, -0.035em, balanced): the landing's headline alone, its two sentences one line each from `tablet`. Set at 500, not 600, so Plex's plain letterforms carry it at 76 px without going heavy. It scales with the viewport between 40 and 76 px, the one text besides the footer's wordmark that does.
+- **Lede** (`text-lede`, 400, 1.1875rem/1.75rem, muted): the landing's line under its headline, held to `--measure-lede` (40rem) and centred; `main` in it is mono at the lede's own size.
+- **Headline** (`text-headline`, 600, 1.5rem/2rem, -0.015em, balanced): one page title, or a project's name in its header, and the landing's section heads.
 - **Title** (`text-title`, 600, 1.1875rem/1.6rem, -0.01em): a long ask's title, a region head, the answer's outcome hero, a README's headings.
 - **Want** (`text-want`, 1rem/1.5rem): a row's first line at 500, and a want or brief in prose at 400.
 - **Body** (`text-body`, 400, 1rem/1.55rem): prose, held to the measure.
@@ -379,12 +397,14 @@ Every route names exactly one shell in its `staticData` (`shell: "site" | "proje
 
 | Shell | Routes | Container | Header | Side columns |
 | --- | --- | --- | --- | --- |
-| `site` | `/`, `/explore`, `/asks`, `/install`, `/privacy`, `/terms` | centred, `--container-site` (1360 px), `--gutter-site` (32 px) | framed top bar | only the filters on `/asks` (`--column-filters`, 240 px), left of the list |
+| `site` | `/`, `/explore`, `/asks`, `/install`, `/privacy`, `/terms` | centred, ruled, `--container-site` (1760 px), `--gutter-site` (32 px) | framed top bar | only the filters on `/asks` (`--column-filters`, 240 px), left of the list |
 | `project` | `/:owner/:project/**`, `/inbox`, `/settings`, `/people/:handle` | fluid to `--container-project` (1600 px), `--gutter-project` (28 px) | full-bleed top bar, then the page header | only the about column on Overview (`--column-about`, 340 px) and the file tree on Code (`--column-tree`, 280 px) |
-| `docs` | `/docs/**` | centred, `--container-site` (1360 px) | the site's top bar | nav tree `--column-docs-nav` (240 px), the article at `--measure` (72ch), "on this page" `--column-docs-toc` (220 px) |
-| `focus` | sign-in, MCP consent, new project, new proposal | a centred card, `--container-focus` (400 px) | the wordmark only | none |
+| `docs` | `/docs/**` | centred, ruled, `--container-site` (1760 px) | the site's top bar | nav tree `--column-docs-nav` (240 px), parted from the article by a rule its full height; the article at `--measure` (72ch) with "on this page" (`--column-docs-toc`, 220 px) beside it, hugging it, the rest of the frame paper |
+| `focus` | sign-in, MCP consent, new project, new proposal | a centred, ruled card, `--container-focus` (400 px) | the wordmark only, in the framed bar | none |
 
 A shell sets its gutter once, on its frame, and every bar and page inside it reads it: 16 px on a phone, 20 px from `tablet`, and from `shell` (1120 px) `--gutter-site` in the site, the docs and a focused page, or `--gutter-project` in a project.
+
+**Rails.** The site, the docs and a focused page are ruled: from `tablet`, the container stands `--frame-inset` (24 px) in from the viewport and carries a hairline down each edge, the page's full height (`RAILS` in `app-shell.tsx`), and the top bar is a box between them, `--frame-gap` (16 px) under the viewport's top, with a hairline over and under it. Everything inside (the frame, a section's rule, the footer's rule) runs rail to rail, and the gutter sits inside the rails, so content stands 32 px in from them. Below `tablet` the rails and the gap go: the bar keeps its rule underneath, and the page takes the phone's 16 px gutter. The top bar's height stays `--top-bar`, borders included, so what sticks under it reads `--stick-bar` unchanged, and when the bar sticks it sits flush at the top. The platform's own pages draw the same frame at the card's width, in their inline style. A project has no rails.
 
 From `columns` (1100 px, `--breakpoint-columns`) a side column stands beside its main column; below it, every side column stacks under its main column. From `nav` (900 px, `--breakpoint-nav`) the top bar shows its links; below it they fold into a menu. Phone width (360 px) is a first-class layout: nothing scrolls sideways.
 
@@ -420,14 +440,14 @@ Square. The radius is 2 px (`--radius: 0.125rem`), and shadcn's base-lyra compon
 
 ### Top bar
 
-- **Character:** the same contents in every shell: the wordmark (linking `/`), Explore, Asks, Docs, Install, search, Keys (a keyboard icon that opens the keys dialog, the `?` key's pointer twin) and the account (handle and inbox count, or Sign in). Framed in the site and docs shells (inside the container, a hairline under it), full-bleed in the project shell; the focus shell shows the wordmark alone.
+- **Character:** the same contents in every shell: the wordmark (linking `/`), Explore, Asks, Docs, Install, search, Keys (a keyboard icon that opens the keys dialog, the `?` key's pointer twin) and the account (handle and inbox count, or Sign in). Framed in the site and docs shells (a box between the rails: a hairline under it, and from `tablet` a hairline over it under a 16 px gap), full-bleed in the project shell; the focus shell shows the wordmark alone in the same box.
 - **Current item:** ink at 500 with `aria-current="page"`; the others muted. Never a coloured bar.
 - **Below 900 px:** the links and Keys fold into a menu (a sheet), the wordmark and the account stay.
 
 ### Footer
 
 - **Where:** the site and docs shells; the project and focus shells have none.
-- **Shape:** a hairline above, a row of plain links (Docs, Install, Privacy, Terms), then **the brand's domain in upper case** across the container's full width as one line of display text in the UI sans: read from `@repo/brand` (`Brand.domain`), upper-cased with CSS, never typed (`brand:check` fails on the name outside `packages/brand`). It is sized to the container with container query units so the line fills the width without wrapping, at 600 with -0.04em tracking and a 0.9 line, in ink. It is the one type that scales with its box. No mark beside it.
+- **Shape:** a hairline above, rail to rail, a row of plain links (Docs, Install, Settings, Privacy, Terms), then **the brand's domain in upper case** as a watermark: one line of display text in the UI sans, read from `@repo/brand` (`Brand.domain`), upper-cased with CSS, never typed (`brand:check` fails on the name outside `packages/brand`). It is drawn in the ink at a tenth of its strength (`text-foreground/10`), centred, and sized with container query units to fill the content's width exactly, at 600 with -0.04em tracking and a 0.9 line, standing whole on the page's bottom edge (the 0.9 line leaves 0.075em under the baseline, and nothing else), so the page ends in the name. It is the one type that scales with its box. No mark beside it. The size (12.131cqi) is the width over the line's measured width per em, noted in `footer.tsx`; measure again if the domain changes.
 
 ### Project header and tabs
 
@@ -561,8 +581,8 @@ The platform's own label, never rewritten, through the state badge: a lock and t
 ### The landing
 
 - **Where:** `/`, in the site shell (ADR 0041 amends ADR 0030's bare page). A reader who carries a session is sent to `/inbox`.
-- **Hero:** one primary action (the open asks) and the install command, then Fig 1, the music box (`features/landing/music-box`): an isometric drawing in inline SVG, in the page's own inks, of a cylinder music box under an open glass lid with the gate along its front. The cylinder is `main`; the glass is everything public, a frosted panel a layer; the lit comb tooth that plays sour is an ask, its section of the comb the territory; a clip on the ruler is the claim; a strip of pins is an answer, carried along a rail under seven bridges, one per stage, cheapest first. A first answer is refused at the shape stage and drops into that stage's tray with a printed slip; a second passes every stage, the held-back stage's sealed box ringing one bell, and the press, the only thing that writes the cylinder, turns it over onto the cylinder while a paper tape prints its credit. The card is a plain card with Fig 1 and a title in its top corners, the hint and a live readout in its bottom corners, and a legend under it that names each part by its word in `GLOSSARY.md`. State colours appear only on a stage's flag, the held-back bell, the stray pin the shape stage refused, and the landed pin and tooth, each beside the readout's word. The server draws the still picture (the refused answer in its tray, the second landed); in the browser one loop plays the story from a pure model of time (`model.ts`), stops off screen, and under `prefers-reduced-motion` moves only when a click or a key asks it to, straight to the next moment. The camera and solids are ported from the anatomy skill's kit (`music-box/iso.ts`, with its MIT notice).
-- **Below:** the seven stages in words, one column each, with a refused and a landed output beneath them, the four words, landings as they happen, and every way in (linking `/install`), each a heading over a hairline rather than a card. Its evidence is real output, set in mono as a terminal prints it. "Landing now" lists the latest landings and refused answers across public projects, the latest first and at most six, from `recentLandings`, the platform's one bounded read of them (at most 20, kept in D1 as they happen, never a replay of a project's events). Each row is a mark, the project over the ask's want (a landing with no ask shows its short SHA), linking the landed commit or the refused ask, and when. A refusal names its tag and its area, never a held-back check's name, a suite, a lane, a path or a log.
+- **Hero:** centred between the rails: the headline at Display, its two sentences one line each, the lede under it at Lede in muted, held to `--measure-lede`; then the page's one primary action (the open asks), a size up (44 px), over the install command; then Fig 1, the music box, held to `--container-figure` (76rem) and centred, so the drawing keeps its detail in the wide frame (`features/landing/music-box`): an isometric drawing in inline SVG, in the page's own inks, of a cylinder music box under an open glass lid with the gate along its front. The cylinder is `main`; the glass is everything public, a frosted panel a layer; the lit comb tooth that plays sour is an ask, its section of the comb the territory; a clip on the ruler is the claim; a strip of pins is an answer, carried along a rail under seven bridges, one per stage, cheapest first. A first answer is refused at the shape stage and drops into that stage's tray with a printed slip; a second passes every stage, the held-back stage's sealed box ringing one bell, and the press, the only thing that writes the cylinder, turns it over onto the cylinder while a paper tape prints its credit. The card is a plain card with Fig 1 and a title in its top corners, the hint and a live readout in its bottom corners, and a legend under it that names each part by its word in `GLOSSARY.md`. State colours appear only on a stage's flag, the held-back bell, the stray pin the shape stage refused, and the landed pin and tooth, each beside the readout's word. The server draws the still picture (the refused answer in its tray, the second landed); in the browser one loop plays the story from a pure model of time (`model.ts`), stops off screen, and under `prefers-reduced-motion` moves only when a click or a key asks it to, straight to the next moment. The camera and solids are ported from the anatomy skill's kit (`music-box/iso.ts`, with its MIT notice).
+- **Below:** the seven stages in words, one column each, with a refused and a landed output beneath them, the four words, landings as they happen, and every way in (linking `/install`), each a section under a rule that runs rail to rail, its head at Headline, rather than a card. Its evidence is real output, set in mono as a terminal prints it. "Landing now" lists the latest landings and refused answers across public projects, the latest first and at most six, from `recentLandings`, the platform's one bounded read of them (at most 20, kept in D1 as they happen, never a replay of a project's events). Each row is a mark, the project over the ask's want (a landing with no ask shows its short SHA), linking the landed commit or the refused ask, and when. A refusal names its tag and its area, never a held-back check's name, a suite, a lane, a path or a log.
 
 ### Install
 
@@ -580,7 +600,7 @@ Light and dark follow the system by default. On `/settings` (Appearance) a reade
 
 ### The platform's own pages
 
-Sign-in (with the MCP consent), sign-up, the Google handle page, the code, add-email and reset pages, the problem page and the platform's `/` load nothing (no script, no web font), so they carry the sage garden palette as hex literals in their inline style, copied from `apps/web/src/styles.css` for both schemes: paper, card, ink, surface, muted, rule, the 3:1 control border, primary with its on-primary text, refused only for a refusal, and waiting for the marked "Warning" line in the loopback case; `color-scheme: light dark`. Their faces are named as the web's are, IBM Plex Sans then the system sans at 16 px and IBM Plex Mono then the system mono, so Plex shows only where the reader has it installed. This is the one place the type is not the web's, kept by design and awaiting the maintainer's sign-off: loading Plex would mean a `font-src` in the pages' policy and about 60 KB of font inlined in every page the Worker sends. Every page but `/` is the focus shell: the wordmark as text from `@repo/brand` above one card with a hairline border and a 2 px radius, no edge accent, no navigation and no eyebrow, its h1 first. The consent names the client, its publisher when known, and the host that receives access; on sign-in and sign-up it also lists what the client may do as the person, and says it never sees the password. The platform's `/` keeps a plain document frame.
+Sign-in (with the MCP consent), sign-up, the Google handle page, the code, add-email and reset pages, the problem page and the platform's `/` load nothing (no script, no web font), so they carry the sage garden palette as hex literals in their inline style, copied from `apps/web/src/styles.css` for both schemes: paper, card, ink, surface, muted, rule, the 3:1 control border, primary with its on-primary text, refused only for a refusal, and waiting for the marked "Warning" line in the loopback case; `color-scheme: light dark`. Their faces are named as the web's are, IBM Plex Sans then the system sans at 16 px and IBM Plex Mono then the system mono, so Plex shows only where the reader has it installed. This is the one place the type is not the web's, kept by design and awaiting the maintainer's sign-off: loading Plex would mean a `font-src` in the pages' policy and about 60 KB of font inlined in every page the Worker sends. Every page but `/` is the focus shell: the rails at the card's width (25rem) from 640 px, the wordmark as text from `@repo/brand` in the framed bar, then one card with a hairline border and a 2 px radius, no edge accent, no navigation and no eyebrow, its h1 first. The consent names the client, its publisher when known, and the host that receives access; on sign-in and sign-up it also lists what the client may do as the person, and says it never sees the password. The platform's `/` keeps a plain document frame.
 
 ### shadcn
 

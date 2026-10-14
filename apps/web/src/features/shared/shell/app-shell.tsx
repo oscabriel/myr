@@ -27,8 +27,9 @@ const ProjectContainer = ({ children }: { readonly children: ReactNode }) => (
 );
 
 /**
- * The article first, so it is read first; from `columns` the tree stands to its left. Below `columns` the index
- * shows no tree under itself: the index already lists every page.
+ * The article first, so it is read first; from `columns` the tree stands to
+ * its left, parted by a rule the article's full height. Below `columns` the
+ * index shows no tree under itself: the index already lists every page.
  */
 const DocsFrame = ({ children }: { readonly children: ReactNode }) => {
   const index = useLocation({
@@ -36,8 +37,13 @@ const DocsFrame = ({ children }: { readonly children: ReactNode }) => {
   });
 
   return (
-    <div className="columns:grid columns:grid-cols-[var(--column-docs-nav)_minmax(0,1fr)] max-w-site mx-auto flex w-full flex-1 flex-col">
-      <div className="columns:col-start-2 columns:row-start-1 flex min-w-0 flex-col">
+    <div className="columns:grid columns:grid-cols-[var(--column-docs-nav)_minmax(0,1fr)] flex w-full flex-1 flex-col">
+      <div
+        className={cn(
+          "columns:col-start-2 columns:row-start-1 border-rule flex min-w-0 flex-col",
+          index ? undefined : "columns:border-l"
+        )}
+      >
         {children}
       </div>
       <div
@@ -57,15 +63,11 @@ const DocsFrame = ({ children }: { readonly children: ReactNode }) => {
 const FRAMES = {
   docs: DocsFrame,
   focus: ({ children }: { readonly children: ReactNode }) => (
-    <div className="max-w-focus mx-auto flex w-full flex-1 flex-col pb-16">
-      {children}
-    </div>
+    <div className="flex w-full flex-1 flex-col pb-16">{children}</div>
   ),
   project: ProjectContainer,
   site: ({ children }: { readonly children: ReactNode }) => (
-    <div className="max-w-site mx-auto flex w-full flex-1 flex-col">
-      {children}
-    </div>
+    <div className="flex w-full flex-1 flex-col">{children}</div>
   ),
 } as const satisfies Record<
   ShellName,
@@ -85,6 +87,19 @@ export const SHELL_GUTTERS = {
 } as const satisfies Record<ShellName, string>;
 
 const FOOTED: ReadonlySet<ShellName> = new Set(["docs", "site"]);
+
+/**
+ * The rails: from `tablet`, a hairline down each edge of the container, the
+ * page's full height, with the top bar's box, the frame and the footer
+ * between them (DESIGN.md "Rails"). The site and the docs are ruled at the
+ * site's container, a focused page at its card's; a project is full-bleed.
+ */
+const RAILS = {
+  docs: "max-w-site border-rule tablet:border-x mx-auto w-full",
+  focus: "max-w-focus border-rule tablet:border-x mx-auto w-full",
+  project: "",
+  site: "max-w-site border-rule tablet:border-x mx-auto w-full",
+} as const satisfies Record<ShellName, string>;
 
 const NO_READS: ShellReads = {};
 
@@ -133,12 +148,19 @@ export const AppShell = ({
           <KeysProvider openDialog={openDialog}>
             <SkipLink />
             <div
-              className={`flex min-h-dvh flex-col ${SHELL_GUTTERS[shell]}`}
-              data-shell={shell}
+              className={cn(
+                "flex min-h-dvh flex-col",
+                shell === "project" ? "" : "tablet:px-(--frame-inset)"
+              )}
             >
-              <TopBar shell={shell} />
-              <Frame>{children}</Frame>
-              {FOOTED.has(shell) ? <Footer /> : null}
+              <div
+                className={`flex flex-1 flex-col ${SHELL_GUTTERS[shell]} ${RAILS[shell]}`}
+                data-shell={shell}
+              >
+                <TopBar shell={shell} />
+                <Frame>{children}</Frame>
+                {FOOTED.has(shell) ? <Footer /> : null}
+              </div>
             </div>
             {hydrated && LazyOverlays !== undefined ? (
               <Suspense fallback={null}>
