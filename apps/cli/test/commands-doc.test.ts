@@ -161,6 +161,7 @@ describe("the command rows against the CLI", () => {
         );
         // Known commands, so an empty tree and an empty list can't agree.
         expect(commands.has("asks")).toBeTruthy();
+        expect(commands.has("whoami")).toBeTruthy();
         expect(commands.has("env set")).toBeTruthy();
         expect(commands.has("env")).toBeFalsy();
       }),

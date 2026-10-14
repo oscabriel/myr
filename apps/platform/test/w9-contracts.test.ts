@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
-import { AskId, ProposalId, RepoPath } from "@repo/protocol/ids";
+import { Projects } from "@repo/project/projects";
+import { AskId, Handle, ProposalId, RepoPath } from "@repo/protocol/ids";
 import { Unauthenticated } from "@repo/protocol/principal";
 import { advanceTo } from "@repo/testkit/clock";
 import { aProject, withAsk, withVouches } from "@repo/testkit/scenarios";
@@ -103,6 +104,51 @@ describe("the code, policy and drafting contracts over /rpc", () => {
           })
         )
       ).toStrictEqual(Exit.fail(new Unauthenticated()));
+    })
+  );
+});
+
+// Projects a handler must not wake: a call to one is a defect, so a test over it fails.
+const asleep = Layer.succeed(
+  Projects,
+  Projects.of({
+    create: (name) => Effect.die(`a handler made ${name}`),
+    get: (name) => Effect.die(`a handler woke ${name}`),
+  })
+);
+
+const sleeping = Effect.gen(function* () {
+  const world = yield* Layer.build(worldOf([datekit]));
+
+  const ports = Layer.mergeAll(asleep, Layer.succeedContext(world));
+
+  return yield* served(
+    Layer.mergeAll(
+      Handlers.pipe(Layer.provide(ports)),
+      ports,
+      MemorySessions.layer({ "bob-token": Handle.make("bob") })
+    )
+  );
+});
+
+describe("whoami over /rpc", () => {
+  it.effect("names the caller from the session, and wakes no project", () =>
+    Effect.gen(function* () {
+      const { handler } = yield* sleeping;
+      const bob = yield* rpcClient(handler, "bob-token");
+
+      expect(yield* bob.whoami({})).toStrictEqual({ handle: "bob" });
+    })
+  );
+
+  it.effect("refuses a caller with no session", () =>
+    Effect.gen(function* () {
+      const { handler } = yield* sleeping;
+      const anyone = yield* rpcClient(handler);
+
+      expect(yield* Effect.exit(anyone.whoami({}))).toStrictEqual(
+        Exit.fail(new Unauthenticated())
+      );
     })
   );
 });

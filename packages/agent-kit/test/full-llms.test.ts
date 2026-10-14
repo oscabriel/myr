@@ -74,6 +74,7 @@ const commands: readonly CommandDoc[] = [
     flags: ["--head", "--project", "--json"],
     positional: ["ask"],
   }),
+  row(["whoami"], "Show who the platform takes you for."),
 ];
 
 const projects: readonly ProjectListing[] = [

@@ -34,6 +34,9 @@ const handlers: Handlers = Layer.mergeAll(
   ),
   Contracts.toLayerHandler("status", () =>
     Effect.succeed({ answers: [], claims: [], handle: Handle.make("tester") })
+  ),
+  Contracts.toLayerHandler("whoami", () =>
+    Effect.succeed({ handle: Handle.make("tester") })
   )
 );
 
@@ -96,6 +99,24 @@ describe("the remote client", () => {
       expect(run.code).toBe(0);
       expect(run.out[0]).toBe("Signed in as tester.");
     }).pipe(Effect.scoped)
+  );
+
+  it.live(
+    "whoami says whom the platform takes the caller for, and no more",
+    () =>
+      Effect.gen(function* () {
+        const platform = yield* httpPlatform(handlers);
+
+        const run = yield* runProgram(["whoami"], {
+          client: remote(
+            holding(Option.some(profileOn(platform.origin, knownToken)))
+          ),
+          handlers,
+        });
+
+        expect(run.code).toBe(0);
+        expect(run.out).toStrictEqual(["Signed in as tester."]);
+      }).pipe(Effect.scoped)
   );
 
   it.live(

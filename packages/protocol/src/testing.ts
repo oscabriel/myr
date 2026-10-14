@@ -56,5 +56,6 @@ export const unanswered = Contracts.toLayer({
   verdict: uncalled,
   vouch: uncalled,
   watch: uncalled,
+  whoami: uncalled,
   why: uncalled,
 });

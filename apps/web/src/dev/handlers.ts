@@ -366,6 +366,7 @@ export const devHandlers: Layer.Layer<
             )
           )
         ),
+      whoami: () => Effect.map(person, ({ handle }) => ({ handle })),
       why: ({ at, path, project }) =>
         code(project, (of) => whyOf(of, Option.fromUndefinedOr(at), path)),
     };

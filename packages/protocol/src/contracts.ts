@@ -155,6 +155,8 @@ const servedOn = {
   verdict: SurfaceName.literals,
   vouch: ["rpc", "mcp", "cli"],
   watch: ["rpc", "web"],
+  // The handle alone, read from the session: no project is woken for it.
+  whoami: ["rpc", "mcp", "cli"],
   why: ["rpc", "mcp", "web"],
 } as const satisfies Record<string, readonly SurfaceName[]>;
 
@@ -272,6 +274,23 @@ export class Status extends Rpc.make("status", {
   .annotate(NeedsApproval, false)
   .annotate(Cli, { name: "status" })
   .annotate(Surfaces, servedOn.status) {}
+
+export class WhoAmI extends Rpc.make("whoami", {
+  payload: NoPayload,
+  success: Schema.Struct({ handle: Handle }),
+})
+  .annotate(
+    Description,
+    "Show who the caller is: the handle the platform takes them for, from the session alone."
+  )
+  .annotate(Audience, "signedIn")
+  .annotate(Visibility, "public")
+  .annotate(ReadOnly, true)
+  .annotate(Idempotent, true)
+  .annotate(Destructive, false)
+  .annotate(NeedsApproval, false)
+  .annotate(Cli, { name: "whoami" })
+  .annotate(Surfaces, servedOn.whoami) {}
 
 export class VerdictOf extends Rpc.make("verdict", {
   error: Schema.Union([UnknownProject, UnknownAsk]),
@@ -1018,6 +1037,7 @@ export class Contracts extends RpcGroup.make(
   ListAsks,
   ShowAsk,
   Status,
+  WhoAmI,
   VerdictOf,
   LandingOf,
   Credits,

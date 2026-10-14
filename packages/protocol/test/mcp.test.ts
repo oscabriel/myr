@@ -10,6 +10,7 @@ import {
   ListAsks,
   SubmitAnswer,
   surfaced,
+  WhoAmI,
 } from "../src/contracts.ts";
 import { PROJECT_DESCRIPTION_CAP } from "../src/domain/front-page.ts";
 import { RECENT_LANDINGS_CAP } from "../src/domain/recent-landing.ts";
@@ -149,6 +150,11 @@ describe("the contracts as MCP tools", () => {
             required: ["ask", "base", "head", "project", "requestId"],
           },
           name: "submitAnswer",
+        });
+        expect(byName.get("whoami")).toStrictEqual({
+          description: Context.get(WhoAmI.annotations, Description),
+          inputSchema: {},
+          name: "whoami",
         });
       })
   );

@@ -85,6 +85,14 @@ const table = [
     tag: "status",
   },
   {
+    audience: "signedIn",
+    cli: "whoami",
+    errors: [],
+    flags: "RI",
+    on: "RMC",
+    tag: "whoami",
+  },
+  {
     audience: "public",
     cli: "verdict <ask>",
     errors: ["UnknownProject", "UnknownAsk"],

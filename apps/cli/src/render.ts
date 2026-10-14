@@ -15,6 +15,7 @@ import {
   SubmitAnswer,
   TodayOf,
   VerdictOf,
+  WhoAmI,
 } from "@repo/protocol/contracts";
 import type { Contract } from "@repo/protocol/contracts";
 import { LandReceipt } from "@repo/protocol/domain/answer";
@@ -223,6 +224,10 @@ const claim = viewOf(Claim.successSchema, ({ claim: held }) => {
     ].join("\n"),
   };
 });
+
+const whoami = viewOf(WhoAmI.successSchema, ({ handle }) =>
+  prose(`Signed in as ${handle}.`)
+);
 
 const status = viewOf(Status.successSchema, ({ answers, claims, handle }) =>
   joined(
@@ -530,6 +535,7 @@ export const views = {
   submitAnswer: submitted,
   today,
   verdict,
+  whoami,
 } as const satisfies Readonly<
   Partial<
     Record<

@@ -1212,6 +1212,12 @@
         "seq": 42
       }
     },
+    "whoami": {
+      "payload": {},
+      "success": {
+        "handle": "alice"
+      }
+    },
     "why": {
       "payload": {
         "at": "main",
