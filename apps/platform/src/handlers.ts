@@ -395,6 +395,8 @@ export const Handlers: Layer.Layer<
         Stream.unwrap(
           Effect.map(servedFramed, (live) => watchHandler(payload, { live }))
         ).pipe(Stream.provideService(Projects, projects)),
+      // The session names the caller; no project is woken for it.
+      whoami: () => Effect.map(person, ({ handle }) => ({ handle })),
       why: ({ at, path, project }) =>
         code(project, (of) => whyOf(of, Option.fromUndefinedOr(at), path)),
     };

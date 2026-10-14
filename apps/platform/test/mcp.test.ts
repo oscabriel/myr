@@ -906,6 +906,33 @@ const naming = Layer.mergeAll(
 );
 
 describe("the platform's MCP resources and prompts, over scripted contracts", () => {
+  it.effect(
+    "answers whoami with the caller's handle, from the session alone, and refuses it with no credential",
+    () =>
+      Effect.gen(function* () {
+        const { fetch } = yield* served(naming);
+
+        const answered = yield* resultOf(
+          fetch,
+          Answered,
+          "tools/call",
+          { arguments: {}, name: "whoami" },
+          "bob-token"
+        );
+
+        const anonymous = yield* Effect.map(
+          fetch(mcpRequest("tools/call", { arguments: {}, name: "whoami" })),
+          ({ status }) => status
+        );
+
+        expect(answered).toStrictEqual({
+          isError: false,
+          structuredContent: { handle: "bob" },
+        });
+        expect(anonymous).toBe(401);
+      })
+  );
+
   it.effect("read through the Client the tools use, as the caller", () =>
     Effect.gen(function* () {
       const { fetch } = yield* served(naming);

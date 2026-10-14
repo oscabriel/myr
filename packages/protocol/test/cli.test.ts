@@ -591,6 +591,7 @@ describe("the group as CLI commands", () => {
       "asks",
       "ask",
       "status",
+      "whoami",
       "verdict",
       "landing",
       "credits",

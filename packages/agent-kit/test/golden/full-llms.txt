@@ -44,6 +44,7 @@ __CLI__ login --url https://platform-test.example.workers.dev
 - `__CLI__ status`: Show your claims and answers. Only reads.
 - `__CLI__ submit <ask>`: Offer a commit as an answer to a claimed ask.
 - `__CLI__ verdict <ask>`: Show the verdict on an answer to an ask. Only reads.
+- `__CLI__ whoami`: Show who the platform takes you for. Only reads.
 
 ## Projects
 

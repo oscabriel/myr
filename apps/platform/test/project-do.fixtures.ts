@@ -6,6 +6,7 @@ import { memoryFs } from "@repo/artifacts/repo-host/memory-fs";
 import { CheckAt } from "@repo/checks/check-runner";
 import { CheckRunnerMemory, scriptKey } from "@repo/checks/check-runner/memory";
 import { EvidenceStoreMemory } from "@repo/checks/evidence-store/memory";
+import { FrontPageMemory } from "@repo/project/front-page/memory";
 import { Lander } from "@repo/project/lander";
 import { LanderIsogit } from "@repo/project/lander/isogit";
 import { FinishersFromChecks } from "@repo/project/project";
@@ -416,6 +417,13 @@ export const outcomeOf = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
       onSuccess: (value) => ({ value }),
     })
   );
+
+/** A front page that lists nothing, so every project is probed as it was before listings seeded the adapter. */
+export const unlisted = FrontPageMemory.layer({
+  credits: [],
+  entries: [],
+  projects: [],
+});
 
 export const namespaceOf = inProcessNamespace((name) =>
   shellOver(":memory:", Option.some(name))

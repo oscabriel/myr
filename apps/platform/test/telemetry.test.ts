@@ -28,6 +28,7 @@ import {
   namespaceOf,
   parseIso,
   project,
+  unlisted,
   world,
 } from "./project-do.fixtures.ts";
 
@@ -173,7 +174,9 @@ describe("the Worker's telemetry", () => {
               LandingCommand.Start({ main: LandedSha.make("a".repeat(40)) })
             )
           );
-        }).pipe(Effect.provide(DoProjects(namespace)));
+        }).pipe(
+          Effect.provide(DoProjects(namespace).pipe(Layer.provide(unlisted)))
+        );
 
         const logged = JSON.stringify(console.written());
 
@@ -252,7 +255,12 @@ describe("a Project DO call", () => {
             made.claim(bob, parseIso).pipe(Effect.withErrorReporting)
           );
         }).pipe(
-          Effect.provide(Layer.merge(DoProjects(namespace), caller.layer))
+          Effect.provide(
+            Layer.merge(
+              DoProjects(namespace).pipe(Layer.provide(unlisted)),
+              caller.layer
+            )
+          )
         );
 
         expect(refused._tag).toBe("UnknownAsk");
@@ -312,7 +320,11 @@ describe("a Workflow instance", () => {
           invocation({ project, requestId }),
           instance("Answer.run"),
           Effect.provide(
-            Layer.mergeAll(DoProjects(namespace), engine, caller.layer)
+            Layer.mergeAll(
+              DoProjects(namespace).pipe(Layer.provide(unlisted)),
+              engine,
+              caller.layer
+            )
           ),
           Effect.exit
         );

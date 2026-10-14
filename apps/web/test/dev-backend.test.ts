@@ -4,12 +4,14 @@ import { Client, Contracts } from "@repo/protocol/contracts";
 import { forkRev } from "@repo/protocol/domain/code";
 import { ProjectEvent } from "@repo/protocol/domain/event";
 import { Handle, ProjectName } from "@repo/protocol/ids";
+import { Unauthenticated } from "@repo/protocol/principal";
 import {
   Context,
   DateTime,
   Duration,
   Effect,
   Equal,
+  Exit,
   Layer,
   Stream,
 } from "effect";
@@ -178,6 +180,20 @@ const listedWithLanding = inFreshWorld((as) =>
   })
 );
 
+const sessionsNamed = inFreshWorld((as) =>
+  Effect.gen(function* () {
+    const ines = yield* clientOf(as(decider));
+    const bram = yield* clientOf(as(contributor));
+    const anyone = yield* clientOf(as());
+
+    return {
+      anyone: yield* Effect.exit(anyone.whoami({})),
+      bram: yield* bram.whoami({}),
+      ines: yield* ines.whoami({}),
+    };
+  })
+);
+
 const listedWithLedgers = inFreshWorld((as) =>
   Effect.gen(function* () {
     const anyone = yield* clientOf(as());
@@ -236,6 +252,18 @@ describe("the dev seed", seededWorlds, () => {
         PROJECTS
       );
       expect(Equal.equals(first, second)).toBeTruthy();
+    })
+  );
+
+  it.live("names each session's person by whoami, and nobody with none", () =>
+    Effect.gen(function* () {
+      const { anyone, bram, ines } = yield* sessionsNamed;
+
+      expect({ bram, ines }).toStrictEqual({
+        bram: { handle: "bram" },
+        ines: { handle: "ines-v" },
+      });
+      expect(anyone).toStrictEqual(Exit.fail(new Unauthenticated()));
     })
   );
 
