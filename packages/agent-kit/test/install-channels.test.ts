@@ -45,7 +45,6 @@ describe("the Install page's channels", () => {
       "text",
       "git",
       "web",
-      "pi",
     ]);
 
     for (const each of channels) {
@@ -55,12 +54,14 @@ describe("the Install page's channels", () => {
     }
   });
 
-  it("install the CLI by script or from npm, then sign in to the platform", () => {
+  it("install the CLI by the script alone, then sign in to the platform", () => {
     expect(textsOf(channel("cli"))).toStrictEqual([
       `curl -fsSL ${webUrl}/install.sh | sh`,
-      `npm install -g ${Brand.cliPackage}`,
       `${Brand.cli} login --url ${platformUrl}`,
     ]);
+    expect(
+      channels.flatMap(textsOf).filter((each) => /\bnpm install\b/u.test(each))
+    ).toStrictEqual([]);
   });
 
   it("give MCP one tab per client and stdio, with the snippets agentSetup gives", () => {
@@ -121,14 +122,12 @@ describe("the Install page's channels", () => {
     ).toStrictEqual([]);
   });
 
-  it("show the web and the pi extension with no command, the extension as planned", () => {
-    const pi = channel("pi");
-
+  it("show the web with no command, and no channel says it is planned", () => {
+    expect(channel("web").snippets).toStrictEqual([]);
     expect(
-      channels.filter(({ planned }) => planned).map(({ id }) => id)
-    ).toStrictEqual(["pi"]);
-    expect([pi.snippets, channel("web").snippets]).toStrictEqual([[], []]);
-    expect(pi.summary).toContain("MCP");
-    expect(pi.summary).toContain("skills");
+      channels
+        .flatMap(({ summary, title }) => [summary, title])
+        .filter((each) => /\bplanned\b|\bnot yet\b|\buntil then\b/iu.test(each))
+    ).toStrictEqual([]);
   });
 });

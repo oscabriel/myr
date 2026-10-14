@@ -1,7 +1,6 @@
 // The Install page's one source: every way to reach the platform, with the snippets `agentSetup` gives where a way is
-// one of its channels, so the page and `/agents.md` never disagree on a command.
-import { Brand } from "@repo/brand";
-
+// one of its channels, so the page and `/agents.md` never disagree on a command. Every channel is one that works
+// today: a way not built yet, or a package not published yet, has no card, so nothing on the page reads as unfinished.
 import {
   anyAgent,
   hasCommand,
@@ -31,29 +30,19 @@ export interface InstallChannel {
   readonly tabbed: boolean;
   readonly snippets: readonly SetupSnippet[];
   readonly links: readonly InstallLink[];
-  /** Not built yet: it says so, and carries no command. */
-  readonly planned: boolean;
 }
 
 const channel = (
   fields: Pick<InstallChannel, "audience" | "id" | "summary" | "title"> &
-    Partial<Pick<InstallChannel, "links" | "planned" | "snippets" | "tabbed">>
+    Partial<Pick<InstallChannel, "links" | "snippets" | "tabbed">>
 ): InstallChannel => ({
   links: [],
-  planned: false,
   snippets: [],
   tabbed: false,
   ...fields,
 });
 
-const npm: SetupSnippet = {
-  label: "Or from npm",
-  language: "sh",
-  name: "npm",
-  text: `npm install -g ${Brand.cliPackage}`,
-};
-
-/** The script's snippet, said for the machines it has a build for, then npm beside it. */
+/** The script's snippet, said for the machines it has a build for: the one way to install the CLI. */
 const cli = (input: SetupInput) =>
   channel({
     audience: "Terminal",
@@ -64,7 +53,6 @@ const cli = (input: SetupInput) =>
         ...installScript(input),
         label: "The script, for Linux on x64 and macOS on Apple silicon",
       },
-      npm,
       ...signIn(input),
     ],
     summary:
@@ -151,17 +139,8 @@ const web = () =>
     id: "web",
     links: [{ label: "Sign in", page: false, path: "/auth/signin" }],
     summary:
-      "Sign in to read your inbox, take a maintainer's decisions and propose asks. A list of the CLI sessions you have signed in and the agents you have connected is planned.",
+      "Sign in to read your inbox, take a maintainer's decisions and propose asks.",
     title: "The web",
-  });
-
-const pi = () =>
-  channel({
-    audience: "Harness",
-    id: "pi",
-    planned: true,
-    summary: "Planned. Until then, pi works through the MCP server or skills.",
-    title: "Pi extension",
   });
 
 export const installChannels = (
@@ -173,5 +152,4 @@ export const installChannels = (
   text(input),
   git(input),
   web(),
-  pi(),
 ];

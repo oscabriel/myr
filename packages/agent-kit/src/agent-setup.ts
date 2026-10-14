@@ -10,7 +10,7 @@ import { span } from "./sections.ts";
 import { code, listed, page, printJson, table } from "./text.ts";
 
 export interface SetupSnippet {
-  /** A short name, for a tab or a list of choices: "Cursor", "npm". */
+  /** A short name, for a tab or a list of choices: "Cursor", "stdio". */
   readonly name: string;
   readonly label: string;
   readonly language: "sh" | "json" | "text";
