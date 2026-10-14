@@ -168,6 +168,6 @@ export const askOpen = Command.make(
     }).pipe(reportRefusals(COMMAND, flags.json))
 ).pipe(
   Command.withDescription(
-    `Open an ask by landing its file and its check, read from ${Brand.configDir}/asks/<ask>.ask.ts and the path it names unless --files gives them, once the check fails on main by an assertion, twice in the same way. It runs only with --yes: a person approves it.`
+    `Open an ask by landing its file and its check, read from the ask's own file under ${Brand.configDir}/asks/ and the path it names unless --files gives them, once the check fails on main by an assertion, twice in the same way. It runs only with --yes: a person approves it.`
   )
 );

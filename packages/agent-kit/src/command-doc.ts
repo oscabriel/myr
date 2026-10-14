@@ -76,7 +76,7 @@ export const localCommandDocs: readonly CommandDoc[] = [
     readOnly: false,
     source: "local",
     summary:
-      "Open an ask by landing its file and its check, read from the config folder's asks/<ask>.ask.ts and the path it names unless --files gives them, once the check fails on main by an assertion, twice in the same way.",
+      "Open an ask by landing its file and its check, read from the ask's own file under the config folder's asks/ and the path it names unless --files gives them, once the check fails on main by an assertion, twice in the same way.",
   },
   {
     flags: [
