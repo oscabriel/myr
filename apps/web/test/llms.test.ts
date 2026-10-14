@@ -14,7 +14,7 @@ import {
   ProjectName,
 } from "@repo/protocol/ids";
 import type { RepoName } from "@repo/protocol/ids";
-import { Effect, Option } from "effect";
+import { Deferred, Effect, Layer, Option } from "effect";
 
 import { commands as catalog } from "../src/features/agents/catalog.ts";
 import {
@@ -448,6 +448,23 @@ const listingWithAsks =
       )
     );
 
+/** The listing answers only once the asks have been asked for, so reading the two one after the other never ends. */
+const listingWaitsOnAsks =
+  (listed: readonly ProjectListing[], listedAsks: readonly AskListing[]) =>
+  () =>
+    Layer.unwrap(
+      Effect.map(Deferred.make<boolean>(), (asked) =>
+        platformWith(
+          Contracts.toLayerHandler("listProjects", () =>
+            Effect.as(Deferred.await(asked), { projects: listed })
+          ),
+          Contracts.toLayerHandler("listAsks", () =>
+            Effect.as(Deferred.succeed(asked, true), { asks: listedAsks })
+          )
+        )
+      )
+    );
+
 const getAt = (path: string, accept: string) =>
   new Request(`${webUrl}${path}`, { headers: { accept } });
 
@@ -494,6 +511,23 @@ describe("the list pages, asked for Markdown", () => {
         status: 200,
         vary: "Accept",
       });
+    })
+  );
+
+  it.effect("reads /oscabriel/datekit's listing and asks at once", () =>
+    Effect.gen(function* () {
+      const seen = yield* answered(
+        projectPageHandler(
+          listingWaitsOnAsks(projects, asks),
+          platformUrl
+        )({
+          next: () => "the page" as const,
+          params: { project: "datekit" },
+          request: getAt("/oscabriel/datekit", "text/markdown"),
+        })
+      );
+
+      expect(seen).toMatchObject({ status: 200 });
     })
   );
 

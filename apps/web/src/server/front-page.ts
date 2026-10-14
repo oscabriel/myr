@@ -40,24 +40,29 @@ export const readFrontPage = Effect.gen(function* () {
   const { entries } = yield* client.frontPage({});
   const families = familiesOf(entries);
 
-  const parents = yield* Effect.forEach(
-    families,
-    ([project, ask]) =>
-      client.showAsk({ ask, project }).pipe(
-        Effect.map((read) => Option.some(read.ask)),
-        Effect.orElseSucceed(() => Option.none<Ask>())
+  // The parents and the replays need only the entries, so the two waves go at once.
+  const { events, parents } = yield* Effect.all(
+    {
+      events: Effect.forEach(
+        Arr.dedupe(families.map(([project]) => project)),
+        (project) =>
+          Stream.runCollect(client.watch({ project, since: 0 })).pipe(
+            Effect.map((read) => Option.some({ events: read, project })),
+            Effect.orElseSucceed(() => Option.none())
+          ),
+        { concurrency: AT_ONCE }
       ),
-    { concurrency: AT_ONCE }
-  );
-
-  const events = yield* Effect.forEach(
-    Arr.dedupe(families.map(([project]) => project)),
-    (project) =>
-      Stream.runCollect(client.watch({ project, since: 0 })).pipe(
-        Effect.map((read) => Option.some({ events: read, project })),
-        Effect.orElseSucceed(() => Option.none())
+      parents: Effect.forEach(
+        families,
+        ([project, ask]) =>
+          client.showAsk({ ask, project }).pipe(
+            Effect.map((read) => Option.some(read.ask)),
+            Effect.orElseSucceed(() => Option.none<Ask>())
+          ),
+        { concurrency: AT_ONCE }
       ),
-    { concurrency: AT_ONCE }
+    },
+    { concurrency: "unbounded" }
   );
 
   return yield* Schema.encodeEffect(FrontPageData)({

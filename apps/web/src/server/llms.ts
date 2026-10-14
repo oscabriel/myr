@@ -61,23 +61,24 @@ export const projectLlmsHandler =
         }
 
         const client = yield* Client;
-        const { projects } = yield* client.listProjects({});
+
+        const readAsks = client.listAsks({ project: project.value }).pipe(
+          Effect.map((listed) => Option.some(listed.asks)),
+          Effect.catchTag("UnknownProject", () => Effect.succeedNone)
+        );
+
+        // The asks need only the name, so they are read beside the listing.
+        const [{ projects }, asks] = yield* Effect.all(
+          [client.listProjects({}), readAsks],
+          { concurrency: 2 }
+        );
 
         const listing = Arr.findFirst(
           projects,
           (each) => each.project === project.value
         );
 
-        if (Option.isNone(listing)) {
-          return missing();
-        }
-
-        const asks = yield* client.listAsks({ project: project.value }).pipe(
-          Effect.map((listed) => Option.some(listed.asks)),
-          Effect.catchTag("UnknownProject", () => Effect.succeedNone)
-        );
-
-        if (Option.isNone(asks)) {
+        if (Option.isNone(listing) || Option.isNone(asks)) {
           return missing();
         }
 
