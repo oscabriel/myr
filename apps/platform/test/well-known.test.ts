@@ -3,15 +3,17 @@ import { RefName, RepoHost } from "@repo/artifacts/repo-host";
 import { RepoHostMemory } from "@repo/artifacts/repo-host/memory";
 import { memoryFs } from "@repo/artifacts/repo-host/memory-fs";
 import { CodeStoreMemory } from "@repo/project/code-store/memory";
+import { FrontPage } from "@repo/project/front-page";
 import { FrontPageMemory } from "@repo/project/front-page/memory";
 import { landedRef } from "@repo/project/lander";
 import type { ProjectApi } from "@repo/project/project";
 import { Projects } from "@repo/project/projects";
+import type { ProjectListing } from "@repo/protocol/domain/front-page";
 import { keyOf, LandedSha, ProjectName, RepoName } from "@repo/protocol/ids";
 import { UnknownProject } from "@repo/protocol/refusal";
 import { gitClient } from "@repo/testkit/git-client";
 import { untouchable } from "@repo/testkit/untouchable";
-import { Effect, Layer, Option, Ref, Schema } from "effect";
+import { DateTime, Effect, Layer, Option, Ref, Schema } from "effect";
 
 import { agentSkills } from "../src/well-known.ts";
 import { coreLoopWorld } from "./world.ts";
@@ -263,7 +265,10 @@ const countedHost = (counts: Ref.Ref<{ files: number; refs: number }>) =>
     })
   ).pipe(Layer.provide(RepoHostMemory));
 
-const landedWhere = (landed: Ref.Ref<ReadonlyMap<ProjectName, LandedSha>>) =>
+const landedWhere = (
+  landed: Ref.Ref<ReadonlyMap<ProjectName, LandedSha>>,
+  heads: Ref.Ref<number>
+) =>
   Layer.succeed(
     Projects,
     Projects.of({
@@ -272,27 +277,49 @@ const landedWhere = (landed: Ref.Ref<ReadonlyMap<ProjectName, LandedSha>>) =>
         Effect.succeed(
           untouchable<ProjectApi>("ProjectApi", {
             head: () =>
-              Effect.map(Ref.get(landed), (all) =>
-                Option.match(Option.fromUndefinedOr(all.get(project)), {
-                  onNone: () => ({}),
-                  onSome: (sha) => ({ landed: sha }),
-                })
+              Effect.andThen(
+                Ref.update(heads, (n) => n + 1),
+                Effect.map(Ref.get(landed), (all) =>
+                  Option.match(Option.fromUndefinedOr(all.get(project)), {
+                    onNone: () => ({}),
+                    onSome: (sha) => ({ landed: sha }),
+                  })
+                )
               ),
           })
         ),
     })
   );
 
+const listedFrom = (listings: Ref.Ref<readonly ProjectListing[]>) =>
+  Layer.succeed(
+    FrontPage,
+    FrontPage.of({
+      credits: () => Effect.succeed([]),
+      entries: () => Effect.succeed([]),
+      projects: () => Ref.get(listings),
+      recentLandings: () => Effect.succeed([]),
+    })
+  );
+
 describe("the agent skills index, kept by each project's landed commit", () => {
   it.effect(
-    "reads each skill once while no main moves, and again only for a project whose main moved",
+    "reads each skill once while no main moves, wakes no project while no listed project lands, and reads again only the skill whose main moved",
     () =>
       Effect.gen(function* () {
         const counts = yield* Ref.make({ files: 0, refs: 0 });
+        const heads = yield* Ref.make(0);
 
         const landed = yield* Ref.make<ReadonlyMap<ProjectName, LandedSha>>(
           new Map()
         );
+
+        const firstLanding = DateTime.makeUnsafe("2026-10-01T09:00:00Z");
+
+        const listings = yield* Ref.make<readonly ProjectListing[]>([
+          { ...listing(burrow), landedAt: firstLanding },
+          { ...listing(datekit), landedAt: firstLanding },
+        ]);
 
         yield* Effect.gen(function* () {
           const host = yield* RepoHost;
@@ -336,9 +363,12 @@ describe("the agent skills index, kept by each project's landed commit", () => {
             ({ skills }) => skills.map(({ description }) => description)
           );
 
-          const reads = Effect.flatMap(
-            Ref.getAndSet(counts, { files: 0, refs: 0 }),
-            Effect.succeed
+          const reads = Effect.map(
+            Effect.all({
+              files: Ref.getAndSet(counts, { files: 0, refs: 0 }),
+              heads: Ref.getAndSet(heads, 0),
+            }),
+            ({ files, heads: woken }) => ({ ...files, heads: woken })
           );
 
           const once = yield* described;
@@ -346,9 +376,20 @@ describe("the agent skills index, kept by each project's landed commit", () => {
           const twice = yield* described;
           const readTwice = yield* reads;
 
+          // A landing moves the project's main and its listing's instant.
           yield* Ref.update(
             landed,
             (all) => new Map([...all, [datekit, LandedSha.make(moved)]])
+          );
+          yield* Ref.update(listings, (all) =>
+            all.map((each) =>
+              each.project === datekit
+                ? {
+                    ...each,
+                    landedAt: DateTime.makeUnsafe("2026-10-02T09:00:00Z"),
+                  }
+                : each
+            )
           );
 
           const afterMove = yield* described;
@@ -363,9 +404,9 @@ describe("the agent skills index, kept by each project's landed commit", () => {
           }).toStrictEqual({
             afterMove: ["Answer any one of datekit's asks."],
             once: ["Answer one of datekit's asks."],
-            readAfterMove: { files: 1, refs: 0 },
-            readOnce: { files: 2, refs: 0 },
-            readTwice: { files: 0, refs: 0 },
+            readAfterMove: { files: 1, heads: 2, refs: 0 },
+            readOnce: { files: 2, heads: 2, refs: 0 },
+            readTwice: { files: 0, heads: 0, refs: 0 },
             twice: ["Answer one of datekit's asks."],
           });
         }).pipe(
@@ -373,12 +414,8 @@ describe("the agent skills index, kept by each project's landed commit", () => {
             Layer.mergeAll(
               countedHost(counts),
               CodeStoreMemory,
-              landedWhere(landed),
-              FrontPageMemory.layer({
-                credits: [],
-                entries: [],
-                projects: [listing(burrow), listing(datekit)],
-              })
+              landedWhere(landed, heads),
+              listedFrom(listings)
             )
           )
         );
