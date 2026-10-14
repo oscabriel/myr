@@ -49,7 +49,11 @@ export const stageRuns = Match.type<StageName>().pipe(
     "shape",
     () => "What the change touches, read from its paths and added lines."
   ),
-  Match.when("merge", () => "The answer merged onto the landed main."),
+  Match.when(
+    "merge",
+    () =>
+      "The answer merged onto the landed main, and merged again when main moves."
+  ),
   Match.when(
     "cheap",
     () => "Counts on the merged tree: the project's ratchets."

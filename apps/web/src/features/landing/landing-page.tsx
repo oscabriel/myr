@@ -12,7 +12,7 @@ import { LandingNowList } from "./landing-now-list.tsx";
 import type { LandingNow } from "./landing-now.ts";
 import { MusicBox } from "./music-box/music-box.tsx";
 import { WaysIn } from "./ways-in.tsx";
-import { HEADLINE, HERO_LEDE } from "./words.ts";
+import { CONCURRENCY, HEADLINE, HERO_LEDE } from "./words.ts";
 
 /** The page's one main action, a size up from a toolbar's button. */
 const PRIMARY = buttonVariants({
@@ -38,9 +38,9 @@ const Headline = () => {
   );
 };
 
-/** The lede, with `main` set as the ref it is, in mono at the lede's own size. */
-const Lede = () => {
-  const [before, after] = HERO_LEDE.split(MAIN);
+/** A sentence with `main` set as the ref it is, in mono at the sentence's own size. */
+const WithMain = ({ text }: { readonly text: string }) => {
+  const [before, after] = text.split(MAIN);
 
   return (
     <>
@@ -164,7 +164,13 @@ export const LandingView = ({
           <Headline />
         </h1>
         <p className="text-lede text-muted-foreground max-w-(--measure-lede) text-pretty">
-          <Lede />
+          <WithMain text={HERO_LEDE} />
+        </p>
+        <p
+          className="text-ui text-muted-foreground max-w-(--measure-lede) text-pretty"
+          data-concurrency=""
+        >
+          <WithMain text={CONCURRENCY} />
         </p>
       </div>
       <div className="flex max-w-full flex-col items-center gap-4">
