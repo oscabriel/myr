@@ -11,8 +11,17 @@ import {
   ProjectListing,
 } from "@repo/protocol/domain/front-page";
 import { AskId, KindName, ProjectName } from "@repo/protocol/ids";
+import { UnknownAsk } from "@repo/protocol/refusal";
 import { asTester, unanswered } from "@repo/protocol/testing";
-import { DateTime, Effect, Layer, Option, Schema } from "effect";
+import {
+  DateTime,
+  Deferred,
+  Effect,
+  Layer,
+  Option,
+  Schema,
+  Stream,
+} from "effect";
 import { FetchHttpClient } from "effect/http";
 import { RpcClient, RpcSerialization, RpcTest } from "effect/rpc";
 
@@ -680,6 +689,52 @@ const projectsNeverAnswer = Layer.effect(
   ])
 );
 
+/** A family's parent and child, so the page reads the parent and replays its project. */
+const familyEntries = Schema.decodeSync(Schema.Array(FrontPageEntry))(
+  ["drop-fetch", "drop-fetch-auth"].map((ask) => ({
+    ask: {
+      ask,
+      blockedBy: ask === "drop-fetch" ? ["drop-fetch-auth"] : [],
+      claimed: false,
+      kind: "migrate",
+      territory: ".",
+      want: `The want of ${ask}.`,
+    },
+    posture: "open",
+    project: "burrow",
+    takeable: true,
+  }))
+);
+
+/** The parent's read answers only once the replay has begun, so reading the two one after the other never ends. */
+const parentWaitsOnReplay = Layer.unwrap(
+  Effect.gen(function* () {
+    const replayed = yield* Deferred.make<boolean>();
+
+    return Layer.effect(Client, RpcTest.makeClient(Contracts)).pipe(
+      Layer.provide([
+        Layer.mergeAll(
+          unanswered,
+          Contracts.toLayerHandler("frontPage", () =>
+            Effect.succeed({ entries: familyEntries })
+          ),
+          Contracts.toLayerHandler("showAsk", (payload) =>
+            Deferred.await(replayed).pipe(
+              Effect.andThen(new UnknownAsk({ ask: payload.ask }))
+            )
+          ),
+          Contracts.toLayerHandler("watch", () =>
+            Stream.fromEffect(Deferred.succeed(replayed, true)).pipe(
+              Stream.flatMap(() => Stream.empty)
+            )
+          )
+        ),
+        asTester,
+      ])
+    );
+  })
+);
+
 const decodeData = Schema.decodeEffect(FrontPageData);
 
 /** A fresh dev world seeds itself first, which a full test run can slow past 5 s. */
@@ -754,6 +809,20 @@ describe("the front page as the server sends it", () => {
 
         expect(rowsIn(yield* sentFrom(data))).toHaveLength(3);
       })
+  );
+
+  it.effect("reads the parents and replays the projects at once", () =>
+    Effect.gen(function* () {
+      const data = yield* readFrontPage.pipe(
+        Effect.flatMap(decodeData),
+        Effect.provide(parentWaitsOnReplay)
+      );
+
+      expect({
+        events: data.events.map(({ project }) => project),
+        parents: data.parents,
+      }).toStrictEqual({ events: ["oscabriel/burrow"], parents: [] });
+    })
   );
 });
 
