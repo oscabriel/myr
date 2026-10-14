@@ -13,7 +13,7 @@ import type { UnknownRevision } from "@repo/protocol/refusal";
 import { Array, DateTime, Effect, Equal, Option } from "effect";
 
 import type { CodeProject } from "../code.ts";
-import { asOneView, CodeCache } from "./cache.ts";
+import { asOneView } from "./cache.ts";
 import { versionAt, walkableAt } from "./file-walk.ts";
 import {
   INCREMENT_REACH,
@@ -24,7 +24,9 @@ import {
   throughHistory,
 } from "./history.ts";
 import type { StoredPathLog } from "./history.ts";
+import { logKept, logKey, throughStore } from "./objects.ts";
 import { commitAt, resolveAt } from "./revision.ts";
+import type { Resolved } from "./revision.ts";
 import { entryAt, READS_AT_ONCE } from "./tree.ts";
 
 export const LOG_LIMIT = 100;
@@ -89,17 +91,14 @@ export const pageOf = (
   from: number,
   count: number
 ): Effect.Effect<readonly Commit[], RepoNotFound, RepoHost> =>
-  Effect.gen(function* () {
-    const cache = yield* CodeCache;
-
-    return yield* cache.through(
-      `${repo}:log:${sha}:${from}:${count}`,
-      RepoHost.use((host) =>
-        host.log(repo, Revision.Commit({ sha }), count, from)
-      ),
-      { heavy: true }
-    );
-  });
+  throughStore(
+    logKept,
+    logKey(repo, sha, from, count),
+    RepoHost.use((host) =>
+      host.log(repo, Revision.Commit({ sha }), count, from)
+    ).pipe(Effect.asSome),
+    { heavy: true }
+  ).pipe(Effect.map(Option.getOrElse(() => [])));
 
 const idAt = (repo: RepoName, tree: string, path: RepoPath) =>
   Effect.map(
@@ -251,17 +250,16 @@ const historyOf = (
     };
   });
 
-export const logPage = (
+const pageFrom = (
   project: CodeProject,
+  resolved: Resolved,
   input: {
-    readonly at: Option.Option<Rev>;
     readonly path: Option.Option<RepoPath>;
     readonly from: number;
     readonly limit: number;
   }
-): Effect.Effect<LogPage, UnknownRevision, RepoHost> =>
+): Effect.Effect<LogPage, never, RepoHost> =>
   Effect.gen(function* () {
-    const resolved = yield* resolveAt(project, input.at);
     const { commit: sha, repo } = resolved;
     const from = Math.max(0, Math.floor(input.from));
     const limit = Math.min(LOG_LIMIT, Math.max(1, Math.floor(input.limit)));
@@ -325,5 +323,23 @@ export const logPage = (
     return pageWith(
       commits,
       scan.length > PATH_SCAN ? Option.some(from + PATH_SCAN) : Option.none()
+    );
+  });
+
+export const logPage = (
+  project: CodeProject,
+  input: {
+    readonly at: Option.Option<Rev>;
+    readonly path: Option.Option<RepoPath>;
+    readonly from: number;
+    readonly limit: number;
+  }
+): Effect.Effect<LogPage, UnknownRevision, RepoHost> =>
+  Effect.gen(function* () {
+    const resolved = yield* resolveAt(project, input.at);
+
+    return yield* keptOnlyIfCanonical(
+      resolved,
+      pageFrom(project, resolved, input)
     );
   }).pipe(inRepoSession);

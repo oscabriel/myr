@@ -8,8 +8,11 @@ import type { UnknownRevision } from "@repo/protocol/refusal";
 import { Array, Effect, Match, Option, Order } from "effect";
 
 import type { CodeProject } from "../code.ts";
-import { CodeCache } from "./cache.ts";
+import { contentsOf } from "./blob.ts";
+import { keptOnlyIfCanonical } from "./history.ts";
+import { objectKey, throughStore, treeKept } from "./objects.ts";
 import { commitAt, resolveAt } from "./revision.ts";
+import type { Resolved } from "./revision.ts";
 
 /** Live store reads take 0.1-0.5 s and chain per path segment; 48 at once keeps a walk fast and under the store's 2,000 requests per 10 s per repo. */
 export const READS_AT_ONCE = 48;
@@ -18,21 +21,18 @@ export const entriesOf = (
   repo: RepoName,
   id: string
 ): Effect.Effect<readonly TreeEntry[], RepoNotFound, RepoHost> =>
-  Effect.gen(function* () {
-    const cache = yield* CodeCache;
-
-    return yield* cache.through(
-      `${repo}:tree:${id}`,
-      RepoHost.use((host) => host.readTree(repo, ObjectId.make(id))).pipe(
-        Effect.flatMap(
-          Option.match({
-            onNone: () => Effect.die(`${repo} has no tree ${id}`),
-            onSome: Effect.succeed,
-          })
-        )
-      )
-    );
-  });
+  throughStore(
+    treeKept,
+    objectKey(treeKept, repo, id),
+    RepoHost.use((host) => host.readTree(repo, ObjectId.make(id)))
+  ).pipe(
+    Effect.flatMap(
+      Option.match({
+        onNone: () => Effect.die(`${repo} has no tree ${id}`),
+        onSome: Effect.succeed,
+      })
+    )
+  );
 
 export const segmentsOf = (path: string): Option.Option<readonly string[]> => {
   const segments = path.split("/");
@@ -122,23 +122,14 @@ const linkTargetOf = (
 
 const LINK_TARGET_MAX = 4096;
 
+/** A link's blob is kept as any blob is, by its id. */
 const linkTextOf = (repo: RepoName, link: string) =>
-  Effect.gen(function* () {
-    const cache = yield* CodeCache;
-
-    return yield* cache.through(
-      `${repo}:link:${link}`,
-      RepoHost.use((host) => host.readBlob(repo, ObjectId.make(link))).pipe(
-        Effect.map(
-          Option.flatMap((bytes) =>
-            bytes.length > LINK_TARGET_MAX
-              ? Option.none()
-              : Option.some(new TextDecoder().decode(bytes))
-          )
-        )
-      )
-    );
-  });
+  Effect.map(
+    contentsOf(repo, BlobSha.make(link)),
+    Option.flatMap(({ size, text }) =>
+      size > LINK_TARGET_MAX ? Option.none() : text
+    )
+  );
 
 /** One link followed, never a chain; a link's entry is a blob too, so its kind is asked, not its type. */
 const linkedFile = (
@@ -231,13 +222,11 @@ export const folderAt = (
     })
   );
 
-export const listing = (
-  project: CodeProject,
-  at: Option.Option<Rev>,
+const folderListing = (
+  { commit, repo }: Resolved,
   path: Option.Option<RepoPath>
-): Effect.Effect<TreeListing, UnknownRevision | UnknownPath, RepoHost> =>
+): Effect.Effect<TreeListing, UnknownPath, RepoHost> =>
   Effect.gen(function* () {
-    const { commit, repo } = yield* resolveAt(project, at);
     const tree = yield* folderAt(repo, commit, path);
 
     const prefix = Option.match(path, {
@@ -283,4 +272,15 @@ export const listing = (
         onSome: (found) => ({ readme: found }),
       }),
     };
+  });
+
+export const listing = (
+  project: CodeProject,
+  at: Option.Option<Rev>,
+  path: Option.Option<RepoPath>
+): Effect.Effect<TreeListing, UnknownRevision | UnknownPath, RepoHost> =>
+  Effect.gen(function* () {
+    const resolved = yield* resolveAt(project, at);
+
+    return yield* keptOnlyIfCanonical(resolved, folderListing(resolved, path));
   });

@@ -1,4 +1,6 @@
 import { RepoHost } from "@repo/artifacts/repo-host";
+import { CodeStore } from "@repo/project/code-store";
+import { CodeCache } from "@repo/project/code/cache";
 import { rawFor } from "@repo/project/code/raw";
 import { Projects } from "@repo/project/projects";
 import { Contracts } from "@repo/protocol/contracts";
@@ -53,7 +55,9 @@ const decodeProject = Schema.decodeUnknownOption(ProjectName);
 const raw = Layer.unwrap(
   Effect.gen(function* () {
     const services = Context.make(RepoHost, yield* RepoHost).pipe(
-      Context.add(Projects, yield* Projects)
+      Context.add(Projects, yield* Projects),
+      Context.add(CodeCache, yield* CodeCache),
+      Context.add(CodeStore, yield* CodeStore)
     );
 
     const answer = Effect.gen(function* () {

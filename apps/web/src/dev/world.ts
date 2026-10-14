@@ -5,6 +5,8 @@ import { EvidenceStoreMemory } from "@repo/checks/evidence-store/memory";
 import { cannedDrafter } from "@repo/drafting/draft-runs/canned";
 import { withDraftRunsInline } from "@repo/drafting/draft-runs/inline";
 import { AlarmsMemory } from "@repo/project/alarms/memory";
+import { CodeStoreMemory } from "@repo/project/code-store/memory";
+import { CodeCacheLive } from "@repo/project/code/cache";
 import { ProjectDescriptionsMemory } from "@repo/project/description/memory";
 import type { FrontPage } from "@repo/project/front-page";
 import type { Lander } from "@repo/project/lander";
@@ -24,10 +26,16 @@ import { DevFrontPage } from "./front-page.ts";
 import { DevLander } from "./lander.ts";
 import { DevProjection } from "./projection.ts";
 
+// Objects kept as the platform keeps them (`apps/platform/src/ports.ts`), so a
+// page's second read of a commit, a tree or a blob reaches the host no more.
+const CODE_READS_KEPT = { heavy: 40, light: 2000 };
+
 const ports = Layer.mergeAll(
   AlarmsMemory,
   DevAnswerRunsLayer,
   cannedDrafter,
+  CodeCacheLive(CODE_READS_KEPT.light, CODE_READS_KEPT.heavy),
+  CodeStoreMemory,
   DevProjection,
   RulesEvaluatorJson.pipe(Layer.provide(FinishersFromChecks))
 ).pipe(

@@ -16,7 +16,8 @@ import { UnknownRevision } from "@repo/protocol/refusal";
 import { Array, Effect, Option } from "effect";
 
 import type { CodeProject } from "../code.ts";
-import { CodeCache } from "./cache.ts";
+import { keptOnlyIfCanonical } from "./history.ts";
+import { commitKept, objectKey, throughStore } from "./objects.ts";
 
 const FULL_SHA = /^[0-9a-f]{40}$/u;
 
@@ -41,21 +42,12 @@ export const commitAt = (
   repo: RepoName,
   sha: CommitSha
 ): Effect.Effect<Option.Option<Commit>, RepoNotFound, RepoHost> =>
-  Effect.gen(function* () {
-    const cache = yield* CodeCache;
-
-    return yield* cache
-      .through(
-        `${repo}:commit:${sha}`,
-        RepoHost.use((host) => host.readCommit(repo, sha)).pipe(
-          Effect.flatMap(Effect.fromOption)
-        )
-      )
-      .pipe(
-        Effect.asSome,
-        Effect.catchTag("NoSuchElementError", () => Effect.succeedNone)
-      );
-  });
+  throughStore(
+    commitKept,
+    objectKey(commitKept, repo, sha),
+    RepoHost.use((host) => host.readCommit(repo, sha)),
+    { fits: (commit) => commit.sha === sha }
+  );
 
 /**
  * Where a revision resolved: the commit, and the repo that holds it. Only the
@@ -104,8 +96,9 @@ const pointIn = (
         ),
         Effect.catchTag("RepoNotFound", () => Effect.succeedNone)
       ),
+    // A fork's commit is read before the address resolves, so it is kept in no store here.
     Commit: ({ sha }) =>
-      commitAt(repo, sha).pipe(
+      keptOnlyIfCanonical({ canonical: false }, commitAt(repo, sha)).pipe(
         Effect.map(Option.map((found) => found.sha)),
         Effect.catchTag("RepoNotFound", () => Effect.succeedNone)
       ),

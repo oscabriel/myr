@@ -1,98 +1,42 @@
-import { ObjectId, RepoHost } from "@repo/artifacts/repo-host";
-import type { RepoNotFound } from "@repo/artifacts/repo-host";
+import type { RepoHost, RepoNotFound } from "@repo/artifacts/repo-host";
 import type { FileView, Rev } from "@repo/protocol/domain/code";
 import { BlobSha } from "@repo/protocol/ids";
 import type { CommitSha, RepoName, RepoPath } from "@repo/protocol/ids";
 import { UnknownPath } from "@repo/protocol/refusal";
 import type { UnknownRevision } from "@repo/protocol/refusal";
-import { Effect, Option, Schema } from "effect";
+import { Effect, Option } from "effect";
 
 import type { CodeProject } from "../code.ts";
-import { CodeCache } from "./cache.ts";
+import {
+  contentsOf,
+  contentsOfBytes,
+  keepContents,
+  unlessTooLarge,
+} from "./blob.ts";
+import type { Contents } from "./blob.ts";
 import { versionAt } from "./file-walk.ts";
+import { keptOnlyIfCanonical } from "./history.ts";
+import {
+  blobKept,
+  fileKept,
+  fileKey,
+  keepObject,
+  objectKey,
+  throughStore,
+} from "./objects.ts";
 import { commitAt, resolveAt } from "./revision.ts";
+import type { Resolved } from "./revision.ts";
 import { entryAt } from "./tree.ts";
 
-export const TEXT_CAP = 1024 * 1024;
+export {
+  contentsOf,
+  contentsOfBytes,
+  isBinary,
+  TEXT_CAP,
+  unlessTooLarge,
+} from "./blob.ts";
 
-// git's own test: a NUL among the first bytes means the blob is not text.
-const SNIFF = 8192;
-
-const KEPT_TEXT = 256 * 1024;
-
-export const isBinary = (bytes: Uint8Array) =>
-  bytes.subarray(0, SNIFF).includes(0);
-
-export interface Contents {
-  readonly size: number;
-  readonly binary: boolean;
-  readonly truncated: boolean;
-  readonly text: Option.Option<string>;
-}
-
-const MemoryLimit = Schema.Struct({ code: Schema.Literal("MEMORY_LIMIT") });
-
-const isMemoryLimit = Schema.is(MemoryLimit);
-
-/** Artifacts' binding throws a too-large blob as a defect, which here is an answer. */
-export const unlessTooLarge = <A, E, R>(
-  read: Effect.Effect<A, E, R>,
-  tooLarge: () => A
-): Effect.Effect<A, E, R> =>
-  Effect.catchDefect(read, (defect) =>
-    isMemoryLimit(defect) ? Effect.succeed(tooLarge()) : Effect.die(defect)
-  );
-
-export const contentsOfBytes = (bytes: Uint8Array): Contents => {
-  const binary = isBinary(bytes);
-  const truncated = !binary && bytes.length > TEXT_CAP;
-
-  return {
-    binary,
-    size: bytes.length,
-    text:
-      binary || truncated
-        ? Option.none()
-        : Option.some(new TextDecoder().decode(bytes)),
-    truncated,
-  };
-};
-
-export const contentsOf = (
-  repo: RepoName,
-  blob: BlobSha
-): Effect.Effect<Option.Option<Contents>, RepoNotFound, RepoHost> =>
-  Effect.gen(function* () {
-    const cache = yield* CodeCache;
-
-    return yield* cache.through(
-      `${repo}:text:${blob}`,
-      unlessTooLarge(
-        RepoHost.use((host) => host.readBlob(repo, ObjectId.make(blob))).pipe(
-          Effect.map(Option.map(contentsOfBytes))
-        ),
-        () =>
-          Option.some({
-            binary: false,
-            size: 0,
-            text: Option.none(),
-            truncated: true,
-          })
-      ),
-      {
-        heavy: true,
-        keep: (contents) =>
-          Option.match(contents, {
-            onNone: () => false,
-            onSome: ({ text }) =>
-              Option.match(text, {
-                onNone: () => true,
-                onSome: (read) => read.length <= KEPT_TEXT,
-              }),
-          }),
-      }
-    );
-  });
+export type { Contents } from "./blob.ts";
 
 const viewOf = (
   commit: CommitSha,
@@ -112,42 +56,65 @@ const viewOf = (
   }),
 });
 
-/** ASSUMPTION: Artifacts' `readFile` gives a symlink's own blob, as the tree does, rather than following it. */
-const wholeAt = (repo: RepoName, commit: CommitSha, path: RepoPath) =>
-  Effect.gen(function* () {
-    const cache = yield* CodeCache;
+interface Whole {
+  readonly blob: BlobSha;
+  readonly contents: Contents;
+}
 
-    return yield* cache.through(
-      `${repo}:file:${commit}:${path}`,
-      unlessTooLarge(versionAt(repo, commit, path), Option.none),
-      {
-        heavy: true,
-        keep: (read) =>
-          Option.match(read, {
-            onNone: () => false,
-            onSome: ({ bytes }) => bytes.byteLength <= KEPT_TEXT,
-          }),
+/**
+ * The file in one host call, kept as the blob its path names at the commit
+ * and that blob's contents, each by its id: a kept file is read from the
+ * store alone. ASSUMPTION: Artifacts' `readFile` gives a symlink's own blob,
+ * as the tree does, rather than following it.
+ */
+const wholeAt = (
+  repo: RepoName,
+  commit: CommitSha,
+  path: RepoPath
+): Effect.Effect<Option.Option<Whole>, RepoNotFound, RepoHost> =>
+  Effect.gen(function* () {
+    const key = yield* fileKey(repo, commit, path);
+
+    const named = yield* throughStore(fileKept, key, Effect.succeedNone);
+
+    if (Option.isSome(named)) {
+      const kept = yield* contentsOf(repo, named.value.blob);
+
+      if (Option.isSome(kept)) {
+        return Option.some({ blob: named.value.blob, contents: kept.value });
       }
+    }
+
+    const read = yield* unlessTooLarge(
+      versionAt(repo, commit, path),
+      Option.none
     );
+
+    if (Option.isNone(read)) {
+      return Option.none();
+    }
+
+    const { blob, bytes } = read.value;
+    const contents = contentsOfBytes(bytes);
+
+    yield* keepObject(fileKept, key, { blob });
+    yield* keepObject(blobKept, objectKey(blobKept, repo, blob), contents, {
+      heavy: true,
+      keep: keepContents,
+    });
+
+    return Option.some({ blob, contents });
   });
 
-export const fileView = (
-  project: CodeProject,
-  at: Option.Option<Rev>,
+const fileAtCommit = (
+  { commit, repo }: Resolved,
   path: RepoPath
-): Effect.Effect<FileView, UnknownRevision | UnknownPath, RepoHost> =>
+): Effect.Effect<FileView, UnknownPath, RepoHost> =>
   Effect.gen(function* () {
-    const { commit, repo } = yield* resolveAt(project, at);
-
     const whole = yield* wholeAt(repo, commit, path).pipe(Effect.orDie);
 
     if (Option.isSome(whole)) {
-      return viewOf(
-        commit,
-        path,
-        whole.value.blob,
-        contentsOfBytes(whole.value.bytes)
-      );
+      return viewOf(commit, path, whole.value.blob, whole.value.contents);
     }
 
     const { tree } = yield* commitAt(repo, commit).pipe(
@@ -170,4 +137,15 @@ export const fileView = (
     );
 
     return viewOf(commit, path, sha, contents);
+  });
+
+export const fileView = (
+  project: CodeProject,
+  at: Option.Option<Rev>,
+  path: RepoPath
+): Effect.Effect<FileView, UnknownRevision | UnknownPath, RepoHost> =>
+  Effect.gen(function* () {
+    const resolved = yield* resolveAt(project, at);
+
+    return yield* keptOnlyIfCanonical(resolved, fileAtCommit(resolved, path));
   });
