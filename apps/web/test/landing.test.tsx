@@ -10,6 +10,8 @@ import { DateTime, Effect } from "effect";
 import glossary from "../../../GLOSSARY.md?raw";
 import { LandingNow } from "../src/features/landing/landing-now.ts";
 import { LandingView } from "../src/features/landing/landing-page.tsx";
+import { REST, poseAt } from "../src/features/landing/music-box/model.ts";
+import { KEYS } from "../src/features/landing/music-box/words.ts";
 import { readLandingNow } from "../src/features/landing/read.ts";
 import { LEDE } from "../src/features/landing/words.ts";
 import { landingHead } from "../src/routes/index.tsx";
@@ -101,19 +103,13 @@ const EIGHT_LANDINGS = Array.from({ length: 8 }, (_, index) =>
   })
 );
 
-/** One of the hero's two panels, by its flow. */
-const panelOf = (markup: string, flow: string) =>
-  new RegExp(
-    `<section\\b[^>]*data-flow="${flow}"[\\s\\S]*?</section>`,
-    "u"
-  ).exec(markup)?.[0] ?? "";
+/** The hero's figure: the music box, its card and its legend. */
+const figureOf = (markup: string) =>
+  /<figure\b[^>]*data-figure="music-box"[\s\S]*?<\/figcaption>/u.exec(
+    markup
+  )?.[0] ?? "";
 
-const stepsIn = (panel: string) =>
-  [...panel.matchAll(/data-step="(?<step>[^"]+)"/gu)].map(
-    (found) => found.groups?.step
-  );
-
-/** Code hosts and forges by name: the comparison describes the usual flow by mechanism alone. */
+/** Code hosts and forges by name: the page describes the platform by mechanism alone. */
 const PRODUCTS =
   /github|gitlab|bitbucket|gerrit|gitea|forgejo|codeberg|sourcehut/iu;
 
@@ -247,44 +243,35 @@ describe(LandingView, () => {
   );
 
   it.effect(
-    "compares the usual flow, by its mechanism under an X, with an ask landing through the gate under a check",
+    "draws the platform as a music box, its legend naming the parts by GLOSSARY.md's words and no product",
     () =>
       Effect.gen(function* () {
         const markup = yield* pageWith(landed);
-        const usual = panelOf(markup, "usual");
-        const gate = panelOf(markup, "gate");
+        const figure = figureOf(markup);
 
-        expect(stepsIn(usual)).toStrictEqual([
-          "issue",
-          "branch",
-          "pull request",
-          "review comments",
-          "merge button",
-          "main",
-        ]);
-        expect(stepsIn(gate)).toStrictEqual([
-          "ask",
-          "claim",
-          "answer",
-          "gate",
-          "main",
-        ]);
         expect(
-          [usual, gate].map((panel) => /lucide-(?:x|check)\b/u.exec(panel)?.[0])
-        ).toStrictEqual(["lucide-x", "lucide-check"]);
-        expect(textIn(usual + gate)).not.toMatch(PRODUCTS);
+          [...figure.matchAll(/data-key="(?<word>[^"]+)"/gu)].map(
+            (found) => found.groups?.word
+          )
+        ).toStrictEqual(KEYS.map((key) => key.word));
+        expect(
+          KEYS.map((key) => key.word)
+            .filter((word) => word !== "main" && word !== "Public")
+            .filter((word) => defined(word) === undefined)
+        ).toStrictEqual([]);
+        expect(textIn(figure)).toContain(poseAt(REST).readout);
+        expect(textIn(figure)).not.toMatch(PRODUCTS);
       })
   );
 
   it.effect(
-    "uses no banned word outside the usual flow's panel, and no shadowed, gradient or rounder surface than a card's",
+    "uses no banned word, and no shadowed, gradient or rounder surface than a card's",
     () =>
       Effect.gen(function* () {
         const markup = yield* pageWith(landed);
-        const usual = panelOf(markup, "usual");
-        const text = textIn(markup.replace(usual, "")).toLowerCase();
+        const text = textIn(markup).toLowerCase();
 
-        // DESIGN.md's list, and the glossary's words to avoid. "Merge" is banned for a landing; Inbox and Explore are page names now.
+        // DESIGN.md's list, and the glossary's words to avoid. "Merge" is banned for a landing, and stays the name of a stage; Inbox and Explore are page names now.
         expect(
           [
             "review",
@@ -313,19 +300,15 @@ describe(LandingView, () => {
   );
 
   it.effect(
-    "draws the comparison and the gate as inline SVG, and moves only where motion is welcome",
+    "draws the music box as inline SVG with the gate's stages beneath it, and moves only where motion is welcome",
     () =>
       Effect.gen(function* () {
         const markup = yield* pageWith(landed);
         const main = mainOf(markup);
 
-        expect(
-          ["usual", "gate"].map((flow) =>
-            panelOf(markup, flow).includes("<svg")
-          )
-        ).toStrictEqual([true, true]);
-        expect(main.slice(main.indexOf('aria-labelledby="gate"'))).toContain(
-          "<svg"
+        expect(figureOf(markup)).toContain("<svg");
+        expect(main.indexOf('data-figure="music-box"')).toBeLessThan(
+          main.indexOf('aria-labelledby="gate"')
         );
         expect(
           [...main.matchAll(/class="(?<names>[^"]*)"/gu)].flatMap((found) =>

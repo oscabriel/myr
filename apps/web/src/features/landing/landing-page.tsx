@@ -7,10 +7,10 @@ import { CommandLine } from "../shared/command.tsx";
 import { AppLink } from "../shared/link.tsx";
 import { ASKS_PATH, EXPLORE_PATH, INSTALL_PATH } from "../shared/paths.ts";
 import { GUTTER } from "../shared/shell/gutter.ts";
-import { Comparison } from "./comparison.tsx";
 import { GateDrawing } from "./gate-drawing.tsx";
 import { LandingNowList } from "./landing-now-list.tsx";
 import type { LandingNow } from "./landing-now.ts";
+import { MusicBox } from "./music-box/music-box.tsx";
 import { WaysIn } from "./ways-in.tsx";
 import { HEADLINE, HERO_LEDE } from "./words.ts";
 
@@ -147,7 +147,7 @@ export const LandingView = ({
           <CommandLine command={installCommand(webUrl)} />
         </div>
       </div>
-      <Comparison />
+      <MusicBox />
     </div>
 
     <Part id="gate" title="The gate">

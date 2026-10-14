@@ -728,3 +728,265 @@
   --tw-prose-th-borders: var(--input);
   --tw-prose-td-borders: var(--rule);
 }
+
+/*
+  The landing's music box (features/landing/music-box): an isometric drawing
+  in the page's own inks. Every fill and stroke reads one of these tokens,
+  each a mix of the card and the ink, so both schemes come from the page's
+  palette. Sides take four tones by how they meet the light, tops the
+  lightest; lines run from the ink (hi) down to a groove (faint). State
+  colours appear only on a stage's flag, the held-back bell, the landed pin
+  and tooth, and the stray pin, each beside the readout's word for it.
+*/
+.mbx {
+  --mbx-paper: var(--card);
+  --mbx-top: var(--card);
+  --mbx-shade-0: color-mix(in oklab, var(--card) 84%, var(--foreground));
+  --mbx-shade-1: color-mix(in oklab, var(--card) 88.5%, var(--foreground));
+  --mbx-shade-2: color-mix(in oklab, var(--card) 92.5%, var(--foreground));
+  --mbx-shade-3: color-mix(in oklab, var(--card) 96%, var(--foreground));
+  --mbx-lit-top: var(--card);
+  --mbx-lit-shade: color-mix(in oklab, var(--card) 93%, var(--foreground));
+  --mbx-hi: color-mix(in oklab, var(--foreground) 88%, var(--card));
+  --mbx-mid: color-mix(in oklab, var(--foreground) 50%, var(--card));
+  --mbx-lo: color-mix(in oklab, var(--foreground) 30%, var(--card));
+  --mbx-faint: color-mix(in oklab, var(--foreground) 16%, var(--card));
+  --mbx-lit: var(--foreground);
+  --mbx-glass: color-mix(in oklab, var(--foreground) 5%, transparent);
+  --mbx-dot: var(--foreground);
+
+  @variant dark {
+    --mbx-top: color-mix(in oklab, var(--card) 88%, white);
+    --mbx-shade-0: color-mix(in oklab, var(--card) 82%, black);
+    --mbx-shade-1: color-mix(in oklab, var(--card) 91%, black);
+    --mbx-shade-2: var(--card);
+    --mbx-shade-3: color-mix(in oklab, var(--card) 94%, white);
+    --mbx-lit-top: color-mix(in oklab, var(--card) 80%, white);
+    --mbx-lit-shade: color-mix(in oklab, var(--card) 90%, white);
+    --mbx-hi: color-mix(in oklab, var(--foreground) 80%, var(--card));
+    --mbx-mid: color-mix(in oklab, var(--foreground) 44%, var(--card));
+    --mbx-lo: color-mix(in oklab, var(--foreground) 26%, var(--card));
+    --mbx-faint: color-mix(in oklab, var(--foreground) 15%, var(--card));
+    --mbx-glass: color-mix(in oklab, var(--foreground) 6%, transparent);
+  }
+}
+
+.mbx-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.mbx-svg path,
+.mbx-svg circle {
+  vector-effect: non-scaling-stroke;
+}
+
+.mbx-fill {
+  fill: var(--mbx-paper);
+}
+
+.mbx-shade,
+.mbx-top {
+  stroke: none;
+}
+
+.mbx-shade[data-shade="0"] {
+  fill: var(--mbx-shade-0);
+}
+
+.mbx-shade[data-shade="1"] {
+  fill: var(--mbx-shade-1);
+}
+
+.mbx-shade[data-shade="2"] {
+  fill: var(--mbx-shade-2);
+}
+
+.mbx-shade[data-shade="3"] {
+  fill: var(--mbx-shade-3);
+}
+
+.mbx-top {
+  fill: var(--mbx-top);
+}
+
+.mbx-solid[data-flat] > :is(.mbx-shade, .mbx-top) {
+  display: none;
+}
+
+.mbx-solid[data-glass] > :is(.mbx-fill, .mbx-shade, .mbx-top) {
+  fill: var(--mbx-glass);
+}
+
+.mbx-solid[data-lit] > .mbx-top,
+[data-state="ask"] .mbx-top {
+  fill: var(--mbx-lit-top);
+}
+
+.mbx-solid[data-lit] > .mbx-shade,
+[data-state="ask"] .mbx-shade {
+  fill: var(--mbx-lit-shade);
+}
+
+.mbx-line {
+  fill: none;
+  stroke: var(--mbx-lo);
+  stroke-width: 0.6px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.mbx-line[data-tone="hi"] {
+  stroke: var(--mbx-hi);
+}
+
+.mbx-line[data-tone="mid"] {
+  stroke: var(--mbx-mid);
+}
+
+.mbx-line[data-tone="faint"] {
+  stroke: var(--mbx-faint);
+}
+
+.mbx-line[data-tone="lit"],
+.mbx-solid[data-lit] > .mbx-edge,
+[data-state="ask"] .mbx-edge {
+  stroke: var(--mbx-lit);
+  stroke-width: 1px;
+}
+
+.mbx-dots circle {
+  fill: var(--mbx-dot);
+  opacity: 0.45;
+}
+
+.mbx-dots[data-tone="lo"] circle {
+  opacity: 0.24;
+}
+
+.mbx-pins path,
+.mbx-pin {
+  fill: none;
+  stroke: var(--mbx-hi);
+  stroke-width: 1.3px;
+  stroke-linecap: round;
+}
+
+.mbx-pins [data-alpha="0"] {
+  opacity: 0.2;
+}
+
+.mbx-pins [data-alpha="1"] {
+  opacity: 0.45;
+}
+
+.mbx-pins [data-alpha="2"] {
+  opacity: 0.7;
+}
+
+.mbx-pin[data-part="sour"] {
+  stroke: var(--mbx-lit);
+  stroke-width: 1.6px;
+}
+
+/* A state's colour, beside the readout's word for it. */
+.mbx [data-state="landed"] :is(.mbx-fill, .mbx-shade, .mbx-top),
+.mbx [data-state="refused"] :is(.mbx-fill, .mbx-shade, .mbx-top),
+.mbx [data-state="sealed"] :is(.mbx-fill, .mbx-shade, .mbx-top),
+.mbx [data-state="checking"] :is(.mbx-fill, .mbx-shade, .mbx-top) {
+  fill: var(--mbx-state);
+}
+
+.mbx [data-state] .mbx-edge {
+  stroke: var(--mbx-state, var(--mbx-mid));
+}
+
+.mbx [data-state="landed"],
+.mbx-pin[data-state="landed"] {
+  --mbx-state: var(--landed);
+  stroke: var(--landed);
+}
+
+.mbx [data-state="refused"] {
+  --mbx-state: var(--refused);
+}
+
+.mbx [data-state="sealed"] {
+  --mbx-state: var(--sealed);
+}
+
+.mbx [data-state="checking"] {
+  --mbx-state: var(--checking);
+}
+
+.mbx [data-state="idle"] {
+  --mbx-state: var(--mbx-mid);
+}
+
+.mbx [data-state="ask"] {
+  --mbx-state: var(--mbx-lit);
+}
+
+.mbx-line[data-tone="lit"][data-stray] {
+  stroke: var(--refused);
+}
+
+.mbx-stage {
+  cursor: pointer;
+  touch-action: pan-y;
+}
+
+.mbx-swatch {
+  display: inline-block;
+  width: 16px;
+  height: 10px;
+  margin-inline-end: 0.5rem;
+  overflow: visible;
+  vertical-align: 0;
+}
+
+/* On a phone the bench's margins go, so the machine is drawn larger. */
+@media (width < 40rem) {
+  .mbx-stage .mbx-svg {
+    width: 130%;
+    margin-inline: -15%;
+  }
+}
+
+.mbx-swatch path {
+  fill: var(--card);
+  stroke: var(--mbx-mid);
+  stroke-width: 1px;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.mbx-swatch[data-mark="lit"] path {
+  stroke: var(--mbx-lit);
+}
+
+.mbx-swatch[data-mark="landed"] path:first-child {
+  fill: var(--landed);
+  stroke: var(--landed);
+}
+
+.mbx-swatch[data-mark="refused"] path:first-child {
+  fill: var(--refused);
+  stroke: var(--refused);
+}
+
+.mbx-swatch[data-mark="sealed"] path:first-child {
+  fill: var(--sealed);
+  stroke: var(--sealed);
+}
+
+.mbx-swatch[data-mark="glass"] path:first-child {
+  fill: var(--mbx-glass);
+}
+
+.mbx-swatch .mbx-swatch-crease {
+  fill: none;
+  stroke: var(--mbx-lo);
+}
