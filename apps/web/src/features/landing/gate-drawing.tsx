@@ -1,92 +1,14 @@
 /**
- * The gate as arcs over a track: an answer enters on the left, meets the
- * seven stages in order, and either leaves the track at the first that
- * refuses it or reaches main. Inline SVG with no text in it; the stages'
- * names sit in the page beneath their ticks, one column each.
+ * The gate in words and in git's own output: the seven stages in order, one
+ * column each, the bridges of the music box above, then a refused push and a
+ * landed one as a terminal prints them.
  */
 import { StageName } from "@repo/protocol/domain/outcome";
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
 
 import { stageNames, stageRuns } from "../shared/status-line.tsx";
 import { landedPush, refusedPush } from "./transcript.ts";
 import type { Transcript as Printed } from "./transcript.ts";
-
-const COLUMN = 100;
-
-const WIDTH = COLUMN * StageName.literals.length;
-
-const TRACK = 92;
-
-const HEIGHT = 124;
-
-/** The stage that refuses the drawn answer: an `OutOfScope`, the shape stage's. */
-const REFUSED_AT = StageName.literals.indexOf("shape");
-
-const tickX = (index: number) => COLUMN / 2 + index * COLUMN;
-
-/** Each stage settles in turn, once, where motion is welcome. */
-const settling = (index: number): CSSProperties => ({
-  animationDelay: `${index * 120}ms`,
-});
-
-const arch = (inset: number, top: number) =>
-  `M${inset} ${TRACK} V${top + 36} C${inset} ${top + 8} ${inset + 90} ${top} ${WIDTH / 2} ${top} C${WIDTH - inset - 90} ${top} ${WIDTH - inset} ${top + 8} ${WIDTH - inset} ${top + 36} V${TRACK}`;
-
-const Drawing = () => {
-  const refusedX = tickX(REFUSED_AT);
-
-  return (
-    <svg
-      aria-hidden="true"
-      className="h-auto w-full"
-      preserveAspectRatio="xMidYMid meet"
-      viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-    >
-      <g className="stroke-rule" fill="none" strokeWidth={2}>
-        <path d={arch(14, 8)} />
-        <path d={arch(30, 20)} />
-      </g>
-      <path
-        className="stroke-muted-foreground"
-        d={arch(46, 32)}
-        fill="none"
-        strokeWidth={2}
-      />
-      <line
-        className="stroke-foreground"
-        strokeWidth={2}
-        x1={0}
-        x2={WIDTH - 14}
-        y1={TRACK}
-        y2={TRACK}
-      />
-      <path
-        className="stroke-landed"
-        d={`M${WIDTH - 22} ${TRACK - 7} L${WIDTH - 12} ${TRACK} L${WIDTH - 22} ${TRACK + 7}`}
-        fill="none"
-        strokeWidth={2}
-      />
-      <path
-        className="stroke-refused"
-        d={`M${refusedX} ${TRACK} C${refusedX + 24} ${TRACK} ${refusedX + 30} ${HEIGHT - 6} ${refusedX + 64} ${HEIGHT - 6} H${refusedX + 110}`}
-        fill="none"
-        strokeDasharray="5 4"
-        strokeWidth={2}
-      />
-      {StageName.literals.map((stage, index) => (
-        <circle
-          className="fill-card stroke-foreground motion-safe:animate-stamp origin-center [transform-box:fill-box]"
-          cx={tickX(index)}
-          cy={TRACK}
-          key={stage}
-          r={7}
-          strokeWidth={2}
-          style={settling(index)}
-        />
-      ))}
-    </svg>
-  );
-};
 
 const Stages = () => (
   <ol className="tablet:grid-cols-7 grid grid-cols-1 gap-x-3 gap-y-3">
@@ -175,12 +97,11 @@ export const GateDrawing = ({
 }) => (
   <div className="flex flex-col gap-8">
     <figure className="flex flex-col gap-4">
-      <Drawing />
       <Stages />
       <figcaption className="text-ui text-muted-foreground max-w-(--measure)">
-        An answer meets the stages in order, cheapest first. The first stage
-        that fails refuses it, with every reason that stage found; an answer
-        that passes them all lands on main.
+        The seven bridges of Fig 1, in order, cheapest first. The first stage
+        that fails refuses the answer, with every reason that stage found; an
+        answer that passes them all lands on main.
       </figcaption>
     </figure>
     <div className="columns:grid-cols-2 grid gap-5">

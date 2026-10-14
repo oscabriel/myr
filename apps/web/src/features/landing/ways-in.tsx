@@ -4,7 +4,7 @@ import { commands } from "../agents/catalog.ts";
 import { AppLink } from "../shared/link.tsx";
 import { INSTALL_PATH } from "../shared/paths.ts";
 
-/** Every way in that works today, each a card that opens its place on the Install page. */
+/** Every way in that works today, each a link to its place on the Install page. */
 export const WaysIn = ({
   platformUrl,
   webUrl,
@@ -12,12 +12,12 @@ export const WaysIn = ({
   readonly platformUrl: string;
   readonly webUrl: string;
 }) => (
-  <ul className="tablet:grid-cols-2 columns:grid-cols-3 grid gap-5">
+  <ul className="tablet:grid-cols-2 columns:grid-cols-3 grid gap-x-8 gap-y-6">
     {installChannels({ commands, platformUrl, webUrl })
       .filter(({ planned }) => !planned)
       .map(({ audience, id, summary, title }) => (
         <li
-          className="bg-card border-rule flex min-w-0 flex-col gap-2 rounded-md border p-4"
+          className="border-rule flex min-w-0 flex-col gap-1.5 border-t pt-4"
           data-way={id}
           key={id}
         >
