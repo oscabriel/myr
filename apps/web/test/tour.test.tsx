@@ -162,7 +162,7 @@ describe(TourView, () => {
             `Asked-by: ${EXAMPLE.asker}`,
             `Signed-off-by: ${EXAMPLE.claimant}`,
             "Agents used, disclosed and not credit",
-            "Assisted-by: claude-code:haiku (claimed)",
+            "Assisted-by: claude-code:haiku (self-reported)",
           ])
         ).toBeTruthy();
         expect(textIn(markup)).toContain(EXAMPLE_NOTE);

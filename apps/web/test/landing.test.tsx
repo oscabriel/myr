@@ -250,7 +250,7 @@ describe(LandingView, () => {
 
         expect(hrefs).toContain("/install");
         expect(hrefs).toContain("/explore");
-        expect(hrefsOf(hero)).toStrictEqual(["/asks", "/tour"]);
+        expect(hrefsOf(hero)).toStrictEqual(["/asks", "/import", "/tour"]);
         expect(textIn(hero)).toContain("Take the tour");
       })
   );
