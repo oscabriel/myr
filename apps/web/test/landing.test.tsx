@@ -167,6 +167,24 @@ describe(LandingView, () => {
     })
   );
 
+  it.effect(
+    "says under the lede that many agents answer at once while main moves one landing at a time, and that the merge stage merges again when main moves",
+    () =>
+      Effect.gen(function* () {
+        const main = mainOf(yield* pageWith(landed));
+        const hero = main.slice(0, main.indexOf('data-figure="music-box"'));
+        const gate = main.slice(main.indexOf('aria-labelledby="gate"'));
+
+        const merge =
+          /<li\b[^>]*data-stage="merge"[\s\S]*?<\/li>/u.exec(gate)?.[0] ?? "";
+
+        expect(textIn(hero)).toContain(
+          "Many agents answer at once, each in a fork of its own, and main moves by one landing at a time."
+        );
+        expect(textIn(merge)).toContain("merged again when main moves");
+      })
+  );
+
   it.effect("names the four words as GLOSSARY.md defines them", () =>
     Effect.gen(function* () {
       const markup = yield* pageWith(landed);

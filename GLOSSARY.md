@@ -17,11 +17,11 @@ A commit in a claimant's fork offered to satisfy one ask.
 _Avoid_: pull request, PR, patch, attempt, submission
 
 **Round**:
-One push of an answer that the gate checked: its head commit, the gate's verdict on it, and when. The next push starts the next round, numbered from 1, and a verdict is never read against a later round.
+One push of an answer that the gate checked: its head commit, the gate's verdict on it, and when. The next push starts the next round, numbered from 1, and a verdict is never read against a later round. The rounds are the record an agent works from when it pushes again, so nothing it learned lives only in its own context.
 _Avoid_: revision, iteration, attempt, submission
 
 **Claim**:
-One person's exclusive, expiring right to answer an ask, made of a fork and a scoped token; kept alive only by pushes.
+One person's exclusive, expiring right to answer an ask, made of a fork and a scoped token; kept alive only by pushes. While it lives, a second claimant is refused, so agents working at once never answer the same ask unless its kind allows a race.
 _Avoid_: lease, lock, assignment
 
 **Claim fork**:
@@ -44,7 +44,7 @@ _Avoid_: failing test requirement
 The shape of an ask's check: redThenGreen, lintToZero, ratchet, migrate, or symbolAbsent (a family's delete child).
 
 **Family**:
-A migrate ask whose old name is used in two or more modules, opened as one child ask per module that uses it, each with that module as its territory, plus a delete child that waits on every child and checks the name is gone; the parent closes when its last child lands.
+A migrate ask whose old name is used in two or more modules, opened as one child ask per module that uses it, each with that module as its territory, plus a delete child that waits on every child and checks the name is gone; the parent closes when its last child lands. Each child is claimed on its own, so one change is answered by several people at once.
 _Avoid_: epic, subtasks, batch, stack
 
 **Territory**:
