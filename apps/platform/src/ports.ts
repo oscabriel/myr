@@ -48,6 +48,9 @@ import { ProjectSockets } from "./watch.ts";
 // changes, and each Artifacts read is billed.
 const CODE_READS_KEPT = { heavy: 40, light: 2000 };
 
+// Read when a code read first asks, never at load; on `workers.dev` it keeps nothing.
+const coloCache = () => caches.default;
+
 export type WorkerPorts =
   | CheckRunner
   | EvidenceStore
@@ -117,7 +120,7 @@ const corePorts = (config: PlatformConfig): Layer.Layer<WorkerPorts> => {
     }),
     EvidenceStoreR2(config.EVIDENCE),
     CodeCacheLive(CODE_READS_KEPT.light, CODE_READS_KEPT.heavy),
-    CodeStoreR2(config.CODE_CACHE),
+    CodeStoreR2(config.CODE_CACHE, coloCache),
     MetricsBinding(config.METRICS),
     // Without this entry a draft proposal starts no run, and stays drafting.
     DraftRunsWorkflow(config.ANSWER)
