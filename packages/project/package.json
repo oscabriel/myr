@@ -5,6 +5,7 @@
   "exports": {
     "./claim": "./src/claim.ts",
     "./landing": "./src/landing.ts",
+    "./listing": "./src/listing.ts",
     "./project-store": "./src/project-store.ts",
     "./project-store/rows": "./src/project-store/rows.ts",
     "./project-store/memory": "./src/project-store/memory.ts",
@@ -18,6 +19,7 @@
     "./alarms": "./src/alarms.ts",
     "./alarms/memory": "./src/alarms/memory.ts",
     "./answer-runs": "./src/answer-runs.ts",
+    "./background": "./src/background.ts",
     "./answer-runs/inline": "./src/answer-runs/inline.ts",
     "./projection": "./src/projection.ts",
     "./projection/memory": "./src/projection/memory.ts",

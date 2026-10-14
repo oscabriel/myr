@@ -128,11 +128,17 @@ export interface OutboxRun {
   readonly retry: readonly OutboxRow[];
 }
 
-const later = (row: OutboxRow, now: DateTime.Utc): OutboxRow => ({
+/** The row tried again later, with the next backoff. */
+export const later = (row: OutboxRow, now: DateTime.Utc): OutboxRow => ({
   ...row,
   attempts: row.attempts + 1,
   notBefore: DateTime.addDuration(now, backoff(row.attempts)),
 });
+
+const START: OutboxBody["_tag"] = "StartAnswer";
+
+/** An answer's start, which runs once the call that wrote it can answer (see `Background`). */
+export const isStart = (row: OutboxRow) => row.kind === START;
 
 interface Decoded {
   readonly body: OutboxBody;

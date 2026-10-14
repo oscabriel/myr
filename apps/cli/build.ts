@@ -40,6 +40,10 @@ export const compileArgs = (input: {
 }) => [
   "build",
   "--compile",
+  // Bytecode: the binary starts by loading its bundle, and a bytecode cache
+  // skips the parse of the whole bundle each start. ESM is what bytecode takes.
+  "--bytecode",
+  "--format=esm",
   "--minify",
   ...Object.entries(versionDefine(input.version)).flatMap(([key, value]) => [
     "--define",
