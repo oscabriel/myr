@@ -9,7 +9,6 @@ export const Stage = Schema.Union([
     "dev-",
     Schema.String.check(Schema.isPattern(/^[a-z0-9]+$/u)),
   ]),
-  Schema.Literal("demo"),
   Schema.Literal("prod"),
 ]);
 
@@ -18,16 +17,12 @@ export type Stage = typeof Stage.Type;
 // Each has an `env` block in every Worker's `wrangler.jsonc`; add a stage to both.
 export const stages = [
   "dev-oscabriel",
-  "demo",
   "prod",
 ] as const satisfies readonly Stage[];
 
 // The stages people see: no script makes a throwaway project or seeds a
 // fictional one on them without being told to.
-export const publicStages: ReadonlySet<string> = new Set<Stage>([
-  "demo",
-  "prod",
-]);
+export const publicStages: ReadonlySet<string> = new Set<Stage>(["prod"]);
 
 export interface Hosts {
   readonly platform: string;

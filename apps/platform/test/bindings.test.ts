@@ -270,13 +270,8 @@ describe("the platform Worker's bindings", () => {
           vars: keysOf(PlatformVars.fields),
         };
 
-        expect(Object.keys(stages)).toStrictEqual([
-          "dev-oscabriel",
-          "demo",
-          "prod",
-        ]);
+        expect(Object.keys(stages)).toStrictEqual(["dev-oscabriel", "prod"]);
         expect({ top, ...stages }).toStrictEqual({
-          demo: decoded,
           "dev-oscabriel": decoded,
           prod: decoded,
           top: decoded,
@@ -324,17 +319,10 @@ describe("the platform Worker's bindings", () => {
         const model = "@cf/moonshotai/kimi-k2.7-code";
 
         expect({
-          demo: yield* read(env.demo),
           "dev-oscabriel": yield* read(env["dev-oscabriel"]),
           prod: yield* read(env.prod),
           top: yield* read(raw),
         }).toStrictEqual({
-          demo: {
-            ai: "AI",
-            draftLimit: draftLimit("1204"),
-            model,
-            web: "https://web-demo.oscargabriel.workers.dev",
-          },
           "dev-oscabriel": {
             ai: "AI",
             draftLimit: draftLimit("1104"),
@@ -380,12 +368,10 @@ describe("the platform Worker's bindings", () => {
         );
 
       expect({
-        demo: yield* codeCache(env.demo),
         "dev-oscabriel": yield* codeCache(env["dev-oscabriel"]),
         prod: yield* codeCache(env.prod),
         top: yield* codeCache(raw),
       }).toStrictEqual({
-        demo: "code-cache-demo",
         "dev-oscabriel": "code-cache-dev-oscabriel",
         prod: "code-cache-prod",
         top: "code-cache-local",
@@ -417,12 +403,10 @@ describe("the platform Worker's bindings", () => {
           );
 
         expect({
-          demo: yield* datasets(env.demo),
           "dev-oscabriel": yield* datasets(env["dev-oscabriel"]),
           prod: yield* datasets(env.prod),
           top: yield* datasets(raw),
         }).toStrictEqual({
-          demo: [{ binding: "METRICS", dataset: "metrics_demo" }],
           "dev-oscabriel": [
             { binding: "METRICS", dataset: "metrics_dev_oscabriel" },
           ],
@@ -524,13 +508,8 @@ describe("the sandbox Worker's bindings", () => {
           vars: [],
         };
 
-        expect(Object.keys(stages)).toStrictEqual([
-          "dev-oscabriel",
-          "demo",
-          "prod",
-        ]);
+        expect(Object.keys(stages)).toStrictEqual(["dev-oscabriel", "prod"]);
         expect({ top, ...stages }).toStrictEqual({
-          demo: read,
           "dev-oscabriel": read,
           prod: read,
           top: read,

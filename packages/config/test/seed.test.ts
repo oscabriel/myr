@@ -476,7 +476,6 @@ describe(optionsOf, () => {
   it.effect.each([
     [["--world", "node"], "World"],
     [["--stage", "dev-oscabriel"], "Stage"],
-    [["--stage", "demo", "--yes"], "Stage"],
   ] as const)("takes %j as a seed of the %s", ([argv, where]) =>
     Effect.map(optionsOf(argv), (options) => {
       expect(options.where._tag).toBe(where);
@@ -484,7 +483,7 @@ describe(optionsOf, () => {
   );
 
   it.effect.each([
-    [["--stage", "demo"], "--yes"],
+    [["--stage", "dev-oscabriel", "--yes"], "--yes"],
     [[], "--world node or --stage"],
     [["--world", "node", "--stage", "dev-oscabriel"], "only one"],
     [["--world", "workerd"], "--world node"],
@@ -504,8 +503,8 @@ describe(optionsOf, () => {
           "--stage",
           "dev-oscabriel",
           "--tokens-env",
-          "DEMO_SESSIONS",
-          "--operator-env=DEMO_OPERATOR",
+          "DEV_SESSIONS",
+          "--operator-env=DEV_OPERATOR",
           "--only",
           "burrow",
           "--json",
@@ -516,7 +515,7 @@ describe(optionsOf, () => {
             only: "burrow",
             where: SeedWhere.cases.Stage.make({
               stage: "dev-oscabriel",
-              tokens: { operator: "DEMO_OPERATOR", sessions: "DEMO_SESSIONS" },
+              tokens: { operator: "DEV_OPERATOR", sessions: "DEV_SESSIONS" },
             }),
           });
         }

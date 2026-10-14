@@ -56,13 +56,6 @@
         "PUBLIC_PLATFORM_URL": "https://platform-dev-oscabriel.oscargabriel.workers.dev",
       },
     },
-    "demo": {
-      "cache": { "enabled": true },
-      "services": [{ "binding": "PLATFORM", "service": "platform-demo" }],
-      "vars": {
-        "PUBLIC_PLATFORM_URL": "https://platform-demo.oscargabriel.workers.dev",
-      },
-    },
     // Served on the brand's own domain, never workers.dev: infra/deploy.ts
     // passes its Custom Domains and PUBLIC_PLATFORM_URL, which name the brand,
     // so they live in infra/stages.ts. The URL here is a stand-in the

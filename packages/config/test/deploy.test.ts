@@ -418,10 +418,10 @@ describe("what a failed deploy prints", () => {
   it.live("names the stages it knows when it refuses one", () =>
     Effect.gen(function* () {
       expect(yield* messageOf([])).toBe(
-        "no --stage: name one of dev-oscabriel, demo, prod"
+        "no --stage: name one of dev-oscabriel, prod"
       );
       expect(yield* messageOf(["--stage", "staging"])).toBe(
-        "--stage staging is not a stage infra/stages.ts declares (dev-oscabriel, demo, prod)"
+        "--stage staging is not a stage infra/stages.ts declares (dev-oscabriel, prod)"
       );
     })
   );
@@ -438,64 +438,14 @@ describe("what a failed deploy prints", () => {
 
   it.live("names the secrets file it could not read", () =>
     Effect.gen(function* () {
-      const message = yield* messageOf(["--stage", "demo"], {
-        env: { STAGE_SECRETS_FILE: "/nowhere/demo.secrets" },
+      const message = yield* messageOf(["--stage", "dev-oscabriel"], {
+        env: { STAGE_SECRETS_FILE: "/nowhere/dev-oscabriel.secrets" },
       });
 
       expect(message).toBe(
-        "STAGE_SECRETS_FILE names /nowhere/demo.secrets, which can't be read"
+        "STAGE_SECRETS_FILE names /nowhere/dev-oscabriel.secrets, which can't be read"
       );
     })
-  );
-});
-
-describe("a deploy to demo", () => {
-  it.live(
-    "hands the platform's deploy the values in STAGE_SECRETS_FILE, as a dev stage's does: demo's secrets are generated too",
-    () =>
-      Effect.gen(function* () {
-        const fs = yield* FileSystem.FileSystem;
-        const path = yield* Path.Path;
-        const dir = yield* fs.makeTempDirectoryScoped();
-        const file = path.join(dir, "demo.secrets");
-
-        yield* fs.writeFileString(
-          file,
-          [
-            "# generated for demo",
-            "OPERATOR_TOKEN=operator-token-that-is-long-enough-000",
-            "MASTER_KEY=00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
-          ].join("\n")
-        );
-
-        const { result, spawned } = yield* run(["--stage", "demo"], {
-          env: { STAGE_SECRETS_FILE: file },
-        });
-
-        expect(Result.isSuccess(result)).toBeTruthy();
-        expect(spawned.map(line)).toStrictEqual([
-          ".$ bun run verify",
-          "apps/sandbox$ wrangler deploy --env demo",
-          "apps/platform$ varlock-wrangler deploy --env demo",
-          "apps/web$ bun run build",
-          "apps/web$ wrangler deploy --env demo",
-          ".$ bun run bootstrap --stage demo --check-triggers",
-          ".$ varlock run --path infra/ -- bun scripts/smoke.ts --stage demo --since <since>",
-        ]);
-        expect(
-          spawned.map(({ env }) =>
-            ["MASTER_KEY", "OPERATOR_TOKEN"].filter((name) => name in env)
-          )
-        ).toStrictEqual([
-          [],
-          [],
-          ["MASTER_KEY", "OPERATOR_TOKEN"],
-          [],
-          [],
-          [],
-          [],
-        ]);
-      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
   );
 });
 

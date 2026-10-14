@@ -31,14 +31,14 @@ const datasetOf = ({ query }: Alert) =>
 describe("a stage's alerts", () => {
   it("watch each Worker for errors, and the stage for an issue spike, failing containers and a refusal spike", () => {
     expect(
-      alerts("demo", ACCOUNT).map(({ kind, name }) => `${kind}: ${name}`)
+      alerts("prod", ACCOUNT).map(({ kind, name }) => `${kind}: ${name}`)
     ).toStrictEqual([
-      "errors: platform-demo errors",
-      "errors: sandbox-demo errors",
-      "errors: web-demo errors",
-      "issue spike: demo issue spike",
-      "container failures: demo container failures",
-      "refusal spike: demo refusal spike",
+      "errors: platform-prod errors",
+      "errors: sandbox-prod errors",
+      "errors: web-prod errors",
+      "issue spike: prod issue spike",
+      "container failures: prod container failures",
+      "refusal spike: prod refusal spike",
     ]);
     expect(
       stages.map((stage) =>
@@ -181,20 +181,20 @@ describe("the container failures they watch for", () => {
 describe("what bootstrap prints of them", () => {
   it("says they are made by hand, and gives each one's detection and SQL for the dashboard", () => {
     const lines = alertLines(
-      "demo",
-      alerts("demo", ACCOUNT).filter(({ kind }) => kind !== "errors"),
+      "prod",
+      alerts("prod", ACCOUNT).filter(({ kind }) => kind !== "errors"),
       true
     );
 
     expect(lines).toStrictEqual([
-      "bootstrap demo: make these 3 alerts by hand, as Custom Alerts in the dashboard: no API takes a custom alert's query yet (README, Alerts)",
-      "bootstrap demo: each is custom SQL with an Automatic time range, sent to ALERT_EMAIL's address",
-      "  demo issue spike: anomaly detection on spikes, evaluation window 10m, baseline window 2h, sensitivity 3, minimum event count 3",
-      `    SELECT count() AS value FROM logs.issues WHERE accountTag = '${ACCOUNT}' AND scriptName IN ('platform-demo', 'sandbox-demo', 'web-demo')`,
-      "  demo container failures: threshold, value >= 3, evaluation window 30m",
-      `    SELECT count() AS value FROM logs.workersLogs WHERE accountTag = '${ACCOUNT}' AND scriptName IN ('platform-demo', 'sandbox-demo') AND level = 'error' AND (message LIKE '%sandbox job blocked%' OR message LIKE '%the Checker could not be reached%')`,
-      "  demo refusal spike: anomaly detection on spikes, evaluation window 15m, baseline window 6h, sensitivity 3, minimum event count 5",
-      `    SELECT count() AS value FROM events.analyticsEngine."metrics_demo" WHERE accountTag = '${ACCOUNT}' AND blob1 = 'Refused'`,
+      "bootstrap prod: make these 3 alerts by hand, as Custom Alerts in the dashboard: no API takes a custom alert's query yet (README, Alerts)",
+      "bootstrap prod: each is custom SQL with an Automatic time range, sent to ALERT_EMAIL's address",
+      "  prod issue spike: anomaly detection on spikes, evaluation window 10m, baseline window 2h, sensitivity 3, minimum event count 3",
+      `    SELECT count() AS value FROM logs.issues WHERE accountTag = '${ACCOUNT}' AND scriptName IN ('platform-prod', 'sandbox-prod', 'web-prod')`,
+      "  prod container failures: threshold, value >= 3, evaluation window 30m",
+      `    SELECT count() AS value FROM logs.workersLogs WHERE accountTag = '${ACCOUNT}' AND scriptName IN ('platform-prod', 'sandbox-prod') AND level = 'error' AND (message LIKE '%sandbox job blocked%' OR message LIKE '%the Checker could not be reached%')`,
+      "  prod refusal spike: anomaly detection on spikes, evaluation window 15m, baseline window 6h, sensitivity 3, minimum event count 5",
+      `    SELECT count() AS value FROM events.analyticsEngine."metrics_prod" WHERE accountTag = '${ACCOUNT}' AND blob1 = 'Refused'`,
     ]);
   });
 

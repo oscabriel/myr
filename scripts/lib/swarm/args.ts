@@ -6,7 +6,6 @@
  *   --scenario plain|video   default plain
  *   --dry-run                print the plan; claim nothing, start nothing
  *   --json                   print JSON: the plan (dry run) or the run's summary
- *   --allow-demo             required with --stage demo
  *   --only <handle>…         run only these contributors (repeat, or comma-separate)
  *   --timeout-min <n>        each agent's run timeout, default 20
  *   --view headless|herdr    default headless; herdr runs each harness in a herdr pane
@@ -34,7 +33,7 @@ export interface SwarmOptions {
 }
 
 export const USAGE =
-  "bun scripts/swarm.ts --stage <dev-…|demo> [--project oscabriel/burrow] [--scenario plain|video] [--dry-run] [--json] [--allow-demo] [--only <handle>…] [--timeout-min 20] [--view headless|herdr] [--url <origin>]";
+  "bun scripts/swarm.ts --stage <dev-…> [--project oscabriel/burrow] [--scenario plain|video] [--dry-run] [--json] [--only <handle>…] [--timeout-min 20] [--view headless|herdr] [--url <origin>]";
 
 export const ViewName = Schema.Literals(["headless", "herdr"]);
 
@@ -51,7 +50,7 @@ const VALUED = [
   "--view",
 ] as const;
 
-const SWITCHES = ["--allow-demo", "--dry-run", "--json"] as const;
+const SWITCHES = ["--dry-run", "--json"] as const;
 
 const failed = (reason: string) => new SwarmFailed({ reason });
 
@@ -159,13 +158,7 @@ export const optionsOf = (
 
     if (stage === "prod") {
       return yield* failed(
-        "--stage prod: the swarm's contributors are fictional, so run it on a dev stage or demo"
-      );
-    }
-
-    if (stage === "demo" && !argv.includes("--allow-demo")) {
-      return yield* failed(
-        "--stage demo: its burrow family is for the recorded take; run it there only with --allow-demo"
+        "--stage prod: the swarm's contributors are fictional, so run it on a dev stage"
       );
     }
 

@@ -40,9 +40,9 @@ import type { LoopStep, Patience } from "./core-loop.ts";
 
 export { LoopFailed, LoopStep } from "./core-loop.ts";
 
-// A throwaway project would show on demo's front page.
-export class DemoStageRefused extends Schema.TaggedError<DemoStageRefused>()(
-  "DemoStageRefused",
+// A throwaway project would show on a public stage's front page.
+export class PublicStageRefused extends Schema.TaggedError<PublicStageRefused>()(
+  "PublicStageRefused",
   { stage: Schema.String }
 ) {
   override get message() {
@@ -151,14 +151,14 @@ export const smokeLoop = (
   input: LoopInput
 ): Effect.Effect<
   SmokeLoopReport,
-  LoopFailed | DemoStageRefused,
+  LoopFailed | PublicStageRefused,
   ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem
 > =>
   Effect.gen(function* () {
     const { origin, stage } = input;
 
     if (publicStages.has(stage)) {
-      return yield* new DemoStageRefused({ stage });
+      return yield* new PublicStageRefused({ stage });
     }
 
     const fs = yield* FileSystem.FileSystem;

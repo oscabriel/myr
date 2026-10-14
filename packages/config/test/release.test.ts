@@ -253,7 +253,7 @@ describe("a release's plan", () => {
         build: true,
         env: { CLAUDECODE: "1" },
         publish: true,
-        stage: "demo",
+        stage: "dev-oscabriel",
         upload: true,
       }),
       alone: releaseRun({
@@ -328,7 +328,7 @@ describe("a release's plan", () => {
         build: true,
         env: {},
         publish: true,
-        stage: "demo",
+        stage: "dev-oscabriel",
         upload: true,
       })
     ).toStrictEqual(
@@ -473,11 +473,11 @@ describe("a release's build step", () => {
         yield* runStep("tsdown", layout, {
           origin: "https://platform.example",
           stage: Option.none(),
-          version: "0.2.0-demo.1",
+          version: "0.2.0-rc.1",
         }).pipe(Effect.provide(layer));
 
         expect(yield* spawned).toStrictEqual([
-          "apps/cli$ bun run build -- --targets bun-linux-x64,bun-darwin-arm64 --version 0.2.0-demo.1",
+          "apps/cli$ bun run build -- --targets bun-linux-x64,bun-darwin-arm64 --version 0.2.0-rc.1",
         ]);
       }).pipe(Effect.provide(NodeServices.layer))
   );
@@ -543,7 +543,7 @@ const sha256 = (content: string) =>
     Effect.provide(NodeServices.layer)
   );
 
-const origin = "https://platform-demo.example.workers.dev";
+const origin = "https://platform-dev-oscabriel.example.workers.dev";
 
 const base = `${origin}/releases/0.1.0`;
 

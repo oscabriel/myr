@@ -29,7 +29,7 @@ const entryOf = (name: string) =>
     };
   });
 
-describe("the demo-readiness scripts", () => {
+describe("the examples' scripts", () => {
   it.live(
     "swarm, seed, release and import-examples each run one entry file that exists",
     () =>

@@ -358,13 +358,13 @@ const onDev = (...flags: readonly string[]) => [
 
 describe("bun scripts/import-examples.ts", () => {
   it.live(
-    "takes --stage demo as any declared stage: its dry run plans the import onto demo",
+    "takes --stage prod as any declared stage: its dry run plans the import onto prod",
     () =>
       Effect.gen(function* () {
         const platform = yield* fakePlatform(["ky"]);
 
         const { ledger, printed, result } = yield* ran(
-          ["--stage", "demo", "--dry-run", "--only", "anyhow"],
+          ["--stage", "prod", "--dry-run", "--only", "anyhow"],
           platform.layer
         );
 

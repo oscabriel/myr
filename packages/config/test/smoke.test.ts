@@ -564,7 +564,7 @@ describe("smoke's own checks", () => {
   it.live("fails health when the platform serves another stage", () =>
     Effect.gen(function* () {
       const origin = yield* fakePlatform(healthy);
-      const result = yield* Effect.result(smoke(origin, { stage: "demo" }));
+      const result = yield* Effect.result(smoke(origin, { stage: "prod" }));
 
       expect(result).toStrictEqual(
         Result.fail(
@@ -572,7 +572,7 @@ describe("smoke's own checks", () => {
             failures: [
               {
                 probe: "health",
-                reason: "GET /health named stage dev-oscabriel, not demo",
+                reason: "GET /health named stage dev-oscabriel, not prod",
               },
             ],
             origin,
@@ -870,7 +870,7 @@ describe("the smoke command", () => {
       yield* main(["--stage", "dev-oscabriel", "--url", `${origin}/`]);
 
       const failed = yield* Effect.flip(
-        main(["--stage", "demo", "--url", origin])
+        main(["--stage", "prod", "--url", origin])
       );
 
       expect(
@@ -951,11 +951,11 @@ describe("the smoke command", () => {
   it("says to bootstrap first when neither --url nor bootstrap's record names the origin", () => {
     const failed = new NoOrigin({
       file: "infra/workers-dev.json",
-      stage: "demo",
+      stage: "prod",
     });
 
     expect(failed.message).toBe(
-      "no --url, and infra/workers-dev.json doesn't record the account's workers.dev subdomain: run bun run bootstrap -- --stage demo first"
+      "no --url, and infra/workers-dev.json doesn't record the account's workers.dev subdomain: run bun run bootstrap -- --stage prod first"
     );
   });
 });

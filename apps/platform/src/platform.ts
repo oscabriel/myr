@@ -44,7 +44,7 @@ const SessionTable = Schema.Record(Schema.String, Handle).check(
 );
 
 export const StageName = Schema.String.check(
-  Schema.isPattern(/^(?:local|demo|prod|dev-[a-z0-9]+(?:-[a-z0-9]+)*)$/u)
+  Schema.isPattern(/^(?:local|prod|dev-[a-z0-9]+(?:-[a-z0-9]+)*)$/u)
 );
 
 export const LanderAdapter = Schema.Literals(["container", "isogit"]);
