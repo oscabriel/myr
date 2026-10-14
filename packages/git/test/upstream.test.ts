@@ -7,7 +7,9 @@ import {
   DateTime,
   Duration,
   Effect,
+  Fiber,
   Layer,
+  Option,
   Redacted,
   Ref,
   Stream,
@@ -219,6 +221,66 @@ describe("the upstream over RepoHost", () => {
           );
         })
       )
+  );
+
+  // On Workers a request that awaits another request's I/O is cancelled as hung,
+  // and one whose client left is cancelled where it stands: its mint never ends.
+  it.live(
+    "never has an exchange wait on a token another exchange is minting",
+    () =>
+      Effect.gen(function* () {
+        const mints = yield* Ref.make(0);
+        const requests = yield* Ref.make<readonly Request[]>([]);
+
+        const stalling = Layer.effect(
+          RepoHost,
+          Effect.gen(function* () {
+            const host = yield* RepoHost;
+
+            return RepoHost.of({
+              ...host,
+              mintToken: (name, scope, ttl) =>
+                Effect.flatMap(
+                  Ref.getAndUpdate(mints, (count) => count + 1),
+                  (count) =>
+                    count === 0
+                      ? Effect.never
+                      : host.mintToken(name, scope, ttl)
+                ),
+            });
+          })
+        ).pipe(Layer.provide(RepoHostMemory));
+
+        const later = yield* Effect.gen(function* () {
+          yield* RepoHost.use((host) => host.create(repo)).pipe(Effect.orDie);
+
+          const upstream = yield* Upstream;
+
+          const abandoned = yield* Effect.forkChild(
+            upstream.exchange(repo, advertise)
+          );
+
+          yield* Effect.yieldNow;
+
+          const answered = yield* Effect.timeoutOption(
+            Effect.as(upstream.exchange(repo, advertise), "answered"),
+            "2 seconds"
+          );
+
+          yield* Fiber.interrupt(abandoned);
+
+          return answered;
+        }).pipe(
+          Effect.provide(
+            UpstreamRepoHost.pipe(
+              Layer.provideMerge(Layer.mergeAll(stalling, recording(requests)))
+            )
+          )
+        );
+
+        expect(later).toStrictEqual(Option.some("answered"));
+        expect(yield* Ref.get(mints)).toBe(2);
+      })
   );
 
   it.effect("calls a request that got no response an UpstreamFailure", () =>
