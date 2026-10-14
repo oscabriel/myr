@@ -4,13 +4,14 @@ import { ObjectId, RepoHost } from "@repo/artifacts/repo-host";
 import type { RepoNotFound } from "@repo/artifacts/repo-host";
 import { RepoHostLocal } from "@repo/artifacts/repo-host/local";
 import type { PushFacts, PushTarget } from "@repo/gate/facts";
+import { answerBase } from "@repo/git/answer-base";
 import { addedLines, treeDiff } from "@repo/git/tree-diff";
 import type { Change } from "@repo/git/tree-diff";
 import type { Ask } from "@repo/protocol/domain/ask";
 import type { ClaimView } from "@repo/protocol/domain/claim";
 import { RefNameText } from "@repo/protocol/domain/common";
 import type { Policy } from "@repo/protocol/domain/policy";
-import { CommitSha, RepoName, TreeSha } from "@repo/protocol/ids";
+import { CommitSha, LandedSha, RepoName, TreeSha } from "@repo/protocol/ids";
 import type { Principal } from "@repo/protocol/principal";
 import {
   Effect,
@@ -109,10 +110,9 @@ export const commitOf = (root: string, revision: string) =>
       : yield* new UnknownRevision({ revision, root });
   });
 
-const mergeBase = (root: string, base: string, head: CommitSha) =>
+const mergeBase = (root: string, base: CommitSha, head: CommitSha) =>
   Effect.gen(function* () {
-    const from = yield* commitOf(root, base);
-    const ran = yield* runGit(root, ["merge-base", from, head]);
+    const ran = yield* runGit(root, ["merge-base", base, head]);
     const sha = ran.stdout.trim();
 
     return ran.exitCode === 0 && Schema.is(CommitSha)(sha)
@@ -222,7 +222,13 @@ const openWorking = (
 
 export interface LocalFactsInput {
   readonly root: string;
+  /** Main as the caller has it: the newest landing the answer may be judged from. */
   readonly base: string;
+  /**
+   * The claim's base, when the repo has it: where the answer left main. Absent,
+   * the merge base of `base` and `head` stands for it.
+   */
+  readonly claimBase: Option.Option<CommitSha>;
   readonly head: string;
   readonly policy: Policy;
   readonly ask: Option.Option<Ask>;
@@ -286,10 +292,25 @@ export const localFacts = (
   Effect.scoped(
     Effect.gen(function* () {
       const head = yield* commitOf(input.root, input.head);
-      const base = yield* mergeBase(input.root, input.base, head);
-      const opened = yield* openWorking(input.root, [base, head]);
+      const landed = yield* commitOf(input.root, input.base);
+
+      const claimBase = yield* Option.match(input.claimBase, {
+        onNone: () => mergeBase(input.root, landed, head),
+        onSome: Effect.succeed,
+      });
+
+      const opened = yield* openWorking(input.root, [landed, claimBase, head]);
 
       return yield* Effect.gen(function* () {
+        // As the gateway chooses it: the newest landing the head contains.
+        const base = yield* answerBase({
+          base: claimBase,
+          canonical: opened.name,
+          head,
+          landed: LandedSha.make(landed),
+          repo: opened.name,
+        });
+
         const changes = yield* treeDiff(
           opened.name,
           yield* treeOf(opened.name, base),

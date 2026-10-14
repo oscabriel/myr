@@ -45,6 +45,7 @@ import { pushStages, refusingStage, runGate } from "@repo/gate/gate";
 import type { StageRefusal } from "@repo/gate/gate";
 import { scan } from "@repo/gate/stages/shape";
 import { verdictOf } from "@repo/gate/verdict";
+import { answerBase } from "@repo/git/answer-base";
 import { patchId } from "@repo/git/patch-id";
 import { formatLanding } from "@repo/git/trailers";
 import { HarnessAudit } from "@repo/protocol/audit";
@@ -4613,12 +4614,25 @@ export const projectService = (
               viewOf(h.policy, ask, state, row.pinned),
           });
 
-          const base = Option.getOrElse(
+          const claimBase = Option.getOrElse(
             Option.map(
               Option.flatMap(claimed, ({ state }) => claimOf(state)),
               (claim) => claim.base
             ),
             () => live.value.landed
+          );
+
+          // A fork the host lacks keeps the claim's base; the facts refuse it.
+          const base = yield* withPorts(
+            answerBase({
+              base: claimBase,
+              canonical: repo,
+              head: input.after,
+              landed: live.value.landed,
+              repo: input.repo,
+            })
+          ).pipe(
+            Effect.catchTag("RepoNotFound", () => Effect.succeed(claimBase))
           );
 
           const refused = yield* gateOf(
@@ -4808,12 +4822,25 @@ export const projectService = (
               viewOf(h.policy, ask, state, row.pinned),
           });
 
+          // The base given is where the answer left main (the gateway gives
+          // the claim's); it is judged from the newest landing its head
+          // contains since, so the same change keeps the same patch id.
+          const base = yield* withPorts(
+            answerBase({
+              base: input.base,
+              canonical: repo,
+              head: input.head,
+              landed: live.value.landed,
+              repo: fork,
+            })
+          ).pipe(Effect.catchTag("RepoNotFound", () => Effect.fail(refused)));
+
           const facts = yield* withLayerFacts(
             h,
             writes,
             pushFacts({
               ask,
-              base: input.base,
+              base,
               claim: view,
               claimsHeld: heldBy(h, caller.handle),
               head: input.head,
@@ -4829,7 +4856,7 @@ export const projectService = (
               MissingCommit: () =>
                 Effect.fail(
                   new StaleBase({
-                    base: input.base,
+                    base,
                     conflicts: [],
                     main: live.value.landed,
                   })
@@ -4856,7 +4883,7 @@ export const projectService = (
                 h.policy.value,
                 Option.map(own, ({ row }) => row)
               ),
-              base: input.base,
+              base,
               credits: creditsFor(ask.value, caller.handle),
               fork,
               head: input.head,
