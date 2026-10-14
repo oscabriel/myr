@@ -1,13 +1,18 @@
 import { describe, expect, it } from "@effect/vitest";
+import { Contracts } from "@repo/protocol/contracts";
 import { CreditSummary } from "@repo/protocol/domain/record";
 import { Handle } from "@repo/protocol/ids";
+import { isNotFound } from "@tanstack/react-router";
 import { Effect, Schema } from "effect";
 import type { ReactElement } from "react";
 
 import {
   areaSentence,
+  NoSuchPersonView,
   PersonView,
 } from "../src/features/people/person-page.tsx";
+import { readPersonPage } from "../src/routes/people/$handle.tsx";
+import { platformWith, unreachablePlatform } from "./platform.ts";
 import { renderAt } from "./render.tsx";
 import { reachingTransport } from "./transport.ts";
 
@@ -88,7 +93,7 @@ describe("a person's page", () => {
 
       for (const project of ["oscabriel/datekit", "oscabriel/burrow"]) {
         expect(html).toContain(`href="/${project}"`);
-        expect(html).toContain(`href="/${project}#recent-landings"`);
+        expect(html).toContain(`href="/${project}/commits/main?show=landings"`);
       }
     })
   );
@@ -127,6 +132,60 @@ describe("a person's page", () => {
         );
 
         expect(textOf(html)).toContain("No credited landings yet.");
+        expect(html).toContain('href="/asks"');
+      })
+  );
+});
+
+describe("the person's route", () => {
+  const encodedCredits = Schema.encodeSync(Schema.Array(CreditSummary))(
+    credits
+  );
+
+  const platform = platformWith(
+    Contracts.toLayerHandler("credits", (payload) =>
+      Effect.succeed({ credits: payload.handle === handle ? credits : [] })
+    )
+  );
+
+  it.effect(
+    "reads the credits in its loader, so the page arrives with them",
+    () =>
+      Effect.gen(function* () {
+        const read = yield* readPersonPage("ines-v").pipe(
+          Effect.provide(platform)
+        );
+
+        expect(read.handle).toBe("ines-v");
+        expect(read.credits).toStrictEqual(encodedCredits);
+      })
+  );
+
+  it.effect(
+    "is not found for an address that names no handle, before any read",
+    () =>
+      Effect.gen(function* () {
+        const refused = yield* Effect.flip(
+          readPersonPage("-not-a-handle").pipe(
+            Effect.provide(unreachablePlatform)
+          )
+        );
+
+        expect(isNotFound(refused)).toBeTruthy();
+      })
+  );
+
+  it.effect(
+    "draws the not-found page as a project's: titled, with a crumb and a way onward",
+    () =>
+      Effect.gen(function* () {
+        const html = yield* renderAt(
+          "/people/-not-a-handle",
+          <NoSuchPersonView />
+        );
+
+        expect(html).toMatch(/<h1\b[^>]*>No such person<\/h1>/u);
+        expect(html).toContain("this address names none");
         expect(html).toContain('href="/asks"');
       })
   );

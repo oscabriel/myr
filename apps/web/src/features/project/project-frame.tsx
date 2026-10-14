@@ -1,12 +1,14 @@
 /**
  * Every page of a project inside one frame: the project's header across the
- * top, the Code tab's bar under it on that tab's pages, then a page's side
+ * top, the code bar under it on the code's pages (the history and a commit
+ * sit under the Landings tab, yet are the code's), then a page's side
  * column (the file tree beside code, a finish's files) and the page itself.
  */
 import { useLocation } from "@tanstack/react-router";
+import { Option } from "effect";
 import type { ReactNode } from "react";
 
-import { projectTabOf } from "../shared/shell/sections.ts";
+import { codeAddressOf } from "../code/code-address.ts";
 import {
   SideColumnOutlet,
   useSideColumn,
@@ -64,7 +66,7 @@ export const ProjectFrame = ({
   header,
 }: {
   readonly header?: ReactNode;
-  /** The Code tab's bar, drawn under the header on that tab's pages only. */
+  /** The code bar, drawn under the header on every page of the code (files, history, a commit, the refs), whichever tab the page sits under. */
   readonly codeBar?: ReactNode;
   readonly children: ReactNode;
 }) => {
@@ -74,7 +76,7 @@ export const ProjectFrame = ({
   const code =
     header !== undefined &&
     codeBar !== undefined &&
-    projectTabOf(pathname) === "code";
+    Option.isSome(codeAddressOf(pathname));
 
   return (
     <div

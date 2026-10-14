@@ -416,6 +416,44 @@ describe(ProjectView, () => {
   );
 
   it.effect(
+    "reads a decider's territory of every path in words, never as the glob",
+    () =>
+      Effect.gen(function* () {
+        const about = aboutOf(
+          yield* page({
+            deciders: [
+              { handles: [Handle.make("ines-v")], paths: Glob.make("**") },
+            ],
+          })
+        );
+
+        const text = textIn(about);
+
+        expect(text).toMatch(/every path\s*·\s*ines-v/u);
+        expect(text).not.toMatch(/\*\*\s*·/u);
+      })
+  );
+
+  it.effect(
+    "offers a signed-out reader a sign-in that returns to proposing, and a signed-in one the propose link",
+    () =>
+      Effect.gen(function* () {
+        const signedOut = mainColumnOf(yield* page({ signedIn: false }));
+
+        expect(textIn(signedOut)).toContain("Sign in to propose one.");
+        expect(signedOut).toContain(
+          `href="/auth/signin?return=${encodeURIComponent("/oscabriel/datekit/proposals/new")}"`
+        );
+        expect(signedOut).not.toContain('data-propose=""');
+
+        const signedIn = mainColumnOf(yield* page({ signedIn: true }));
+
+        expect(signedIn).toContain('data-propose=""');
+        expect(textIn(signedIn)).not.toContain("Sign in to propose one.");
+      })
+  );
+
+  it.effect(
     "names where an imported project came from, with its branch, as a copy read-only here; and nothing for one that started empty",
     () =>
       Effect.gen(function* () {
@@ -1038,12 +1076,7 @@ describe("a project's page in its frame", () => {
           ({ hash }) => (hash === undefined ? [] : [hash])
         );
 
-        expect(hashes).toStrictEqual([
-          "open-asks",
-          "recent-landings",
-          "proposals",
-          "who-decides",
-        ]);
+        expect(hashes).toStrictEqual(["open-asks", "proposals", "who-decides"]);
         expect(
           hashes.filter((hash) => !markup.includes(`id="${hash}"`))
         ).toStrictEqual([]);

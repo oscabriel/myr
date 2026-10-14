@@ -25,7 +25,7 @@ export const FilesButton = ({
         variant="outline"
       >
         <FolderTree aria-hidden="true" strokeWidth={1.75} />
-        {/* Not "Files": the bar's toggle beside it is Files | Commits. */}
+        {/* Not "Files": the bar's toggle beside it is Files | History. */}
         {commit ? "Changed files" : "Tree"}
       </Button>
       {FilesSheet === undefined || !open ? null : (

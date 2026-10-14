@@ -1,5 +1,6 @@
 import type { ProjectName } from "@repo/protocol/ids";
 
+import type { LogShow } from "./log-page.ts";
 import { revSegment } from "./rev.ts";
 
 export const pathSegments = (path: string): string =>
@@ -36,7 +37,7 @@ export const commitsHref = (
   }: {
     readonly from?: number;
     readonly path?: string;
-    readonly show?: "answers" | "openings";
+    readonly show?: LogShow;
   } = {}
 ) => {
   const query = new URLSearchParams();

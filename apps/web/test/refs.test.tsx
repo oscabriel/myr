@@ -372,7 +372,7 @@ describe(RefChoices, () => {
       'data-fork="ines-v/parse-iso"'
     );
 
-  it("lists main as current, then the tags, then the answers in forks", () => {
+  it("lists main as current, then the tags, then the answers in claim forks", () => {
     const markup = choices();
 
     expect(
@@ -382,6 +382,17 @@ describe(RefChoices, () => {
     ).toStrictEqual(["main", "v1.1.0", "v1.0.0", "ines-v/parse-iso"]);
     expect(elementWith(markup, 'data-ref-choice="main"')).toContain(
       'aria-current="true"'
+    );
+    expect(plainText(markup)).toContain("Answers in claim forks");
+  });
+
+  it("names no branch: main carries no branch mark and sits under no heading, since a tag and a fork are revisions", () => {
+    const markup = choices();
+
+    expect(markup).not.toContain("lucide-git-branch");
+    expect(plainText(markup)).not.toMatch(/\bBranch\b/u);
+    expect(markup.indexOf('data-ref-choice="main"')).toBeLessThan(
+      markup.indexOf("<p")
     );
   });
 

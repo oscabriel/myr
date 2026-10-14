@@ -8,7 +8,7 @@ import { Option, Schema } from "effect";
 
 import { segmentsOf } from "../shared/paths.ts";
 
-/** The Code tab's pages: Files are `tree`, `blob` and `why`; Commits are `commits` and `commit`. */
+/** The Code tab's pages: Files are `tree`, `blob` and `why`; History is `commits` and `commit`. */
 export type CodePage = "blob" | "commit" | "commits" | "refs" | "tree" | "why";
 
 export interface CodeAddress {
@@ -49,7 +49,7 @@ export const codeAddressOf = (pathname: string): Option.Option<CodeAddress> =>
     }));
   });
 
-/** The pages under Files, and the rest under Commits; the refs list is neither. */
+/** The pages under Files, and the rest under History; the refs list is neither. */
 export const codeViewOf = (page: CodePage): "commits" | "files" | undefined => {
   if (page === "refs") {
     return undefined;

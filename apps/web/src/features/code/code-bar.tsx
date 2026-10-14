@@ -1,6 +1,6 @@
 /**
  * The Code tab's own bar, under the project's header (ADR 0041): Files or
- * Commits, the ref switcher, the revision's head commit, Go to file and
+ * History, the ref switcher, the revision's head commit, Go to file and
  * Clone. Below `columns` it also opens the file tree as a sheet. It reads
  * where it is from the path, and the head commit from the page's own read.
  */
@@ -96,7 +96,7 @@ const ViewToggle = ({
 
   return (
     <nav
-      aria-label="Files or commits"
+      aria-label="Files or history"
       className="border-input flex shrink-0 border"
     >
       <AppLink
@@ -111,7 +111,7 @@ const ViewToggle = ({
         className={SEGMENT}
         to={commitsHref(project, address.rev)}
       >
-        Commits
+        History
       </AppLink>
     </nav>
   );

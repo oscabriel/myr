@@ -273,25 +273,32 @@ export const ProjectTabs = ({
     className={`border-rule bg-background border-b ${GUTTER}`}
     data-project-tabs=""
   >
-    <div className="flex [scrollbar-width:none] overflow-x-auto overscroll-x-contain">
-      {projectSections(project).map(({ hash, label, tab, to }) => (
-        <AppLink
-          activeOptions={activeFor(hash)}
-          aria-current={tab === current ? "page" : undefined}
-          className={TAB}
-          data-current={tab === current ? "" : undefined}
-          key={tab}
-          to={to}
-          {...(hash === undefined ? {} : { hash })}
-        >
-          {label}
-          {tab === "asks" && open !== undefined ? (
-            <span className="text-label text-muted-foreground tabular-nums">
-              {open.asks}
-            </span>
-          ) : null}
-        </AppLink>
-      ))}
+    {/* Below `tablet` the strip scrolls with its scrollbar hidden, so a fade at its right edge is the cue that more tabs lie off screen. */}
+    <div
+      className="tablet:after:hidden after:from-background relative after:pointer-events-none after:absolute after:inset-y-0 after:right-0 after:w-10 after:bg-linear-to-l after:to-transparent after:content-['']"
+      data-tabs-fade=""
+    >
+      <div className="flex [scrollbar-width:none] overflow-x-auto overscroll-x-contain">
+        {projectSections(project).map(({ hash, label, search, tab, to }) => (
+          <AppLink
+            activeOptions={activeFor(hash)}
+            aria-current={tab === current ? "page" : undefined}
+            className={TAB}
+            data-current={tab === current ? "" : undefined}
+            key={tab}
+            to={to}
+            {...(hash === undefined ? {} : { hash })}
+            {...(search === undefined ? {} : { search })}
+          >
+            {label}
+            {tab === "asks" && open !== undefined ? (
+              <span className="text-label text-muted-foreground tabular-nums">
+                {open.asks}
+              </span>
+            ) : null}
+          </AppLink>
+        ))}
+      </div>
     </div>
   </nav>
 );

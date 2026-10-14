@@ -28,7 +28,7 @@ const Later = ({ commit }: { readonly commit: boolean }) =>
     </ClientOnly>
   );
 
-/** The repository's tree beside a page of Files or Commits. */
+/** The repository's tree beside a page of Files or History. */
 export const CodeColumn = () => (
   <SideColumn label="Files">
     <Later commit={false} />

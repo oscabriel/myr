@@ -24,7 +24,7 @@ const tabs = (current: string) =>
     { href: "/oscabriel/datekit", text: "Overview" },
     { href: "/oscabriel/datekit/tree/main", text: "Code" },
     { href: "/oscabriel/datekit#open-asks", text: "Asks" },
-    { href: "/oscabriel/datekit#recent-landings", text: "Landings" },
+    { href: "/oscabriel/datekit/commits/main?show=landings", text: "Landings" },
     { href: "/oscabriel/datekit#proposals", text: "Proposals" },
     { href: "/oscabriel/datekit#who-decides", text: "People" },
     { href: "/oscabriel/datekit/people", text: "Policy" },
@@ -132,6 +132,28 @@ describe("a project's tabs", () => {
     expect(markup).toContain("overflow-x-auto");
     expect(markup).not.toContain("flex-wrap");
   });
+
+  it("fades its right edge below tablet, the cue that tabs lie off screen where the scrollbar is hidden", () => {
+    const markup = renderToStaticMarkup(
+      <ProjectTabs current="code" project={datekit} />
+    );
+
+    const fade =
+      /<div\b[^>]*class="(?<classes>[^"]*)"[^>]*data-tabs-fade=""/u.exec(markup)
+        ?.groups?.classes ?? "";
+
+    expect(fade.split(" ")).toStrictEqual(
+      expect.arrayContaining([
+        "after:bg-linear-to-l",
+        "after:from-background",
+        "after:pointer-events-none",
+        "tablet:after:hidden",
+      ])
+    );
+    expect(markup.indexOf('data-tabs-fade=""')).toBeLessThan(
+      markup.indexOf("overflow-x-auto")
+    );
+  });
 });
 
 describe(projectTabOf, () => {
@@ -144,10 +166,11 @@ describe(projectTabOf, () => {
     ["/oscabriel/datekit/asks/fix-week-start", "asks"],
     ["/oscabriel/datekit/decisions/dec-000001", "asks"],
     ["/oscabriel/datekit/answers/fix-week-start", "landings"],
-    ["/oscabriel/datekit/commits/main", "code"],
+    ["/oscabriel/datekit/commits/main", "landings"],
+    ["/oscabriel/datekit/commits/%40bram%2Fparse-iso", "landings"],
     [
       "/oscabriel/datekit/commit/1111111111111111111111111111111111111111",
-      "code",
+      "landings",
     ],
     ["/oscabriel/datekit/proposals/prop-000001", "proposals"],
     ["/oscabriel/datekit/people", "policy"],
