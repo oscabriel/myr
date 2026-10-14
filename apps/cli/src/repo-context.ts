@@ -96,12 +96,16 @@ export const parseRemote = (
       : Option.none();
   });
 
+export interface Remote {
+  readonly name: string;
+  readonly url: string;
+}
+
 export interface RepoContext {
   readonly root: string;
-  readonly remote: Option.Option<{
-    readonly name: string;
-    readonly url: string;
-  }>;
+  readonly remote: Option.Option<Remote>;
+  /** Every remote the repo has, as `git remote -v` lists them. */
+  readonly remotes: readonly Remote[];
   readonly origin: Option.Option<string>;
   readonly repo: Option.Option<RepoRef>;
 }
@@ -139,7 +143,7 @@ const git = (cwd: string, args: readonly string[]) =>
     })
   );
 
-const remotesOf = (listing: string) =>
+const remotesOf = (listing: string): readonly Remote[] =>
   listing.split("\n").flatMap((line) => {
     const match = /^(?<name>\S+)\t(?<url>\S+) \(fetch\)$/u.exec(line);
 
@@ -188,6 +192,7 @@ export const repoContext = (
     return {
       origin: Option.map(parsed, ({ origin }) => origin),
       remote,
+      remotes,
       repo: Option.flatMap(parsed, ({ repo }) => parseRepoName(repo)),
       root: top.stdout.trim(),
     };

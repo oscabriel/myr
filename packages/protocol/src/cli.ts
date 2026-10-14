@@ -92,15 +92,20 @@ export interface Defaults<R> {
   readonly values: Effect.Effect<Readonly<Record<string, string>>, never, R>;
 }
 
+/** A view is pure, or looks around first (the repo the command stands in) with the defaults' services. */
+export type Render<Success, R> = (
+  success: Success
+) => Option.Option<View> | Effect.Effect<Option.Option<View>, never, R>;
+
 export interface ToCommandOptions<Success, OutputR, DefaultsR> {
   readonly output: Effect.Effect<CommandOutput, never, OutputR>;
   readonly defaults?: Defaults<DefaultsR> | undefined;
-  readonly render?: ((success: Success) => Option.Option<View>) | undefined;
+  readonly render?: Render<Success, DefaultsR> | undefined;
   readonly refusalsIn?: ((success: Success) => readonly Refusal[]) | undefined;
 }
 
-export type Views<Rpcs extends Rpc.Any> = Readonly<
-  Record<string, (success: Rpc.Success<Rpcs>) => Option.Option<View>>
+export type Views<Rpcs extends Rpc.Any, R = never> = Readonly<
+  Record<string, Render<Rpc.Success<Rpcs>, R>>
 >;
 
 export class ApprovalNeeded extends Schema.TaggedError<ApprovalNeeded>()(
@@ -550,10 +555,13 @@ export const toCommand = <
 
         const data = yield* Effect.orDie(encodeSuccess(success));
 
-        const view = Option.getOrElse(
+        const rendered =
           options.render === undefined
-            ? Option.none()
-            : options.render(success),
+            ? Option.none<View>()
+            : options.render(success);
+
+        const view = Option.getOrElse(
+          Effect.isEffect(rendered) ? yield* rendered : rendered,
           () => asJson(JSON.stringify(data, null, 2))
         );
 
@@ -573,7 +581,7 @@ export const toCommand = <
 export interface ToCommandsOptions<Rpcs extends Rpc.Any, OutputR, DefaultsR> {
   readonly output: Effect.Effect<CommandOutput, never, OutputR>;
   readonly defaults?: Defaults<DefaultsR> | undefined;
-  readonly views?: Views<Rpcs> | undefined;
+  readonly views?: Views<Rpcs, DefaultsR> | undefined;
   readonly refusalsIn?:
     | ((success: Rpc.Success<Rpcs>) => readonly Refusal[])
     | undefined;

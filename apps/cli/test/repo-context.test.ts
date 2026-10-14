@@ -153,6 +153,7 @@ describe("the repo the CLI stands in", () => {
         expect(context).toStrictEqual({
           origin: Option.some(platform),
           remote: Option.some({ name: "origin", url }),
+          remotes: [{ name: "origin", url }],
           repo: Option.some({
             ask: AskId.make("fix-week"),
             handle: Handle.make("alice"),
