@@ -57,6 +57,7 @@ import {
   tooth,
   trayBacks,
   trayFronts,
+  trayOpening,
 } from "./parts.ts";
 
 const STATIC = {
@@ -120,7 +121,12 @@ const Pins = ({
 
 /** The first answer: on the carriage, then in its tray. */
 const Stray = ({ frame }: { readonly frame: ReturnType<typeof liveFrame> }) => (
-  <g data-part="stray" opacity={frame.strayOpacity} transform={frame.stray}>
+  <g
+    data-fault={frame.fault ? "" : undefined}
+    data-part="stray"
+    opacity={frame.strayOpacity}
+    transform={frame.stray}
+  >
     <Marks marks={MOVING.strayStrip} />
   </g>
 );
@@ -229,8 +235,17 @@ const Drawing = ({ pose }: { readonly pose: Pose }) => {
       <g data-part="tray-layer">
         {pose.drop > 0 ? <Stray frame={frame} /> : null}
       </g>
-      <g data-part="slip" opacity={pose.slip.toFixed(3)} transform={frame.slip}>
-        <Marks marks={MOVING.slip} />
+      <clipPath id="mbx-tray">
+        <path d={trayOpening(STATIONS[1])} />
+      </clipPath>
+      <g clipPath="url(#mbx-tray)">
+        <g
+          data-part="slip"
+          opacity={pose.slip.toFixed(3)}
+          transform={frame.slip}
+        >
+          <Marks marks={MOVING.slip} />
+        </g>
       </g>
       <Marks marks={STATIC.trayFronts} />
       <g data-part="arm-back">

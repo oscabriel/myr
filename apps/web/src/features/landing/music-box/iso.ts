@@ -235,7 +235,7 @@ const turn = (o: Flat, a: Flat, b: Flat) =>
   (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
 
 /** Andrew's monotone chain. */
-const hullOf = (points: readonly Flat[]): readonly Flat[] => {
+export const hullOf = (points: readonly Flat[]): readonly Flat[] => {
   const sorted = points.toSorted((a, b) => a[0] - b[0] || a[1] - b[1]);
 
   if (sorted.length < 3) {

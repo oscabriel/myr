@@ -125,10 +125,12 @@ export const liveFrame = (pose: Pose) => {
     claim: move((1 - pose.claim) * 26, 0, 0),
     claimOpacity: pose.claim,
     fan: pose.drum * 14,
+    /** The stray pin, once the shape stage has found it. */
+    fault: pose.drop > 0 || pose.flags.includes("refused"),
     feeler: move(0, 0, -pose.feeler * 1.6),
     flag: move(toothX(pose.tooth), 0, 0),
     ratchet: -pose.ratchet * ((Math.PI * 2) / 18),
-    slip: move(0, 0, (pose.slip - 1) * 6),
+    slip: move(0, 0, (pose.slip - 1) * 10),
     stray: move(
       stray,
       pose.drop * (TRAY_Y[0] + 9 - (STRIP_Y[0] + STRIP_Y[1]) / 2),

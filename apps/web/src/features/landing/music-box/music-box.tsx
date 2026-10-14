@@ -119,6 +119,7 @@ const paint = (parts: Parts, pose: Pose, last: Pose | undefined) => {
       home?.appendChild(stray);
     }
 
+    set(stray, "data-fault", frame.fault ? "" : undefined);
     set(stray, "transform", frame.stray);
     set(stray, "opacity", frame.strayOpacity.toFixed(3));
   }

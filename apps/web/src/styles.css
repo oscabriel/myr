@@ -929,7 +929,8 @@
   --mbx-state: var(--mbx-lit);
 }
 
-.mbx-line[data-tone="lit"][data-stray] {
+/* The stray pin the shape stage refused, beside the readout's OutOfScope. */
+.mbx [data-fault] .mbx-line[data-tone="lit"] {
   stroke: var(--refused);
 }
 

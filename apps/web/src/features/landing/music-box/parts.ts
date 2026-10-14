@@ -28,6 +28,8 @@ import {
   turned,
   view,
   dot,
+  hullOf,
+  pathOf,
   sub,
 } from "./iso.ts";
 import type { Flat, Frame, Plan, Point } from "./iso.ts";
@@ -1264,23 +1266,38 @@ export const trayFronts = (): readonly Mark[] =>
     ),
   ]);
 
+/** Everything above a tray's floor, on screen: a slip rising in it shows only there. */
+export const trayOpening = (x: number) => {
+  const floor = [
+    [x - TRAY_HALF + 1.2, TRAY_Y[0] + 1.2],
+    [x + TRAY_HALF - 1.2, TRAY_Y[0] + 1.2],
+    [x + TRAY_HALF - 1.2, TRAY_Y[1] - 1.2],
+    [x - TRAY_HALF + 1.2, TRAY_Y[1] - 1.2],
+  ].map(([px = 0, py = 0]) => flat([px, py, 1.4]));
+
+  return pathOf(
+    hullOf([...floor, ...floor.map(([sx, sy]): Flat => [sx, sy - 80])]),
+    true
+  );
+};
+
 /** A refusal's printed slip, built sunk in its tray; the motion raises it. */
 export const slip = (x: number): readonly Mark[] => {
   const frame: Frame = {
-    a: [0, -0.26, 0.97],
-    o: [x, TRAY_Y[0] + 9, 1.4],
+    a: [0, 0.97, 0.26],
+    o: [x, TRAY_Y[0] + 6, 1.4],
     u: X,
-    v: [0, 0.97, 0.26],
+    v: [0, -0.26, 0.97],
   };
 
   const rule = (v: number, from: number, to: number) =>
     polyline([inFrame(frame, 0.5, [from, v]), inFrame(frame, 0.5, [to, v])], C);
 
   return [
-    solid(prism(frame, rect(-6, 0, 6, 9), 0, 0.5, C), "hi", { crease: "lo" }),
-    line(rule(7, -4.5, 3.5), "lo", { free: true }),
-    line(rule(5, -4.5, 4.5), "lo", { free: true }),
-    line(rule(3, -4.5, 1), "lo", { free: true }),
+    solid(prism(frame, rect(-6, 0, 6, 13), 0, 0.5, C), "hi", { crease: "lo" }),
+    line(rule(11, -4.5, 3.5), "lo", { free: true }),
+    line(rule(9, -4.5, 4.5), "lo", { free: true }),
+    line(rule(7, -4.5, 1), "lo", { free: true }),
   ];
 };
 
@@ -1488,6 +1505,19 @@ export const printer = (): readonly Mark[] => {
       inner: [line(sideSeam(PRINTER, 15, C, 3), "faint")],
     }),
     line(planOutline(slot, 20, C, 2), "lo"),
+    line(
+      polyline(
+        [
+          [TAPE.x - 1, PRINTER.y + PRINTER.d, 0.6],
+          [TAPE.x + TAPE.w + 1, PRINTER.y + PRINTER.d, 0.6],
+          [TAPE.x + TAPE.w + 1, PRINTER.y + PRINTER.d, 2.4],
+          [TAPE.x - 1, PRINTER.y + PRINTER.d, 2.4],
+        ],
+        C,
+        true
+      ),
+      "lo"
+    ),
     box(
       [PRINTER.x + 2, PRINTER.y + 6, 20],
       [PRINTER.x + 6, PRINTER.y + 14, 28],
