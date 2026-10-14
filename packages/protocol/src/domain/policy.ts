@@ -12,11 +12,14 @@ import { VisibilityPolicy } from "./visibility.ts";
 
 const Source = Schema.Literals(["config", "defaults"]);
 
-const Budget = Schema.Struct({
-  decisionsPerDay: AtLeastOne,
+/** How long an undecided decision waits before it takes its default. */
+const Decisions = Schema.Struct({
   expireDays: AtLeastOne,
 });
 
+const defaultDecisions = { expireDays: 14 };
+
+/** Throttles on people nobody has vouched for; a vouched person and a maintainer are never held. */
 const Caps = Schema.Struct({
   claimsPerPerson: AtLeastOne,
   /** `0` turns proposals off. */
@@ -54,11 +57,14 @@ export const Policy = Schema.Struct({
   agents: Agents,
   asks: Schema.Array(Ask),
   at: LandedSha,
-  budget: Budget,
   caps: Caps,
   claims: Claims,
   deciders: Schema.Array(
     Schema.Struct({ handles: Schema.NonEmptyArray(Handle), paths: Glob })
+  ),
+  // Defaulted here too: a policy kept as JSON before this key existed still reads.
+  decisions: Decisions.pipe(
+    Schema.withDecodingDefaultKey(Effect.succeed(defaultDecisions))
   ),
   functions: Functions,
   judge: Schema.Struct({
@@ -121,14 +127,9 @@ export type FromCI = typeof FromCI.Type;
 export const PolicyInput = Schema.Struct({
   agents: Agents.pipe(Schema.withDecodingDefaultKey(Effect.succeed("trailer"))),
   asks: Schema.Array(AskInput),
-  budget: Budget.pipe(
-    Schema.withDecodingDefaultKey(
-      Effect.succeed({ decisionsPerDay: 5, expireDays: 14 })
-    )
-  ),
   caps: Caps.pipe(
     Schema.withDecodingDefaultKey(
-      Effect.succeed({ claimsPerPerson: 3, proposalsPerPerson: 2 })
+      Effect.succeed({ claimsPerPerson: 20, proposalsPerPerson: 20 })
     )
   ),
   claims: Claims.pipe(
@@ -144,6 +145,9 @@ export const PolicyInput = Schema.Struct({
       ]),
       paths: Glob,
     })
+  ),
+  decisions: Decisions.pipe(
+    Schema.withDecodingDefaultKey(Effect.succeed(defaultDecisions))
   ),
   functions: Functions,
   kinds: Schema.Array(AskKind),

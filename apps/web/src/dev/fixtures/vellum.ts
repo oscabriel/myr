@@ -189,15 +189,12 @@ const ENV_SCHEMA = [
   "",
 ].join("\n");
 
-export const decisionsPerDay = 5;
-
 const CLAIMS = { lapseAfter: { hours: 96 }, warnAfter: { hours: 48 } } as const;
 
 const HOUR_MS = 3_600_000;
 
 const policy = policyJson({
   asks: [],
-  budget: { decisionsPerDay, expireDays: 3 },
   caps: { claimsPerPerson: 3, proposalsPerPerson: 2 },
   claims: {
     lapseAfterMs: CLAIMS.lapseAfter.hours * HOUR_MS,
@@ -210,6 +207,7 @@ const policy = policyJson({
     { handles: [people.okonkwo], paths: ".env.schema" },
     { handles: [people.okonkwo], paths: `${dir}/vouched.td` },
   ],
+  decisions: { expireDays: 3 },
   functions: { admit: false, opensAlone: false },
   kinds: [
     {

@@ -288,10 +288,13 @@ const verdict = viewOf(VerdictOf.successSchema, ({ verdict: found }) => {
   );
 });
 
+const plural = (count: number, one: string, many: string) =>
+  `${count} ${count === 1 ? one : many}`;
+
 const today = viewOf(TodayOf.successSchema, (page) =>
   joined(
     prose(
-      `Today for ${page.decider}: ${page.budget.used} of ${page.budget.total} decisions used${page.overflow === 0 ? "" : `; ${page.overflow} more wait beyond the budget`}.`
+      `Today for ${page.decider}: ${plural(page.decisions.length, "decision", "decisions")} waiting${page.expiringSoon.length === 0 ? "" : `, ${page.expiringSoon.length} due within a day`}; each takes its default if nobody decides first.`
     ),
     table(
       ["decision", "project", "about", "default", "expires"],
@@ -313,9 +316,6 @@ const today = viewOf(TodayOf.successSchema, (page) =>
         ])
   )
 );
-
-const plural = (count: number, one: string, many: string) =>
-  `${count} ${count === 1 ? one : many}`;
 
 const countOf = (count: number) => (count === 0 ? "nobody" : `${count}`);
 
@@ -344,7 +344,7 @@ const vouchModes = {
 } as const satisfies Record<PublicPolicy["vouch"]["mode"], string>;
 
 const evaluated = (policy: PublicPolicy) => {
-  const { agents, budget, caps, claims, record, vouch, vouches } = policy;
+  const { agents, caps, claims, decisions, record, vouch, vouches } = policy;
   const denounced = vouches.filter((line) => line.denounced).length;
 
   return joined(
@@ -367,17 +367,17 @@ const evaluated = (policy: PublicPolicy) => {
     fields([
       [
         "Claims",
-        `${plural(caps.claimsPerPerson, "claim", "claims")} per person at once`,
+        `${plural(caps.claimsPerPerson, "claim", "claims")} at once for a person nobody has vouched for; a vouched person and a maintainer are never held`,
       ],
       [
         "Proposals",
         caps.proposalsPerPerson === 0
           ? "Proposals are off"
-          : `${plural(caps.proposalsPerPerson, "proposal", "proposals")} per person at once`,
+          : `${plural(caps.proposalsPerPerson, "proposal", "proposals")} open at once for a person nobody has vouched for`,
       ],
       [
-        "Budget",
-        `${plural(budget.decisionsPerDay, "decision", "decisions")} a day per maintainer; an undecided one takes its default after ${plural(budget.expireDays, "day", "days")}`,
+        "Decisions",
+        `an undecided one takes its default after ${plural(decisions.expireDays, "day", "days")}`,
       ],
       [
         "Claim timing",

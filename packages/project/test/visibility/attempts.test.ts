@@ -15,6 +15,7 @@ import { attemptsLeft, isoWeek } from "../../src/visibility/claims.ts";
 import { CheckScript, mergedAt, Pusher } from "../world.ts";
 import {
   bob,
+  inesV,
   countersigned,
   firstSuite,
   mainFiles,
@@ -94,9 +95,13 @@ const suiteSealed = Effect.gen(function* () {
   return { api, pinned };
 });
 
-const claimOn = (ask: string, pinned: PinnedClaim["pinned"]): PinnedClaim => ({
+const claimOn = (
+  ask: string,
+  pinned: PinnedClaim["pinned"],
+  claimant = bob.handle
+): PinnedClaim => ({
   ask: AskId.make(ask),
-  claimant: bob.handle,
+  claimant,
   pinned,
 });
 
@@ -189,6 +194,50 @@ describe("a held-back run, judged by the live port", () => {
           ],
           trailers: [],
           writes: ["attempts"],
+        });
+      }).pipe(Effect.provide(visibilityWorld()))
+  );
+
+  it.effect(
+    "counts no attempt for the sealing layer's own reader and writer: a maintainer's failure is refused, never exhausted, and writes no row",
+    () =>
+      Effect.gen(function* () {
+        const { pinned } = yield* suiteSealed;
+        const failing = bits(pinned, 1);
+
+        const failed = new HeldBackFailed({
+          area: exportArea,
+          suite: pinned.suite,
+        });
+
+        // Past the claim's three and the week's ten alike.
+        const asks = Array.makeBy(12, (index) =>
+          index < 6 ? "parse-iso" : "trim-input"
+        );
+
+        const judgements = yield* Effect.forEach(asks, (ask) =>
+          judged(claimOn(ask, pinned, inesV.handle), failing)
+        );
+
+        const passing = yield* judged(
+          claimOn("fix-a", pinned, inesV.handle),
+          bits(pinned, 2)
+        );
+
+        expect({
+          passing: [passing.refusals, Option.isSome(passing.trailer)],
+          refusals: Array.dedupe(
+            judgements.flatMap(({ refusals }) => refusals)
+          ),
+          rows: (yield* stored).attempts,
+          writes: Array.dedupe(
+            judgements.flatMap(({ writes }) => Object.keys(writes))
+          ),
+        }).toStrictEqual({
+          passing: [[], true],
+          refusals: [failed],
+          rows: [],
+          writes: [],
         });
       }).pipe(Effect.provide(visibilityWorld()))
   );

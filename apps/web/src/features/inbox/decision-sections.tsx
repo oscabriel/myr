@@ -30,11 +30,15 @@ import { expiringSoon, expiryOrder } from "./decisions.ts";
 
 const counted = (count: number) => (count === 0 ? "none" : String(count));
 
-export const budgetSentence = (budget: Today["budget"]) =>
-  `Decisions: ${budget.used} taken, ${counted(Math.max(0, budget.total - budget.used))} left today. Finishes are counted apart: ${counted(budget.finishes)} taken.`;
+/** The decisions waiting, as one sentence: every open one shows, and each takes its default if nobody decides. */
+export const waitingSentence = (today: Today) => {
+  const soon = today.expiringSoon.length;
 
-export const budgetShort = (budget: Today["budget"]) =>
-  `${counted(Math.max(0, budget.total - budget.used))} left today`;
+  return `Decisions: ${counted(today.decisions.length)} waiting${soon === 0 ? "" : `, ${soon} due today`}. Each takes its default if nobody decides before it expires.`;
+};
+
+export const waitingShort = (today: Today) =>
+  `${counted(today.decisions.length)} waiting`;
 
 interface Listed {
   readonly decision: Decision;
@@ -216,7 +220,7 @@ const DecisionSections = ({
       {later.length === 0 ? null : (
         <Section
           count={plural(later.length, "decision", "decisions")}
-          name="Within your budget"
+          name="Later"
         >
           {later.map((each) => (
             <DecisionRow
@@ -230,19 +234,6 @@ const DecisionSections = ({
     </>
   );
 };
-
-const Tomorrow = ({ overflow }: { readonly overflow: number }) =>
-  overflow === 0 ? null : (
-    <Section name="Waits for tomorrow">
-      <li
-        className="border-rule text-ui flex min-h-10 items-center border-b py-2"
-        data-overflow={overflow}
-      >
-        {overflow} more {overflow === 1 ? "waits" : "wait"} for tomorrow; each
-        expires to its default if nobody decides first.
-      </li>
-    </Section>
-  );
 
 const Newcomers = ({
   newcomers,
@@ -413,22 +404,17 @@ export const DecisionGroups = ({
     stamped,
   };
 
-  return (
-    <>
-      {listed.length === 0 ? (
-        <Section name="Decisions waiting">
-          <li className="pt-3">
-            <EmptyState
-              command={`${Brand.cli} today`}
-              title="Nothing to decide today. Undecided decisions expire to their safe default."
-            />
-          </li>
-        </Section>
-      ) : (
-        <DecisionSections listed={listed} props={props} />
-      )}
-      <Tomorrow overflow={today.overflow} />
-    </>
+  return listed.length === 0 ? (
+    <Section name="Decisions waiting">
+      <li className="pt-3">
+        <EmptyState
+          command={`${Brand.cli} today`}
+          title="Nothing to decide today. Undecided decisions expire to their safe default."
+        />
+      </li>
+    </Section>
+  ) : (
+    <DecisionSections listed={listed} props={props} />
   );
 };
 

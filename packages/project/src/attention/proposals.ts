@@ -98,7 +98,7 @@ const admit = (
 };
 
 const opening = (policy: Policy, proposer: Proposer, now: DateTime.Utc) => ({
-  expiresAt: DateTime.add(now, { days: policy.budget.expireDays }),
+  expiresAt: DateTime.add(now, { days: policy.decisions.expireDays }),
   id: proposer.id,
   openedAt: now,
   project: proposer.project,

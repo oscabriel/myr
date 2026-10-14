@@ -64,17 +64,12 @@ export const Decision = Schema.Struct({
 
 export type Decision = typeof Decision.Type;
 
+/** A decider's open decisions, every one, ordered by expiry. */
 export const Today = Schema.Struct({
-  budget: Schema.Struct({
-    finishes: Schema.Int,
-    total: Schema.Int,
-    used: Schema.Int,
-  }),
   decider: Handle,
   decisions: Schema.Array(Decision),
   expiringSoon: Schema.Array(DecisionId),
   newcomers: Schema.Array(Handle),
-  overflow: Schema.Int,
   unattended: Schema.Array(LandingView),
 });
 

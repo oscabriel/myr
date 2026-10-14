@@ -384,7 +384,6 @@ const acceptingBlocked = (api: ProjectApi) =>
       .pipe(Effect.result, Effect.map(Result.getFailure));
 
     const between = yield* stored;
-    const { budget } = yield* api.today(alice);
 
     yield* redOnMain(files);
 
@@ -399,7 +398,6 @@ const acceptingBlocked = (api: ProjectApi) =>
     return {
       accepted,
       blocked,
-      budget,
       decided: between.decisions.map(({ decided }) => decided),
       listed: (yield* api.listAsks(anyone)).asks.map(({ ask }) => ask),
       proposals: between.proposals.map(({ state }) => state),
@@ -541,10 +539,9 @@ describe("a proposal", () => {
           expect(run.blocked).toStrictEqual(
             Option.some(new VerifierBlocked({}))
           );
-          expect([run.decided, run.proposals, run.budget]).toStrictEqual([
+          expect([run.decided, run.proposals]).toStrictEqual([
             [undefined],
             ["open"],
-            { finishes: 0, total: 5, used: 0 },
           ]);
           expect([run.accepted, run.listed]).toStrictEqual([
             Option.some("accept"),
@@ -638,7 +635,6 @@ const finishing = (api: ProjectApi) =>
       again: yield* api.finish(aliceSignedIn, finish),
       answer,
       bobFinishes,
-      budget: (yield* api.today(alice)).budget,
       commit: yield* commitOf(landed),
       landed,
       receipt,
@@ -797,7 +793,7 @@ describe("a finish", () => {
   );
 
   it.effect(
-    "lands the answer credited Finished-by, once however often it is sent, and counts in the maintainer's budget, however her sign-in cases her handle",
+    "lands the answer credited Finished-by, once however often it is sent, however her sign-in cases her handle",
     () =>
       Effect.map(seen, (run) => {
         expect([run.settled, run.again.outcome]).toStrictEqual([
@@ -817,7 +813,6 @@ describe("a finish", () => {
             { key: "Finished-by", value: userOf("alice") },
           ],
         });
-        expect(run.budget).toStrictEqual({ finishes: 1, total: 5, used: 0 });
       })
   );
 });
@@ -1171,7 +1166,7 @@ const decisionIds = (from: number, to: number) =>
 
 describe("Today", () => {
   it.effect(
-    "shows a maintainer at most the budget's decisions, soonest to expire first, and counts the rest as overflow",
+    "shows a maintainer every open decision, soonest to expire first; one taken leaves the list and a flag raised joins it",
     () =>
       Effect.map(
         Effect.flatMap(begun, (api) =>
@@ -1179,25 +1174,15 @@ describe("Today", () => {
         ).pipe(Effect.provide(worldOf(scenario, "memory"))),
         (seen) => {
           expect({
-            budget: seen.full.budget,
             decider: seen.full.decider,
             decisions: idsOf(seen.full.decisions),
-            overflow: seen.full.overflow,
           }).toStrictEqual({
-            budget: { finishes: 0, total: 5, used: 0 },
             decider: alice.handle,
-            decisions: decisionIds(1, 5),
-            overflow: 1,
+            decisions: decisionIds(1, 6),
           });
-          expect({
-            budget: seen.afterOne.budget,
-            decisions: idsOf(seen.afterOne.decisions),
-            overflow: seen.afterOne.overflow,
-          }).toStrictEqual({
-            budget: { finishes: 0, total: 5, used: 1 },
-            decisions: decisionIds(2, 5),
-            overflow: 2,
-          });
+          expect(idsOf(seen.afterOne.decisions)).toStrictEqual(
+            decisionIds(2, 7)
+          );
           expect(seen.bobToday).toStrictEqual(new NotDecider({}));
         }
       )

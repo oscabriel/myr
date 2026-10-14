@@ -443,7 +443,7 @@ describe("the dev world's fixtures", seededWorlds, () => {
   );
 
   it.live(
-    "put every kind of decision on a maintainer's Today, one due within the day and two of five taken",
+    "put every kind of decision on a maintainer's Today, every open one, one due within the day",
     () =>
       inWorld(withFixtures, (as) =>
         Effect.gen(function* () {
@@ -465,20 +465,18 @@ describe("the dev world's fixtures", seededWorlds, () => {
           );
 
           expect({
-            budget: [mine.budget.used, mine.budget.total],
             dueToday: mine.expiringSoon.length,
-            overflow: mine.overflow,
             shown: mine.decisions.some(({ id }) => id === mine.expiringSoon[0]),
+            waiting: mine.decisions.length,
           }).toStrictEqual({
-            budget: [2, 5],
             dueToday: 1,
-            overflow: 3,
             shown: true,
+            waiting: 6,
           });
           expect([
             mine.newcomers.length > 0,
             mine.unattended.length > 0,
-            merged.overflow >= 3,
+            merged.decisions.length >= mine.decisions.length,
           ]).toStrictEqual([true, true, true]);
           expect([...kinds].toSorted()).toStrictEqual(
             Object.keys(DecisionSubject.cases).toSorted()
@@ -753,7 +751,7 @@ const timesIn = (options: DevWorldOptions) =>
   inWorld(options, (as) =>
     Effect.gen(function* () {
       const ines = yield* as(signedIn("ines-v"));
-      const { decisions, overflow } = yield* ines.today({});
+      const { decisions } = yield* ines.today({});
 
       const proposedAt = (handle: string, want: string) =>
         Effect.flatMap(as(signedIn(handle)), (client) =>
@@ -772,14 +770,14 @@ const timesIn = (options: DevWorldOptions) =>
 
       const second = yield* proposedAt("sefa", "datekit reads RFC 2822 dates.");
 
-      return { decisions, first, overflow, second };
+      return { decisions, first, second };
     })
   );
 
 const keyOf = ({ id, project }: Decision) => `${project}/${id}`;
 
-// Today's budget counts a UTC day, so which taken decisions fall on the present day moves with the time of day
-// the world is built at: the two worlds are held to the same open count, and shared decisions to one shift.
+// Which decisions are open moves with the time of day the world is built at: the two worlds are held
+// to the same open count, and shared decisions to one shift.
 const placedAtThePresent = (fixtures: FixtureMode, end: DateTime.Utc) =>
   Effect.gen(function* () {
     const fixed = yield* timesIn({ fixtures });
@@ -837,8 +835,7 @@ const placedAtThePresent = (fixtures: FixtureMode, end: DateTime.Utc) =>
       present.decisions.every(
         ({ expiresAt }) => millisFrom(present.second, expiresAt) > 0
       ),
-      present.decisions.length + present.overflow ===
-        fixed.decisions.length + fixed.overflow,
+      present.decisions.length === fixed.decisions.length,
     ]).toStrictEqual([true, true, true, true, true, true, true]);
   });
 

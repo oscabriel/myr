@@ -186,9 +186,9 @@ describe("the domain schemas", () => {
       Schema.decodeUnknownSync(PolicyInput)(fixture.withoutDefaults)
     ).toMatchObject({
       agents: "trailer",
-      budget: { decisionsPerDay: 5, expireDays: 14 },
-      caps: { claimsPerPerson: 3, proposalsPerPerson: 2 },
+      caps: { claimsPerPerson: 20, proposalsPerPerson: 20 },
       claims: { lapseAfterMs: 86_400_000, warnAfterMs: 7_200_000 },
+      decisions: { expireDays: 14 },
       record: { countsAfterDays: 30, windowDays: 365 },
       vouch: { file: `${Brand.configDir}/vouched.td`, mode: "forCode" },
     });
@@ -199,8 +199,7 @@ describe("the domain schemas", () => {
   const [kind] = wire.withoutDefaults.kinds;
 
   it.each([
-    ["budget", { budget: { decisionsPerDay: 0, expireDays: 14 } }],
-    ["budget", { budget: { decisionsPerDay: 5, expireDays: -1 } }],
+    ["decisions", { decisions: { expireDays: 0 } }],
     ["caps", { caps: { claimsPerPerson: 0, proposalsPerPerson: 2 } }],
     ["caps", { caps: { claimsPerPerson: 3, proposalsPerPerson: -1 } }],
     ["claims", { claims: { lapseAfterMs: 0, warnAfterMs: 7_200_000 } }],

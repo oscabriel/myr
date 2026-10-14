@@ -234,10 +234,9 @@ describe("the Agents page's reference sections", () => {
     const values = agentLimits().map(({ value }) => value);
 
     expect(values).toStrictEqual([
-      "3 by default",
-      "2 by default; 0 turns proposals off",
+      "20 by default; a vouched person and a maintainer are never held",
+      "20 by default; 0 turns proposals off",
       "Warned after 2 hours, lapses after 1 day, by default",
-      "5 by default",
       "2 weeks by default, then it takes its default",
       "A set number a minute; past it, CapReached says when to try again",
     ]);

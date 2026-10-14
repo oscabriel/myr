@@ -428,7 +428,6 @@ describe("calls that name no project", () => {
         const today = yield* alice.today({});
 
         expect({
-          budget: today.budget,
           decider: today.decider,
           decisions: today.decisions.map(({ openedAt, project }) => ({
             openedAt: DateTime.formatIso(openedAt),
@@ -436,10 +435,8 @@ describe("calls that name no project", () => {
           })),
           expiringSoon: today.expiringSoon,
           newcomers: today.newcomers,
-          overflow: today.overflow,
           unattended: today.unattended,
         }).toStrictEqual({
-          budget: { finishes: 0, total: 10, used: 1 },
           decider: "alice",
           decisions: [
             { openedAt: "2026-10-07T12:05:00.000Z", project: "alice/datekit" },
@@ -447,7 +444,6 @@ describe("calls that name no project", () => {
           ],
           expiringSoon: [],
           newcomers: ["bob"],
-          overflow: 0,
           unattended: [],
         });
         expect(yield* Effect.flip(bob.today({}))).toStrictEqual(

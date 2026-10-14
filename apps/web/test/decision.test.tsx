@@ -90,12 +90,10 @@ const stray: Decision = {
 };
 
 const todayWith = (decisions: readonly Decision[]): Today => ({
-  budget: { finishes: 0, total: 5, used: 1 },
   decider: okonkwo,
   decisions,
   expiringSoon: decisions.map(({ id }) => id),
   newcomers: [],
-  overflow: 0,
   unattended: [],
 });
 

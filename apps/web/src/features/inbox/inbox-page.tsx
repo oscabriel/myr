@@ -37,10 +37,10 @@ import {
 import { Workspace } from "../shared/shell/workspace.tsx";
 import { When } from "../shared/time.tsx";
 import {
-  budgetSentence,
-  budgetShort,
   DecisionGroups,
   RecentGroups,
+  waitingSentence,
+  waitingShort,
 } from "./decision-sections.tsx";
 import type { Decided } from "./decision-sections.tsx";
 import { readOfCause, TodayRead } from "./decisions.ts";
@@ -54,7 +54,7 @@ import {
 } from "./read.ts";
 import type { Work } from "./read.ts";
 
-export { budgetSentence } from "./decision-sections.tsx";
+export { waitingSentence } from "./decision-sections.tsx";
 
 const WHAT_THE_INBOX_IS =
   "The inbox is your own page: the decisions waiting for you, the asks you hold and where each answer stands in the gate, and the asks you may take next.";
@@ -339,22 +339,20 @@ const SignedInInbox = ({
   readonly deciding: Deciding;
   readonly read: SignedIn;
 }) => {
-  const budget = Option.getOrUndefined(
-    Option.map(todayOf(read), ({ budget: held }) => held)
-  );
+  const today = Option.getOrUndefined(todayOf(read));
 
   return (
     <Workspace
-      {...(budget === undefined ? {} : { count: budgetShort(budget) })}
+      {...(today === undefined ? {} : { count: waitingShort(today) })}
       crumbs={CRUMBS}
       meta={<Record handle={read.handle} />}
       status={
-        budget === undefined ? undefined : (
+        today === undefined ? undefined : (
           <p
             className="text-want max-w-(--measure)"
-            data-budget={`${budget.used}/${budget.total}`}
+            data-waiting={today.decisions.length}
           >
-            {budgetSentence(budget)}
+            {waitingSentence(today)}
           </p>
         )
       }

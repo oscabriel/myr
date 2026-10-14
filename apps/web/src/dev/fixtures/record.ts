@@ -123,33 +123,16 @@ export const verdictIn = (
 export const landingIn = (record: FixtureRecord, sha: CommitSha) =>
   Array.findFirst(record.landings, (landing) => landing.sha === sha);
 
-const spentBy = (record: FixtureRecord, decider: Handle, now: DateTime.Utc) => {
-  const day = DateTime.formatIsoDateUtc(now);
-
-  return record.decisions.filter(
-    ({ decided }) =>
-      decided !== undefined &&
-      sameHandle(decided.by, decider) &&
-      DateTime.formatIsoDateUtc(decided.at) === day
-  ).length;
-};
-
 export const todayIn = (
   record: FixtureRecord,
   decider: Handle,
-  now: DateTime.Utc,
-  perDay: number
+  now: DateTime.Utc
 ): Option.Option<Today> =>
   record.decisions.some(({ deciders }) =>
     deciders.some((each) => sameHandle(each, decider))
   )
     ? Option.some(
         today({
-          budget: {
-            finishes: 0,
-            total: perDay,
-            used: spentBy(record, decider, now),
-          },
           decider,
           decisions: record.decisions,
           firstClaims: record.firstClaims,

@@ -8,8 +8,6 @@ import { kinds, project } from "@myr/cli/rules";
  */
 export default project({
   agents: "trailer",
-  budget: { decisionsPerDay: 5, expire: "14 days" },
-  caps: { claimsPerPerson: 3, proposalsPerPerson: 2 },
   deciders: {
     "**": ["ines-v"],
     "src/tz.ts": ["okonkwo"],

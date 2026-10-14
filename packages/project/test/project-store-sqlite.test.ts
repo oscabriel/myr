@@ -20,6 +20,7 @@ describe("the project store's migrations", () => {
       expect(yield* migrate).toStrictEqual([
         [1, "project_state"],
         [2, "visibility"],
+        [3, "drop_budget_days"],
       ]);
       expect(yield* migrate).toStrictEqual([]);
     }).pipe(Effect.provide(database))

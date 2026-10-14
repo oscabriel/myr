@@ -175,10 +175,10 @@ export const aProject = (
     agents: "trailer",
     asks: [],
     at: landed,
-    budget: { decisionsPerDay: 5, expireDays: 14 },
     caps: { claimsPerPerson: 3, proposalsPerPerson: 2 },
     claims: { lapseAfterMs: 86_400_000, warnAfterMs: 7_200_000 },
     deciders: [{ handles: deciders, paths: "**" }],
+    decisions: { expireDays: 14 },
     functions: { admit: false, opensAlone: false },
     judge: {
       paths: [`${Brand.configDir}/**`],

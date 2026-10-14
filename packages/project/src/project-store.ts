@@ -7,7 +7,6 @@ import type {
   AnswerRow,
   AskRow,
   AttemptRow,
-  BudgetDayRow,
   ClaimRow,
   DecisionRow,
   EnvValueRow,
@@ -33,7 +32,6 @@ export interface ProjectSnapshot {
   readonly answers: readonly AnswerRow[];
   readonly asks: readonly AskRow[];
   readonly attempts: readonly AttemptRow[];
-  readonly budgetDays: readonly BudgetDayRow[];
   readonly claims: readonly ClaimRow[];
   readonly decisions: readonly DecisionRow[];
   readonly envValues: readonly EnvValueRow[];
@@ -52,7 +50,6 @@ export interface ProjectWrites {
   readonly answers?: readonly AnswerRow[];
   readonly asks?: readonly AskRow[];
   readonly attempts?: readonly AttemptRow[];
-  readonly budgetDays?: readonly BudgetDayRow[];
   readonly claims?: readonly ClaimRow[];
   readonly decisions?: readonly DecisionRow[];
   readonly envValues?: readonly EnvValueRow[];

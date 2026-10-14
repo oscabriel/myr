@@ -30,7 +30,7 @@ import {
 } from "../src/features/decision/decision-card.tsx";
 import { orderDecisions } from "../src/features/inbox/decisions.ts";
 import {
-  budgetSentence,
+  waitingSentence,
   InboxView,
 } from "../src/features/inbox/inbox-page.tsx";
 import { movedToInbox } from "../src/features/inbox/moved.ts";
@@ -170,13 +170,11 @@ const landing = (
 });
 
 const today: Today = {
-  budget: { finishes: 1, total: 5, used: 2 },
   decider: okonkwo,
   // Out of order on purpose: the page orders them.
   decisions: [proposal, vouch, stray],
   expiringSoon: [stray.id],
   newcomers: [Handle.make("lin-h")],
-  overflow: 4,
   unattended: [
     landing("c", "format-date", "2026-10-07T09:00:00Z"),
     landing("d", "parse-iso", "2026-10-06T18:00:00Z"),
@@ -201,28 +199,30 @@ const viewOf = (
 const page = viewOf(deciding(today));
 
 describe("the inbox, for the decisions waiting on a reader", () => {
-  it("says the budget as one sentence, the finishes counted apart", () => {
+  it("says how many decisions wait as one sentence, with how many are due today, and names no budget", () => {
     const text = textOf(page);
 
     expect(text).toContain(
-      "Decisions: 2 taken, 3 left today. Finishes are counted apart: 1 taken."
+      "Decisions: 3 waiting, 1 due today. Each takes its default if nobody decides before it expires."
     );
-    expect(markupOf(page)).toContain('data-budget="2/5"');
-    expect(text).not.toContain("2 of 5");
-    expect(text).not.toContain("3 of 5");
+    expect(markupOf(page)).toContain('data-waiting="3"');
+    expect(text).not.toContain("budget");
+    expect(text).not.toContain("tomorrow");
   });
 
-  it("says none when no finish was taken", () => {
-    expect(budgetSentence({ finishes: 0, total: 5, used: 5 })).toBe(
-      "Decisions: 5 taken, none left today. Finishes are counted apart: none taken."
+  it("says none when nothing waits, and leaves the due count out when none is due", () => {
+    expect(waitingSentence({ ...today, decisions: [], expiringSoon: [] })).toBe(
+      "Decisions: none waiting. Each takes its default if nobody decides before it expires."
+    );
+    expect(waitingSentence({ ...today, expiringSoon: [] })).toBe(
+      "Decisions: 3 waiting. Each takes its default if nobody decides before it expires."
     );
   });
 
   it("puts its sections in order, each under its header: decisions, claims, asks, then what happened lately", () => {
     expect(sectionsOf(markupOf(page))).toStrictEqual([
       "Due today",
-      "Within your budget",
-      "Waits for tomorrow",
+      "Later",
       "Your claims",
       "Asks you may take",
       "Newcomers to welcome",
@@ -288,16 +288,6 @@ describe("the inbox, for the decisions waiting on a reader", () => {
     expect(text).toContain("If nobody decides by Thu 8 Oct, 10:00 UTC: adopt");
   });
 
-  it("says how many more wait for tomorrow", () => {
-    const markup = markupOf(page);
-
-    expect(textIn(markup)).toContain("4 more wait for tomorrow");
-    expect(markup).toContain('data-overflow="4"');
-    expect(textOf(viewOf(deciding({ ...today, overflow: 3 })))).toContain(
-      "3 more wait for tomorrow"
-    );
-  });
-
   it("names the newcomers to welcome and the landings that needed nobody", () => {
     const text = textOf(page);
     const markup = markupOf(page);
@@ -345,7 +335,6 @@ describe("the inbox, for the decisions waiting on a reader", () => {
       viewOf(
         deciding({
           ...today,
-          budget: { ...today.budget, used: 3 },
           decisions: [vouch, stray],
         }),
         { decided: AsyncResult.success({ decision: taken }) }
@@ -365,10 +354,10 @@ describe("the inbox, for the decisions waiting on a reader", () => {
       "Opens the ask: its file and check land on main, with you as Decided-by."
     );
     expect(last?.body).not.toContain("data-choice=");
-    expect(textIn(markup)).toContain("Decisions: 3 taken, 2 left today.");
+    expect(textIn(markup)).toContain("Decisions: 2 waiting, 1 due today.");
   });
 
-  it("leaves the decisions and the budget out for a reader who decides nowhere", () => {
+  it("leaves the decisions and their count out for a reader who decides nowhere", () => {
     const markup = markupOf(
       viewOf({
         ...deciding(today),
@@ -377,7 +366,7 @@ describe("the inbox, for the decisions waiting on a reader", () => {
     );
 
     expect(markup).not.toContain("data-decision");
-    expect(markup).not.toContain("data-budget");
+    expect(markup).not.toContain("data-waiting");
   });
 
   it("shows a refused read as the refusal, says what the inbox is, and lists no decision", () => {
@@ -587,22 +576,18 @@ const pageFrom = (encoded: typeof InboxPageData.Encoded) => {
 
 describe("the inbox's decisions, read on the server with the reader's session", () => {
   it.live(
-    "renders a maintainer's decisions from the fixtures: the budget sentence, the sections and what waits",
+    "renders a maintainer's decisions from the fixtures: the waiting sentence, every one in its section",
     () =>
       Effect.gen(function* () {
         const markup = pageFrom(yield* readInbox({ project: vellum }));
         const text = textIn(markup);
 
-        expect(text).toContain(
-          "Decisions: 2 taken, 3 left today. Finishes are counted apart: none taken."
-        );
-        expect(sectionsOf(markup).slice(0, 3)).toStrictEqual([
+        expect(text).toContain("Decisions: 6 waiting, 1 due today.");
+        expect(sectionsOf(markup).slice(0, 2)).toStrictEqual([
           "Due today",
-          "Within your budget",
-          "Waits for tomorrow",
+          "Later",
         ]);
-        expect(text).toContain("3 more wait for tomorrow");
-        expect(rowsOf(markup)).toHaveLength(3);
+        expect(rowsOf(markup)).toHaveLength(6);
 
         for (const { body } of rowsOf(markup)) {
           expect(body).toContain("data-consequence=");

@@ -2,6 +2,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { Client, Contracts } from "@repo/protocol/contracts";
 import { forkRev } from "@repo/protocol/domain/code";
+import { DecisionSubject } from "@repo/protocol/domain/decision";
 import { ProjectEvent } from "@repo/protocol/domain/event";
 import { Handle, ProjectName } from "@repo/protocol/ids";
 import {
@@ -483,23 +484,32 @@ describe("a draft in the dev world", seededWorlds, () => {
       Effect.gen(function* () {
         const { after, before, proposed, shown } = yield* drafted;
 
-        // The seeded decisions expire first and fill the day's budget, so
-        // the draft's decision waits on Today as its overflow.
+        // Today holds every open decision, so the draft's joins the seeded ones.
+        const joined = after.decisions.filter(
+          ({ id }) => !before.decisions.some((was) => was.id === id)
+        );
+
         expect({
           files: shown.files.map(({ path }) => path),
-          overflow: [before.overflow, after.overflow],
+          joined: joined.map(({ subject }) => subject),
+          kept: before.decisions.every(({ id }) =>
+            after.decisions.some((now) => now.id === id)
+          ),
           proposed: proposed.draft?._tag,
           ready: shown.proposal.draft?._tag,
-          shown: after.decisions.map(({ id }) => id),
         }).toStrictEqual({
           files: [
             `${Brand.configDir}/asks/parse-ordinal.ask.ts`,
             "test/asks/parse-ordinal.test.ts",
           ],
-          overflow: [0, 1],
+          joined: [
+            DecisionSubject.cases.OpenProposal.make({
+              proposal: proposed.id,
+            }),
+          ],
+          kept: true,
           proposed: "Drafting",
           ready: "Ready",
-          shown: before.decisions.map(({ id }) => id),
         });
       })
   );

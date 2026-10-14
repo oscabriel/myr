@@ -198,23 +198,23 @@ const Num = ({ children }: { readonly children: string }) => (
 );
 
 const Limits = ({ policy }: { readonly policy: PublicPolicy }) => {
-  const { budget, caps, claims, record } = policy;
+  const { caps, claims, decisions, record } = policy;
 
   return (
     <Region id="limits" title="Limits">
       <Definitions label="Limits">
         <Definition term="Claims">
-          <Num>{`${plural(caps.claimsPerPerson, "claim", "claims")} per person at once`}</Num>
+          <Num>{`${plural(caps.claimsPerPerson, "claim", "claims")} at once for a person nobody has vouched for; a vouched person and a maintainer are never held`}</Num>
         </Definition>
         <Definition term="Proposals">
           <Num>
             {caps.proposalsPerPerson === 0
               ? "Proposals are off"
-              : `${plural(caps.proposalsPerPerson, "proposal", "proposals")} per person at once`}
+              : `${plural(caps.proposalsPerPerson, "proposal", "proposals")} open at once for a person nobody has vouched for`}
           </Num>
         </Definition>
-        <Definition term="Budget">
-          <Num>{`${plural(budget.decisionsPerDay, "decision", "decisions")} a day per maintainer; an undecided one takes its default after ${plural(budget.expireDays, "day", "days")}`}</Num>
+        <Definition term="Decisions">
+          <Num>{`an undecided one takes its default after ${plural(decisions.expireDays, "day", "days")}`}</Num>
         </Definition>
         <Definition term="Claim timing">
           <Num>{`warned after ${spanOf(claims.warnAfterMs)} without a push; lapses after ${spanOf(claims.lapseAfterMs)}`}</Num>

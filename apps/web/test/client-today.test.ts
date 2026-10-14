@@ -33,7 +33,6 @@ describe("Today, through the web's atoms", seededWorld, () => {
       expect(
         Exit.isSuccess(today)
           ? {
-              budget: today.value.budget,
               decider: today.value.decider,
               newcomers: today.value.newcomers,
               projects: Array.dedupe(
@@ -46,7 +45,6 @@ describe("Today, through the web's atoms", seededWorld, () => {
             }
           : undefined
       ).toStrictEqual({
-        budget: { finishes: 0, total: 5, used: 2 },
         decider: "ines-v",
         newcomers: ["bram"],
         projects: ["oscabriel/datekit"],
@@ -111,7 +109,6 @@ describe("Today, through the web's atoms", seededWorld, () => {
                   holds: today.value.decisions.some(
                     ({ id }) => id === proposal.id
                   ),
-                  used: today.value.budget.used,
                 }
               : undefined
           );
@@ -120,8 +117,8 @@ describe("Today, through the web's atoms", seededWorld, () => {
           page: yield* todayIn(registry),
           rail: yield* todayIn(rail),
         }).toStrictEqual({
-          page: { holds: false, used: 3 },
-          rail: { holds: false, used: 3 },
+          page: { holds: false },
+          rail: { holds: false },
         });
 
         unmount();

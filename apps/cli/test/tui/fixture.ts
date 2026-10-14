@@ -61,11 +61,9 @@ export const vouch: Decision = {
 };
 
 export const today: Today = {
-  budget: { finishes: 1, total: 5, used: 2 },
   decider: okonkwo,
   decisions: [proposal, vouch, stray],
   expiringSoon: [stray.id],
   newcomers: [Handle.make("ada"), Handle.make("grace")],
-  overflow: 1,
   unattended: [],
 };

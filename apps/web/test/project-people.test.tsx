@@ -39,7 +39,6 @@ const datekitPolicy = decodePolicy({
   ...unshown,
   agents: "trailer",
   at: sha,
-  budget: { decisionsPerDay: 5, expireDays: 14 },
   caps: { claimsPerPerson: 3, proposalsPerPerson: 2 },
   claims: { lapseAfterMs: 86_400_000, warnAfterMs: 7_200_000 },
   deciders: [
@@ -47,6 +46,7 @@ const datekitPolicy = decodePolicy({
     { handles: ["okonkwo", "bram"], paths: "src/format/**" },
     { handles: ["okonkwo"], paths: "src/tz.ts" },
   ],
+  decisions: { expireDays: 14 },
   record: { countsAfterDays: 30, windowDays: 365 },
   source: "config",
   vouch: { file: `${Brand.configDir}/vouched.td`, mode: "forCode" },
@@ -81,10 +81,10 @@ const burrowPolicy = decodePolicy({
   ...unshown,
   agents: "trailer",
   at: sha,
-  budget: { decisionsPerDay: 5, expireDays: 14 },
   caps: { claimsPerPerson: 3, proposalsPerPerson: 2 },
   claims: { lapseAfterMs: 86_400_000, warnAfterMs: 7_200_000 },
   deciders: [{ handles: ["wren"], paths: "**" }],
+  decisions: { expireDays: 14 },
   record: { countsAfterDays: 30, windowDays: 365 },
   source: "defaults",
   vouch: { file: `${Brand.configDir}/vouched.td`, mode: "forCode" },
@@ -247,14 +247,14 @@ describe("a project's policy page", () => {
     expect(sectionOf(markup, "agents")).not.toContain("data-layers");
   });
 
-  it("shows the caps, budget, claim timing and record window, the numbers tabular", () => {
+  it("shows the caps as throttles on the unvouched, the decision expiry, claim timing and record window, the numbers tabular", () => {
     const limits = sectionOf(mainOf(markupOf(page)), "limits");
 
     for (const words of [
-      "3 claims per person",
-      "2 proposals per person",
-      "5 decisions a day",
-      "14 days",
+      "3 claims at once for a person nobody has vouched for",
+      "a vouched person and a maintainer are never held",
+      "2 proposals open at once for a person nobody has vouched for",
+      "an undecided one takes its default after 14 days",
       "2 hours",
       "24 hours",
       "30 days",

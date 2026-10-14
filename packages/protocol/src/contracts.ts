@@ -338,7 +338,7 @@ export class TodayOf extends Rpc.make("today", {
 })
   .annotate(
     Description,
-    "Show the caller's Today: the decisions to take, held to their budget, each with its evidence and a safe default."
+    "Show the caller's Today: every open decision, soonest to expire first, each with its evidence and a safe default."
   )
   .annotate(Audience, "decider")
   .annotate(Visibility, "maintainers")
@@ -567,7 +567,7 @@ export class PolicyOf extends Rpc.make("projectPolicy", {
 })
   .annotate(
     Description,
-    "Show a project's evaluated config folder at its landed commit: who decides which paths, its vouches, caps, budget and claim timing; for an import, its source."
+    "Show a project's evaluated config folder at its landed commit: who decides which paths, its vouches, caps, decision expiry and claim timing; for an import, its source."
   )
   .annotate(Audience, "public")
   .annotate(Visibility, "public")

@@ -604,8 +604,7 @@
         "policy": {
           "agents": "trailer",
           "at": "4444444444444444444444444444444444444444",
-          "budget": {
-            "decisionsPerDay": 5,
+          "decisions": {
             "expireDays": 14
           },
           "caps": {
@@ -1027,11 +1026,6 @@
         "project": "oscabriel/datekit"
       },
       "success": {
-        "budget": {
-          "finishes": 1,
-          "total": 5,
-          "used": 2
-        },
         "decider": "alice",
         "decisions": [
           {
@@ -1062,7 +1056,6 @@
         ],
         "expiringSoon": ["dec-000001"],
         "newcomers": ["dave"],
-        "overflow": 0,
         "unattended": [
           {
             "ask": "iso-week",

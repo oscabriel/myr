@@ -6,7 +6,6 @@ import {
   AnswerRow,
   AskRow,
   AttemptRow,
-  BudgetDayRow,
   ClaimRow,
   DecisionRow,
   EnvValueRow,
@@ -67,12 +66,6 @@ export const Tables = {
       claimant: row.claimant,
       week: row.week,
     })
-  ),
-  budgetDays: tableOf(
-    "budget_days",
-    BudgetDayRow,
-    ["decider", "day"],
-    (row) => ({ day: row.day, decider: row.decider })
   ),
   claims: tableOf("claims", ClaimRow, ["ask", "claimant"], (row) => ({
     ask: row.ask,
@@ -172,7 +165,6 @@ export const writeAll = <E, R>(
     yield* upsert(Tables.landings, writes.landings ?? []);
     yield* upsert(Tables.proposals, writes.proposals ?? []);
     yield* upsert(Tables.decisions, writes.decisions ?? []);
-    yield* upsert(Tables.budgetDays, writes.budgetDays ?? []);
     yield* upsert(Tables.ratchets, writes.ratchets ?? []);
     yield* upsert(Tables.pushEvents, writes.pushEvents ?? []);
     yield* upsert(EventTable, events);

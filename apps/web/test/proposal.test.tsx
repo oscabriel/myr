@@ -310,12 +310,10 @@ const platformHandlers = (
     Contracts.toLayerHandler("today", () =>
       Ref.update(asked, (seen) => ({ ...seen, today: seen.today + 1 })).pipe(
         Effect.as({
-          budget: { finishes: 0, total: 5, used: 0 },
           decider: Handle.make("okonkwo"),
           decisions: [],
           expiringSoon: [],
           newcomers: [],
-          overflow: 0,
           unattended: [],
         })
       )

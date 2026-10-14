@@ -1,12 +1,12 @@
 {
   "agents": "trailer",
   "asks": [],
-  "budget": { "decisionsPerDay": 5, "expireDays": 14 },
   "caps": { "claimsPerPerson": 3, "proposalsPerPerson": 2 },
   "deciders": [
     { "handles": ["priya"], "paths": "packages/parse/src/public/**" },
     { "handles": "owners", "paths": "**" }
   ],
+  "decisions": { "expireDays": 14 },
   "functions": { "admit": false, "opensAlone": true },
   "kinds": [
     {

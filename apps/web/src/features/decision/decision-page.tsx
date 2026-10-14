@@ -315,7 +315,7 @@ export const DecisionView = ({
       <Apart data={data}>
         <EmptyState
           command={`${Brand.cli} today --project ${data.project}`}
-          title={`Decision ${data.decision} is not on your Today: it was decided, it expired to its default, or it waits beyond today's budget.`}
+          title={`Decision ${data.decision} is not on your Today: it was decided, or it expired to its default.`}
         />
       </Apart>
     ),

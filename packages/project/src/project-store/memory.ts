@@ -73,7 +73,6 @@ const snapshotOf = (state: State) =>
       answers: yield* all(state, Tables.answers),
       asks: yield* all(state, Tables.asks),
       attempts: yield* all(state, Tables.attempts),
-      budgetDays: yield* all(state, Tables.budgetDays),
       claims: yield* all(state, Tables.claims),
       decisions: yield* all(state, Tables.decisions),
       envValues: yield* all(state, Tables.envValues),

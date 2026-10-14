@@ -386,7 +386,7 @@ const promotionOf = (
     ];
 
     const proposal: Proposal = {
-      expiresAt: DateTime.add(now, { days: policy.budget.expireDays }),
+      expiresAt: DateTime.add(now, { days: policy.decisions.expireDays }),
       files: [path],
       id: input.ids.proposal,
       openedAt: now,
@@ -400,7 +400,7 @@ const promotionOf = (
     const decision = openDecision({
       deciders: deciding,
       evidence,
-      expireDays: policy.budget.expireDays,
+      expireDays: policy.decisions.expireDays,
       id: input.ids.decision,
       now,
       project: input.project,

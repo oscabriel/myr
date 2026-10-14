@@ -25,7 +25,7 @@ import type { ProjectName, RepoName } from "@repo/protocol/ids";
 import { CurrentPrincipal, Principal } from "@repo/protocol/principal";
 import type { Person } from "@repo/protocol/principal";
 import { NotDecider } from "@repo/protocol/refusal";
-import { Array, DateTime, Effect, Number, Option, Order, Stream } from "effect";
+import { Array, DateTime, Effect, Option, Order, Stream } from "effect";
 import type { Layer } from "effect";
 import { HttpServerRequest } from "effect/http";
 import type { Rpc, RpcGroup } from "effect/rpc";
@@ -88,17 +88,9 @@ const byExpiry: Order.Order<Decision> = Order.combineAll([
 const acrossProjects = (
   decider: Person,
   pages: readonly Today[]
-): Effect.Effect<Today, NotDecider> => {
-  const sumOf = (pick: (page: Today) => number) =>
-    Number.sumAll(pages.map(pick));
-
-  return Array.isReadonlyArrayNonEmpty(pages)
+): Effect.Effect<Today, NotDecider> =>
+  Array.isReadonlyArrayNonEmpty(pages)
     ? Effect.succeed({
-        budget: {
-          finishes: sumOf(({ budget }) => budget.finishes),
-          total: sumOf(({ budget }) => budget.total),
-          used: sumOf(({ budget }) => budget.used),
-        },
         decider: decider.handle,
         decisions: Array.sort(
           pages.flatMap(({ decisions }) => decisions),
@@ -109,11 +101,9 @@ const acrossProjects = (
           pages.flatMap(({ newcomers }) => newcomers),
           sameHandle
         ),
-        overflow: sumOf(({ overflow }) => overflow),
         unattended: pages.flatMap(({ unattended }) => unattended),
       })
     : Effect.fail(new NotDecider({}));
-};
 
 export const devHandlers: Layer.Layer<
   Rpc.ToHandler<RpcGroup.Rpcs<typeof Contracts>>,

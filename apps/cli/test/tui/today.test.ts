@@ -136,16 +136,19 @@ const rowsWith = (rows: readonly string[], text: string) =>
   rows.filter((row) => row.includes(text));
 
 describe("Today as the terminal shows it", () => {
-  it.live("says whose Today it is and how much of the budget is used", () =>
-    Effect.gen(function* () {
-      const rows = yield* screenOf(start(today));
+  it.live(
+    "says whose Today it is, how many decisions wait, and how many are due within a day",
+    () =>
+      Effect.gen(function* () {
+        const rows = yield* screenOf(start(today));
 
-      expect(rowsWith(rows, "Today for okonkwo")).toHaveLength(1);
-      expect(rowsWith(rows, "Budget: 2 of 5 decisions used")).toStrictEqual([
-        "Budget: 2 of 5 decisions used, 3 left today · 1 finish, counted apart",
-      ]);
-      expect(rowsWith(rows, "1 more waits for tomorrow")).toHaveLength(1);
-    })
+        expect(rowsWith(rows, "Today for okonkwo")).toHaveLength(1);
+        expect(rowsWith(rows, "3 decisions waiting")).toStrictEqual([
+          "3 decisions waiting · 1 due within a day",
+        ]);
+        expect(rowsWith(rows, "Budget")).toHaveLength(0);
+        expect(rowsWith(rows, "for tomorrow")).toHaveLength(0);
+      })
   );
 
   it.live("lists the decisions in expiry order, the cursor on the first", () =>
