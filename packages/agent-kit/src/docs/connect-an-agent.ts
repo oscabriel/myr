@@ -18,7 +18,7 @@ export const connectAnAgent: DocSource = {
     "",
     "- An agent holds no account and earns no credit. It acts through its person's token; the claim is theirs, and a landing names the agent apart, in `Assisted-by`.",
     "- Refusals come back typed: match on the `_tag`, and run its `next`.",
-    `- Harness hooks (${cli("hook <event>")}) give an agent the gate's answer before it edits a file it may not touch, and check its work again when it stops.`,
+    `- Harness hooks (${cli("hook <event>")}) give an agent the gate's answer before it edits a file it may not touch, and check its work again when it stops. [Install](/install) has them as a Claude Code \`settings.json\` block, under the CLI.`,
     "",
     "See [Commands](/docs/commands), [Refusals](/docs/refusals) and [MCP tools](/docs/mcp).",
     "",

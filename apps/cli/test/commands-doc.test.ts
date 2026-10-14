@@ -17,6 +17,7 @@ const Takes = Schema.Struct({
   args: Schema.Array(
     Schema.Struct({ name: Schema.String, required: Schema.Boolean })
   ),
+  description: Schema.String,
   flags: Schema.Array(
     Schema.Struct({
       name: Schema.String,
@@ -35,6 +36,7 @@ const decodeTakes = Schema.decodeSync(Schema.fromJsonString(Takes));
 const takesOf = (doc: HelpDoc.HelpDoc) =>
   encodeTakes({
     args: (doc.args ?? []).map(({ name, required }) => ({ name, required })),
+    description: doc.description,
     flags: doc.flags.map(({ name, required, type }) => ({
       name,
       required,
@@ -175,7 +177,7 @@ describe("the command rows against the CLI", () => {
 
         const differ = rows.flatMap((row) => {
           const { takes } = commands.get(words(row)) ?? {
-            takes: { args: [], flags: [] },
+            takes: { args: [], description: "", flags: [] },
           };
 
           const flags = [...declared(row, takes)].toSorted();
@@ -189,6 +191,30 @@ describe("the command rows against the CLI", () => {
             positional.join(" ") === row.positional.join(" ")
             ? []
             : [{ command: words(row), flags, positional, real }];
+        });
+
+        expect(differ).toStrictEqual([]);
+      }),
+    30_000
+  );
+
+  it.effect(
+    "say what each command does in the CLI's own words: a local command's exactly, a contract's as its help begins",
+    () =>
+      Effect.gen(function* () {
+        const commands = yield* runnable;
+
+        const differ = rows.flatMap((row) => {
+          const said = commands.get(words(row))?.takes.description ?? "";
+
+          const same =
+            row.source === "local"
+              ? said === row.summary
+              : said.startsWith(row.summary);
+
+          return same
+            ? []
+            : [{ command: words(row), said, summary: row.summary }];
         });
 
         expect(differ).toStrictEqual([]);

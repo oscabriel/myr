@@ -4,11 +4,13 @@
 
 This project takes changes through __NAME__: an answer to one of its asks lands only by passing the gate. This block is generated from the config folder, and the gate decides what lands. The full guide is the `datekit-contribute` skill (`.agents/skills/datekit-contribute/SKILL.md`).
 
+It needs the __NAME__ CLI (the install script on the platform's `/install` page) signed in with `__CLI__ login --url <platform>`, and runs in a clone of the project, `git clone <platform>/oscabriel/datekit.git`, where `<platform>` is the host this project lives on: in such a clone, `git remote get-url origin` names it.
+
 1. Read the ask, then claim it: `__CLI__ ask <ask>`, then `__CLI__ claim <ask>`. The claim prints your fork's remote; add it with `git remote add __SLUG__ <remote>`.
 2. Work inside the ask's territory until its check passes.
 3. Run `__CLI__ check`. It gives the refusals a push would get, then runs the ask's check and the project's lanes; fix everything it reports.
-4. Push your answer to your fork: `git push __SLUG__ HEAD:main`. The push itself can be refused; follow the answer with `__CLI__ status`.
-5. Read the verdict on your head: `git fetch __SLUG__ refs/notes/__SLUG__:refs/notes/__SLUG__`, then `git notes --ref=__SLUG__ show HEAD`. It is JSON: match on its `_tag`, and run a refusal's `next`.
+4. Push your answer to your fork: `git push __SLUG__ HEAD:main`. The push itself can be refused, on git's `remote:` lines.
+5. Wait for the verdict: the rest of the checks run on the platform after git returns. Run `__CLI__ status --json` until your answer's `outcome._tag` is no longer `Checking`, then read the verdict on your head: `git fetch __SLUG__ refs/notes/__SLUG__:refs/notes/__SLUG__`, then `git notes --ref=__SLUG__ show HEAD`. It is JSON: match on its `_tag`, and run a refusal's `next`.
 
 - Change only files in the ask's territory; a push that changes anything else is refused with `OutOfScope`.
 - Never change the judge closure (`.__SLUG__/**`, `bunfig.toml`, `tsconfig.json`, `package.json#/scripts`); a push that does is refused with `TouchedJudge`.

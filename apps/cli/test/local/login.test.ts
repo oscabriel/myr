@@ -464,7 +464,7 @@ describe(`${Brand.cli} login --token-stdin`, () => {
   );
 
   it.live(
-    "with no --url and no stored profile, asks for --url",
+    "with no --url and no stored profile, asks for --url, naming the platform's own host",
     () =>
       Effect.gen(function* () {
         const env = yield* home;
@@ -477,7 +477,9 @@ describe(`${Brand.cli} login --token-stdin`, () => {
         });
 
         expect(Exit.isFailure(exit)).toBeTruthy();
-        expect((yield* printed).stderr.join("\n")).toContain("--url");
+        expect((yield* printed).stderr.join("\n")).toContain(
+          `${Brand.cli} login --url https://git.${Brand.domain}`
+        );
       }).pipe(Effect.scoped, Effect.provide(testServices)),
     30_000
   );
