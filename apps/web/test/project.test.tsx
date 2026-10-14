@@ -14,6 +14,7 @@ import type { Ledger } from "@repo/protocol/domain/visibility";
 import {
   AreaName,
   AskId,
+  CommitSha,
   Handle,
   KindName,
   LayerName,
@@ -48,9 +49,11 @@ import { postureWord } from "../src/features/project/posture-label.ts";
 import { ProjectFrame } from "../src/features/project/project-frame.tsx";
 import {
   CloneSteps,
+  newestTag,
   ProjectHeader,
   WatchSteps,
 } from "../src/features/project/project-header.tsx";
+import type { ProjectHeaderFacts } from "../src/features/project/project-header.tsx";
 import {
   ProjectView,
   heldBackOf,
@@ -732,7 +735,7 @@ const headerFrom = (name: string, world: Layer.Layer<Client>) =>
   );
 
 /** A project page as its route draws it: the project's frame, its header (its tab from the path alone), then the page. */
-const framed = (url: string, header: ProjectHeaderData, body: ReactNode) =>
+const framed = (url: string, header: ProjectHeaderFacts, body: ReactNode) =>
   renderAt(
     url,
     <ProjectFrame
@@ -859,7 +862,7 @@ const headerFacts = {
     posture: "openWithSealedEvidence",
   },
   project: ProjectName.make("oscabriel/datekit"),
-} satisfies ProjectHeaderData;
+} satisfies ProjectHeaderFacts;
 
 const headerOf = (markup: string) =>
   elementWith(markup, 'data-project-header=""');
@@ -877,7 +880,6 @@ const sameHeader = (markup: string) =>
 const HEADER_READS = [
   "ledger",
   "listAsks",
-  "listRefs",
   "log",
   "projectPolicy",
   "readFile",
@@ -1219,6 +1221,46 @@ describe("the project's header as the server sends it", () => {
         expect(data.header).toStrictEqual(alone);
       }),
     seededWorld
+  );
+
+  it.effect(
+    "never waits on the refs, on Overview or on any other page",
+    () =>
+      Effect.gen(function* () {
+        const seen = yield* Ref.make<readonly string[]>([]);
+
+        yield* Effect.gen(function* () {
+          yield* readProjectPage("oscabriel/datekit");
+          yield* readProjectHeader("oscabriel/datekit");
+        }).pipe(Effect.provide(countingWorld(seen)));
+
+        expect(yield* Ref.get(seen)).not.toContain("listRefs");
+      }),
+    seededWorld
+  );
+
+  it.effect(
+    "says the newest tag by its numbers once the refs are read, and none before",
+    () =>
+      Effect.sync(() => {
+        const project = ProjectName.make("oscabriel/datekit");
+        const sha = CommitSha.make("a".repeat(40));
+
+        const refs = {
+          forks: [],
+          project,
+          tags: ["v0.9.0", "v0.10.0", "v0.2.0"].map((name) => ({
+            name: TagName.make(name),
+            sha,
+          })),
+        };
+
+        expect(newestTag(Option.some(refs))).toStrictEqual({
+          latestTag: "v0.10.0",
+        });
+        expect(newestTag(Option.some({ ...refs, tags: [] }))).toStrictEqual({});
+        expect(newestTag(Option.none())).toStrictEqual({});
+      })
   );
 
   it.live("makes every read at once, none waiting on another", () =>

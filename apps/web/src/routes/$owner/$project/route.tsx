@@ -1,3 +1,4 @@
+import { useAtomValue } from "@effect/atom-react";
 import {
   createFileRoute,
   getRouteApi,
@@ -8,10 +9,16 @@ import {
 import { createServerFn } from "@tanstack/react-start";
 import { env } from "cloudflare:workers";
 import { Effect, Option, Schema } from "effect";
+import { AsyncResult } from "effect/reactivity";
 import { useMemo, useState } from "react";
+import type { ComponentProps } from "react";
 
+import { refsAtom } from "../../../client/code.ts";
 import { ProjectFrame } from "../../../features/project/project-frame.tsx";
-import { ProjectHeader } from "../../../features/project/project-header.tsx";
+import {
+  newestTag,
+  ProjectHeader,
+} from "../../../features/project/project-header.tsx";
 import {
   inProjectFrame,
   projectTabOf,
@@ -98,6 +105,21 @@ const useHeaderRead = () => {
   );
 };
 
+/** The header with its newest tag, read in the browser once the page is drawn: no page waits on the refs. */
+const HeaderWithTag = ({
+  header,
+  ...props
+}: ComponentProps<typeof ProjectHeader>) => {
+  const refs = useAtomValue(refsAtom(header.project));
+
+  return (
+    <ProjectHeader
+      {...props}
+      header={{ ...header, ...newestTag(AsyncResult.value(refs)) }}
+    />
+  );
+};
+
 const ProjectLayout = () => {
   const { platformUrl } = root.useLoaderData();
   const shell = useShellName();
@@ -115,7 +137,7 @@ const ProjectLayout = () => {
     <ProjectFrame
       header={
         header === undefined ? undefined : (
-          <ProjectHeader
+          <HeaderWithTag
             current={projectTabOf(pathname)}
             header={header}
             platformUrl={platformUrl}
