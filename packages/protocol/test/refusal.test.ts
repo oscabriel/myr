@@ -117,6 +117,27 @@ describe("the refusal union", () => {
     expect(document).not.toMatch(/Infinity|NaN|"null"/u);
   });
 
+  // At ask open the check has not landed, so the local check has no ask to
+  // judge: each of these is answered by fixing the ask and opening it again.
+  it("points every refusal raised at ask open at opening the ask again", () => {
+    const atAskOpen = new Set(
+      groups
+        .filter((group) => group.name === "At ask open")
+        .flatMap((group) => group.members.map((member) => member.identifier))
+    );
+
+    const raised = examples.filter((refusal) => atAskOpen.has(refusal._tag));
+
+    expect(raised.map((refusal) => refusal._tag)).toStrictEqual([
+      "NotRedFirst",
+      "WeakCheck",
+      "IncompleteBrief",
+    ]);
+    expect(raised.map((refusal) => refusal.next)).toStrictEqual(
+      raised.map(() => `${Brand.cli} ask open <ask> --project <owner>/<name>`)
+    );
+  });
+
   it("files every member under exactly one group, in union order", () => {
     expect(
       groups.flatMap((group) =>

@@ -34,6 +34,7 @@ import {
   UnknownProposal,
   UnknownRevision,
   ValueTooShort,
+  WeakCheck,
   Weakened,
 } from "../src/refusal.ts";
 import { explain, headline, receiptLine } from "../src/render.ts";
@@ -403,6 +404,14 @@ describe(explain, () => {
         "  retryable: yes",
       ],
       refusal: DraftInProgress.of(ProposalId.make("prop-000007")),
+    },
+    {
+      lines: [
+        "WeakCheck: the ask's check is weak: nullAnswer",
+        `  next: ${Brand.cli} ask open <ask> --project <owner>/<name>`,
+        "  retryable: no",
+      ],
+      refusal: new WeakCheck({ weakness: "nullAnswer" }),
     },
   ])("explains $refusal._tag with its next command", ({ lines, refusal }) => {
     expect(explain([refusal])).toStrictEqual(lines);

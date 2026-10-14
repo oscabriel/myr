@@ -173,7 +173,7 @@ const elsewhere = {
     todo: "Give a longer value, or acknowledge a short one where the floor allows it.",
   },
   WeakCheck: {
-    todo: "Strengthen the check: as it stands, the trivial answer `weakness` names would pass it.",
+    todo: "Strengthen the check: as it stands, the trivial answer `weakness` names would pass it. Then open the ask again with `next`. The local check cannot judge an ask that has not opened.",
   },
 } as const satisfies Record<Exclude<Tag, AnswerTag>, Repair>;
 

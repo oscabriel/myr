@@ -80,7 +80,7 @@ Every refusal the platform gives, in every group of its closed union. Each has a
 | `Flake` | Never counted against the answerer | yes | 75 | `__CLI__ status` | Nothing: the check failed and then passed on the same tree, and the platform runs it again. |
 | `VerifierBlocked` | Never counted against the answerer | yes | 75 | `__CLI__ status` | Nothing: the platform could not run the checks, and runs them again. |
 | `NotRedFirst` | At ask open | no | 65 | `__CLI__ ask open <ask> --project <owner>/<name>` | Make the ask's check fail on main twice the same way, with a failing assertion, not a load or syntax error: run the lane's command on it yourself, then open the ask again with `next`. The local check cannot judge an ask that has not opened. |
-| `WeakCheck` | At ask open | no | 65 | `__CLI__ check` | Strengthen the check: as it stands, the trivial answer `weakness` names would pass it. |
+| `WeakCheck` | At ask open | no | 65 | `__CLI__ ask open <ask> --project <owner>/<name>` | Strengthen the check: as it stands, the trivial answer `weakness` names would pass it. Then open the ask again with `next`. The local check cannot judge an ask that has not opened. |
 | `IncompleteBrief` | At ask open | no | 65 | `__CLI__ ask open <ask> --project <owner>/<name>` | Fill in the fields `missing` names: the ask's kind requires them. Then open the ask again with `next`. |
 | `LayerContentInPublicTree` | Maintainers only | no | 65 | `__CLI__ check` | Take the paths it names out: their files stay private and never enter a public tree. |
 | `SecretInOutput` | Maintainers only | no | 65 | `__CLI__ check` | Take the write-only value of `item` out of the output or the tree (`where`), then check again. |
