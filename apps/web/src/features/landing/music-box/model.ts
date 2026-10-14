@@ -46,6 +46,8 @@ export interface Pose {
   /** The claim's clip: 0 off the ruler, 1 on it. */
   readonly claim: number;
   readonly carriage: number;
+  /** How far the carriage's answer has come in at the intake, 0 to 1. */
+  readonly arrive: number;
   /** Which answer the carriage holds: none, the first or the second. */
   readonly round: 0 | 1 | 2;
   /** The first answer's slide off the carriage into its tray, 0 to 1, and its fade at the reset. */
@@ -332,6 +334,10 @@ export const poseAt = (time: number): Pose => {
 
   return {
     arm: armAt(t),
+    arrive:
+      t >= ROUND_TWO
+        ? smooth(ROUND_TWO, ROUND_TWO + 0.35, t)
+        : smooth(ROUND_ONE, ROUND_ONE + 0.35, t),
     ask: cycle,
     bell: pulse(arrival(5) + 0.2, 0.05, 0.6, t),
     carriage: carriageAt(t),
@@ -348,7 +354,7 @@ export const poseAt = (time: number): Pose => {
     fixed,
     flags: flagsAt(t),
     fresh: fixed * (1 - smooth(RESET - 2, RESET, t)),
-    holding: between(GRIP, PRESSED + 0.05, t),
+    holding: between(GRIP, PRESSED + 0.25, t),
     phase: words.phase,
     printing: smooth(PRESSED, PRESSED + 0.6, t),
     ratchet: cycle + smooth(PRESSED + 0.3, PRESSED + 0.45, t),

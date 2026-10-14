@@ -124,7 +124,7 @@ const Stray = ({ frame }: { readonly frame: ReturnType<typeof liveFrame> }) => (
   <g
     data-fault={frame.fault ? "" : undefined}
     data-part="stray"
-    opacity={frame.strayOpacity}
+    opacity={frame.strayOpacity.toFixed(3)}
     transform={frame.stray}
   >
     <Marks marks={MOVING.strayStrip} />
@@ -199,7 +199,7 @@ const Drawing = ({ pose }: { readonly pose: Pose }) => {
       <Marks marks={STATIC.railBack} />
       <g data-part="carriage" transform={frame.carriage}>
         <Marks marks={MOVING.carriage} />
-        <g data-part="strip" opacity={pose.round === 2 ? 1 : 0}>
+        <g data-part="strip" opacity={frame.stripOpacity.toFixed(3)}>
           <Marks marks={MOVING.strip} />
         </g>
       </g>
@@ -251,7 +251,7 @@ const Drawing = ({ pose }: { readonly pose: Pose }) => {
       <g data-part="arm-back">
         <Marks marks={armBack(pose.arm)} />
       </g>
-      <g data-part="arm-strip" opacity={pose.holding ? 1 : 0}>
+      <g data-part="arm-strip" opacity={frame.heldOpacity.toFixed(3)}>
         <Marks marks={armStrip(pose.arm)} />
       </g>
       <g data-part="arm-front">

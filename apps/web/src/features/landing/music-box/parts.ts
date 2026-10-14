@@ -146,6 +146,24 @@ const box = (
   );
 
 /** The bench: feet, a bevelled top with a groove, corner screws and a label plate. */
+/** A ruler along the bench's front edge, ticked every 4 units. */
+const RULER: Plan = {
+  d: 4.6,
+  r: 0.8,
+  w: 244,
+  x: -146,
+  y: BASE.y + BASE.d - 10.6,
+};
+
+const rulerTicks = ticksAlongX(
+  Array.from({ length: 60 }, (_, index) => RULER.x + 4 + index * 4),
+  5,
+  RULER.y + 0.4,
+  0.6,
+  [1.4, 2.8],
+  C
+);
+
 export const bench = (): readonly Mark[] => {
   const feet = cornersOf(BASE, 24).toSorted(
     (a, b) => a[0] * C.cosA + a[1] * C.sinA - (b[0] * C.cosA + b[1] * C.sinA)
@@ -172,6 +190,16 @@ export const bench = (): readonly Mark[] => {
     line(planOutline(insetPlan(BASE, 5), 0, C, 8), "lo"),
     line(corner.map((point) => ringOnTop(point, 2.2, 0, C, 16)).join(""), "lo"),
     screws(corner.map(([x, y]) => [x, y, 0])),
+    solid(slab(RULER, 0, 0.6, C, { steps: 2 }), "lo", { crease: "none" }),
+    line(rulerTicks.minor, "lo"),
+    line(rulerTicks.major, "mid"),
+    screws(
+      [
+        [RULER.x + 2, RULER.y + RULER.d / 2, 0.6],
+        [RULER.x + RULER.w - 2, RULER.y + RULER.d / 2, 0.6],
+      ],
+      0.42
+    ),
     solid(slab(label, 0, 0.8, C, { steps: 2 }), "lo", { crease: "none" }),
     line(planOutline(insetPlan(label, 1.6), 0.8, C, 2), "faint"),
     line(
@@ -327,6 +355,43 @@ export const hinges = (): readonly Mark[] => {
   ];
 };
 
+/** The tune card pinned inside the back wall, as every cylinder box has one: printed lines. */
+const tuneCard = (): readonly Mark[] => {
+  const face = CASE.y + WALL + 0.4;
+  const from = CASE.x + WALL + 8;
+  const to = from + 26;
+
+  const rule = (z: number, length: number) =>
+    line(
+      polyline(
+        [
+          [from + 3, face, z],
+          [from + 3 + length, face, z],
+        ],
+        C
+      ),
+      "lo",
+      { free: true }
+    );
+
+  return [
+    box([from, CASE.y + WALL, 22], [to, face, 50], "hi"),
+    rule(45.5, 16),
+    rule(41.5, 20),
+    rule(38, 13),
+    rule(34.5, 19),
+    rule(31, 9),
+    rule(27.5, 17),
+    screws(
+      [
+        [from + 2, face, 48],
+        [to - 2, face, 48],
+      ],
+      0.45
+    ),
+  ];
+};
+
 /** The case behind the movement: floor, back wall, far end wall, bedplate. */
 export const caseBack = (): readonly Mark[] => {
   const floor = CASE;
@@ -361,6 +426,20 @@ export const caseBack = (): readonly Mark[] => {
         inner: [line(sideSeam(end, WALL_TOP - 9, C, 3), "faint")],
       }
     ),
+    line(
+      polyline(
+        [
+          [CASE.x + WALL, CASE.y + WALL + 6, CASE_FLOOR + 7],
+          [CASE.x + WALL, CASE.y + CASE.d - 6, CASE_FLOOR + 7],
+          [CASE.x + WALL, CASE.y + CASE.d - 6, WALL_TOP - 14],
+          [CASE.x + WALL, CASE.y + WALL + 6, WALL_TOP - 14],
+        ],
+        C,
+        true
+      ),
+      "lo"
+    ),
+    ...tuneCard(),
     solid(
       slab(BED, CASE_FLOOR, BED_TOP - CASE_FLOOR, C, { bevel: 0.6, steps: 3 }),
       "lo"
@@ -637,6 +716,44 @@ export const combBlock = (): readonly Mark[] => {
       {
         inner: [line(sideSeam(block, COMB_Z - 5, C, 3), "faint")],
       }
+    ),
+    box([from + 10, COMB_BACK, 13], [from + 34, COMB_BACK + 0.5, 21.5], "hi"),
+    line(
+      polyline(
+        [
+          [from + 13, COMB_BACK + 0.5, 19],
+          [from + 29, COMB_BACK + 0.5, 19],
+        ],
+        C
+      ),
+      "lo",
+      { free: true }
+    ),
+    line(
+      polyline(
+        [
+          [from + 13, COMB_BACK + 0.5, 16.5],
+          [from + 24, COMB_BACK + 0.5, 16.5],
+        ],
+        C
+      ),
+      "lo",
+      { free: true }
+    ),
+    screws(
+      [
+        [from + 12, COMB_BACK + 0.5, 21],
+        [from + 32, COMB_BACK + 0.5, 21],
+        ...Array.from(
+          { length: TEETH / TEETH_PER_SECTION },
+          (_section, section): Point => [
+            (sectionFrom(section) + sectionTo(section)) / 2,
+            COMB_BACK,
+            COMB_Z - 2.5,
+          ]
+        ),
+      ],
+      0.45
     ),
     ...Array.from({ length: 8 }, (_, tooth) =>
       box(

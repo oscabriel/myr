@@ -891,7 +891,15 @@
   stroke-width: 1.6px;
 }
 
-/* A state's colour, beside the readout's word for it. */
+/* A state's colour, beside the readout's word for it, eased in as the stage reports it. */
+.mbx [data-flag] path,
+.mbx [data-part="bell"] path,
+.mbx [data-part="tooth"] path {
+  transition:
+    fill 160ms ease-out,
+    stroke 160ms ease-out;
+}
+
 .mbx [data-state="landed"] :is(.mbx-fill, .mbx-shade, .mbx-top),
 .mbx [data-state="refused"] :is(.mbx-fill, .mbx-shade, .mbx-top),
 .mbx [data-state="sealed"] :is(.mbx-fill, .mbx-shade, .mbx-top),

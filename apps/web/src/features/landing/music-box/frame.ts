@@ -136,7 +136,11 @@ export const liveFrame = (pose: Pose) => {
       pose.drop * (TRAY_Y[0] + 9 - (STRIP_Y[0] + STRIP_Y[1]) / 2),
       -pose.drop * (CARRIAGE_TOP - 1.4)
     ),
-    strayOpacity: pose.round === 1 || pose.drop > 0 ? pose.dropped : 0,
+    strayOpacity:
+      pose.round === 1 || pose.drop > 0 ? pose.dropped * pose.arrive : 0,
+    /** The second answer fades in at the intake; the press's copy fades as it pins it. */
+    stripOpacity: pose.round === 2 ? pose.arrive : 0,
+    heldOpacity: pose.holding ? 1 - pose.fixed : 0,
     teeth: lifts.map((lift) =>
       lift === 0
         ? undefined

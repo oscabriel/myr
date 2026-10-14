@@ -105,7 +105,7 @@ const paint = (parts: Parts, pose: Pose, last: Pose | undefined) => {
   set(parts.one("claim"), "opacity", frame.claimOpacity.toFixed(3));
   set(parts.one("flag"), "transform", frame.flag);
   set(parts.one("carriage"), "transform", frame.carriage);
-  set(parts.one("strip"), "opacity", pose.round === 2 ? "1" : "0");
+  set(parts.one("strip"), "opacity", frame.stripOpacity.toFixed(3));
 
   const stray = parts.one("stray");
 
@@ -138,7 +138,7 @@ const paint = (parts: Parts, pose: Pose, last: Pose | undefined) => {
     repaint(parts.one("arm-front"), armFront(pose.arm));
   }
 
-  set(parts.one("arm-strip"), "opacity", pose.holding ? "1" : "0");
+  set(parts.one("arm-strip"), "opacity", frame.heldOpacity.toFixed(3));
   set(parts.one("entries"), "d", tapeEntries(pose));
 
   if (parts.readout !== null && parts.readout.textContent !== pose.readout) {
