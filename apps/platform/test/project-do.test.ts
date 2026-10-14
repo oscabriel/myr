@@ -6,9 +6,11 @@ import { RequestId } from "@repo/protocol/ids";
 import { UnknownProject } from "@repo/protocol/refusal";
 import { advanceTo, at } from "@repo/testkit/clock";
 import { untouchable } from "@repo/testkit/untouchable";
-import { Context, DateTime, Effect, Layer, Option } from "effect";
+import { Context, DateTime, Deferred, Effect, Layer, Option } from "effect";
 
 import { AnswerRunsWorkflow } from "../src/adapters/answer-runs-workflow.ts";
+import type { AnswerWorkflow } from "../src/adapters/answer-runs-workflow.ts";
+import { DoBackground } from "../src/adapters/background.ts";
 import { decodeEnv } from "../src/platform.ts";
 import { doPorts, Project } from "../src/project-do.ts";
 import { generate } from "../src/workflows/generated.ts";
@@ -122,6 +124,94 @@ describe("a Project DO's shell", () => {
           startedOnce
         );
         expect(yield* Instances.use(({ tries }) => tries)).toBe(1);
+      }).pipe(Effect.provide(world))
+  );
+
+  it.effect(
+    "answers a push before the Answer Workflow is admitted: the start's row stays until the start returns, an alarm meanwhile starts nothing, and the row is acked once",
+    () =>
+      Effect.gen(function* () {
+        yield* advanceTo(noon);
+
+        const admitted = yield* Deferred.make<string>();
+        const context = yield* Effect.context();
+        const { instances, workflow } = answerWorkflow();
+        const pending: Promise<unknown>[] = [];
+
+        // Admission takes as long as the test says, as a Workflow's does.
+        const slow: AnswerWorkflow = {
+          ...workflow,
+          create: (input) =>
+            Effect.runPromiseWith(context)(
+              Effect.flatMap(Deferred.await(admitted), () =>
+                Effect.promise(() => workflow.create(input))
+              )
+            ),
+        };
+
+        const host = {
+          waitUntil: (promise: Promise<unknown>) => {
+            pending.push(promise);
+          },
+        };
+
+        const shell = yield* shellOver(":memory:").pipe(
+          Effect.provide(
+            Layer.mergeAll(
+              AnswerRunsWorkflow(slow, project),
+              Layer.succeed(Instances, instances),
+              DoBackground(host)
+            )
+          )
+        );
+
+        const call = through(shell);
+        const { landed } = yield* opening(call);
+
+        yield* call("claim", [bob, parseIso]);
+
+        const head = yield* Pusher.use((git) =>
+          git.push(forkOf(bob), Option.some(landed), fixedFiles)
+        );
+
+        const requestId = RequestId.make("req-fix0002");
+        const answer = { ask: parseIso, base: landed, head, requestId };
+        const receipt = yield* call("submitAnswer", [bob, answer]);
+
+        // The push is answered while the Workflow's admission is still awaited.
+        const answered = {
+          outcome: receipt.outcome._tag,
+          pending: pending.length,
+          tries: yield* instances.tries,
+        };
+
+        yield* shell.alarm();
+
+        const alarmed = yield* instances.tries;
+
+        yield* Deferred.succeed(admitted, "admitted");
+        yield* Effect.promise(() => Promise.all(pending));
+
+        const made = yield* instances.made;
+
+        yield* shell.alarm();
+
+        const replay = yield* call("submitAnswer", [bob, answer]);
+
+        expect(answered).toStrictEqual({
+          outcome: "Checking",
+          pending: 1,
+          tries: 0,
+        });
+        expect(alarmed).toBe(0);
+        expect(made).toStrictEqual([
+          { id: requestId, params: { project, requestId } },
+        ]);
+        expect(replay).toStrictEqual(receipt);
+        expect({
+          restarts: yield* instances.restarts,
+          tries: yield* instances.tries,
+        }).toStrictEqual({ restarts: [], tries: 1 });
       }).pipe(Effect.provide(world))
   );
 
@@ -256,6 +346,7 @@ describe("the Project DO class", () => {
         const ports = yield* Layer.build(
           doPorts({
             config,
+            host: untouchable("host"),
             name: Option.some(project),
             storage: untouchable("storage"),
           })

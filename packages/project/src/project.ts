@@ -196,6 +196,7 @@ import { isStep } from "./answer-runs/steps.ts";
 import { openDecision } from "./attention/decisions.ts";
 import { recordOf } from "./attention/record.ts";
 import { capFor, capped, mayClaim, standing } from "./attention/vouch.ts";
+import { Background } from "./background.ts";
 import {
   ClaimCommand,
   ClaimEffect,
@@ -270,6 +271,8 @@ import {
 } from "./migrate.ts";
 import {
   isDue,
+  isStart,
+  later,
   measuredRow,
   outboxRow,
   OutboxBody,
@@ -1835,6 +1838,7 @@ export const projectService = (
     const envPort = yield* ProjectEnv;
     const draftRuns = yield* DraftRuns;
     const metrics = yield* Metrics;
+    const background = yield* Background;
     const lock = yield* Semaphore.make(1);
     const repo = RepoName.make(keyOf(name));
 
@@ -2095,13 +2099,25 @@ export const projectService = (
         return outbox;
       });
 
+    // An answer's start runs in the background (see `Background`): its row
+    // stays in the store until the start returns, so a settle meanwhile (the
+    // alarm's, or one the start itself makes) skips it, and a shell that lost
+    // the fiber runs the row again, which the run's id dedupes.
+    const starting = yield* Ref.make<ReadonlySet<string>>(new Set());
+
+    const notStarting = (rows: readonly OutboxRow[]) =>
+      Effect.map(Ref.get(starting), (ids) =>
+        rows.filter((row) => !ids.has(row.id))
+      );
+
     const armAlarm = Effect.gen(function* () {
       const h = yield* hydrate;
+      const outbox = yield* notStarting(h.outbox);
 
       const deadlines = [
         ...h.claims.flatMap(({ state }) => Option.toArray(deadlineOf(state))),
         ...deciderDeadlines(h),
-        ...h.outbox.map(({ notBefore }) => notBefore),
+        ...outbox.map(({ notBefore }) => notBefore),
       ];
 
       if (Array.isReadonlyArrayNonEmpty(deadlines)) {
@@ -2109,28 +2125,86 @@ export const projectService = (
       }
     });
 
+    const runRows = (
+      queue: AnswerQueue,
+      rows: Array.NonEmptyReadonlyArray<OutboxRow>,
+      now: DateTime.Utc
+    ) =>
+      Effect.gen(function* () {
+        const ran = yield* withPorts(
+          runOutbox(rows, queue, now, store.ackOutbox)
+        ).pipe(
+          Effect.provideService(DraftRuns, draftRuns),
+          Effect.provideService(Metrics, metrics)
+        );
+
+        yield* store.ackOutbox(ran.done);
+
+        if (Array.isReadonlyArrayNonEmpty(ran.retry)) {
+          yield* lock.withPermits(1)(store.commit({ outbox: ran.retry }));
+        }
+      });
+
+    const startLater = (
+      queue: AnswerQueue,
+      row: OutboxRow,
+      now: DateTime.Utc
+    ) =>
+      runRows(queue, [row], now).pipe(
+        Effect.catchCause((cause) =>
+          Cause.hasInterruptsOnly(cause)
+            ? Effect.interrupt
+            : Effect.logWarning(
+                "the answer's start failed: it is tried again",
+                cause
+              ).pipe(
+                Effect.andThen(
+                  lock.withPermits(1)(
+                    store.commit({ outbox: [later(row, now)] })
+                  )
+                )
+              )
+        ),
+        Effect.ensuring(
+          Ref.update(
+            starting,
+            (ids) => new Set([...ids].filter((id) => id !== row.id))
+          )
+        ),
+        Effect.andThen(armAlarm)
+      );
+
     const settle = (queue: AnswerQueue, rows: readonly OutboxRow[]) =>
       Effect.gen(function* () {
         const now = yield* DateTime.now;
 
-        const due = Array.dedupeWith(
-          rows.filter((row) => isDue(row, now)),
-          (one, other) => one.id === other.id
+        const due = yield* notStarting(
+          Array.dedupeWith(
+            rows.filter((row) => isDue(row, now)),
+            (one, other) => one.id === other.id
+          )
         );
 
-        if (Array.isReadonlyArrayNonEmpty(due)) {
-          const ran = yield* withPorts(
-            runOutbox(due, queue, now, store.ackOutbox)
-          ).pipe(
-            Effect.provideService(DraftRuns, draftRuns),
-            Effect.provideService(Metrics, metrics)
+        const settled = due.filter((row) => !isStart(row));
+
+        if (Array.isReadonlyArrayNonEmpty(settled)) {
+          yield* runRows(queue, settled, now);
+        }
+
+        // Answer runs go last: they may run long, and settle their own rows.
+        const starts = due.filter(isStart);
+
+        if (Array.isReadonlyArrayNonEmpty(starts)) {
+          yield* Ref.update(
+            starting,
+            (ids) => new Set([...ids, ...starts.map(({ id }) => id)])
           );
 
-          yield* store.ackOutbox(ran.done);
-
-          if (Array.isReadonlyArrayNonEmpty(ran.retry)) {
-            yield* lock.withPermits(1)(store.commit({ outbox: ran.retry }));
-          }
+          yield* Effect.forEach(
+            starts,
+            (row) => background.run(startLater(queue, row, now)),
+            { discard: true }
+          );
         }
 
         yield* armAlarm;

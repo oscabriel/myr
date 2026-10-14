@@ -9,6 +9,8 @@ import { Context, Effect, Layer, ManagedRuntime, Option, Schema } from "effect";
 import { DoAlarms } from "./adapters/alarms.ts";
 import type { AlarmStorage } from "./adapters/alarms.ts";
 import { AnswerRunsWorkflow } from "./adapters/answer-runs-workflow.ts";
+import { DoBackground } from "./adapters/background.ts";
+import type { BackgroundHost } from "./adapters/background.ts";
 import { decodeEnv } from "./platform.ts";
 import type { InvalidEnv, PlatformConfig } from "./platform.ts";
 import { telemetryOf, workerPorts } from "./ports.ts";
@@ -31,12 +33,14 @@ const Nameless = Layer.succeed(
 
 export const doPorts = (input: {
   readonly config: PlatformConfig;
+  readonly host: BackgroundHost;
   readonly storage: AlarmStorage;
   readonly name: Option.Option<ProjectName>;
 }) =>
   Layer.mergeAll(
     workerPorts(input.config),
     DoAlarms(input.storage),
+    DoBackground(input.host),
     Option.match(input.name, {
       onNone: () => Nameless,
       onSome: (project) => AnswerRunsWorkflow(input.config.ANSWER, project),
@@ -57,7 +61,16 @@ const shellOf = (ctx: DurableObjectState, env: Env) =>
         Shell,
         projectShell({
           name: Option.getOrUndefined(name),
-          ports: doPorts({ config, name, storage: ctx.storage }),
+          ports: doPorts({
+            config,
+            host: {
+              waitUntil: (promise) => {
+                ctx.waitUntil(promise);
+              },
+            },
+            name,
+            storage: ctx.storage,
+          }),
           // The storage itself, not `storage.sql`: transactions run through it.
           sql: SqliteClient.layer({ storage: ctx.storage }),
         })

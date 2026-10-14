@@ -95,6 +95,14 @@ export default defineConfig(({ mode }) => {
     // of its bytes. Its source maps go up with each deploy
     // (`upload_source_maps` in wrangler.jsonc), so a stack trace in the
     // Worker's logs still names the source.
-    environments: { ssr: { build: { minify: true, sourcemap: true } } },
+    environments: {
+      ssr: {
+        build: { minify: true, sourcemap: true },
+        // The first page waited on Vite transforming the Worker's modules on
+        // demand (ten to twenty-five seconds, by the machine's load);
+        // transformed as the dev server starts, it waits on a fraction.
+        dev: { warmup: ["./src/server.ts", "./src/routes/**/*.tsx"] },
+      },
+    },
   };
 });

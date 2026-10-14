@@ -116,6 +116,8 @@ describe("the build's version stamp", () => {
     ).toStrictEqual([
       "build",
       "--compile",
+      "--bytecode",
+      "--format=esm",
       "--minify",
       "--define",
       'import.meta.env.CLI_BUILD_VERSION="9.9.9-test"',

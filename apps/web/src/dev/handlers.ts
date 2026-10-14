@@ -11,11 +11,11 @@ import {
   whyOf,
 } from "@repo/project/code";
 import type { CodeProject } from "@repo/project/code";
-import { landedProjectOf, withDescriptions } from "@repo/project/description";
+import { landedProjectOf } from "@repo/project/description";
 import { FrontPage } from "@repo/project/front-page";
+import { withProjectFacts } from "@repo/project/listing";
 import type { ProjectApi } from "@repo/project/project";
 import { Projects } from "@repo/project/projects";
-import { withStandingPosture } from "@repo/project/standing-posture";
 import { Contracts, EnvSchemaOf } from "@repo/protocol/contracts";
 import type { AnswerView } from "@repo/protocol/domain/answer";
 import type { ClaimView } from "@repo/protocol/domain/claim";
@@ -236,15 +236,14 @@ export const devHandlers: Layer.Layer<
         code(project, (of) => pathsOf(of, Option.fromUndefinedOr(at))),
       listProjects: () =>
         frontPage.projects().pipe(
-          Effect.flatMap(withStandingPosture),
-          Effect.provideService(Projects, projects),
           Effect.flatMap((listed) =>
-            withDescriptions(listed, (project) =>
+            withProjectFacts(listed, (project) =>
               Effect.map(projects.get(project), (api) =>
                 landedProjectOf(api, project)
               )
             )
           ),
+          Effect.provideService(Projects, projects),
           Effect.provideService(RepoHost, host),
           Effect.map((listed) => ({ projects: listed }))
         ),

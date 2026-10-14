@@ -129,11 +129,21 @@ const ProjectLayout = () => {
   );
 };
 
+/**
+ * How long the header's facts stand before a move between the project's pages
+ * reads them again: without it the router reads the six facts on every move.
+ * A reader who enters at a page with no header of its own (a new proposal)
+ * and moves to a tab within this time sees the frame without a header until
+ * the next read.
+ */
+export const HEADER_STALE_MS = 60_000;
+
 // One header for every page of a project, and the page's side column (`staticData.column`) under it, so both
 // stay mounted as the reader moves between the project's pages.
 export const Route = createFileRoute("/$owner/$project")({
   staticData: { shell: "project" },
   params: projectParams,
   loader: headerLoader((project) => projectHeader({ data: project })),
+  staleTime: HEADER_STALE_MS,
   component: ProjectLayout,
 });
