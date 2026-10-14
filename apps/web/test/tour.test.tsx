@@ -41,7 +41,7 @@ const stepsOf = (markup: string) =>
     ].map(([step, id]) => [id, step])
   );
 
-/** A `myr` command's words: its path and flags, as `commandDocs` lists them. */
+/** A CLI command's words: its path and flags, as `commandDocs` lists them. */
 const partsOf = (command: string) => {
   const [, ...words] = command.split(/\s+/u);
 
