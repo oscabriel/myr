@@ -13,9 +13,8 @@ export const WaysIn = ({
   readonly webUrl: string;
 }) => (
   <ul className="tablet:grid-cols-2 columns:grid-cols-3 grid gap-x-8 gap-y-6">
-    {installChannels({ commands, platformUrl, webUrl })
-      .filter(({ planned }) => !planned)
-      .map(({ audience, id, summary, title }) => (
+    {installChannels({ commands, platformUrl, webUrl }).map(
+      ({ audience, id, summary, title }) => (
         <li
           className="border-rule flex min-w-0 flex-col gap-1.5 border-t pt-4"
           data-way={id}
@@ -37,6 +36,7 @@ export const WaysIn = ({
           </div>
           <p className="text-ui text-muted-foreground">{summary}</p>
         </li>
-      ))}
+      )
+    )}
   </ul>
 );

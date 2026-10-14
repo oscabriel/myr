@@ -147,9 +147,7 @@ const Snippets = ({ channel }: { readonly channel: InstallChannel }) => {
 const ChannelCard = ({ channel }: { readonly channel: InstallChannel }) => (
   <section
     aria-labelledby={channel.id}
-    className={`bg-card flex min-w-0 flex-col gap-3 rounded-md border p-4 ${
-      channel.planned ? "border-rule border-dashed" : "border-rule"
-    }`}
+    className="bg-card border-rule flex min-w-0 flex-col gap-3 rounded-md border p-4"
   >
     <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
       {/* The anchor's target: its margin clears the sticky top bar, with room above the title. */}

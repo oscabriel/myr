@@ -173,14 +173,16 @@ describe("the Install page", () => {
   );
 
   it.effect(
-    "shows the pi extension as planned, with no command, and git over HTTPS with no SSH key",
+    "installs only by the script, says nothing is planned, and shows git over HTTPS with no SSH key",
     () =>
       Effect.gen(function* () {
         const html = yield* page;
-        const pi = sectionOf(html, "pi");
 
-        expect(textOf(pi)).toContain("Planned");
-        expect(codeOf(pi)).toStrictEqual([]);
+        expect(
+          codeOf(html).filter((code) => code.includes("npm"))
+        ).toStrictEqual([]);
+        expect(textOf(html)).not.toMatch(/planned|until then/iu);
+        expect(codeOf(sectionOf(html, "cli"))[0]).toContain("/install.sh | sh");
         expect(textOf(sectionOf(html, "git"))).toContain("HTTPS");
         expect(
           textOf(html)

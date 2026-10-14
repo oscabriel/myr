@@ -59,6 +59,7 @@ export interface SeedOptions {
 }
 
 const FLAGS = new Set([
+  "--allow-fictional",
   "--as",
   "--json",
   "--only",
@@ -70,7 +71,7 @@ const FLAGS = new Set([
 ]);
 
 const USAGE =
-  "bun scripts/seed.ts --world node | --stage <dev-…> [--url <origin>] [--tokens-env SESSION_TOKENS] [--operator-env OPERATOR_TOKEN] [--only <project> [--as <copy>]] [--json]";
+  "bun scripts/seed.ts --world node | --stage <dev-…> | --stage prod --allow-fictional [--url <origin>] [--tokens-env SESSION_TOKENS] [--operator-env OPERATOR_TOKEN] [--only <project> [--as <copy>]] [--json]";
 
 const failed = (reason: string) => new SeedFailed({ reason });
 
@@ -80,9 +81,11 @@ const stageFrom = (argv: readonly string[]) =>
       Effect.mapError(({ message }) => failed(message))
     );
 
-    if (stage === "prod") {
+    // The examples are fictional, and their pages say so: they reach the
+    // real platform only when the person running the seed says they may.
+    if (stage === "prod" && !argv.includes("--allow-fictional")) {
       return yield* failed(
-        "--stage prod is the real platform: the examples are fictional, so seed them on a dev stage"
+        "--stage prod is the real platform: the examples are fictional, so seed them on a dev stage, or add --allow-fictional to show them on prod as labelled examples"
       );
     }
 

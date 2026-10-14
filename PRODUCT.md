@@ -107,7 +107,7 @@ What it declines:
 
 ## Evidence on Hand
 
-- The examples `examples/datekit` (a date library with a maintainers layer of sealed checks and an `.env.schema`) and `examples/burrow` (six services with a lint ratchet and a migrate ask split six ways) are fictional projects with fictional people (`ines-v`, `okonkwo`, `bram`, `okafor`, `lin-h`, and burrow's vouched contributors). Pages show them as examples, never as real users.
+- The examples `examples/datekit` (a date library with a maintainers layer of sealed checks and an `.env.schema`) and `examples/burrow` (six services with a lint ratchet and a migrate ask split six ways) are fictional projects with fictional people (`ines-v`, `okonkwo`, `bram`, `okafor`, `lin-h`, and burrow's vouched contributors). Pages show them as examples, never as real users: each example's README opens by saying it is fictional, and `seed` puts them on `prod` only when told to with `--allow-fictional`.
 - Measured numbers come only from live runs on a stage, each with its date. No testimonials, customers or adoption figures exist; none may be invented.
 
 ## Product Principles
