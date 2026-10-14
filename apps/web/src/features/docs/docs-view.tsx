@@ -167,7 +167,7 @@ export const DocsPageView = ({ page }: { readonly page: DocPage }) => {
         ]}
       />
       <div
-        className={`columns:grid columns:grid-cols-[minmax(0,1fr)_var(--column-docs-toc)] columns:gap-x-14 flex flex-col pt-6 pb-16 ${GUTTER}`}
+        className={`columns:grid columns:grid-cols-[minmax(0,var(--measure))_var(--column-docs-toc)] columns:justify-start columns:gap-x-14 flex flex-col pt-6 pb-16 ${GUTTER}`}
       >
         <article className="max-w-(--measure) min-w-0" data-doc={page.slug}>
           <h1 className="text-headline text-balance break-words">

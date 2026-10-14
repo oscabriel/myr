@@ -22,15 +22,16 @@ const LINK =
   "text-muted-foreground hover:text-foreground no-underline transition-colors duration-[120ms]";
 
 /**
- * The site's and the docs' foot: plain links, then the brand's domain as one
- * line of display type sized to the container (`cqi`), so it fills the
- * width at every size without wrapping. Upper case is the style's, so the
- * text stays the brand's own (the maintainer's overrides, 5).
+ * The site's and the docs' foot, between the rails: a hairline across them,
+ * plain links, then the brand's domain as one line of display type sized to
+ * the container (`cqi`), so it fills the width at every size without
+ * wrapping. Upper case is the style's, so the text stays the brand's own
+ * (the maintainer's overrides, 5).
  */
 export const Footer = () => (
-  <footer className="border-rule mt-16 border-t" data-footer="">
+  <footer className="border-rule mt-auto border-t" data-footer="">
     <div
-      className={`max-w-site @container mx-auto flex flex-col gap-8 pt-6 pb-4 ${GUTTER}`}
+      className={`@container flex w-full flex-col gap-8 pt-6 pb-4 ${GUTTER}`}
     >
       <ul className="text-ui flex flex-wrap gap-x-5 gap-y-2">
         {LINKS.map(({ label, to }) => (

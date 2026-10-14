@@ -14,7 +14,11 @@ import { MusicBox } from "./music-box/music-box.tsx";
 import { WaysIn } from "./ways-in.tsx";
 import { HEADLINE, HERO_LEDE } from "./words.ts";
 
-const PRIMARY = buttonVariants({ className: "no-underline", size: "lg" });
+/** The page's one main action, a size up from a toolbar's button. */
+const PRIMARY = buttonVariants({
+  className: "text-want h-11 px-6 no-underline",
+  size: "lg",
+});
 
 const Code = ({ children }: { readonly children: ReactNode }) => (
   <code className={ID}>{children}</code>
@@ -22,20 +26,35 @@ const Code = ({ children }: { readonly children: ReactNode }) => (
 
 const MAIN = "main";
 
-/** The lede, with `main` set as the ref it is. */
+/** The headline's two sentences, one line each from `tablet`: the want, then the gate. */
+const Headline = () => {
+  const [first, ...rest] = HEADLINE.split(/(?<=\.)\s+/u);
+
+  return (
+    <>
+      <span className="tablet:block">{first}</span>{" "}
+      <span className="tablet:block">{rest.join(" ")}</span>
+    </>
+  );
+};
+
+/** The lede, with `main` set as the ref it is, in mono at the lede's own size. */
 const Lede = () => {
   const [before, after] = HERO_LEDE.split(MAIN);
 
   return (
     <>
       {before}
-      <Code>{MAIN}</Code>
+      <code className="font-mono">{MAIN}</code>
       {after}
     </>
   );
 };
 
-/** A section of the page: its heading first, then a link beside it, then its body. */
+/**
+ * A section of the page under a rule that runs rail to rail: its heading
+ * first, then a link beside it, then its body.
+ */
 const Part = ({
   aside,
   children,
@@ -47,9 +66,12 @@ const Part = ({
   readonly id: string;
   readonly title: string;
 }) => (
-  <section aria-labelledby={id} className="flex flex-col gap-5">
+  <section
+    aria-labelledby={id}
+    className={`border-rule flex flex-col gap-6 border-t py-12 ${GUTTER}`}
+  >
     <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-      <h2 className="text-title" id={id}>
+      <h2 className="text-headline" id={id}>
         {title}
       </h2>
       {aside}
@@ -128,18 +150,24 @@ export const LandingView = ({
   readonly webUrl: string;
 }) => (
   <main
-    className={`flex min-w-0 flex-1 flex-col gap-16 pt-12 pb-20 outline-none ${GUTTER}`}
+    className="flex min-w-0 flex-1 flex-col pb-8 outline-none"
     id="main"
     tabIndex={-1}
   >
-    <div className="flex flex-col gap-10">
-      <div className="flex max-w-(--measure) flex-col gap-4">
-        <h1 className="text-headline text-balance">{HEADLINE}</h1>
-        <p className="text-body">
+    {/* The hero: the headline and its lede centred between the rails, the one action under them, then Fig 1 across the frame. */}
+    <div
+      className={`tablet:pt-20 flex flex-col items-center gap-12 pt-12 pb-16 ${GUTTER}`}
+      data-hero=""
+    >
+      <div className="flex flex-col items-center gap-6 text-center">
+        <h1 className="text-display text-balance">
+          <Headline />
+        </h1>
+        <p className="text-lede text-muted-foreground max-w-(--measure-lede) text-pretty">
           <Lede />
         </p>
       </div>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+      <div className="flex max-w-full flex-col items-center gap-4">
         <AppLink className={PRIMARY} data-action="asks" to={ASKS_PATH}>
           Browse open asks
         </AppLink>
@@ -147,7 +175,9 @@ export const LandingView = ({
           <CommandLine command={installCommand(webUrl)} />
         </div>
       </div>
-      <MusicBox />
+      <div className="w-full max-w-(--container-figure)">
+        <MusicBox />
+      </div>
     </div>
 
     <Part id="gate" title="The gate">

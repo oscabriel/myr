@@ -370,7 +370,10 @@
   `max-w-focus` read the containers, and a column or the measure is read
   as `w-(--column-about)`, `max-w-(--measure)` or `max-w-(--measure-page)`.
 
-  site     a centred 1360 px container with 32 px gutters
+  site     a centred 1760 px container with 32 px gutters, ruled: a
+           hairline runs down each edge the page's full height from `tablet`,
+           the top bar is a box between them, and every section's rule runs
+           rail to rail
   project  fluid to 1600 px with 28 px gutters; the about column (340 px)
            on Overview and the file tree (280 px) on Code are its only
            side columns
@@ -384,6 +387,14 @@
   measure-page
            a project page's head, facts, toolbar and document body stop
            at 56rem (Workspace), wide enough for a table beside its prose
+  measure-lede
+           the landing's lede stops at 40rem under its headline
+  container-figure
+           the landing's figure stops at 76rem, centred, so the drawing
+           keeps its detail in a wide frame
+  frame-inset
+           the room between the viewport and the rails from `tablet`
+           (24 px), and the gap over the top bar's box (16 px)
 
   From `columns` (1100 px) a side column stands beside its main column,
   and below it stacks under it; from `nav` (900 px) the top bar's links
@@ -399,7 +410,7 @@
            sticks there clears them
 */
 @theme static {
-  --container-site: 85rem;
+  --container-site: 110rem;
   --container-project: 100rem;
   --container-focus: 25rem;
   --column-about: 21.25rem;
@@ -411,6 +422,10 @@
   --gutter-project: 1.75rem;
   --measure: 72ch;
   --measure-page: 56rem;
+  --measure-lede: 40rem;
+  --container-figure: 76rem;
+  --frame-inset: 1.5rem;
+  --frame-gap: 1rem;
   --top-bar: 3.5rem;
   --toolbar: 2.5rem;
   --tabs: 2.75rem;
@@ -431,7 +446,18 @@
     under 13 px. Mono is only for what a terminal prints or takes; its
     three lines are inline (the token's own), a transcript
     (`leading-terminal`) and code (`leading-code`, Pierre's 20 px).
+
+    Display and lede are the landing's alone: the one headline that
+    persuades, set at 500 so Plex's plain letters carry it, and the line
+    under it. Display is the one size that scales with the viewport, between
+    40 and 76 px, so two lines fit a phone and fill the frame.
   */
+  --text-display: clamp(2.5rem, 1.25rem + 3.5vw, 4.75rem);
+  --text-display--line-height: 1.02;
+  --text-display--letter-spacing: -0.035em;
+  --text-display--font-weight: 500;
+  --text-lede: 1.1875rem;
+  --text-lede--line-height: 1.75rem;
   --text-headline: 1.5rem;
   --text-headline--line-height: 2rem;
   --text-headline--letter-spacing: -0.015em;

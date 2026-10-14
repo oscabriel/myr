@@ -46,17 +46,22 @@ export const escapeHtml = (text: string) =>
 // values copied from apps/web/src/styles.css as hex (the paper, ink, rule,
 // muted, input, primary and state roles, light and dark), and its faces named
 // first. No font may load here, so IBM Plex is used where the reader has it
-// installed and the system's faces stand in otherwise.
+// installed and the system's faces stand in otherwise. The frame is the
+// web's: from 640 px a hairline down each edge of the card's container, the
+// page's full height, with the wordmark's bar a box between them under a
+// 16 px gap (DESIGN.md "Rails"); on a phone the bar's rule alone.
 const STYLE = `
 :root{color-scheme:light dark;--paper:#f8f7f4;--ink:#1a1f2e;--card:#ffffff;--surface:#e8e6e1;--muted:#5d6371;--rule:#d6d4cf;--input:#79808f;--primary:#677a6d;--on-primary:#ffffff;--refused:#ae2325;--waiting:#516012;--selection:#0c628c38}
 @media (prefers-color-scheme:dark){:root{--paper:#0a0a0a;--ink:#f5f5f5;--card:#121212;--surface:#1a1a1a;--muted:#a0a0a0;--rule:#2a2a2a;--input:#696969;--primary:#7c9082;--on-primary:#000000;--refused:#ff5451;--waiting:#bad074;--selection:#68bbef38}}
 *{box-sizing:border-box}
 body{margin:0;background-color:var(--paper);color:var(--ink);caret-color:var(--ink);font-family:"IBM Plex Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:16px;line-height:1.5;-webkit-text-size-adjust:100%;text-size-adjust:100%}
 ::selection{background-color:var(--selection);color:var(--ink)}
-.top{display:flex;justify-content:center;padding:48px 16px 0}
-.wordmark{margin:0;font-size:1.75rem;line-height:2.25rem;font-weight:600;letter-spacing:-.02em}
-main{max-width:27rem;margin:0 auto;padding:32px 16px 64px}
-main.document{max-width:44rem;padding-top:48px}
+.frame{display:flex;flex-direction:column;min-height:100dvh;max-width:25rem;margin:0 auto}
+.top{display:flex;align-items:center;height:56px;padding:0 16px;border-bottom:1px solid var(--rule)}
+.wordmark{margin:0;font-size:1rem;line-height:1.5rem;font-weight:600;letter-spacing:-.015em}
+main{padding:32px 16px 64px}
+main.document{max-width:44rem;margin:0 auto;padding-top:48px}
+@media (min-width:40em){.frame{border-left:1px solid var(--rule);border-right:1px solid var(--rule)}.top{margin-top:16px;padding:0 32px;border-top:1px solid var(--rule)}main{padding:32px 32px 64px}}
 .card{background-color:var(--card);border:1px solid var(--rule);border-radius:2px;padding:28px 24px}
 .card>:last-child{margin-bottom:0}
 h1{font-size:1.5rem;line-height:2rem;font-weight:600;letter-spacing:-.015em;margin:0 0 20px;text-wrap:balance;overflow-wrap:anywhere}
@@ -94,17 +99,18 @@ li{margin:0 0 8px}
 
 type Width = "form" | "document";
 
-// A form is the focus shell: the wordmark as text above one card, and no
-// navigation. A document (the platform's `/`) reads as plain prose.
+// A form is the focus shell: the wordmark as text in a bar between the rails,
+// one card under it, and no navigation. A document (the platform's `/`)
+// reads as plain prose.
 const frame = (body: string, width: Width) =>
   width === "document"
     ? `<main class="document">
 ${body}
 </main>`
-    : `<header class="top"><p class="wordmark">${escapeHtml(Brand.name)}</p></header>
+    : `<div class="frame"><header class="top"><p class="wordmark">${escapeHtml(Brand.name)}</p></header>
 <main><div class="card">
 ${body}
-</div></main>`;
+</div></main></div>`;
 
 // `body` is HTML already escaped.
 export const page = (title: string, body: string, width: Width = "form") =>

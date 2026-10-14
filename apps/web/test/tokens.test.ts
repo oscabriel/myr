@@ -688,9 +688,12 @@ describe("the shells' widths", () => {
 
   // Spec 3.1: each shell's container, its side columns, and prose's measure.
   it.each([
-    ["container-site", "85rem"],
+    ["container-site", "110rem"],
     ["container-project", "100rem"],
     ["container-focus", "25rem"],
+    ["container-figure", "76rem"],
+    ["frame-inset", "1.5rem"],
+    ["frame-gap", "1rem"],
     ["column-about", "21.25rem"],
     ["column-tree", "17.5rem"],
     ["column-docs-nav", "15rem"],
@@ -698,6 +701,7 @@ describe("the shells' widths", () => {
     ["gutter-site", "2rem"],
     ["gutter-project", "1.75rem"],
     ["measure", "72ch"],
+    ["measure-lede", "40rem"],
   ])("names --%s as %s", (token, width) => {
     expect(layout.get(token)).toBe(width);
   });

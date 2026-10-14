@@ -106,16 +106,22 @@ const Controls = () => {
 const BAR = "flex h-(--top-bar) min-w-0 items-center gap-4";
 
 /**
- * Framed in the site and the docs (inside the container, its hairline too),
- * full-bleed in a project, and the wordmark alone in a focused page.
+ * A box between the rails: a hairline under it everywhere, and from
+ * `tablet` a hairline over it and a gap above, so the rails show past its
+ * top. Its height is the bar's, borders included, so what sticks under it
+ * reads `--stick-bar` as before.
+ */
+const FRAMED = "border-rule tablet:mt-(--frame-gap) tablet:border-t border-b";
+
+/**
+ * Framed in the site, the docs and a focused page (a box between the
+ * shell's rails), full-bleed in a project, and the wordmark alone in a
+ * focused page.
  */
 export const TopBar = ({ shell }: { readonly shell: ShellName }) => {
   if (shell === "focus") {
     return (
-      <header
-        className={`max-w-focus mx-auto w-full ${GUTTER} ${BAR}`}
-        data-top-bar="focus"
-      >
+      <header className={`${FRAMED} ${GUTTER} ${BAR}`} data-top-bar="focus">
         <Wordmark />
       </header>
     );
@@ -137,12 +143,11 @@ export const TopBar = ({ shell }: { readonly shell: ShellName }) => {
       {inside}
     </header>
   ) : (
-    <header className="bg-background sticky top-0 z-30" data-top-bar="framed">
-      <div
-        className={`border-rule max-w-site mx-auto border-b ${GUTTER} ${BAR}`}
-      >
-        {inside}
-      </div>
+    <header
+      className={`bg-background sticky top-0 z-30 ${FRAMED} ${GUTTER} ${BAR}`}
+      data-top-bar="framed"
+    >
+      {inside}
     </header>
   );
 };
