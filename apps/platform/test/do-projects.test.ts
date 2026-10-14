@@ -2,6 +2,7 @@ import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { LogRef } from "@repo/checks/evidence-store";
 import { envSchemaMethod } from "@repo/project/deciders";
 import { DraftResult } from "@repo/project/draft-runs";
+import { FrontPageMemory } from "@repo/project/front-page/memory";
 import { LandingCommand } from "@repo/project/landing";
 import type { ProjectApi } from "@repo/project/project";
 import { Projects } from "@repo/project/projects";
@@ -44,6 +45,7 @@ import {
   outcomeOf,
   parseIso,
   project,
+  unlisted,
   world,
 } from "./project-do.fixtures.ts";
 
@@ -234,7 +236,9 @@ describe("Projects over the Project DO namespace", () => {
     Effect.gen(function* () {
       const { names, namespace } = yield* namespaceOf;
 
-      const outcome = yield* script.pipe(Effect.provide(DoProjects(namespace)));
+      const outcome = yield* script.pipe(
+        Effect.provide(DoProjects(namespace).pipe(Layer.provide(unlisted)))
+      );
 
       expect(outcome.before).toStrictEqual({
         refused: new UnknownProject({ project }),
@@ -250,6 +254,76 @@ describe("Projects over the Project DO namespace", () => {
   );
 
   it.effect(
+    "takes a project the front page lists as made without a probe, and probes only a name it does not list",
+    () =>
+      Effect.gen(function* () {
+        const { namespace } = yield* namespaceOf;
+
+        // Made before any listing, as a project is until its first projection.
+        yield* Effect.gen(function* () {
+          const made = yield* (yield* Projects).create(project);
+
+          yield* made.initProject(alice, {});
+        }).pipe(
+          Effect.provide(DoProjects(namespace).pipe(Layer.provide(unlisted)))
+        );
+
+        const calls: string[] = [];
+
+        const recording: ProjectNamespace = {
+          get: (id) => {
+            const stub = namespace.get(id);
+
+            return {
+              call: (request) => {
+                calls.push(`${id.toString()} ${request.method}`);
+
+                return stub.call(request);
+              },
+            };
+          },
+          idFromName: (name) => namespace.idFromName(name),
+        };
+
+        const listing = FrontPageMemory.layer({
+          credits: [],
+          entries: [],
+          projects: [{ openAsks: 0, posture: "open", project }],
+        });
+
+        const outcome = yield* Effect.gen(function* () {
+          const projects = yield* Projects;
+          const api = yield* projects.get(project);
+
+          yield* api.status(bob);
+
+          yield* Effect.flatMap(projects.get(project), (again) =>
+            again.status(bob)
+          );
+
+          return {
+            again: yield* outcomeOf(projects.create(project)),
+            other: yield* outcomeOf(projects.get(other)),
+          };
+        }).pipe(
+          Effect.provide(DoProjects(recording).pipe(Layer.provide(listing)))
+        );
+
+        expect(outcome.again).toStrictEqual({
+          refused: new ProjectExists({ project }),
+        });
+        expect(outcome.other).toStrictEqual({
+          refused: new UnknownProject({ project: other }),
+        });
+        expect(calls).toStrictEqual([
+          `${keyOf(project)} status`,
+          `${keyOf(project)} status`,
+          `${keyOf(other)} listAsks`,
+        ]);
+      }).pipe(Effect.provide(world))
+  );
+
+  it.effect(
     "answers every ProjectApi method as the project's service does in process",
     () =>
       Effect.gen(function* () {
@@ -262,7 +336,9 @@ describe("Projects over the Project DO namespace", () => {
         const throughDo = yield* Effect.gen(function* () {
           const { namespace } = yield* namespaceOf;
 
-          return yield* script.pipe(Effect.provide(DoProjects(namespace)));
+          return yield* script.pipe(
+            Effect.provide(DoProjects(namespace).pipe(Layer.provide(unlisted)))
+          );
         }).pipe(Effect.provide(world));
 
         const died = yield* Effect.filter(projectMethods, (method) =>

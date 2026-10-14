@@ -177,7 +177,9 @@ const world = (kept: Kept) =>
 
     const ports = Context.merge(
       base,
-      yield* Layer.build(DoProjects(namespace))
+      yield* Layer.build(
+        DoProjects(namespace).pipe(Layer.provide(Layer.succeedContext(base)))
+      )
     );
 
     const { dispose, handler } = serve(

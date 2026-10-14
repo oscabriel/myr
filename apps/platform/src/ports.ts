@@ -77,7 +77,7 @@ const memoryFrontPage = Layer.mergeAll(
   ProjectDescriptionsMemory
 );
 
-const corePorts = (config: PlatformConfig): Layer.Layer<WorkerPorts> =>
+const projections = (config: PlatformConfig) =>
   Layer.mergeAll(
     memoryFrontPage,
     // The D1 cartridge: delete this entry and the platform falls back to the memory
@@ -90,7 +90,16 @@ const corePorts = (config: PlatformConfig): Layer.Layer<WorkerPorts> =>
     ).pipe(
       Layer.provide(D1Client.layer({ db: config.FRONT_PAGE })),
       Layer.orDie
-    ),
+    )
+  );
+
+const corePorts = (config: PlatformConfig): Layer.Layer<WorkerPorts> => {
+  // One layer, built once: the handlers read the front page, and the Project
+  // DO adapter reads its listing to know which projects were made.
+  const listed = projections(config);
+
+  return Layer.mergeAll(
+    listed,
     UpstreamRepoHost,
     CheckRunnerSandbox(config.SANDBOX),
     config.LANDER_ADAPTER === "isogit"
@@ -99,7 +108,7 @@ const corePorts = (config: PlatformConfig): Layer.Layer<WorkerPorts> =>
     RulesEvaluatorWorker(config.LOADER).pipe(
       Layer.provide(FinishersFromChecks)
     ),
-    DoProjects(config.PROJECT),
+    DoProjects(config.PROJECT).pipe(Layer.provide(listed)),
     Layer.succeed(ProjectSockets, Option.some(config.PROJECT)),
     WorkerRateLimits({
       claim: config.CLAIM_LIMIT,
@@ -116,6 +125,7 @@ const corePorts = (config: PlatformConfig): Layer.Layer<WorkerPorts> =>
     Layer.provideMerge(RepoHostBinding.layer(config.ARTIFACTS)),
     Layer.provideMerge(WorkerFetch)
   );
+};
 
 export const workerPorts = (config: PlatformConfig): Layer.Layer<WorkerPorts> =>
   plugIn(config, corePorts(config), Object.values(cartridges));

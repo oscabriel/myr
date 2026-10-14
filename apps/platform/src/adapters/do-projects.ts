@@ -1,4 +1,5 @@
 import { envSchemaMethod } from "@repo/project/deciders";
+import { FrontPage } from "@repo/project/front-page";
 import type { ProjectApi } from "@repo/project/project";
 import { Projects } from "@repo/project/projects";
 import { keyOf } from "@repo/protocol/ids";
@@ -126,15 +127,38 @@ const apiOf = (
 
 export const DoProjects = (
   namespace: ProjectNamespace
-): Layer.Layer<Projects> =>
+): Layer.Layer<Projects, never, FrontPage> =>
   Layer.effect(
     Projects,
     Effect.gen(function* () {
+      const frontPage = yield* FrontPage;
       const known = yield* Ref.make<ReadonlySet<ProjectName>>(new Set());
+
+      // Every project the front page lists was made, so its listing, read once
+      // per isolate on the first name not yet known, stands in for a probe of
+      // each: a fan-out over every listed project then wakes each DO once, for
+      // its own call alone. A name the listing lacks is probed, as before.
+      const listed = yield* Effect.cached(
+        Effect.map(
+          frontPage.projects(),
+          (listing) => new Set(listing.map(({ project }) => project))
+        )
+      );
 
       const isMade = (project: ProjectName) =>
         Effect.gen(function* () {
           if ((yield* Ref.get(known)).has(project)) {
+            return true;
+          }
+
+          const names = yield* listed;
+
+          const seeded = yield* Ref.updateAndGet(
+            known,
+            (all) => new Set([...all, ...names])
+          );
+
+          if (seeded.has(project)) {
             return true;
           }
 

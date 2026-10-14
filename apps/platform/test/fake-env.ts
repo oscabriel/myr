@@ -130,7 +130,8 @@ export const fakeEnv = (): Env => ({
   DRAFT_MODEL: "@cf/moonshotai/kimi-k2.7-code",
   EMAIL: untouchable("EMAIL"),
   EVIDENCE: untouchable("EVIDENCE"),
-  FRONT_PAGE: untouchable("FRONT_PAGE"),
+  // Lists nothing: the Project DO adapter reads the listing before it probes a project.
+  FRONT_PAGE: emptyFrontPage(),
   LANDER_ADAPTER: "container",
   LOADER: untouchable("LOADER"),
   MASTER_KEY: masterKey,

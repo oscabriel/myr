@@ -52,6 +52,7 @@ import {
   project as doProject,
   shellOver,
   through,
+  unlisted,
   world as doWorld,
 } from "./project-do.fixtures.ts";
 import { coreLoopWorld } from "./world.ts";
@@ -661,7 +662,7 @@ const roomNamespace = (refuses = false) =>
 const relayedFrom = (namespace: ProjectNamespace & WatchNamespace, since = 0) =>
   watchHandler({ project: doProject, since }, { live: true }).pipe(
     Stream.provideService(ProjectSockets, Option.some(namespace)),
-    Stream.provide(DoProjects(namespace))
+    Stream.provide(DoProjects(namespace).pipe(Layer.provide(unlisted)))
   );
 
 describe("the Worker's relay of a Project DO's watch socket", () => {

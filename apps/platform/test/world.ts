@@ -327,7 +327,11 @@ export const coreLoopWorld = (
     );
 
     const core = base.pipe(
-      Context.merge(yield* Layer.build(DoProjects(namespace)))
+      Context.merge(
+        yield* Layer.build(
+          DoProjects(namespace).pipe(Layer.provide(Layer.succeedContext(base)))
+        )
+      )
     );
 
     const ports = core.pipe(
