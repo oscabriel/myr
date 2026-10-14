@@ -5,8 +5,9 @@ import { Effect, Option, Schema } from "effect";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
+import { devPeople } from "../src/dev/seed.ts";
 import { hereOf, SessionView } from "../src/features/auth/session-slot.tsx";
-import { devSignIn } from "../src/routes/auth/-dev.ts";
+import { devSignIn, toDevSignIn } from "../src/routes/auth/-dev.ts";
 import { backend } from "../src/server/backend.ts";
 import { serverClientOver } from "../src/server/client.ts";
 import {
@@ -939,6 +940,52 @@ describe("the dev sign-in", () => {
 
     expect(response.status).toBe(400);
     expect(response.headers.getSetCookie()).toStrictEqual([]);
+  });
+
+  it.effect(
+    "without a handle, lists every person of the dev world as a link that keeps the return path, and sets nothing",
+    () =>
+      Effect.gen(function* () {
+        const response = devSignIn({
+          request: get("/auth/dev?return=%2Finbox%3Ftab%3Dasks%26x%3D1"),
+        });
+
+        const page = yield* Effect.promise(() => response.text());
+
+        expect([
+          response.status,
+          response.headers.get("content-type"),
+          response.headers.get("cache-control"),
+          response.headers.getSetCookie(),
+        ]).toStrictEqual([200, "text/html; charset=utf-8", "no-store", []]);
+        expect(devPeople.length).toBeGreaterThan(1);
+
+        for (const handle of devPeople) {
+          expect(page).toContain(
+            `href="/auth/dev?handle=${handle}&amp;return=%2Finbox%3Ftab%3Dasks%26x%3D1"`
+          );
+        }
+      })
+  );
+
+  it("is where a development build's /auth/signin sends the browser, its return path kept and nothing set", () => {
+    const response = toDevSignIn({
+      request: get("/auth/signin?return=%2Finbox"),
+    });
+
+    expect([
+      response.status,
+      response.headers.get("location"),
+      response.headers.getSetCookie(),
+    ]).toStrictEqual([302, "/auth/dev?return=%2Finbox", []]);
+  });
+
+  it("sends a return path outside this origin, or under /auth/, back to the front page", () => {
+    const response = toDevSignIn({
+      request: get("/auth/signin?return=https%3A%2F%2Felsewhere.example%2F"),
+    });
+
+    expect(response.headers.get("location")).toBe("/auth/dev?return=%2F");
   });
 });
 

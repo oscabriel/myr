@@ -5,6 +5,7 @@ coverage/
 .wrangler/
 *.log
 .DS_Store
+.playwright-mcp/
 
 # varlock: keep .env.schema; local values stay out of git
 .env
