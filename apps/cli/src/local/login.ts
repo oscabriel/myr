@@ -465,17 +465,27 @@ const mayOpenBrowser = (env: Readonly<Record<string, string>>) =>
     );
   });
 
-const viewOf = (said: string, commands: readonly (readonly string[])[]) => {
+const viewOf = (
+  said: string,
+  commands: readonly (readonly string[])[],
+  next?: string
+) => {
   const lines = commands.map((argv) => typed(argv));
+  const after = next === undefined ? [] : [next];
 
   return {
-    markdown:
+    markdown: [
       lines.length === 0
         ? said
         : `${said}\n\n\`\`\`sh\n${lines.join("\n")}\n\`\`\``,
-    text: [said, ...lines.map((line) => `  ${line}`)].join("\n"),
+      ...after,
+    ].join("\n\n"),
+    text: [said, ...lines.map((line) => `  ${line}`), ...after].join("\n"),
   };
 };
+
+const nextAfterLogin = (handle: string) =>
+  `Next: ${Brand.cli} front to find an ask, or ${Brand.cli} init --project ${handle.toLowerCase()}/<name> in a repo of yours.`;
 
 export const login = Command.make(
   "login",
@@ -546,7 +556,8 @@ export const login = Command.make(
           given.noGitConfig
             ? `Logged in to ${url} as ${handle} (profile ${name}). git's config is unchanged; for git to use this login, run:`
             : `Logged in to ${url} as ${handle} (profile ${name}). git now asks ${Brand.cli} for this platform's token; its global config got:`,
-          commands
+          commands,
+          nextAfterLogin(handle)
         ),
       });
     })

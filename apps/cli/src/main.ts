@@ -23,7 +23,7 @@ import { cliVersion } from "./version.ts";
 
 export const banner = [
   "Start here:",
-  `  ${Brand.cli} asks      list the open asks you could take`,
+  `  ${Brand.cli} front     list the open asks across every project`,
   `  ${Brand.cli} claim     take one; you get a fork to push your answer to`,
   `  ${Brand.cli} check     run the gate's checks locally before you push`,
 ].join("\n");
@@ -52,6 +52,16 @@ const isSharedUsage = Schema.is(
   Schema.Union([ApprovalNeeded, MissingValue, UnknownCommand])
 );
 
+const isMissingValue = Schema.is(MissingValue);
+
+/** `asks` wants one project; outside a clone, the cross-project list is the answer. */
+const hinted = (failure: Failure) =>
+  isMissingValue(failure) &&
+  failure.command === "asks" &&
+  failure.flag === "--project"
+    ? `${failure.message}; ${Brand.cli} front lists every project's`
+    : undefined;
+
 const signIn = [
   "Unauthenticated: the platform does not know who you are",
   `  next: ${Brand.cli} login`,
@@ -73,7 +83,7 @@ const usageLine = (failure: Failure): Option.Option<string> => {
   }
 
   if (isUsage(failure) || Schema.isSchemaError(failure)) {
-    return Option.some(failure.message);
+    return Option.some(hinted(failure) ?? failure.message);
   }
 
   return isTransportFailure(failure)

@@ -315,9 +315,50 @@ describe(`${Brand.cli} init in an existing repo`, () => {
           remotes: Brand.slug,
           staged: "notes.md",
         });
-        expect(
-          yield* gitOk(machine.repo, "log", "-1", "--format=%s")
-        ).toContain(CONFIG);
+        expect({
+          kept: ran.err.filter((line) => line.includes("kept")),
+          subject: (yield* gitOk(
+            machine.repo,
+            "log",
+            "-1",
+            "--format=%s"
+          )).includes(CONFIG),
+        }).toStrictEqual({ kept: [], subject: true });
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+    { timeout: 30_000 }
+  );
+
+  it.live(
+    "ends with the project's address and the next step: an ask file, its test and ask open",
+    () =>
+      Effect.gen(function* () {
+        const machine = yield* aMachine;
+        const gateway = "https://platform.example.test/oscabriel/demo.git";
+
+        const platform = yield* aPlatform(
+          Effect.succeed({
+            project: ProjectName.make("oscabriel/demo"),
+            remote: gateway,
+          })
+        );
+
+        const ran = yield* cli(machine, platform.layer, [
+          "init",
+          "--project",
+          "oscabriel/demo",
+          "--yes",
+          "--no-push",
+        ]);
+
+        expect(ran.code).toBe(0);
+
+        const said = ran.out.join("\n");
+
+        expect(said).toContain("https://platform.example.test/oscabriel/demo");
+        expect(said).toContain(
+          `Next: write an ask in ${Brand.configDir}/asks/<ask>.ask.ts`
+        );
+        expect(said).toContain(`${Brand.cli} ask open <ask>`);
       }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
     { timeout: 30_000 }
   );
@@ -577,9 +618,10 @@ describe(`${Brand.cli} init in an existing repo`, () => {
             "--format=",
             "HEAD"
           ),
+          kept: ran.err.filter((line) => line.includes("kept")),
           onPlatform: (yield* git(machine.bare, "show", `main:${CONFIG}`))
             .stdout,
-        }).toStrictEqual({ committed: CONFIG, onPlatform: mine });
+        }).toStrictEqual({ committed: CONFIG, kept: [], onPlatform: mine });
       }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
     { timeout: 30_000 }
   );

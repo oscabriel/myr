@@ -150,7 +150,7 @@ const spawning = { timeout: 60_000 };
 
 const banner = [
   "Start here:",
-  `${Brand.cli} asks      list the open asks you could take`,
+  `${Brand.cli} front     list the open asks across every project`,
   `${Brand.cli} claim     take one; you get a fork to push your answer to`,
   `${Brand.cli} check     run the gate's checks locally before you push`,
 ];
