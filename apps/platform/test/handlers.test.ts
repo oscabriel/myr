@@ -387,7 +387,9 @@ describe("discussions", () => {
           ),
         });
 
-        const listed = yield* bob.listDiscussions({ project: datekit.project });
+        const threads = yield* bob.listDiscussions({
+          project: datekit.project,
+        });
 
         const shown = yield* carol.showDiscussion({
           discussion: discussion.id,
@@ -408,7 +410,7 @@ describe("discussions", () => {
           spamReplies: new Denounced({}),
         });
         expect(
-          listed.discussions.map(({ id, posts, state }) => [id, posts, state])
+          threads.discussions.map(({ id, posts, state }) => [id, posts, state])
         ).toStrictEqual([["disc-000001", 2, "open"]]);
         expect(shown.discussion).toStrictEqual(replied.discussion);
       }).pipe(Effect.provide(platform()))

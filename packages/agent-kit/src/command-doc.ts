@@ -169,6 +169,13 @@ const fieldsOf = (ast: SchemaAST.AST) =>
     ? ast.propertySignatures.map(({ name }) => String(name))
     : [];
 
+const requiredFieldsOf = (ast: SchemaAST.AST) =>
+  SchemaAST.isObjects(ast)
+    ? ast.propertySignatures.flatMap(({ name, type }) =>
+        type.context?.isOptional === true ? [] : [String(name)]
+      )
+    : [];
+
 export const contractCommandDocs = (
   group: typeof Contracts
 ): readonly CommandDoc[] =>
@@ -187,6 +194,7 @@ export const contractCommandDocs = (
     }
 
     const positional = cli.positional ?? [];
+    const required = requiredFieldsOf(rpc.payloadSchema.ast);
     const readOnly = Context.get(annotations, ReadOnly);
     const needsApproval = Context.get(annotations, NeedsApproval);
 
@@ -205,7 +213,8 @@ export const contractCommandDocs = (
         ],
         needsApproval,
         path: [first, ...rest],
-        positional: [...positional],
+        // An optional positional (a reply's discussion) is taken, not required, so the row leaves it out.
+        positional: positional.filter((field) => required.includes(field)),
         readOnly,
         source: "contract",
         summary: Context.get(annotations, Description),

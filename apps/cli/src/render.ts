@@ -8,9 +8,12 @@ import {
   FrontPage,
   LedgerOf,
   ListAsks,
+  ListDiscussions,
   ListProjects,
   PolicyOf,
+  PostDiscussion,
   ShowAsk,
+  ShowDiscussion,
   Status,
   SubmitAnswer,
   TodayOf,
@@ -20,6 +23,7 @@ import type { Contract } from "@repo/protocol/contracts";
 import { LandReceipt } from "@repo/protocol/domain/answer";
 import type { AnswerReceipt } from "@repo/protocol/domain/answer";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
+import type { Discussion } from "@repo/protocol/domain/discussion";
 import { Outcome } from "@repo/protocol/domain/outcome";
 import type {
   ImportSource,
@@ -193,6 +197,76 @@ const asks = viewOf(ListAsks.successSchema, ({ asks: listed }) =>
 );
 
 const ask = viewOf(ShowAsk.successSchema, ({ brief }) => prose(brief));
+
+const discussionStates = {
+  closed: "closed",
+  open: "open",
+  proposed: "became a proposal",
+} as const satisfies Record<Discussion["state"], string>;
+
+const discussions = viewOf(
+  ListDiscussions.successSchema,
+  ({ discussions: listed }) =>
+    joined(
+      table(
+        ["discussion", "title", "opener", "posts", "last post", "state"],
+        listed.map(
+          ({ id, lastPostAt, opener, posts, proposal, state, title }) => [
+            id,
+            title,
+            opener,
+            String(posts),
+            when(lastPostAt),
+            proposal === undefined
+              ? discussionStates[state]
+              : `${discussionStates[state]} ${proposal}`,
+          ]
+        ),
+        "No discussions yet."
+      ),
+      prose(
+        `Read one with \`${Brand.cli} discussion <discussion>\`; open one with \`${Brand.cli} discussion post --title "<title>" --body "<post>"\`.`
+      )
+    )
+);
+
+const onward = (discussion: Discussion) => {
+  if (discussion.state === "open") {
+    return `Reply with \`${Brand.cli} discussion post ${discussion.id} --body "<post>"\`.`;
+  }
+
+  return discussion.proposal === undefined
+    ? "This discussion is closed."
+    : `This discussion became ${discussion.proposal}: read it with \`${Brand.cli} proposal ${discussion.proposal}\`.`;
+};
+
+const thread = (discussion: Discussion): View =>
+  joined(
+    prose(`# ${discussion.title}`),
+    fields([
+      ["Discussion", discussion.id],
+      ["Opened by", `${discussion.opener} at ${when(discussion.openedAt)}`],
+      [
+        "State",
+        discussion.proposal === undefined
+          ? discussionStates[discussion.state]
+          : `${discussionStates[discussion.state]} ${discussion.proposal}`,
+      ],
+    ]),
+    ...discussion.posts.map(({ at, body, by }) =>
+      prose(`**${by}** at ${when(at)}\n\n${body}`)
+    ),
+    prose(onward(discussion))
+  );
+
+const discussion = viewOf(
+  ShowDiscussion.successSchema,
+  ({ discussion: shown }) => thread(shown)
+);
+
+const posted = viewOf(PostDiscussion.successSchema, ({ discussion: shown }) =>
+  thread(shown)
+);
 
 const claim = viewOf(Claim.successSchema, ({ claim: held }) => {
   const steps = [
@@ -523,9 +597,12 @@ export const views = {
   frontPage: front,
   ledger,
   listAsks: asks,
+  listDiscussions: discussions,
   listProjects: projects,
+  postDiscussion: posted,
   projectPolicy: policy,
   showAsk: ask,
+  showDiscussion: discussion,
   status,
   submitAnswer: submitted,
   today,

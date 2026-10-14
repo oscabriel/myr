@@ -434,7 +434,7 @@ const provoked = {
     refusal: new NotDecider({}),
   },
   postDiscussion: {
-    args: { discussion: DiscussionId.make("disc-000001"), body: "Hello", project },
+    args: { body: "Hello", discussion: DiscussionId.make("disc-000001"), project },
     refusal: new UnknownDiscussion({
       discussion: DiscussionId.make("disc-000001"),
     }),

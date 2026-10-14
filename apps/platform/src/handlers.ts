@@ -267,13 +267,13 @@ export const Handlers: Layer.Layer<
         ),
       ledger: ({ project }) =>
         Effect.flatMap(caller, (who) => on(project, (api) => api.ledger(who))),
-      listDiscussions: ({ project }) =>
-        Effect.flatMap(caller, (who) =>
-          on(project, (api) => api.listDiscussions(who))
-        ),
       listAsks: ({ project }) =>
         Effect.flatMap(caller, (who) =>
           on(project, (api) => api.listAsks(who))
+        ),
+      listDiscussions: ({ project }) =>
+        Effect.flatMap(caller, (who) =>
+          on(project, (api) => api.listDiscussions(who))
         ),
       listPaths: ({ at, project }) =>
         code(project, (of) => pathsOf(of, Option.fromUndefinedOr(at))),
