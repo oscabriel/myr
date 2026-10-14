@@ -1,11 +1,17 @@
 // Workers Cache keys an answer by path and query alone, not by host, `Cookie` or `Authorization`.
 // An answer to a request with a credential, one that sets a cookie, or one with no `Cache-Control` is kept nowhere;
 // any other varies by `Cookie`, so a signed-in reader is never handed a page kept from a signed-out one.
+// A page the edge keeps is served stale for a day while it is read again, so a page seldom visited still answers
+// at the edge's speed; the browser keeps its own `Cache-Control`, and a page's events bring it up to date once drawn.
 import { Effect } from "effect";
 
 export const KEPT_NOWHERE = "private, no-store";
 
 const EDGE_OVERRIDES = ["cdn-cache-control", "cloudflare-cdn-cache-control"];
+
+const EDGE_ONLY = "cloudflare-cdn-cache-control";
+
+export const EDGE_STALE_SECONDS = 86_400;
 
 const directivesOf = (cacheControl: string) =>
   cacheControl
@@ -28,6 +34,22 @@ const keptNowhere = (cacheControl: string) =>
   directivesOf(cacheControl).some(
     (directive) => directive === "private" || directive === "no-store"
   );
+
+// Only a found page with an age of its own: a miss may be answered once it is made, and an immutable answer is never stale.
+const staleLonger = (cacheControl: string, status: number) => {
+  const directives = directivesOf(cacheControl);
+
+  return status !== 200 ||
+    directives.includes("immutable") ||
+    !directives.some((directive) => directive.startsWith("max-age="))
+    ? undefined
+    : [
+        ...directives.filter(
+          (directive) => !directive.startsWith("stale-while-revalidate=")
+        ),
+        `stale-while-revalidate=${EDGE_STALE_SECONDS}`,
+      ].join(", ");
+};
 
 const varyingByCookie = (vary: string | null) => {
   const names = (vary ?? "")
@@ -61,6 +83,12 @@ const edgeHeaders = (request: Request, response: Response) => {
 
   if (cacheControl !== null && !keptNowhere(cacheControl)) {
     headers.set("vary", varyingByCookie(headers.get("vary")));
+
+    const atTheEdge = staleLonger(cacheControl, response.status);
+
+    if (atTheEdge !== undefined) {
+      headers.set(EDGE_ONLY, atTheEdge);
+    }
   }
 
   return headers;
