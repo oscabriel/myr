@@ -2,7 +2,7 @@
 
 A Git platform for the boundary between a project and everyone else. Everything a project ships is public, its contribution process is typed code on `main`, and a push lands only by passing a typed gate.
 
-Anyone's agent can now offer a change at any hour, and projects answer by closing the door or hand-building a vouch gate in front of it. Myr puts that boundary in the platform, so it is held at the push rather than in a maintainer's evening. It runs live at <https://myr.technology>.
+Anyone's agent can now offer a change at any hour, and projects answer by closing the door or hand-building a vouch gate in front of it. Myr puts that boundary in the platform, so it is held at the push rather than in a maintainer's evening. Many agents offering changes to one project at once is the reason it is held there: each answer is judged on its own merged tree, and `main` moves by one landing at a time. It runs live at <https://myr.technology>.
 
 A platform can do what a setting on a code host cannot:
 
@@ -21,6 +21,19 @@ remote:   next: myr check
 remote:   retryable: no
  ! [remote rejected] HEAD -> main (OutOfScope)
 ```
+
+## Many agents at once
+
+A claim is exclusive unless the ask's kind allows a race, so a second claimant hears `AskFull`, and a claim lives only while its claimant pushes: by default it is warned after 2 hours and lapses after 24 without a push. Each project is one Durable Object and each pushed answer runs in a Workflow of its own, so answers to different asks are merged and checked in parallel; only the final write to `main` waits, in a landing slot that holds one answer at a time. The platform never rebases an answer: when `main` moved while it waited, it merges the answer three ways onto the new `main` and checks the merged tree again, up to three times (`maxRemerges` in `packages/project/src/landing.ts`). When that merge conflicts, or `main` keeps moving, the answer is refused `StaleBase`, and a conflict's refusal names each conflicting path with the landing, ask and person that moved it. A migrate ask whose old name is used in several modules opens as a family: one child ask per module, each claimed on its own, plus a delete child that waits until every other child has landed. What an agent carries from one push to the next is kept by the platform, not in its context: each push is a numbered round with its own verdict, each refusal is a typed value with the command to run next, and `myr evidence` returns a failing lane's log to the answer's claimant.
+
+Measured live on the `dev-oscabriel` stage on 2026-10-08, from commits `25a727e` (swarm run 1) and `6730a0e` (the rest), with [`scripts/swarm.ts`](scripts/swarm.ts) and `smoke --loop`; the whole record, failures included, is in [examples/swarm-run-2026-10-08.md](examples/swarm-run-2026-10-08.md).
+
+| Run | Measured |
+| --- | --- |
+| Swarm run 2: six contributors on four harnesses (Claude Code, OpenCode, Amp, pi), one family child each | 6 of 6 landed in 7 min 41 s; one `StaleBase` landed on its second attempt, one `ChecksFailed` landed after a fix |
+| Both swarm runs' ten landings | 6 of 10 met a moved `main` and were merged and checked again before landing |
+| The core loop, five runs | 5 of 5 passed, each refused `OutOfScope` in git's output before it landed |
+| The Lander's land step, ten swarm landings | median 5.5 s, worst 12 s: over the 5 s bar in 5 of 10 |
 
 ## Quick start
 
@@ -104,7 +117,7 @@ apps/        the platform, sandbox and web Workers, and the CLI
 packages/    the protocol (one schema for every surface), gate, rules, checks, lifecycles, git and the rest
 infra/       bootstrap, deploy, the stage table, teardown
 scripts/     brand and byte checks, seed, smoke, swarm, release
-examples/    datekit and burrow, fictional projects seeded on dev stages
+examples/    datekit and burrow, fictional projects seeded on dev stages, and the swarm's run record
 tools/       the vendored lint plugins
 ```
 
