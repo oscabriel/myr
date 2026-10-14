@@ -1,3 +1,4 @@
+import { Brand } from "@repo/brand";
 import {
   Cli,
   Description,
@@ -77,8 +78,7 @@ export const localCommandDocs: readonly CommandDoc[] = [
     positional: ["ask"],
     readOnly: false,
     source: "local",
-    summary:
-      "Open an ask by landing its file and its check, read from the ask's own file under the config folder's asks/ and the path it names unless --files gives them, once the check fails on main by an assertion, twice in the same way.",
+    summary: `Open an ask by landing its file and its check, read from the ask's own file under ${Brand.configDir}/asks/ and the path it names unless --files gives them, once the check fails on main by an assertion, twice in the same way.`,
   },
   {
     flags: [
