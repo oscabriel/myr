@@ -125,6 +125,7 @@ const NOT_BINDINGS: ReadonlySet<string> = new Set([
   "minify",
   "name",
   "observability",
+  "placement",
   "preview_urls",
   "secrets",
   "triggers",

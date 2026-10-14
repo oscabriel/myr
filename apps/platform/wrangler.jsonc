@@ -35,6 +35,11 @@
   "upload_source_maps": true,
   "workers_dev": true,
   "preview_urls": false,
+  // Smart Placement runs the Worker near the stores each request waits on (the
+  // Project DO, D1, R2), not near the caller: a page's reads go one hop to the
+  // platform and then stay local, and fewer locations keep their isolates warm.
+  // `placement` is inherited by every env.
+  "placement": { "mode": "smart" },
   // Every invocation's logs and trace, unsampled, and Issues, which groups
   // what failed. The runtime's own spans record each Durable Object SQL
   // statement's bound values and each fetch's full URL, so these traces hold
