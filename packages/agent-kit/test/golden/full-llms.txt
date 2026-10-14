@@ -58,47 +58,47 @@ Every refusal the platform gives, in every group of its closed union. Each has a
 | --- | --- | --- | --- | --- | --- |
 | `NotClaimed` | Push and claim | yes | 75 | `__CLI__ claim <ask>` | Claim the ask, then push again. |
 | `ClaimLapsed` | Push and claim | yes | 75 | `__CLI__ claim <ask>` | Your claim lapsed after a spell without a push: claim the ask again if it is still open. |
-| `NotVouched` | Push and claim | no | 77 | `__CLI__ status` | Ask a member of the project to vouch for you. |
+| `NotVouched` | Push and claim | no | 77 | `__CLI__ policy --project <owner>/<name>` | Ask a member of the project to vouch for you. |
 | `CapReached` | Push and claim | yes | 75 | `__CLI__ status` | Read `limit`: for claims, release or land a claim you hold; for proposals, wait for an open one to be decided; for drafts, the proposal has had every draft round it takes; with `retryAfter`, wait that many seconds and try again. |
 | `AskFull` | Push and claim | yes | 75 | `__CLI__ asks` | Someone else holds the claim: pick another ask. |
 | `NoAsk` | Push and claim | no | 66 | `__CLI__ asks` | Push to the fork your claim gave you, which names its ask. |
 | `RepoBusy` | Push and claim | yes | 75 | `git push` | Push again. |
-| `DirectPush` | Push and claim | no | 77 | `__CLI__ asks` | Main moves only by a landing: push your answer to your claim's fork. |
+| `DirectPush` | Push and claim | no | 77 | `__CLI__ fork --project <owner>/<name>` | Main moves only by a landing. A contributor pushes the answer to the claim's fork; a maintainer makes a working fork with `next` and lands it with `land`. |
 | `AskBlocked` | Push and claim | yes | 75 | `__CLI__ asks` | Wait for the asks it names to land, or answer one of them first. |
-| `Denounced` | Push and claim | no | 77 | `__CLI__ status` | The project's vouch file denounces you: it takes no claims or proposals from you. |
+| `Denounced` | Push and claim | no | 77 | `__CLI__ policy --project <owner>/<name>` | The project's vouch file denounces you: it takes no claims or proposals from you. |
 | `OutOfScope` | Shape | no | 65 | `__CLI__ check` | Undo your changes to the paths it names: they are outside the ask's territory. |
 | `TouchedJudge` | Shape | no | 65 | `__CLI__ check` | Undo your changes to the paths it names: they decide what the checks do. |
 | `Weakened` | Shape | no | 65 | `__CLI__ check` | Take the marker out; a marker without a reason may get one after ` -- ` for a maintainer to weigh, but one a maintainer declined stays out; never raise a ratchet. |
 | `PrivatePathInPublicTree` | Shape | no | 65 | `__CLI__ check` | Take the held-back paths it names out of your answer. |
 | `ReachedInternals` | Shape | no | 65 | `__CLI__ check` | Import the other module only through its public files. |
-| `StaleBase` | Merge | yes | 75 | `git pull --rebase` | Main moved: rebase onto it, resolve the conflicts it names, and push again. `movedBy` names the landing that last changed each conflicting path, with its `author` and `ask`: keep that change as you resolve. |
+| `StaleBase` | Merge | yes | 75 | `git push __SLUG__ HEAD:main` | Main moved under the answer. With no `conflicts`, push again: the platform merges onto the moved main itself. With `conflicts`, merge the project's main into your answer, resolve, and push again. `movedBy` names the landing that last changed each conflicting path, with its `author` and `ask`: keep that change as you resolve. |
 | `StaleLayer` | Merge | yes | 75 | `__CLI__ status` | Nothing: the answer is checked again. |
 | `ChecksFailed` | Checks | no | 65 | the command that reproduces the failure | Run `next` to see the failure, fix it, and push again. |
-| `HeldBackFailed` | Checks | no | 65 | `__CLI__ status` | A held-back check failed; you see only its area and suite. Fix the behaviour and push again. |
+| `HeldBackFailed` | Checks | no | 65 | `__CLI__ verdict <ask> --project <owner>/<name>` | A held-back check failed; you see only its area and suite. Fix the behaviour and push again. |
 | `AttemptsExhausted` | Checks | yes | 75 | `__CLI__ status` | Wait until `resetsAt`: you used every attempt on that area's held-back checks for now. |
 | `Flake` | Never counted against the answerer | yes | 75 | `__CLI__ status` | Nothing: the check failed and then passed on the same tree, and the platform runs it again. |
 | `VerifierBlocked` | Never counted against the answerer | yes | 75 | `__CLI__ status` | Nothing: the platform could not run the checks, and runs them again. |
-| `NotRedFirst` | At ask open | no | 65 | `__CLI__ check` | Make the ask's check fail on main by an assertion, the same way twice, then open the ask again. |
+| `NotRedFirst` | At ask open | no | 65 | `__CLI__ ask open <ask> --project <owner>/<name>` | Make the ask's check fail on main twice the same way, with a failing assertion, not a load or syntax error: run the lane's command on it yourself, then open the ask again with `next`. The local check cannot judge an ask that has not opened. |
 | `WeakCheck` | At ask open | no | 65 | `__CLI__ check` | Strengthen the check: as it stands, the trivial answer `weakness` names would pass it. |
-| `IncompleteBrief` | At ask open | no | 65 | `__CLI__ check` | Fill in the fields `missing` names: the ask's kind requires them. |
+| `IncompleteBrief` | At ask open | no | 65 | `__CLI__ ask open <ask> --project <owner>/<name>` | Fill in the fields `missing` names: the ask's kind requires them. Then open the ask again with `next`. |
 | `LayerContentInPublicTree` | Maintainers only | no | 65 | `__CLI__ check` | Take the paths it names out: their files stay private and never enter a public tree. |
 | `SecretInOutput` | Maintainers only | no | 65 | `__CLI__ check` | Take the write-only value of `item` out of the output or the tree (`where`), then check again. |
 | `UnstatedRequirement` | Maintainers only | no | 65 | `__CLI__ check` | State in public what the area's held-back check holds, or take the check out of the suite. |
 | `PostureChange` | Decision | no | 65 | `__CLI__ today` | A maintainer declined the posture change it names (`from`, `to`): take out what changes the posture; `next` lists the decisions. |
-| `NotDecider` | Decision | no | 77 | `__CLI__ status` | Only one of the project's maintainers may do this: ask one of them. |
+| `NotDecider` | Decision | no | 77 | `__CLI__ policy --project <owner>/<name>` | Only one of the project's maintainers may do this: ask one of them. |
 | `DecisionClosed` | Decision | no | 66 | `__CLI__ today` | Nothing to decide: it was taken already, or expired to its default. |
 | `ProposalClosed` | Decision | no | 66 | `__CLI__ today` | Nothing more is drafted for it: the proposal was accepted, declined or expired. |
 | `DraftInProgress` | Decision | yes | 75 | `__CLI__ proposal <proposal>` | Wait: the platform is drafting this proposal's ask already, and `next` shows when it settles. |
-| `UnknownProject` | Lookup | no | 66 | `__CLI__ asks` | Check the project's name: every project is listed in the index. |
+| `UnknownProject` | Lookup | no | 66 | `__CLI__ projects` | Check the project's name: `next` lists every project. |
 | `UnknownAsk` | Lookup | no | 66 | `__CLI__ asks` | Check the ask's name: `next` lists the project's open asks. |
-| `UnknownCommit` | Lookup | no | 66 | `git fetch` | Fetch the project, then name a commit it holds. |
+| `UnknownCommit` | Lookup | no | 66 | `log {"project":"<owner>/<name>"}` | Name a commit the project holds: `next`, the MCP tool, lists its log. |
 | `UnknownDecision` | Lookup | no | 66 | `__CLI__ today` | Check the decision's id: `next` lists the decisions waiting on you. |
-| `UnknownPath` | Lookup | no | 66 | `git ls-tree` | Name a path the commit holds: `next` lists its files. |
-| `UnknownRevision` | Lookup | no | 66 | `git ls-remote` | Name `main`, a commit the project holds or one of its tags: `next` lists its refs. |
+| `UnknownPath` | Lookup | no | 66 | `readTree {"at":"main","project":"<owner>/<name>"}` | Name a path the commit holds: `next`, the MCP tool, lists a folder's entries; give it `at` the commit. |
+| `UnknownRevision` | Lookup | no | 66 | `listRefs {"project":"<owner>/<name>"}` | Name `main`, a commit the project holds or one of its tags: `next`, the MCP tool, lists its refs. |
 | `UnknownProposal` | Lookup | no | 66 | `__CLI__ today` | Check the proposal's id: `next` lists the proposals waiting on you. |
-| `ProjectExists` | Setup | no | 65 | `__CLI__ asks` | Pick another name: that one is taken. |
+| `ProjectExists` | Setup | no | 65 | `__CLI__ projects` | Pick another name: that one is taken. |
 | `NotYourNamespace` | Setup | no | 77 |  | Make the project in your own namespace: `next` names it with your handle. |
-| `ImportFailed` | Setup | yes | 75 | `__CLI__ init` | Read `reason`, then import again. |
+| `ImportFailed` | Setup | yes | 75 | `__CLI__ init --project <owner>/<name> --import <url>` | Read `reason`, then import again with `next`. |
 | `UnknownEnvItem` | Env | no | 66 | `__CLI__ env shape` | Name a key the project's env shape has: `next` lists them. |
 | `NotSensitive` | Env | no | 65 | `__CLI__ env shape` | Only an `@sensitive` item holds a write-only value: `next` shows which items are. |
 | `ValueTooShort` | Env | no | 65 | `__CLI__ env set <key>`, with `--acknowledge-short` when the value is above the floor | Give a longer value, or acknowledge a short one where the floor allows it. |
@@ -177,7 +177,7 @@ A project's page follows its events as they happen (the `watch` contract). Each 
 
 ### Recover from `StaleBase`
 
-`main` moved under your answer, and the answer did not merge onto it. Rebase onto the new `main`, resolve what the rebase stops on, and push again: `git pull --rebase https://platform-test.example.workers.dev/<owner>/<name>.git main`, then `git push __SLUG__ HEAD:main`.
+`main` moved under your answer. With no `conflicts`, push again: `git push __SLUG__ HEAD:main`; the platform merges the answer onto the moved `main` itself. With `conflicts`, merge the project's `main` into your answer, resolve what the merge stops on, and push again: `git fetch https://platform-test.example.workers.dev/<owner>/<name>.git main && git merge FETCH_HEAD`, then `git push __SLUG__ HEAD:main`. Never rebase: the claim's base stays where it was granted, so a rebased answer carries every sibling's file as its own and is refused as `OutOfScope`. In a clone of the claim's fork, the `__SLUG__` remote is the fork, whose `main` is the base, not the project's.
 
 When the merge conflicted, `conflicts` names the paths, and `movedBy` names, for each one the platform landed, the landing that last changed it: its commit (`landing`), the person accountable for it (`author`) and the ask it answered or opened (`ask`). Read that ask (`__CLI__ ask <ask> --project <owner>/<name>`) before you resolve, so your answer keeps its change.
 

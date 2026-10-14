@@ -57,7 +57,7 @@ const repairs = {
     todo: "The project's vouch file denounces you: it takes no claims or proposals from you.",
   },
   DirectPush: {
-    todo: "Main moves only by a landing: push your answer to your claim's fork.",
+    todo: "Main moves only by a landing. A contributor pushes the answer to the claim's fork; a maintainer makes a working fork with `next` and lands it with `land`.",
   },
   Flake: {
     todo: "Nothing: the check failed and then passed on the same tree, and the platform runs it again.",
@@ -84,7 +84,7 @@ const repairs = {
   },
   RepoBusy: { todo: "Push again." },
   StaleBase: {
-    todo: "Main moved: rebase onto it, resolve the conflicts it names, and push again. `movedBy` names the landing that last changed each conflicting path, with its `author` and `ask`: keep that change as you resolve.",
+    todo: "Main moved under the answer. With no `conflicts`, push again: the platform merges onto the moved main itself. With `conflicts`, merge the project's main into your answer, resolve, and push again. `movedBy` names the landing that last changed each conflicting path, with its `author` and `ask`: keep that change as you resolve.",
   },
   StaleLayer: { todo: "Nothing: the answer is checked again." },
   TouchedJudge: {
@@ -106,9 +106,9 @@ const elsewhere = {
     next: cli("proposal", "<proposal>"),
     todo: "Wait: the platform is drafting this proposal's ask already, and `next` shows when it settles.",
   },
-  ImportFailed: { todo: "Read `reason`, then import again." },
+  ImportFailed: { todo: "Read `reason`, then import again with `next`." },
   IncompleteBrief: {
-    todo: "Fill in the fields `missing` names: the ask's kind requires them.",
+    todo: "Fill in the fields `missing` names: the ask's kind requires them. Then open the ask again with `next`.",
   },
   LayerContentInPublicTree: {
     todo: "Take the paths it names out: their files stay private and never enter a public tree.",
@@ -117,7 +117,7 @@ const elsewhere = {
     todo: "Only one of the project's maintainers may do this: ask one of them.",
   },
   NotRedFirst: {
-    todo: "Make the ask's check fail on main by an assertion, the same way twice, then open the ask again.",
+    todo: "Make the ask's check fail on main twice the same way, with a failing assertion, not a load or syntax error: run the lane's command on it yourself, then open the ask again with `next`. The local check cannot judge an ask that has not opened.",
   },
   NotSensitive: {
     todo: "Only an `@sensitive` item holds a write-only value: `next` shows which items are.",
@@ -139,7 +139,7 @@ const elsewhere = {
     todo: "Check the ask's name: `next` lists the project's open asks.",
   },
   UnknownCommit: {
-    todo: "Fetch the project, then name a commit it holds.",
+    todo: "Name a commit the project holds: `next`, the MCP tool, lists its log.",
   },
   UnknownDecision: {
     todo: "Check the decision's id: `next` lists the decisions waiting on you.",
@@ -148,16 +148,16 @@ const elsewhere = {
     todo: "Name a key the project's env shape has: `next` lists them.",
   },
   UnknownPath: {
-    todo: "Name a path the commit holds: `next` lists its files.",
+    todo: "Name a path the commit holds: `next`, the MCP tool, lists a folder's entries; give it `at` the commit.",
   },
   UnknownProject: {
-    todo: "Check the project's name: every project is listed in the index.",
+    todo: "Check the project's name: `next` lists every project.",
   },
   UnknownProposal: {
     todo: "Check the proposal's id: `next` lists the proposals waiting on you.",
   },
   UnknownRevision: {
-    todo: "Name `main`, a commit the project holds or one of its tags: `next` lists its refs.",
+    todo: "Name `main`, a commit the project holds or one of its tags: `next`, the MCP tool, lists its refs.",
   },
   UnstatedRequirement: {
     todo: "State in public what the area's held-back check holds, or take the check out of the suite.",

@@ -79,7 +79,7 @@ const reason = Match.typeTags<Refusal, string>()({
     // local check keeps no log for it to read.
     return ChecksFailed.isLocal(logRef)
       ? `the ${lane} checks failed on this commit; run ${next} to see the failure`
-      : `the ${lane} checks failed on the answer; run ${next} in a clone of the fork to see the failure; the log is kept as ${logRef}, which the answerer and the project's maintainers read with ${Brand.cli} evidence`;
+      : `the ${lane} checks failed on the answer; run ${next} in a clone of the fork to see the failure; the log is kept as ${logRef}, which the answerer and the project's maintainers read with ${Brand.cli} evidence ${logRef} --project <owner>/<name>`;
   },
   ClaimLapsed: ({ ask }) => `your claim on ${ask} lapsed`,
   DecisionClosed: ({ decision }) =>
@@ -88,7 +88,7 @@ const reason = Match.typeTags<Refusal, string>()({
     "this project's vouch file denounces you, so it takes no claims or proposals from you",
   DirectPush: ({ ref }) =>
     ref.startsWith(BRANCH)
-      ? `main moves only by a landing, so ${ref} takes no direct push; push your answer to your claim's fork`
+      ? `main moves only by a landing, so ${ref} takes no direct push; a contributor pushes the answer to the claim's fork, and a maintainer makes a working fork with ${Brand.cli} fork and lands it with ${Brand.cli} land`
       : `${ref} is written by the platform, not pushed; a fork takes branches only, so push your answer with git push ${Brand.slug} HEAD:main`,
   DraftInProgress: ({ proposal }) =>
     `the platform is already drafting ${proposal}'s ask`,
@@ -105,8 +105,10 @@ const reason = Match.typeTags<Refusal, string>()({
   // `today` across every project raises it too, so it names no project.
   NotDecider: () =>
     "you are not a maintainer here: only the maintainers a project's config names may do this",
+  // The ask is not on main until it opens, so the local check cannot judge it:
+  // the lane's own command, run on main, shows what it does.
   NotRedFirst: () =>
-    "the ask's check must fail on main twice in the same way, by an assertion",
+    "the ask's check must fail on main twice the same way, with a failing assertion, not a load or syntax error, on two runs; run the lane's command on it yourself, then open the ask again",
   NotSensitive: ({ key }) =>
     `${key} is not @sensitive, so it holds no write-only value`,
   NotVouched: () => "no member of this project has vouched for you",
@@ -126,10 +128,14 @@ const reason = Match.typeTags<Refusal, string>()({
   RepoBusy: () => "the repo was busy with another push",
   SecretInOutput: ({ item, where }) =>
     `the write-only value ${item} appeared in the ${where}`,
+  // With no conflict, main only kept moving while the answer was merged onto
+  // it, and the platform merges again on the next push. A conflict is merged
+  // by hand: the answer is judged from the newest landing it contains, so a
+  // rebased answer carries every sibling's file as its own.
   StaleBase: ({ base, conflicts, main, movedBy = [] }) =>
     conflicts.length === 0
-      ? `main moved to ${short(main)}, past your base ${short(base)}`
-      : `main moved to ${short(main)}, past your base ${short(base)}; conflicts in ${list(conflicts.map((path) => conflictIn(path, movedBy)))}`,
+      ? `main moved to ${short(main)}, past your base ${short(base)}, while this answer was checked; push again and the platform merges it onto the moved main`
+      : `main moved to ${short(main)}, past your base ${short(base)}, at ${list(conflicts.map((path) => conflictIn(path, movedBy)))}; merge main into your answer: git fetch <platform>/<owner>/<name>.git main && git merge FETCH_HEAD, then push again`,
   StaleLayer: ({ layer }) =>
     `the ${layer} layer moved since this answer was checked; it will be checked again`,
   TouchedJudge: ({ paths }) =>

@@ -20,6 +20,20 @@ export { At } from "./domain/common.ts";
 
 const cli = (...args: readonly string[]) => [Brand.cli, ...args].join(" ");
 
+// A `next` fixed per tag names what the tag does not carry as a placeholder,
+// spelled as the docs spell it.
+const PROJECT = "<owner>/<name>";
+
+const ASK = "<ask>";
+
+// A code read is an MCP tool with no command: its `next` is the tool call
+// that would answer, as an agent with no shell makes it.
+const tool = (name: string, payload: Record<string, string>) =>
+  `${name} ${JSON.stringify(payload)}`;
+
+// A push to the claim's fork; the platform merges onto the moved main itself.
+const pushAnswer = `git push ${Brand.slug} HEAD:main`;
+
 const Label = Schema.NonEmptyString;
 
 const Paths = Schema.NonEmptyArray(RepoPath);
@@ -62,7 +76,7 @@ export class ClaimLapsed extends Schema.TaggedError<ClaimLapsed>()(
 
 export class NotVouched extends Schema.TaggedError<NotVouched>()("NotVouched", {
   ...Final,
-  ...nextIs(cli("status")),
+  ...nextIs(cli("policy", "--project", PROJECT)),
 }) {}
 
 export class CapReached extends Schema.TaggedError<CapReached>()("CapReached", {
@@ -95,7 +109,7 @@ export class RepoBusy extends Schema.TaggedError<RepoBusy>()("RepoBusy", {
 
 export class DirectPush extends Schema.TaggedError<DirectPush>()("DirectPush", {
   ...Final,
-  ...nextIs(cli("asks")),
+  ...nextIs(cli("fork", "--project", PROJECT)),
   ref: Label,
 }) {}
 
@@ -113,7 +127,7 @@ export class AskBlocked extends Schema.TaggedError<AskBlocked>()("AskBlocked", {
 
 export class Denounced extends Schema.TaggedError<Denounced>()("Denounced", {
   ...Final,
-  ...nextIs(cli("status")),
+  ...nextIs(cli("policy", "--project", PROJECT)),
 }) {}
 
 export class OutOfScope extends Schema.TaggedError<OutOfScope>()("OutOfScope", {
@@ -164,9 +178,11 @@ export const MovedBy = Schema.Struct({
 
 export type MovedBy = typeof MovedBy.Type;
 
+// Never a rebase: the claim's base stays where it was granted, and a rebased
+// answer earns `OutOfScope` for every sibling's file.
 export class StaleBase extends Schema.TaggedError<StaleBase>()("StaleBase", {
   ...Retryable,
-  ...nextIs("git pull --rebase"),
+  ...nextIs(pushAnswer),
   base: CommitSha,
   conflicts: Schema.Array(RepoPath),
   main: CommitSha,
@@ -200,7 +216,12 @@ export class ChecksFailed extends Schema.TaggedError<ChecksFailed>()(
 /** A held-back check failed; only its area and suite are disclosed. */
 export class HeldBackFailed extends Schema.TaggedError<HeldBackFailed>()(
   "HeldBackFailed",
-  { ...Final, ...nextIs(cli("status")), area: Label, suite: Label }
+  {
+    ...Final,
+    ...nextIs(cli("verdict", ASK, "--project", PROJECT)),
+    area: Label,
+    suite: Label,
+  }
 ) {}
 
 export class AttemptsExhausted extends Schema.TaggedError<AttemptsExhausted>()(
@@ -224,11 +245,13 @@ export class VerifierBlocked extends Schema.TaggedError<VerifierBlocked>()(
   { ...Retryable, ...nextIs(cli("status")) }
 ) {}
 
+// An ask's file lands by opening it, so the local check, which reads the asks
+// on a landed base, cannot judge one yet: the ask is opened again.
 export class NotRedFirst extends Schema.TaggedError<NotRedFirst>()(
   "NotRedFirst",
   {
     ...Final,
-    ...nextIs(cli("check")),
+    ...nextIs(cli("ask", "open", ASK, "--project", PROJECT)),
   }
 ) {}
 
@@ -240,7 +263,11 @@ export class WeakCheck extends Schema.TaggedError<WeakCheck>()("WeakCheck", {
 
 export class IncompleteBrief extends Schema.TaggedError<IncompleteBrief>()(
   "IncompleteBrief",
-  { ...Final, ...nextIs(cli("check")), missing: Schema.NonEmptyArray(Label) }
+  {
+    ...Final,
+    ...nextIs(cli("ask", "open", ASK, "--project", PROJECT)),
+    missing: Schema.NonEmptyArray(Label),
+  }
 ) {}
 
 export class LayerContentInPublicTree extends Schema.TaggedError<LayerContentInPublicTree>()(
@@ -270,7 +297,7 @@ export class PostureChange extends Schema.TaggedError<PostureChange>()(
 
 export class NotDecider extends Schema.TaggedError<NotDecider>()("NotDecider", {
   ...Final,
-  ...nextIs(cli("status")),
+  ...nextIs(cli("policy", "--project", PROJECT)),
 }) {}
 
 export class DecisionClosed extends Schema.TaggedError<DecisionClosed>()(
@@ -293,7 +320,7 @@ export class DraftInProgress extends Schema.TaggedError<DraftInProgress>()(
 
 export class UnknownProject extends Schema.TaggedError<UnknownProject>()(
   "UnknownProject",
-  { ...Final, ...nextIs(cli("asks")), project: ProjectName }
+  { ...Final, ...nextIs(cli("projects")), project: ProjectName }
 ) {}
 
 export class UnknownAsk extends Schema.TaggedError<UnknownAsk>()("UnknownAsk", {
@@ -304,7 +331,7 @@ export class UnknownAsk extends Schema.TaggedError<UnknownAsk>()("UnknownAsk", {
 
 export class UnknownCommit extends Schema.TaggedError<UnknownCommit>()(
   "UnknownCommit",
-  { ...Final, ...nextIs("git fetch"), sha: CommitSha }
+  { ...Final, ...nextIs(tool("log", { project: PROJECT })), sha: CommitSha }
 ) {}
 
 export class UnknownDecision extends Schema.TaggedError<UnknownDecision>()(
@@ -314,12 +341,21 @@ export class UnknownDecision extends Schema.TaggedError<UnknownDecision>()(
 
 export class UnknownPath extends Schema.TaggedError<UnknownPath>()(
   "UnknownPath",
-  { ...Final, ...nextIs("git ls-tree"), commit: CommitSha, path: RepoPath }
+  {
+    ...Final,
+    ...nextIs(tool("readTree", { at: "main", project: PROJECT })),
+    commit: CommitSha,
+    path: RepoPath,
+  }
 ) {}
 
 export class UnknownRevision extends Schema.TaggedError<UnknownRevision>()(
   "UnknownRevision",
-  { ...Final, ...nextIs("git ls-remote"), rev: Schema.String }
+  {
+    ...Final,
+    ...nextIs(tool("listRefs", { project: PROJECT })),
+    rev: Schema.String,
+  }
 ) {}
 
 export class UnknownProposal extends Schema.TaggedError<UnknownProposal>()(
@@ -329,7 +365,7 @@ export class UnknownProposal extends Schema.TaggedError<UnknownProposal>()(
 
 export class ProjectExists extends Schema.TaggedError<ProjectExists>()(
   "ProjectExists",
-  { ...Final, ...nextIs(cli("asks")), project: ProjectName }
+  { ...Final, ...nextIs(cli("projects")), project: ProjectName }
 ) {}
 
 export class NotYourNamespace extends Schema.TaggedError<NotYourNamespace>()(
@@ -350,7 +386,11 @@ export class NotYourNamespace extends Schema.TaggedError<NotYourNamespace>()(
 
 export class ImportFailed extends Schema.TaggedError<ImportFailed>()(
   "ImportFailed",
-  { ...Retryable, ...nextIs(cli("init")), reason: Label }
+  {
+    ...Retryable,
+    ...nextIs(cli("init", "--project", PROJECT, "--import", "<url>")),
+    reason: Label,
+  }
 ) {}
 
 export class UnknownEnvItem extends Schema.TaggedError<UnknownEnvItem>()(

@@ -341,6 +341,8 @@ describe(refusalsMarkdown, () => {
         ...explain(refusals),
         "```",
         "",
+        `Next: \`${Brand.cli} projects\``,
+        "",
         `Next: \`${Brand.cli} asks\``,
         "",
       ].join("\n")

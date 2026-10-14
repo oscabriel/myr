@@ -61,7 +61,7 @@ export const answerAnAsk: DocSource = {
     "",
     "Every refusal says whether trying again can help and names the command to run next. Run it, fix what it names, and push again. [Refusals](/docs/refusals) lists each one with what to do.",
     "",
-    `When \`main\` moves under your answer, the platform merges your answer onto the new \`main\` on its own; you need do nothing. Only when that merge fails is the answer refused with \`StaleBase\`. It names each conflicting path and, for each one the platform landed, the landing that last changed it. Read what that landing changed, make your work fit it on those paths, and push to your fork again: each push is merged afresh onto the \`main\` of that moment. When it names no path, push the same work again as it is.`,
+    `When \`main\` moves under your answer, the platform merges your answer onto the new \`main\` on its own; you need do nothing. Only when that merge fails is the answer refused with \`StaleBase\`. It names each conflicting path and, for each one the platform landed, the landing that last changed it. Merge the project's \`main\` into your answer, resolve those paths, and push to your fork again: ${code(`git fetch ${platformUrl}/<owner>/<name>.git main && git merge FETCH_HEAD`)}. Each push is judged from the newest landing it contains, so a merge or a rebase onto \`main\` carries no sibling's file. When it names no path, push the same work again as it is.`,
     "",
     "## Credit",
     "",

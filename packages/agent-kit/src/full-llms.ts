@@ -1,3 +1,4 @@
+import { Brand } from "@repo/brand";
 import type { ProjectListing } from "@repo/protocol/domain/front-page";
 import { Option } from "effect";
 
@@ -20,7 +21,7 @@ const guides = (commands: Commands, platformUrl: string) => [
   "",
   "### Recover from `StaleBase`",
   "",
-  `\`main\` moved under your answer, and the answer did not merge onto it. Rebase onto the new \`main\`, resolve what the rebase stops on, and push again: ${code(`git pull --rebase ${platformUrl}/<owner>/<name>.git main`)}, then ${pushAnswer()}.`,
+  `\`main\` moved under your answer. With no \`conflicts\`, push again: ${pushAnswer()}; the platform merges the answer onto the moved \`main\` itself. With \`conflicts\`, merge the project's \`main\` into your answer, resolve what the merge stops on, and push again: ${code(`git fetch ${platformUrl}/<owner>/<name>.git main && git merge FETCH_HEAD`)}, then ${pushAnswer()}. Never rebase: the claim's base stays where it was granted, so a rebased answer carries every sibling's file as its own and is refused as \`OutOfScope\`. In a clone of the claim's fork, the \`${Brand.slug}\` remote is the fork, whose \`main\` is the base, not the project's.`,
   "",
   `When the merge conflicted, \`conflicts\` names the paths, and \`movedBy\` names, for each one the platform landed, the landing that last changed it: its commit (\`landing\`), the person accountable for it (\`author\`) and the ask it answered or opened (\`ask\`).${withCommand(
     typed(commands, "ask", {}, ["project"]),

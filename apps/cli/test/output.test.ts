@@ -1,4 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
+import { Brand } from "@repo/brand";
 import { Envelope } from "@repo/protocol/envelope";
 import { CommitSha, RepoPath } from "@repo/protocol/ids";
 import { StaleBase } from "@repo/protocol/refusal";
@@ -102,7 +103,9 @@ describe("plain output", () => {
         );
 
         expect(printed.out).toStrictEqual([]);
-        expect(printed.err.join("\n")).toContain("git pull --rebase");
+        expect(printed.err.join("\n")).toContain(
+          `git push ${Brand.slug} HEAD:main`
+        );
       })
   );
 });

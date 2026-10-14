@@ -54,23 +54,23 @@ Instead of landing an answer, the platform answers with refusals. Git prints the
 | --- | --- | --- | --- | --- |
 | `NotClaimed` | yes | 75 | `__CLI__ claim <ask>` | Claim the ask, then push again. |
 | `ClaimLapsed` | yes | 75 | `__CLI__ claim <ask>` | Your claim lapsed after a spell without a push: claim the ask again if it is still open. |
-| `NotVouched` | no | 77 | `__CLI__ status` | Ask a member of the project to vouch for you. |
+| `NotVouched` | no | 77 | `__CLI__ policy --project <owner>/<name>` | Ask a member of the project to vouch for you. |
 | `CapReached` | yes | 75 | `__CLI__ status` | Read `limit`: for claims, release or land a claim you hold; for proposals, wait for an open one to be decided; for drafts, the proposal has had every draft round it takes; with `retryAfter`, wait that many seconds and try again. |
 | `AskFull` | yes | 75 | `__CLI__ asks` | Someone else holds the claim: pick another ask. |
 | `NoAsk` | no | 66 | `__CLI__ asks` | Push to the fork your claim gave you, which names its ask. |
 | `RepoBusy` | yes | 75 | `git push` | Push again. |
-| `DirectPush` | no | 77 | `__CLI__ asks` | Main moves only by a landing: push your answer to your claim's fork. |
+| `DirectPush` | no | 77 | `__CLI__ fork --project <owner>/<name>` | Main moves only by a landing. A contributor pushes the answer to the claim's fork; a maintainer makes a working fork with `next` and lands it with `land`. |
 | `AskBlocked` | yes | 75 | `__CLI__ asks` | Wait for the asks it names to land, or answer one of them first. |
-| `Denounced` | no | 77 | `__CLI__ status` | The project's vouch file denounces you: it takes no claims or proposals from you. |
+| `Denounced` | no | 77 | `__CLI__ policy --project <owner>/<name>` | The project's vouch file denounces you: it takes no claims or proposals from you. |
 | `OutOfScope` | no | 65 | `__CLI__ check` | Undo your changes to the paths it names: they are outside the ask's territory. |
 | `TouchedJudge` | no | 65 | `__CLI__ check` | Undo your changes to the paths it names: they decide what the checks do. |
 | `Weakened` | no | 65 | `__CLI__ check` | Take the marker out; a marker without a reason may get one after ` -- ` for a maintainer to weigh, but one a maintainer declined stays out; never raise a ratchet. |
 | `PrivatePathInPublicTree` | no | 65 | `__CLI__ check` | Take the held-back paths it names out of your answer. |
 | `ReachedInternals` | no | 65 | `__CLI__ check` | Import the other module only through its public files. |
-| `StaleBase` | yes | 75 | `git pull --rebase` | Main moved: rebase onto it, resolve the conflicts it names, and push again. `movedBy` names the landing that last changed each conflicting path, with its `author` and `ask`: keep that change as you resolve. |
+| `StaleBase` | yes | 75 | `git push __SLUG__ HEAD:main` | Main moved under the answer. With no `conflicts`, push again: the platform merges onto the moved main itself. With `conflicts`, merge the project's main into your answer, resolve, and push again. `movedBy` names the landing that last changed each conflicting path, with its `author` and `ask`: keep that change as you resolve. |
 | `StaleLayer` | yes | 75 | `__CLI__ status` | Nothing: the answer is checked again. |
 | `ChecksFailed` | no | 65 | the command that reproduces the failure | Run `next` to see the failure, fix it, and push again. |
-| `HeldBackFailed` | no | 65 | `__CLI__ status` | A held-back check failed; you see only its area and suite. Fix the behaviour and push again. |
+| `HeldBackFailed` | no | 65 | `__CLI__ verdict <ask> --project <owner>/<name>` | A held-back check failed; you see only its area and suite. Fix the behaviour and push again. |
 | `AttemptsExhausted` | yes | 75 | `__CLI__ status` | Wait until `resetsAt`: you used every attempt on that area's held-back checks for now. |
 | `Flake` | yes | 75 | `__CLI__ status` | Nothing: the check failed and then passed on the same tree, and the platform runs it again. |
 | `VerifierBlocked` | yes | 75 | `__CLI__ status` | Nothing: the platform could not run the checks, and runs them again. |

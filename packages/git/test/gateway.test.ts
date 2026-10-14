@@ -1,5 +1,6 @@
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
+import { Brand } from "@repo/brand";
 import { CommitSha, RepoPath } from "@repo/protocol/ids";
 import { OutOfScope, StaleBase, TouchedJudge } from "@repo/protocol/refusal";
 import type { Refusal } from "@repo/protocol/refusal";
@@ -151,8 +152,8 @@ describe("the gateway between git and its upstream", () => {
 
         expect(pushed.exitCode).toBe(1);
         expect(remoteLines(pushed.stderr)).toStrictEqual([
-          "remote: StaleBase: main moved to 2222222, past your base 1111111",
-          "remote:   next: git pull --rebase",
+          "remote: StaleBase: main moved to 2222222, past your base 1111111, while this answer was checked; push again and the platform merges it onto the moved main",
+          `remote:   next: git push ${Brand.slug} HEAD:main`,
           "remote:   retryable: yes",
         ]);
         expect(pushed.stderr).toContain(
@@ -283,8 +284,8 @@ describe("the gateway between git and its upstream", () => {
 
         expect(pushed.exitCode).toBe(1);
         expect(remoteLines(pushed.stderr).slice(-3)).toStrictEqual([
-          `remote: StaleBase: main moved to ${tip.slice(0, 7)}, past your base ${base.slice(0, 7)}`,
-          "remote:   next: git pull --rebase",
+          `remote: StaleBase: main moved to ${tip.slice(0, 7)}, past your base ${base.slice(0, 7)}, while this answer was checked; push again and the platform merges it onto the moved main`,
+          `remote:   next: git push ${Brand.slug} HEAD:main`,
           "remote:   retryable: yes",
         ]);
         expect(pushed.stderr).toContain(

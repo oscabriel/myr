@@ -100,7 +100,7 @@ describe("the prompts", () => {
     const prompt = userPrompt(input(2, feedback));
 
     expect(prompt).toContain(
-      "NotRedFirst: the ask's check must fail on main twice in the same way, by an assertion"
+      "NotRedFirst: the ask's check must fail on main twice the same way, with a failing assertion, not a load or syntax error, on two runs"
     );
     expect(prompt).toContain("diagnosis: Passed");
 
