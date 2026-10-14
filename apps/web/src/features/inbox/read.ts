@@ -26,9 +26,16 @@ export const WORK_SHOWN = 10;
 
 const AT_ONCE = 4;
 
+/** What the answer's verdict holds, so the strip reads a stage it never needed as not needed, as the answer page does. */
+export const WorkHolds = Schema.Struct({
+  decided: Schema.Boolean,
+  heldBack: Schema.Boolean,
+});
+
 export const Work = Schema.Struct({
   answer: Schema.optionalKey(AnswerView),
   claim: ClaimView,
+  holds: Schema.optionalKey(WorkHolds),
   /** The gate stage the answer reached, from its verdict; absent while it has none. */
   stage: Schema.optionalKey(StageName),
   want: Schema.optionalKey(Schema.NonEmptyString),
@@ -218,8 +225,39 @@ export const pairWork = ({
   }));
 };
 
-// A verdict names the stage an answer reached; a check still running names it in its outcome.
-const stageOf = (work: Work) =>
+const waitedOnPerson = Outcome.isAnyOf(["AwaitingDecision", "AwaitingFinish"]);
+
+const headKey = (project: ProjectName, { ask, head }: AnswerView) =>
+  `${project}/${ask}/${head}`;
+
+/** The heads whose answer waited on a maintainer at some round: a landing after one passed the maintainer stage. */
+const waitedHeads = (
+  answers: readonly AnswerView[],
+  again: ReadonlyMap<ProjectName, readonly AnswerView[]>,
+  claims: readonly ClaimView[]
+) => {
+  const projectOf = new Map(
+    claims.map(({ ask, project }) => [ask, project] as const)
+  );
+
+  return new Set([
+    ...answers.flatMap((answer) => {
+      const project = projectOf.get(answer.ask);
+
+      return project !== undefined && waitedOnPerson(answer.outcome)
+        ? [headKey(project, answer)]
+        : [];
+    }),
+    ...[...again].flatMap(([project, listed]) =>
+      listed.flatMap((answer) =>
+        waitedOnPerson(answer.outcome) ? [headKey(project, answer)] : []
+      )
+    ),
+  ]);
+};
+
+// A verdict names the stage an answer reached, and what it holds; a check still running names its stage in its outcome.
+const stageOf = (waited: ReadonlySet<string>) => (work: Work) =>
   Effect.gen(function* () {
     const client = yield* Client;
     const { answer, claim } = work;
@@ -239,9 +277,21 @@ const stageOf = (work: Work) =>
         : Option.none(),
     ]);
 
+    const holds =
+      verdict === undefined
+        ? {}
+        : {
+            holds: {
+              decided:
+                waited.has(headKey(claim.project, answer)) ||
+                waitedOnPerson(answer.outcome),
+              heldBack: verdict.heldBack.length > 0,
+            },
+          };
+
     return Option.match(stage, {
       onNone: () => work,
-      onSome: (at): Work => ({ ...work, stage: at }),
+      onSome: (at): Work => ({ ...work, ...holds, stage: at }),
     });
   });
 
@@ -266,7 +316,7 @@ const workOf = (claims: readonly ClaimView[], answers: readonly AnswerView[]) =>
 
     return yield* Effect.forEach(
       pairWork({ again, answers, claims, wants }),
-      stageOf,
+      stageOf(waitedHeads(answers, again, claims)),
       { concurrency: AT_ONCE }
     );
   });

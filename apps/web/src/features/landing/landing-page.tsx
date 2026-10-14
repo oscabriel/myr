@@ -5,19 +5,31 @@ import { buttonVariants } from "../../components/ui/button.tsx";
 import { ID, LINK } from "../shared/classes.ts";
 import { CommandLine } from "../shared/command.tsx";
 import { AppLink } from "../shared/link.tsx";
-import { ASKS_PATH, EXPLORE_PATH, INSTALL_PATH } from "../shared/paths.ts";
+import {
+  ASKS_PATH,
+  EXPLORE_PATH,
+  IMPORT_PATH,
+  INSTALL_PATH,
+} from "../shared/paths.ts";
 import { GUTTER } from "../shared/shell/gutter.ts";
 import { GateDrawing } from "./gate-drawing.tsx";
 import { LandingNowList } from "./landing-now-list.tsx";
 import type { LandingNow } from "./landing-now.ts";
 import { MusicBox } from "./music-box/music-box.tsx";
 import { WaysIn } from "./ways-in.tsx";
-import { HEADLINE, HERO_LEDE } from "./words.ts";
+import { HEADLINE, HERO_LEDE, RUN_A_PROJECT } from "./words.ts";
 
-/** The page's one main action, a size up from a toolbar's button. */
+/** The page's main action, a size up from a toolbar's button. */
 const PRIMARY = buttonVariants({
   className: "text-want h-11 px-6 no-underline",
   size: "lg",
+});
+
+/** The maintainer's way in, beside it at the same size, outlined. */
+const SECONDARY = buttonVariants({
+  className: "text-want h-11 px-6 no-underline",
+  size: "lg",
+  variant: "outline",
 });
 
 const Code = ({ children }: { readonly children: ReactNode }) => (
@@ -154,7 +166,7 @@ export const LandingView = ({
     id="main"
     tabIndex={-1}
   >
-    {/* The hero: the headline and its lede centred between the rails, the one action under them, then Fig 1 across the frame. */}
+    {/* The hero: the headline and its lede centred between the rails, the two ways in under them, then Fig 1 across the frame. */}
     <div
       className={`tablet:pt-20 flex flex-col items-center gap-12 pt-12 pb-16 ${GUTTER}`}
       data-hero=""
@@ -168,9 +180,14 @@ export const LandingView = ({
         </p>
       </div>
       <div className="flex max-w-full flex-col items-center gap-4">
-        <AppLink className={PRIMARY} data-action="asks" to={ASKS_PATH}>
-          Browse open asks
-        </AppLink>
+        <div className="flex max-w-full flex-wrap justify-center gap-3">
+          <AppLink className={PRIMARY} data-action="asks" to={ASKS_PATH}>
+            Browse open asks
+          </AppLink>
+          <AppLink className={SECONDARY} data-action="import" to={IMPORT_PATH}>
+            {RUN_A_PROJECT}
+          </AppLink>
+        </div>
         <div className="max-w-full min-w-0">
           <CommandLine command={installCommand(webUrl)} />
         </div>

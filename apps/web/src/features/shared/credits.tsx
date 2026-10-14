@@ -12,7 +12,7 @@ export const inTrailerOrder = (credits: readonly Credit[]) =>
   credits.toSorted((one, other) => rank(one) - rank(other));
 
 export const assistedValue = ({ harness, model, verified }: AgentTrailer) =>
-  `${harness}${model === undefined ? "" : `:${model}`} (${verified ? "verified" : "claimed"})`;
+  `${harness}${model === undefined ? "" : `:${model}`} (${verified ? "verified" : "self-reported"})`;
 
 const LINES = "flex flex-col gap-1 font-mono text-mono leading-terminal";
 

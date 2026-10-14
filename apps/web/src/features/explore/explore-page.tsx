@@ -4,10 +4,11 @@ import { DateTime } from "effect";
 import type { ReactNode } from "react";
 
 import { LandingProjects } from "../landing/projects.ts";
+import { RUN_A_PROJECT } from "../landing/words.ts";
 import { postureLabel } from "../project/posture-label.ts";
 import { EmptyState } from "../shared/empty.tsx";
 import { AppLink } from "../shared/link.tsx";
-import { ASKS_PATH, projectPath } from "../shared/paths.ts";
+import { ASKS_PATH, IMPORT_PATH, projectPath } from "../shared/paths.ts";
 import { UnreachableNotice } from "../shared/pending.tsx";
 import { PostureBadge } from "../shared/posture.tsx";
 import { GUTTER } from "../shared/shell/gutter.ts";
@@ -173,7 +174,12 @@ export const ExploreView = ({
       <h1 className="text-headline">{EXPLORE_TITLE}</h1>
       <p className="text-body text-muted-foreground max-w-(--measure)">
         <Lede projects={projects} /> Looking for something to work on?{" "}
-        <AppLink to={ASKS_PATH}>See every open ask</AppLink>.
+        <AppLink to={ASKS_PATH}>See every open ask</AppLink>. Have a repo of
+        your own?{" "}
+        <AppLink data-action="import" to={IMPORT_PATH}>
+          {RUN_A_PROJECT}
+        </AppLink>
+        .
       </p>
     </div>
     <Body projects={projects} />

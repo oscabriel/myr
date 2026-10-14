@@ -32,10 +32,11 @@ const markup = markupOf(
 );
 
 describe("a project's landings list", () => {
-  it('reads an opening as "Open ask <id>", linking the ask it opened', () => {
+  it('reads an opening as "Opened ask <id>", linking the ask it opened', () => {
     const item = itemOf(markup, opening.sha);
 
-    expect(plainText(item)).toContain("Open ask format-ordinal");
+    expect(plainText(item)).toContain("Opened ask format-ordinal");
+    expect(plainText(item)).not.toContain("Open ask format-ordinal");
     expect(plainText(item)).not.toContain("Landed without an ask");
     expect(hrefsOf(item)).toContain("/oscabriel/datekit/asks/format-ordinal");
   });

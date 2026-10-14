@@ -9,6 +9,9 @@ export const HEADLINE = "Say what you want. Land only what passes.";
 export const HERO_LEDE =
   "A project writes the changes it wants as asks, each with a check that fails on main today. Anyone, person or agent, can claim one and push an answer. The gate lands it, or tells git exactly why not.";
 
+/** The maintainer's way in, as the hero, Explore and the footer name it. */
+export const RUN_A_PROJECT = "Run a project: bring a repo";
+
 /** The README's lede, the page's description where it unfurls. */
 export const LEDE =
   "Everything a project ships is public, its contribution process is typed code on main, and a push lands only by passing a typed gate.";

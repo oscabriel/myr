@@ -171,15 +171,15 @@ export const StageStrip = ({
           data-state={state}
           key={name}
         >
-          <span className="text-label flex min-w-0 items-start gap-1.5">
+          {/* Four cells a row on a phone, then three: the mark sits over the name there, so "Maintainer" and "Held-back" stand whole. */}
+          <span className="text-label tablet:flex-row tablet:items-start tablet:gap-1.5 flex min-w-0 flex-col gap-0.5">
             <StateMarkIcon
               className="mt-px"
               mark={marks[state].mark}
               size="sm"
             />
-            {/* Four cells a row on a phone: a long label wraps rather than losing its end. */}
             <span
-              className={`min-w-0 break-words ${
+              className={`min-w-0 [hyphens:none] whitespace-nowrap ${
                 state === "pending" || state === "skipped"
                   ? "text-muted-foreground"
                   : "text-foreground"
@@ -190,7 +190,7 @@ export const StageStrip = ({
             </span>
           </span>
           <span
-            className={`text-label pl-5 font-normal ${
+            className={`text-label tablet:pl-5 font-normal ${
               state === "current" ? currentTone : wordTones[state]
             }`}
           >

@@ -360,10 +360,15 @@ describe("the footer", () => {
         expect(linksOf(footer).map(({ text }) => text)).toStrictEqual([
           "Docs",
           "Install",
+          "Bring a repo",
           "Settings",
           "Privacy",
           "Terms",
         ]);
+        // The maintainer's way in, as the hero offers it, reachable signed out from every site page.
+        expect(
+          linksOf(footer).find(({ text }) => text === "Bring a repo")?.href
+        ).toBe("/import");
       })
   );
 });

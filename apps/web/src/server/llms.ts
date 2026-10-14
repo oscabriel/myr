@@ -11,6 +11,7 @@ import {
 } from "../features/agents/llms.ts";
 import { markdown, unavailable } from "../features/agents/respond.ts";
 import { stillWaiting } from "../features/front/families.ts";
+import { openAsks } from "../features/project/asks.tsx";
 
 export type ClientFor = (request: Request) => Layer.Layer<Client>;
 
@@ -82,8 +83,10 @@ export const projectLlmsHandler =
 
         return markdown(
           projectLlms({
-            // An ask waits only on asks still open, as the page says.
-            asks: stillWaiting(asks.value),
+            // An ask waits only on asks still open, and a family's finale
+            // is folded into its family while it waits, so the count is the
+            // page's and the header's.
+            asks: openAsks(stillWaiting(asks.value)),
             commands,
             listing: listing.value,
             platformUrl,

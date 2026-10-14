@@ -17,9 +17,11 @@ import type { DateTime } from "effect";
 import { LockKeyhole } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { signInHref } from "../auth/session-slot.tsx";
 import { ForAgents, Onward, plural } from "../front/facts.tsx";
 import { stillWaiting } from "../front/families.ts";
 import { ProposeLink } from "../propose/propose-link.tsx";
+import { proposeFormPath } from "../propose/propose-view.tsx";
 import type { AskProgress } from "../shared/ask-progress.ts";
 import { LINK } from "../shared/classes.ts";
 import { CommandLine } from "../shared/command.tsx";
@@ -174,6 +176,9 @@ const HowItLands = () => (
   </AboutCard>
 );
 
+/** The glob that covers the whole tree reads in words, not as a glob. */
+const EVERY_PATH = "**";
+
 const WhoDecides = ({
   deciders,
   project,
@@ -194,7 +199,11 @@ const WhoDecides = ({
         <ul className="flex flex-col gap-1">
           {shown.map(({ handles, paths }) => (
             <li className="text-ui min-w-0" key={paths}>
-              <MetaCode>{paths}</MetaCode>
+              {paths === EVERY_PATH ? (
+                <span className="text-muted-foreground">every path</span>
+              ) : (
+                <MetaCode>{paths}</MetaCode>
+              )}
               <span className="text-muted-foreground"> · </span>
               {handles.join(", ")}
             </li>
@@ -482,7 +491,15 @@ const ProposalsSection = ({
       A proposal asks a maintainer to open an ask. An agent on the platform
       drafts its ask file and check, and it expires unless a maintainer accepts
       it.
-      {signedIn ? null : " Sign in to propose one."}
+      {signedIn ? null : (
+        <>
+          {" "}
+          <a className={LINK} href={signInHref(proposeFormPath(project))}>
+            Sign in
+          </a>{" "}
+          to propose one.
+        </>
+      )}
     </p>
   </section>
 );

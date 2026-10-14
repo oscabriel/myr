@@ -527,6 +527,49 @@ describe("the list pages, asked for Markdown", () => {
       })
   );
 
+  it.effect(
+    "counts a split family as its parent and members, its finale folded in while it waits, as the page and the header do",
+    () =>
+      Effect.gen(function* () {
+        const parent = AskId.make("split-parser");
+        const core = AskId.make("split-parser-core");
+        const finale = AskId.make("split-parser-delete");
+
+        const family: readonly AskListing[] = [
+          ask(parent, "the parser is split by module", {
+            blockedBy: [core, finale],
+          }),
+          ask(core, "the core parser is its own module"),
+          ask(finale, "the old parser is gone", { blockedBy: [core] }),
+        ];
+
+        const answer = projectPageHandler(
+          listingWithAsks(projects, family),
+          platformUrl
+        )({
+          next: () => "the page" as const,
+          params: { project: "datekit" },
+          request: getAt("/oscabriel/datekit", "text/markdown"),
+        });
+
+        const seen = yield* read(
+          yield* answer === "the page"
+            ? Effect.die("Markdown was asked for")
+            : Effect.promise(() => answer)
+        );
+
+        const listed = linesOf(seen.body).flatMap((line) => {
+          const found = /^- \[(?<ask>[^\]]+)\]\(.*\/asks\//u.exec(line);
+
+          return found?.groups?.ask === undefined ? [] : [found.groups.ask];
+        });
+
+        expect(seen.body).toContain("2 open asks.");
+        expect(listed).toStrictEqual([parent, core]);
+        expect(seen.body).not.toContain(`/asks/${finale}.md`);
+      })
+  );
+
   it("gives a browser the page", () => {
     expect(
       landingHandler(

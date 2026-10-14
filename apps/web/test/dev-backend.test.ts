@@ -20,6 +20,8 @@ import { RpcClient, RpcSerialization } from "effect/rpc";
 import { devStart } from "../src/dev/clock.ts";
 import { devServer } from "../src/dev/server.ts";
 import { devToken } from "../src/dev/sessions.ts";
+import { stillWaiting } from "../src/features/front/families.ts";
+import { openAsks } from "../src/features/project/asks.tsx";
 
 const PROJECTS = [
   ProjectName.make("oscabriel/burrow"),
@@ -75,6 +77,22 @@ const pages = inFreshWorld((as) =>
     const { projects } = yield* anyone.listProjects({});
 
     return { entries, projects };
+  })
+);
+
+const listedWithAsks = inFreshWorld((as) =>
+  Effect.gen(function* () {
+    const anyone = yield* clientOf(as());
+    const { projects } = yield* anyone.listProjects({});
+
+    const asks = yield* Effect.forEach(PROJECTS, (project) =>
+      Effect.map(anyone.listAsks({ project }), ({ asks: listed }) => ({
+        asks: listed,
+        project,
+      }))
+    );
+
+    return { asks, projects };
   })
 );
 
@@ -274,6 +292,23 @@ describe("the dev seed", seededWorlds, () => {
         ]);
         expect(opening.opened).toBeDefined();
         expect(landedAt).toHaveLength(1);
+      })
+  );
+
+  it.live(
+    "counts each project's open asks as its page does: a split family as one row, its finale folded in while it waits",
+    () =>
+      Effect.gen(function* () {
+        const { asks, projects } = yield* listedWithAsks;
+
+        expect(
+          projects.map(({ openAsks: count, project }) => [project, count])
+        ).toStrictEqual(
+          asks.map(({ asks: listed, project }) => [
+            project,
+            openAsks(stillWaiting(listed)).length,
+          ])
+        );
       })
   );
 

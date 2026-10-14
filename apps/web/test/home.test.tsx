@@ -9,6 +9,7 @@ import {
   AskId,
   CommitSha,
   Handle,
+  LandedSha,
   ProjectName,
   RequestId,
 } from "@repo/protocol/ids";
@@ -67,6 +68,14 @@ const sectionsOf = (markup: string) =>
   [...markup.matchAll(/<section\b[^>]*aria-label="(?<name>[^"]+)"/gu)].map(
     (found) => found.groups?.name
   );
+
+/** Each stage of a strip with its state, in the gate's order. */
+const stagesOf = (markup: string) =>
+  [
+    ...markup.matchAll(
+      /data-stage="(?<stage>[^"]+)" data-state="(?<state>[^"]+)"/gu
+    ),
+  ].map((found) => `${found.groups?.stage} ${found.groups?.state}`);
 
 const commandsOf = (markup: string) =>
   [...markup.matchAll(/<code\b[^>]*>(?<command>.*?)<\/code>/gsu)].map((found) =>
@@ -212,6 +221,44 @@ describe("the inbox, for the asks a reader holds and may take", () => {
           "heldBack refused",
           "human pending",
         ]);
+      })
+  );
+
+  it.effect(
+    "reads a landed answer's held-back and maintainer stages as not needed when its verdict held neither, as the answer page does",
+    () =>
+      Effect.gen(function* () {
+        const landed: AnswerView = {
+          ...refused("parse-iso-week"),
+          outcome: Outcome.cases.Landed.make({
+            sha: LandedSha.make("c".repeat(40)),
+          }),
+        };
+
+        const work = {
+          answer: landed,
+          claim: claim({
+            ask: "parse-iso-week",
+            fork: "datekit--parse-iso-week--bram",
+            state: "answered",
+          }),
+          stage: "human",
+        } as const;
+
+        expect(
+          stagesOf(
+            yield* pageOf({
+              work: [{ ...work, holds: { decided: false, heldBack: false } }],
+            })
+          ).slice(5)
+        ).toStrictEqual(["heldBack skipped", "human skipped"]);
+        expect(
+          stagesOf(
+            yield* pageOf({
+              work: [{ ...work, holds: { decided: true, heldBack: true } }],
+            })
+          ).slice(5)
+        ).toStrictEqual(["heldBack passed", "human passed"]);
       })
   );
 

@@ -56,7 +56,8 @@ describe(CreditTrailers, () => {
       />
     );
 
-    expect(text).toContain("Assisted-by: pi:opus-4 (claimed)");
+    expect(text).toContain("Assisted-by: pi:opus-4 (self-reported)");
+    expect(text).not.toContain("(claimed)");
   });
 
   it("shows a held-back trailer as its own Held-back line", () => {

@@ -73,7 +73,9 @@ const proposeWords = (written: boolean, busy: boolean) => {
   return busy ? "Proposing" : "Propose";
 };
 
-const PROPOSE_COMMAND = `${Brand.cli} propose --draft "<want>"`;
+/** The same proposal from a terminal, with the flags the CLI's `propose` takes: the want, the project, and a draft asked for. */
+export const proposeCommand = (project: ProjectName) =>
+  `${Brand.cli} propose --want "<want>" --project ${project} --draft`;
 
 const SignInFirst = ({
   about,
@@ -108,11 +110,11 @@ const SignInFirst = ({
         to propose one here, or propose from your clone:
       </span>
     </p>
-    <CommandLine command={PROPOSE_COMMAND} />
+    <CommandLine command={proposeCommand(project)} />
   </section>
 );
 
-const GoodWant = () => (
+const GoodWant = ({ project }: { readonly project: ProjectName }) => (
   <>
     <FactBlock label="A good want">
       <ul className="text-ui flex list-disc flex-col gap-1.5 pl-4">
@@ -122,7 +124,7 @@ const GoodWant = () => (
       </ul>
     </FactBlock>
     <FactBlock label="From a terminal">
-      <CommandLine command={PROPOSE_COMMAND} numbered />
+      <CommandLine command={proposeCommand(project)} numbered />
     </FactBlock>
   </>
 );
@@ -310,7 +312,7 @@ export const ProposeView = ({
         { label: project, to: `/${project}` },
         { label: "Propose an ask" },
       ]}
-      facts={<GoodWant />}
+      facts={<GoodWant project={project} />}
       factsHeading="Proposing"
       meta="A maintainer decides whether the ask opens; nothing lands from here."
       title="Propose an ask"
@@ -327,7 +329,7 @@ export const ProposeView = ({
         {children}
       </ProposeBody>
       <div className="border-rule flex flex-col border-t pt-4">
-        <GoodWant />
+        <GoodWant project={project} />
       </div>
     </Workspace>
   </div>

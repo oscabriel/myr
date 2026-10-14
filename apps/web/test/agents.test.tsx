@@ -143,6 +143,40 @@ describe("the Install page", () => {
     })
   );
 
+  it.effect(
+    "wraps the sentence to paste, its URLs anywhere, and keeps a config file as written",
+    () =>
+      Effect.gen(function* () {
+        const html = yield* page;
+
+        const blocks = [...html.matchAll(/<pre\b[^>]*>/gu)].map(([tag]) => ({
+          label: decoded(
+            /aria-label="(?<label>[^"]*)"/u.exec(tag)?.groups?.label ?? ""
+          ),
+          wraps:
+            tag.includes("whitespace-pre-wrap") &&
+            tag.includes("[overflow-wrap:anywhere]"),
+        }));
+
+        const prompt = blocks.filter(
+          ({ label }) => label === "Paste into the agent's prompt"
+        );
+
+        expect(prompt).toHaveLength(1);
+        expect(prompt.every(({ wraps }) => wraps)).toBeTruthy();
+        expect(
+          blocks.filter(
+            ({ label }) => label !== "Paste into the agent's prompt"
+          ).length
+        ).toBeGreaterThan(0);
+        expect(
+          blocks
+            .filter(({ label }) => label !== "Paste into the agent's prompt")
+            .some(({ wraps }) => wraps)
+        ).toBeFalsy();
+      })
+  );
+
   it.effect("gives every snippet a button that copies it", () =>
     Effect.gen(function* () {
       expect(

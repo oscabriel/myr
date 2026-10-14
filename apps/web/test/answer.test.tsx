@@ -269,6 +269,16 @@ describe("the answer page", () => {
     expect(markup).toContain(`href="/oscabriel/datekit/asks/${askId}"`);
   });
 
+  it("reads a family's parent, open but waiting on its children, as waiting, never as open to take", () => {
+    const blocked = { ...ask, blockedBy: [AskId.make("split-format")] };
+    const markup = markupOf(page({ ask: blocked, verdict: undefined }));
+
+    expect(markup).not.toContain(">Open to take<");
+    expect(markup).toMatch(/<strong\b[^>]*>Waiting<\/strong>/u);
+    // An ask nothing blocks is open to take, as before.
+    expect(markupOf(page({ verdict: undefined }))).toContain(">Open to take<");
+  });
+
   it("names a lane's log only as the command that reads it", () => {
     const passing = verdictOf(Outcome.cases.Checking.make({ stage: "checks" }));
     const text = textOf(page({ verdict: passing }));

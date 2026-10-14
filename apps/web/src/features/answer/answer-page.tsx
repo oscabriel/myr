@@ -700,7 +700,8 @@ export const AnswerView = ({
               ask,
               claimant: progress?.claimant,
               kind: "ask",
-              takeable: ask.state === "open",
+              // A family's parent waits for its children: open, but not to take.
+              takeable: ask.state === "open" && ask.blockedBy.length === 0,
             }
           }
         />
