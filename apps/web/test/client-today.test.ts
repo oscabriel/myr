@@ -48,7 +48,7 @@ describe("Today, through the web's atoms", seededWorld, () => {
         decider: "ines-v",
         newcomers: ["bram"],
         projects: ["oscabriel/datekit"],
-        subjects: ["OpenProposal", "OpenProposal", "StrayPush"],
+        subjects: ["OpenProposal", "OpenProposal", "OpenProposal", "StrayPush"],
         unattended: ["diff-in-days-dst"],
       });
     })
@@ -100,7 +100,7 @@ describe("Today, through the web's atoms", seededWorld, () => {
         expect(taken?.choice).toBe("decline");
         expect(
           taken === undefined ? undefined : DateTime.formatIso(taken.at)
-        ).toBe("2026-10-07T09:21:00.000Z");
+        ).toBe("2026-10-07T09:27:00.000Z");
 
         const todayIn = (where: typeof registry) =>
           Effect.map(settled(where, todayAtom), (today) =>

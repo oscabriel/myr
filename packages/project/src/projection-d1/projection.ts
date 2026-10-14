@@ -211,6 +211,7 @@ export const ProjectionD1: Layer.Layer<Projection, never, SqlClient> =
           ],
           Claimed: ({ ask }) => [claims(ask, 1)],
           Decided: () => unkept,
+          DiscussionPosted: () => [],
           Judged: refusedRow,
           Landed: ({ landing }) => [
             ...landedRow({ landing }),

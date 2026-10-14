@@ -26,13 +26,14 @@ const tabs = (current: string) =>
     { href: "/oscabriel/datekit#open-asks", text: "Asks" },
     { href: "/oscabriel/datekit/commits/main?show=landings", text: "Landings" },
     { href: "/oscabriel/datekit#proposals", text: "Proposals" },
+    { href: "/oscabriel/datekit/discussions", text: "Discussions" },
     { href: "/oscabriel/datekit#who-decides", text: "People" },
     { href: "/oscabriel/datekit/people", text: "Policy" },
     { href: "/oscabriel/datekit/visibility", text: "Visibility" },
   ].map((link) => ({ current: link.text === current, ...link }));
 
 describe("a project's tabs", () => {
-  it("links all eight, in ADR 0041's order, and marks only the page being read", () => {
+  it("links all nine, in ADR 0041's order, and marks only the page being read", () => {
     const markup = renderToStaticMarkup(
       <ProjectTabs current="code" project={datekit} />
     );

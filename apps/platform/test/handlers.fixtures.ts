@@ -118,6 +118,7 @@ export interface WorldOptions {
   readonly limits?: {
     readonly claim: number;
     readonly draft?: number;
+    readonly post?: number;
     readonly proposal: number;
   };
 }
@@ -143,6 +144,7 @@ export const worldOf = (
     MemoryRateLimits({
       claim: options.limits?.claim ?? 100,
       draft: options.limits?.draft ?? 100,
+      post: options.limits?.post ?? 100,
       proposal: options.limits?.proposal ?? 100,
     }),
     EvidenceStoreMemory

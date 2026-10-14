@@ -11,6 +11,7 @@ import {
   Handle,
   LandedSha,
   ProjectName,
+  DiscussionId,
   ProposalId,
   RepoPath,
   RequestId,
@@ -23,11 +24,13 @@ import {
   NotDecider,
   OutOfScope,
   PrivatePathInPublicTree,
+  DiscussionClosed,
   ProposalClosed,
   ReachedInternals,
   StaleBase,
   TouchedJudge,
   UnknownPath,
+  UnknownDiscussion,
   UnknownProposal,
   UnknownRevision,
   ValueTooShort,
@@ -302,6 +305,16 @@ describe(explain, () => {
     },
     {
       reason:
+        "you already have 20 open discussions here, the most this project allows",
+      refusal: new CapReached({ cap: 20, limit: "discussions" }),
+    },
+    {
+      reason:
+        "you made 5 posts in the last minute, the most the platform allows; try again in 60s",
+      refusal: new CapReached({ cap: 5, limit: "discussions", retryAfter: 60 }),
+    },
+    {
+      reason:
         "you started 2 drafts in the last minute, the most the platform allows; try again in 60s",
       refusal: new CapReached({ cap: 2, limit: "drafts", retryAfter: 60 }),
     },
@@ -362,6 +375,26 @@ describe(explain, () => {
         "  retryable: no",
       ],
       refusal: new ProposalClosed({ proposal: ProposalId.make("prop-000007") }),
+    },
+    {
+      lines: [
+        "UnknownDiscussion: this project has no discussion disc-000007",
+        `  next: ${Brand.cli} discussions`,
+        "  retryable: no",
+      ],
+      refusal: new UnknownDiscussion({
+        discussion: DiscussionId.make("disc-000007"),
+      }),
+    },
+    {
+      lines: [
+        "DiscussionClosed: disc-000007 is closed, or became a proposal, so it takes no more posts",
+        `  next: ${Brand.cli} discussions`,
+        "  retryable: no",
+      ],
+      refusal: new DiscussionClosed({
+        discussion: DiscussionId.make("disc-000007"),
+      }),
     },
     {
       lines: [

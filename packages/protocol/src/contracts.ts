@@ -34,6 +34,12 @@ import {
 } from "./domain/code.ts";
 import { ConfigFile, NoneOrMore } from "./domain/common.ts";
 import { Choice, Decision, Today } from "./domain/decision.ts";
+import {
+  Discussion,
+  DiscussionListing,
+  DiscussionTitle,
+  PostBody,
+} from "./domain/discussion.ts";
 import { EnvSchemaView } from "./domain/env.ts";
 import { ProjectEvent } from "./domain/event.ts";
 import { FrontPageEntry, ProjectListing } from "./domain/front-page.ts";
@@ -47,6 +53,7 @@ import {
   AskId,
   CommitSha,
   DecisionId,
+  DiscussionId,
   EnvKey,
   Handle,
   KindName,
@@ -66,6 +73,7 @@ import {
   ClaimLapsed,
   DecisionClosed,
   Denounced,
+  DiscussionClosed,
   DraftInProgress,
   ImportFailed,
   NotYourNamespace,
@@ -86,6 +94,7 @@ import {
   UnknownAsk,
   UnknownCommit,
   UnknownDecision,
+  UnknownDiscussion,
   UnknownEnvItem,
   UnknownPath,
   UnknownProject,
@@ -130,6 +139,7 @@ const servedOn = {
   landing: SurfaceName.literals,
   ledger: SurfaceName.literals,
   listAsks: SurfaceName.literals,
+  listDiscussions: SurfaceName.literals,
   // A commit's diff and every path stay off MCP: no cap fits a transcript.
   // No command: git reads code locally.
   listPaths: ["rpc", "web"],
@@ -137,6 +147,8 @@ const servedOn = {
   listRefs: ["rpc", "mcp", "web"],
   log: ["rpc", "mcp", "web"],
   openAsk: ["rpc", "mcp", "cli"],
+  // The web adds no form for what the CLI does: a post is made from a terminal.
+  postDiscussion: ["rpc", "mcp", "cli"],
   projectPolicy: SurfaceName.literals,
   proposeAsk: SurfaceName.literals,
   readFile: ["rpc", "mcp", "web"],
@@ -148,6 +160,7 @@ const servedOn = {
   setEnv: ["rpc", "cli"],
   showAsk: SurfaceName.literals,
   showCommit: ["rpc", "web"],
+  showDiscussion: SurfaceName.literals,
   showProposal: SurfaceName.literals,
   status: SurfaceName.literals,
   submitAnswer: ["rpc", "mcp", "cli"],
@@ -646,6 +659,45 @@ export class ShowProposal extends Rpc.make("showProposal", {
   .annotate(Cli, { name: "proposal", positional: ["proposal"] })
   .annotate(Surfaces, servedOn.showProposal) {}
 
+export class ListDiscussions extends Rpc.make("listDiscussions", {
+  error: UnknownProject,
+  payload: { project: ProjectName },
+  success: Schema.Struct({ discussions: Schema.Array(DiscussionListing) }),
+})
+  .annotate(
+    Description,
+    "List a project's discussions, newest post first: each thread's title, opener, state and the proposal it became."
+  )
+  .annotate(Audience, "public")
+  .annotate(Visibility, "public")
+  .annotate(ReadOnly, true)
+  .annotate(Idempotent, true)
+  .annotate(Destructive, false)
+  .annotate(NeedsApproval, false)
+  .annotate(Cli, { name: "discussions" })
+  .annotate(Surfaces, servedOn.listDiscussions) {}
+
+export class ShowDiscussion extends Rpc.make("showDiscussion", {
+  error: Schema.Union([UnknownProject, UnknownDiscussion]),
+  payload: {
+    discussion: described(DiscussionId, "The discussion to show"),
+    project: ProjectName,
+  },
+  success: Schema.Struct({ discussion: Discussion }),
+})
+  .annotate(
+    Description,
+    "Show one discussion: its posts in order, its state and the proposal it became."
+  )
+  .annotate(Audience, "public")
+  .annotate(Visibility, "public")
+  .annotate(ReadOnly, true)
+  .annotate(Idempotent, true)
+  .annotate(Destructive, false)
+  .annotate(NeedsApproval, false)
+  .annotate(Cli, { name: "discussion", positional: ["discussion"] })
+  .annotate(Surfaces, servedOn.showDiscussion) {}
+
 export class InitProject extends Rpc.make("initProject", {
   error: Schema.Union([ProjectExists, NotYourNamespace, ImportFailed]),
   payload: {
@@ -718,8 +770,23 @@ const draftsAlone = Schema.makeFilter(
 );
 
 export class ProposeAsk extends Rpc.make("proposeAsk", {
-  error: Schema.Union([UnknownProject, Denounced, CapReached, NotVouched]),
+  error: Schema.Union([
+    UnknownProject,
+    Denounced,
+    CapReached,
+    NotVouched,
+    NotDecider,
+    UnknownDiscussion,
+    DiscussionClosed,
+  ]),
   payload: Schema.Struct({
+    /** The discussion this proposal comes from; a maintainer alone may name one, and it marks the thread proposed. */
+    discussion: Schema.optionalKey(
+      described(
+        DiscussionId,
+        "The discussion this proposal comes from; a maintainer alone may name one"
+      )
+    ),
     draft: Schema.optionalKey(
       described(
         Schema.Literal(true),
@@ -754,7 +821,7 @@ export class ProposeAsk extends Rpc.make("proposeAsk", {
 })
   .annotate(
     Description,
-    "Propose an ask, optionally with a sealed answer; the proposal expires unless a maintainer accepts it."
+    "Propose an ask, optionally with a sealed answer, or, as a maintainer, from a discussion; the proposal expires unless a maintainer accepts it."
   )
   .annotate(Audience, "signedIn")
   .annotate(Visibility, "public")
@@ -820,6 +887,60 @@ export class FlagAsk extends Rpc.make("flagAsk", {
   .annotate(NeedsApproval, false)
   .annotate(Cli, { name: "ask flag", positional: ["ask"] })
   .annotate(Surfaces, servedOn.flagAsk) {}
+
+const titleOrBody = Schema.makeFilter(
+  (payload: {
+    readonly body?: string;
+    readonly discussion?: string;
+    readonly title?: string;
+  }) => {
+    if (payload.discussion === undefined) {
+      return payload.title === undefined
+        ? "opening a discussion takes a title"
+        : true;
+    }
+
+    return payload.body === undefined
+      ? "a reply takes a body"
+      : payload.title === undefined || "a reply takes no title";
+  }
+);
+
+export class PostDiscussion extends Rpc.make("postDiscussion", {
+  error: Schema.Union([
+    UnknownProject,
+    UnknownDiscussion,
+    DiscussionClosed,
+    Denounced,
+    CapReached,
+  ]),
+  payload: Schema.Struct({
+    body: Schema.optionalKey(described(PostBody, "Your post")),
+    discussion: Schema.optionalKey(
+      described(
+        DiscussionId,
+        "The discussion to reply in; leave out to open one"
+      )
+    ),
+    project: ProjectName,
+    title: Schema.optionalKey(
+      described(DiscussionTitle, "The title of the discussion you open")
+    ),
+  }).check(titleOrBody),
+  success: Schema.Struct({ discussion: Discussion }),
+})
+  .annotate(
+    Description,
+    "Post in a project's discussions: with no discussion named, open a thread with a title and an optional body; with one named, reply with a body. Anyone not denounced may."
+  )
+  .annotate(Audience, "signedIn")
+  .annotate(Visibility, "public")
+  .annotate(ReadOnly, false)
+  .annotate(Idempotent, false)
+  .annotate(Destructive, false)
+  .annotate(NeedsApproval, false)
+  .annotate(Cli, { name: "discussion post", positional: ["discussion"] })
+  .annotate(Surfaces, servedOn.postDiscussion) {}
 
 export class Decide extends Rpc.make("decide", {
   error: Schema.Union([
@@ -1129,11 +1250,14 @@ export class Contracts extends RpcGroup.make(
   WhyOf,
   PolicyOf,
   ShowProposal,
+  ListDiscussions,
+  ShowDiscussion,
   InitProject,
   OpenAsk,
   ProposeAsk,
   DraftAsk,
   FlagAsk,
+  PostDiscussion,
   Decide,
   Claim,
   Release,

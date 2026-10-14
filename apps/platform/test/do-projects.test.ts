@@ -10,6 +10,7 @@ import { ProjectsMemory } from "@repo/project/projects/memory";
 import {
   CommitSha,
   DecisionId,
+  DiscussionId,
   EnvKey,
   keyOf,
   LandedSha,
@@ -142,12 +143,17 @@ const everyMethod = (api: ProjectApi) =>
     layerFacts: settled("layerFacts", api.layerFacts(bob)),
     ledger: settled("ledger", api.ledger(anyone)),
     listAsks: settled("listAsks", api.listAsks(anyone)),
+    listDiscussions: settled("listDiscussions", api.listDiscussions(anyone)),
     onAlarm: settled("onAlarm", api.onAlarm()),
     openAsk: settled(
       "openAsk",
       api.openAsk(bob, { ask: parseIso, files: askFiles() })
     ),
     policy: settled("policy", api.policy()),
+    postDiscussion: settled(
+      "postDiscussion",
+      api.postDiscussion(carol, { title: "Which day starts a week?" })
+    ),
     proposeAsk: settled(
       "proposeAsk",
       api.proposeAsk(carol, { want: "Parse ISO week dates." })
@@ -194,6 +200,10 @@ const everyMethod = (api: ProjectApi) =>
       })
     ),
     showAsk: settled("showAsk", api.showAsk(anyone, parseIso)),
+    showDiscussion: settled(
+      "showDiscussion",
+      api.showDiscussion(anyone, DiscussionId.make("disc-000001"))
+    ),
     showProposal: settled(
       "showProposal",
       api.showProposal(anyone, ProposalId.make("prop-000001"))

@@ -11,6 +11,7 @@ import type { Proposal } from "@repo/protocol/domain/proposal";
 import {
   AskId,
   CommitSha,
+  DiscussionId,
   EnvKey,
   Handle,
   KindName,
@@ -27,6 +28,8 @@ import {
 import {
   AskFull,
   CapReached,
+  Denounced,
+  DiscussionClosed,
   NotClaimed,
   NotDecider,
   UnknownEnvItem,
@@ -58,8 +61,9 @@ import type { WorldOptions } from "./handlers.fixtures.ts";
 
 const people = ["bob", "carol"];
 
+// spam is denounced in datekit's vouch file; the others are vouched for.
 const datekit = aProject({ people }).pipe(
-  withVouches(people),
+  withVouches(people, ["spam"]),
   withAsk({ id: "parse-iso", territory: "packages/parser" }),
   withAsk({ id: "trim-input", territory: "packages/trim" })
 );
@@ -339,6 +343,156 @@ describe("proposals and flags", () => {
         proposer: carols.proposal.proposer,
       }).toStrictEqual({ flags: "parse-iso", proposer: "carol" });
     }).pipe(Effect.provide(platform({ limits: { claim: 5, proposal: 1 } })))
+  );
+});
+
+describe("discussions", () => {
+  it.effect(
+    "take a thread and a reply from anyone not denounced, list and show them, and refuse the denounced",
+    () =>
+      Effect.gen(function* () {
+        yield* made;
+
+        const bob = yield* as("bob");
+        const carol = yield* as("carol");
+        const spam = yield* as("spam");
+
+        const { discussion } = yield* bob.postDiscussion({
+          body: "Weeks start on Monday in ISO 8601; which does parseISO assume?",
+          project: datekit.project,
+          title: "Which day starts a week?",
+        });
+
+        yield* advanceTo("2026-10-07T12:05:00Z");
+
+        const replied = yield* carol.postDiscussion({
+          body: "ISO, always.",
+          discussion: discussion.id,
+          project: datekit.project,
+        });
+
+        const refused = yield* Effect.all({
+          spamOpens: Effect.flip(
+            spam.postDiscussion({
+              project: datekit.project,
+              title: "Buy dates",
+            })
+          ),
+          spamReplies: Effect.flip(
+            spam.postDiscussion({
+              body: "Buy dates",
+              discussion: discussion.id,
+              project: datekit.project,
+            })
+          ),
+        });
+
+        const threads = yield* bob.listDiscussions({
+          project: datekit.project,
+        });
+
+        const shown = yield* carol.showDiscussion({
+          discussion: discussion.id,
+          project: datekit.project,
+        });
+
+        expect(discussion).toMatchObject({
+          id: "disc-000001",
+          opener: "bob",
+          state: "open",
+        });
+        expect(replied.discussion.posts.map(({ by }) => by)).toStrictEqual([
+          "bob",
+          "carol",
+        ]);
+        expect(refused).toStrictEqual({
+          spamOpens: new Denounced({}),
+          spamReplies: new Denounced({}),
+        });
+        expect(
+          threads.discussions.map(({ id, posts, state }) => [id, posts, state])
+        ).toStrictEqual([["disc-000001", 2, "open"]]);
+        expect(shown.discussion).toStrictEqual(replied.discussion);
+      }).pipe(Effect.provide(platform()))
+  );
+
+  it.effect(
+    "become a proposal by a maintainer alone, and then take no more posts",
+    () =>
+      Effect.gen(function* () {
+        yield* made;
+
+        const alice = yield* as("alice");
+        const bob = yield* as("bob");
+
+        const { discussion } = yield* bob.postDiscussion({
+          project: datekit.project,
+          title: "Parse ISO week dates?",
+        });
+
+        const bobProposes = yield* Effect.flip(
+          bob.proposeAsk({
+            discussion: discussion.id,
+            project: datekit.project,
+            want: "Parse ISO week dates.",
+          })
+        );
+
+        const { proposal } = yield* alice.proposeAsk({
+          discussion: discussion.id,
+          project: datekit.project,
+          want: "Parse ISO week dates.",
+        });
+
+        const after = yield* bob.showDiscussion({
+          discussion: discussion.id,
+          project: datekit.project,
+        });
+
+        const reply = yield* Effect.flip(
+          bob.postDiscussion({
+            body: "Please",
+            discussion: discussion.id,
+            project: datekit.project,
+          })
+        );
+
+        expect(bobProposes).toStrictEqual(new NotDecider({}));
+        expect(after.discussion).toMatchObject({
+          proposal: proposal.id,
+          state: "proposed",
+        });
+        expect(reply).toStrictEqual(
+          new DiscussionClosed({ discussion: discussion.id })
+        );
+      }).pipe(Effect.provide(platform()))
+  );
+
+  it.effect("are rate-limited per person, as posts", () =>
+    Effect.gen(function* () {
+      yield* made;
+
+      const bob = yield* as("bob");
+      const carol = yield* as("carol");
+
+      yield* bob.postDiscussion({ project: datekit.project, title: "One" });
+
+      const second = yield* Effect.flip(
+        bob.postDiscussion({ project: datekit.project, title: "Two" })
+      );
+
+      const carols = yield* carol.postDiscussion({
+        project: datekit.project,
+        title: "Carol's",
+      });
+
+      expect(second).toStrictEqual(
+        new CapReached({ cap: 1, limit: "discussions", retryAfter: 60 })
+      );
+      expect(carols.discussion.id).toBe(DiscussionId.make("disc-000002"));
+    }).pipe(
+      Effect.provide(platform({ limits: { claim: 5, post: 1, proposal: 5 } }))
+    )
   );
 });
 

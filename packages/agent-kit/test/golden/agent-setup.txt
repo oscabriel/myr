@@ -129,7 +129,7 @@ Every refusal the platform gives, by group. Each one's row in https://web-test.e
 - Never counted against the answerer: `Flake` and `VerifierBlocked`
 - At ask open: `NotRedFirst`, `WeakCheck` and `IncompleteBrief`
 - Maintainers only: `LayerContentInPublicTree`, `SecretInOutput` and `UnstatedRequirement`
-- Decision: `PostureChange`, `NotDecider`, `DecisionClosed`, `ProposalClosed` and `DraftInProgress`
-- Lookup: `UnknownProject`, `UnknownAsk`, `UnknownCommit`, `UnknownDecision`, `UnknownPath`, `UnknownRevision` and `UnknownProposal`
+- Decision: `PostureChange`, `NotDecider`, `DecisionClosed`, `ProposalClosed`, `DraftInProgress` and `DiscussionClosed`
+- Lookup: `UnknownProject`, `UnknownAsk`, `UnknownCommit`, `UnknownDecision`, `UnknownPath`, `UnknownRevision`, `UnknownProposal` and `UnknownDiscussion`
 - Setup: `ProjectExists`, `NotYourNamespace` and `ImportFailed`
 - Env: `UnknownEnvItem`, `NotSensitive` and `ValueTooShort`

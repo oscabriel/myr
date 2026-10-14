@@ -6,6 +6,7 @@ import {
   AskId,
   CommitSha,
   DecisionId,
+  DiscussionId,
   EnvKey,
   Handle,
   LandedSha,
@@ -83,8 +84,10 @@ export class CapReached extends Schema.TaggedError<CapReached>()("CapReached", {
   ...Retryable,
   ...nextIs(cli("status")),
   cap: Schema.Int,
-  /** Which limit: claims held (also when absent), proposals, or drafts. */
-  limit: Schema.optionalKey(Schema.Literals(["claims", "proposals", "drafts"])),
+  /** Which limit: claims held (also when absent), proposals, drafts, or discussions. */
+  limit: Schema.optionalKey(
+    Schema.Literals(["claims", "proposals", "drafts", "discussions"])
+  ),
   /** For a rate limit: seconds until one more is let through. */
   retryAfter: Schema.optionalKey(
     Schema.Int.check(Schema.isGreaterThanOrEqualTo(1))
@@ -310,6 +313,11 @@ export class ProposalClosed extends Schema.TaggedError<ProposalClosed>()(
   { ...Final, ...nextIs(cli("today")), proposal: ProposalId }
 ) {}
 
+export class DiscussionClosed extends Schema.TaggedError<DiscussionClosed>()(
+  "DiscussionClosed",
+  { ...Final, ...nextIs(cli("discussions")), discussion: DiscussionId }
+) {}
+
 export class DraftInProgress extends Schema.TaggedError<DraftInProgress>()(
   "DraftInProgress",
   { ...Retryable, proposal: ProposalId }
@@ -361,6 +369,11 @@ export class UnknownRevision extends Schema.TaggedError<UnknownRevision>()(
 export class UnknownProposal extends Schema.TaggedError<UnknownProposal>()(
   "UnknownProposal",
   { ...Final, ...nextIs(cli("today")), proposal: ProposalId }
+) {}
+
+export class UnknownDiscussion extends Schema.TaggedError<UnknownDiscussion>()(
+  "UnknownDiscussion",
+  { ...Final, ...nextIs(cli("discussions")), discussion: DiscussionId }
 ) {}
 
 export class ProjectExists extends Schema.TaggedError<ProjectExists>()(
@@ -461,6 +474,7 @@ const decision = [
   DecisionClosed,
   ProposalClosed,
   DraftInProgress,
+  DiscussionClosed,
 ] as const;
 
 const lookup = [
@@ -471,6 +485,7 @@ const lookup = [
   UnknownPath,
   UnknownRevision,
   UnknownProposal,
+  UnknownDiscussion,
 ] as const;
 
 const setup = [ProjectExists, NotYourNamespace, ImportFailed] as const;

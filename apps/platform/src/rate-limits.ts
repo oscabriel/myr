@@ -3,7 +3,8 @@ import type { CapReached } from "@repo/protocol/refusal";
 import { Context } from "effect";
 import type { Effect } from "effect";
 
-export type Limited = "claim" | "proposal" | "draft";
+/** A post shares the proposal binding's window: both are words put to a project's maintainers. */
+export type Limited = "claim" | "proposal" | "draft" | "post";
 
 export class RateLimits extends Context.Service<
   RateLimits,

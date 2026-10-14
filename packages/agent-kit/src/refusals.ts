@@ -54,7 +54,7 @@ const repairs = {
     todo: "Your claim lapsed after a spell without a push: claim the ask again if it is still open.",
   },
   Denounced: {
-    todo: "The project's vouch file denounces you: it takes no claims or proposals from you.",
+    todo: "The project's vouch file denounces you: it takes no claims, proposals or posts from you.",
   },
   DirectPush: {
     todo: "Main moves only by a landing. A contributor pushes the answer to the claim's fork; a maintainer makes a working fork with `next` and lands it with `land`.",
@@ -102,6 +102,9 @@ const elsewhere = {
   DecisionClosed: {
     todo: "Nothing to decide: it was taken already, or expired to its default.",
   },
+  DiscussionClosed: {
+    todo: "Nothing more is posted there: the discussion was closed, or a maintainer turned it into a proposal; `next` lists the open ones.",
+  },
   DraftInProgress: {
     next: cli("proposal", "<proposal>"),
     todo: "Wait: the platform is drafting this proposal's ask already, and `next` shows when it settles.",
@@ -143,6 +146,9 @@ const elsewhere = {
   },
   UnknownDecision: {
     todo: "Check the decision's id: `next` lists the decisions waiting on you.",
+  },
+  UnknownDiscussion: {
+    todo: "Check the discussion's id: `next` lists the project's discussions.",
   },
   UnknownEnvItem: {
     todo: "Name a key the project's env shape has: `next` lists them.",

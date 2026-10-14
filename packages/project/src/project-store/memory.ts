@@ -75,6 +75,7 @@ const snapshotOf = (state: State) =>
       attempts: yield* all(state, Tables.attempts),
       claims: yield* all(state, Tables.claims),
       decisions: yield* all(state, Tables.decisions),
+      discussions: yield* all(state, Tables.discussions),
       envValues: yield* all(state, Tables.envValues),
       landings: yield* decodeAll(
         Tables.landings,

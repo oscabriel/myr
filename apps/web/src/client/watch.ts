@@ -52,6 +52,10 @@ export const keysOf = (
     AskOpened: () => [...keys.project(project), ...keys.front()],
     Claimed: () => keys.project(project),
     Decided: () => keys.project(project),
+    DiscussionPosted: ({ discussion }) => [
+      ...keys.discussion(project, discussion),
+      ...keys.project(project),
+    ],
     Judged: ({ ask }) => keys.ask(project, ask),
     Landed: () => [
       ...keys.project(project),

@@ -224,7 +224,7 @@ const answered = (
     return { claim, head, receipt, requestId };
   });
 
-const ROUNDS_MINUTE = 19;
+const ROUNDS_MINUTE = 25;
 
 /**
  * Bram's first answer to parse-iso-week, refused at Shape for a path outside
@@ -337,17 +337,43 @@ const seedDatekit = Effect.gen(function* () {
     reason: "Its check pins a common year only; leap years need a case too.",
   });
 
+  // Two discussions: one open, one a maintainer turned into a proposal.
+  yield* at(14);
+
+  const talked = yield* api.postDiscussion(as(visitors.regular), {
+    body: "Weeks start on Monday in ISO 8601, but on Sunday in the US; which does parseISO assume?",
+    title: "Which day starts a week?",
+  });
+
+  yield* api.postDiscussion(as(decider), {
+    body: "ISO, always: a locale never changes what a date string means.",
+    discussion: talked.discussion.id,
+  });
+
+  yield* at(15);
+
+  const asked = yield* api.postDiscussion(as(visitors.proposer), {
+    body: "Could parseISO take week dates like 2026-W41-3 too?",
+    title: "ISO week dates",
+  });
+
+  yield* at(16);
+  yield* api.proposeAsk(as(decider), {
+    discussion: asked.discussion.id,
+    want: "parseISO reads an ISO week date to the day it names.",
+  });
+
   yield* Effect.forEach(
     DECLINED,
     (want, index) =>
       Effect.gen(function* () {
-        yield* at(11 + index * 2);
+        yield* at(17 + index * 2);
 
         const { proposal } = yield* api.proposeAsk(as(visitors.regular), {
           want,
         });
 
-        yield* at(12 + index * 2);
+        yield* at(18 + index * 2);
 
         const decision = yield* decisionOn(api, decider, proposal.id);
 
@@ -364,11 +390,11 @@ const seedDatekit = Effect.gen(function* () {
 });
 
 const seedBurrow = Effect.flatMap(
-  started(burrow.project, operator, burrow.files, 15),
-  (api) => opened(api, burrowPeople.decider, burrow.asks, 17)
+  started(burrow.project, operator, burrow.files, 21),
+  (api) => opened(api, burrowPeople.decider, burrow.asks, 23)
 );
 
-const STRAY_MINUTE = 21;
+const STRAY_MINUTE = 27;
 
 export const seedEnd = devMinute(STRAY_MINUTE);
 

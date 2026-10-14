@@ -1,6 +1,7 @@
 import { Ask } from "@repo/protocol/domain/ask";
 import { AgentTrailer } from "@repo/protocol/domain/credit";
 import { Decision } from "@repo/protocol/domain/decision";
+import { Discussion } from "@repo/protocol/domain/discussion";
 import { ProjectEvent } from "@repo/protocol/domain/event";
 import { LandingView } from "@repo/protocol/domain/landing";
 import { ImportSource } from "@repo/protocol/domain/policy";
@@ -84,6 +85,10 @@ export type ProposalRow = typeof ProposalRow.Type;
 export const DecisionRow = Decision;
 
 export type DecisionRow = typeof DecisionRow.Type;
+
+export const DiscussionRow = Discussion;
+
+export type DiscussionRow = typeof DiscussionRow.Type;
 
 export const RatchetRow = Schema.Struct({
   at: LandedSha,

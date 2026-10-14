@@ -130,6 +130,7 @@ const TABS = [
   "Asks",
   "Landings",
   "Proposals",
+  "Discussions",
   "People",
   "Policy",
   "Visibility",

@@ -1,6 +1,6 @@
 /**
  * A project's one header (ADR 0041): its name, posture, description, facts
- * and three actions, then its eight tabs. Every page of the project draws it
+ * and three actions, then its nine tabs. Every page of the project draws it
  * the same; only the current tab moves.
  */
 import { Brand } from "@repo/brand";

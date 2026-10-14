@@ -22,6 +22,8 @@ type CapLimit = NonNullable<CapReached["limit"]>;
 const held = {
   claims: (cap) =>
     `you already hold ${counted(cap, "claim")}, the most this project allows`,
+  discussions: (cap) =>
+    `you already have ${counted(cap, "open discussion")} here, the most this project allows`,
   drafts: (cap) =>
     `this proposal was already drafted ${cap === 1 ? "once" : `${cap} times`}, the most one proposal takes`,
   proposals: (cap) =>
@@ -30,6 +32,7 @@ const held = {
 
 const rated = {
   claims: { noun: "claim", verb: "made" },
+  discussions: { noun: "post", verb: "made" },
   drafts: { noun: "draft", verb: "started" },
   proposals: { noun: "proposal", verb: "made" },
 } as const satisfies Record<CapLimit, { noun: string; verb: string }>;
@@ -85,11 +88,13 @@ const reason = Match.typeTags<Refusal, string>()({
   DecisionClosed: ({ decision }) =>
     `${decision} was already decided, or expired to its default`,
   Denounced: () =>
-    "this project's vouch file denounces you, so it takes no claims or proposals from you",
+    "this project's vouch file denounces you, so it takes no claims, proposals or posts from you",
   DirectPush: ({ ref }) =>
     ref.startsWith(BRANCH)
       ? `main moves only by a landing, so ${ref} takes no direct push; a contributor pushes the answer to the claim's fork, and a maintainer makes a working fork with ${Brand.cli} fork and lands it with ${Brand.cli} land`
       : `${ref} is written by the platform, not pushed; a fork takes branches only, so push your answer with git push ${Brand.slug} HEAD:main`,
+  DiscussionClosed: ({ discussion }) =>
+    `${discussion} is closed, or became a proposal, so it takes no more posts`,
   DraftInProgress: ({ proposal }) =>
     `the platform is already drafting ${proposal}'s ask`,
   Flake: ({ lane }) =>
@@ -143,6 +148,8 @@ const reason = Match.typeTags<Refusal, string>()({
   UnknownAsk: ({ ask }) => `this project has no ask named ${ask}`,
   UnknownCommit: ({ sha }) => `this project has no commit ${sha}`,
   UnknownDecision: ({ decision }) => `this project has no decision ${decision}`,
+  UnknownDiscussion: ({ discussion }) =>
+    `this project has no discussion ${discussion}`,
   UnknownEnvItem: ({ key }) => `the env shape has no item ${key}`,
   UnknownPath: ({ commit, path }) =>
     `${short(commit)} has no file or folder at ${path}`,

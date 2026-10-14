@@ -99,6 +99,7 @@ const apply = (states: Map<AskId, AskProgress>, event: ProjectEvent): void => {
     Lapsed: ({ ask }) => {
       change(ask, startedOver);
     },
+    DiscussionPosted: constVoid,
     LedgerAppended: constVoid,
     ProposalDrafted: constVoid,
     ProposalOpened: constVoid,

@@ -105,6 +105,7 @@ const eventLines = {
   AskOpened: "A new ask opened.",
   Claimed: "Someone claimed an ask.",
   Decided: "A maintainer took a decision.",
+  DiscussionPosted: "Someone posted in a discussion: opened one, or replied.",
   Judged: "An answer was checked, with the outcome its verdict holds.",
   Landed:
     "A landing reached `main`, a project's adoption (its first push or its import) among them.",

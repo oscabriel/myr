@@ -3,10 +3,11 @@ import { Option } from "effect";
 
 import { INBOX_PATH, segmentsOf } from "../paths.ts";
 
-/** A project's eight tabs (ADR 0041), in the header's order. */
+/** A project's nine tabs (ADR 0041, with Discussions), in the header's order. */
 export type ProjectTab =
   | "asks"
   | "code"
+  | "discussions"
   | "landings"
   | "overview"
   | "people"
@@ -48,6 +49,7 @@ export const projectSections = (project: string): readonly Section[] => [
     tab: "proposals",
     to: `/${project}`,
   },
+  { label: "Discussions", tab: "discussions", to: `/${project}/discussions` },
   { hash: "who-decides", label: "People", tab: "people", to: `/${project}` },
   { label: "Policy", tab: "policy", to: `/${project}/people` },
   { label: "Visibility", tab: "visibility", to: `/${project}/visibility` },
@@ -61,6 +63,7 @@ const TAB_OF = {
   commit: "landings",
   commits: "landings",
   decisions: "asks",
+  discussions: "discussions",
   people: "policy",
   proposals: "proposals",
   raw: "code",
@@ -73,6 +76,7 @@ const TAB_OF = {
 /** A crumb names the page itself, which may be narrower than its tab. */
 type PageSection =
   | "code"
+  | "discussions"
   | "landings"
   | "overview"
   | "people"
@@ -82,6 +86,7 @@ type PageSection =
 const PAGE_TO = (project: string) =>
   ({
     code: `/${project}/tree/main`,
+    discussions: `/${project}/discussions`,
     landings: `/${project}/commits/main`,
     overview: `/${project}`,
     people: `/${project}/people`,
@@ -95,6 +100,7 @@ const SECTION_OF = {
   blob: "code",
   commit: "landings",
   commits: "landings",
+  discussions: "discussions",
   people: "people",
   refs: "refs",
   tree: "code",
@@ -173,6 +179,7 @@ export interface Crumb {
 
 const SECTION_LABEL = {
   code: "Code",
+  discussions: "Discussions",
   landings: "Landings",
   overview: "Asks",
   people: "Policy",
@@ -232,6 +239,10 @@ const SUBJECT_CRUMBS = {
   commit: (project: string, sha: string) => [
     ...projectCrumbs(project, "landings", true),
     { label: sha.slice(0, 7), mono: true },
+  ],
+  discussions: (project: string, discussion: string) => [
+    ...projectCrumbs(project, "discussions", true),
+    { label: discussion, mono: true },
   ],
   decisions: (project: string, decision: string) => [
     { label: project, to: `/${project}` },

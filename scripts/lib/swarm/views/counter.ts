@@ -40,6 +40,7 @@ const happening = (event: ProjectEvent) =>
     AskOpened: () => "",
     Claimed: ({ ask, claimant }) => `${claimant} claimed ${ask}`,
     Decided: () => "",
+    DiscussionPosted: () => "",
     Judged: () => "",
     Landed: ({ landing }) =>
       `${landing.ask ?? "main"} landed as ${short(landing.sha)}`,

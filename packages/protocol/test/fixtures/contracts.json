@@ -172,6 +172,30 @@
         }
       }
     },
+    "postDiscussion": {
+      "payload": {
+        "body": "Weeks start on Monday in ISO 8601, but on Sunday in the US; which does parseISO assume?",
+        "project": "oscabriel/datekit",
+        "title": "Which day starts a week?"
+      },
+      "success": {
+        "discussion": {
+          "id": "disc-000001",
+          "openedAt": "2026-10-07T12:00:00.000Z",
+          "opener": "dave",
+          "posts": [
+            {
+              "at": "2026-10-07T12:00:00.000Z",
+              "body": "Weeks start on Monday in ISO 8601, but on Sunday in the US; which does parseISO assume?",
+              "by": "dave"
+            }
+          ],
+          "project": "oscabriel/datekit",
+          "state": "open",
+          "title": "Which day starts a week?"
+        }
+      }
+    },
     "fork": {
       "payload": {
         "project": "oscabriel/datekit"
@@ -977,6 +1001,55 @@
             },
             "round": 1
           }
+        }
+      }
+    },
+    "listDiscussions": {
+      "payload": {
+        "project": "oscabriel/datekit"
+      },
+      "success": {
+        "discussions": [
+          {
+            "id": "disc-000001",
+            "lastPostAt": "2026-10-07T12:30:00.000Z",
+            "openedAt": "2026-10-07T12:00:00.000Z",
+            "opener": "dave",
+            "posts": 2,
+            "project": "oscabriel/datekit",
+            "state": "proposed",
+            "proposal": "prop-000001",
+            "title": "Which day starts a week?"
+          }
+        ]
+      }
+    },
+    "showDiscussion": {
+      "payload": {
+        "discussion": "disc-000001",
+        "project": "oscabriel/datekit"
+      },
+      "success": {
+        "discussion": {
+          "id": "disc-000001",
+          "openedAt": "2026-10-07T12:00:00.000Z",
+          "opener": "dave",
+          "posts": [
+            {
+              "at": "2026-10-07T12:00:00.000Z",
+              "body": "Weeks start on Monday in ISO 8601, but on Sunday in the US; which does parseISO assume?",
+              "by": "dave"
+            },
+            {
+              "at": "2026-10-07T12:30:00.000Z",
+              "body": "ISO, always: a locale never changes what a date string means.",
+              "by": "alice"
+            }
+          ],
+          "project": "oscabriel/datekit",
+          "state": "proposed",
+          "proposal": "prop-000001",
+          "title": "Which day starts a week?"
         }
       }
     },

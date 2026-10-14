@@ -64,12 +64,15 @@ import {
   LandingOf,
   LedgerOf,
   ListAsks,
+  ListDiscussions,
   OpenAsk,
   PolicyOf,
+  PostDiscussion,
   ProposeAsk,
   Release,
   SetEnv,
   ShowAsk,
+  ShowDiscussion,
   ShowProposal,
   Status,
   SubmitAnswer,
@@ -97,6 +100,7 @@ import type { Evidence } from "@repo/protocol/domain/common";
 import type { AgentTrailer, Credit } from "@repo/protocol/domain/credit";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
 import type { Choice, Decision } from "@repo/protocol/domain/decision";
+import type { Discussion } from "@repo/protocol/domain/discussion";
 import { ProjectEvent } from "@repo/protocol/domain/event";
 import type { AskKind } from "@repo/protocol/domain/kind";
 import { LandingView } from "@repo/protocol/domain/landing";
@@ -108,6 +112,7 @@ import type { Proposal } from "@repo/protocol/domain/proposal";
 import {
   AskId,
   CommitSha,
+  DiscussionId,
   EnvKey,
   Handle,
   LandedSha,
@@ -664,6 +669,11 @@ export const MethodSchemas = {
     error: ListAsks.errorSchema,
     success: ListAsks.successSchema,
   },
+  listDiscussions: {
+    args: [Principal],
+    error: Schema.Never,
+    success: ListDiscussions.successSchema,
+  },
   onAlarm: { args: [], error: Schema.Never, success: Schema.Void },
   openAsk: {
     args: [
@@ -677,6 +687,14 @@ export const MethodSchemas = {
     args: [],
     error: Schema.Never,
     success: PolicyOf.successSchema,
+  },
+  postDiscussion: {
+    args: [
+      Person,
+      PostDiscussion.payloadSchema.mapFields(Struct.omit(["project"])),
+    ],
+    error: PostDiscussion.errorSchema,
+    success: PostDiscussion.successSchema,
   },
   proposeAsk: {
     args: [
@@ -751,6 +769,11 @@ export const MethodSchemas = {
     args: [Principal, AskId],
     error: ShowAsk.errorSchema,
     success: ShowAsk.successSchema,
+  },
+  showDiscussion: {
+    args: [Principal, DiscussionId],
+    error: ShowDiscussion.errorSchema,
+    success: ShowDiscussion.successSchema,
   },
   showProposal: {
     args: [Principal, ProposalId],
@@ -934,6 +957,7 @@ interface Hydrated {
   readonly asks: ReadonlyMap<AskId, Ask>;
   readonly claims: readonly Claimed[];
   readonly decisions: readonly Decision[];
+  readonly discussions: readonly Discussion[];
   readonly landings: readonly LandingView[];
   readonly lastSeq: number;
   readonly outbox: readonly OutboxRow[];
@@ -952,6 +976,7 @@ interface Writes {
   readonly attempts: Map<string, AttemptRow>;
   readonly claims: Map<string, ClaimRow>;
   readonly decisions: Map<DecisionId, Decision>;
+  readonly discussions: Map<DiscussionId, Discussion>;
   readonly envValues: Map<EnvKey, EnvValueRow>;
   readonly events: ProjectEventInput[];
   readonly landings: LandingView[];
@@ -972,6 +997,7 @@ const writesOf = (): Writes => ({
   attempts: new Map(),
   claims: new Map(),
   decisions: new Map(),
+  discussions: new Map(),
   envValues: new Map(),
   events: [],
   landings: [],
@@ -993,6 +1019,7 @@ const isEmpty = (writes: Writes) =>
     writes.attempts.size,
     writes.claims.size,
     writes.decisions.size,
+    writes.discussions.size,
     writes.envValues.size,
     writes.events.length,
     writes.landings.length,
@@ -1058,6 +1085,11 @@ const snapshotNow = (h: Hydrated, writes: Writes): ProjectSnapshot => {
       Tables.decisions,
       held.decisions,
       writes.decisions.values()
+    ),
+    discussions: overlaid(
+      Tables.discussions,
+      held.discussions,
+      writes.discussions.values()
     ),
     envValues: overlaid(
       Tables.envValues,
@@ -1879,6 +1911,7 @@ export const projectService = (
         asks: new Map(snapshot.asks.map((ask) => [ask.id, ask])),
         claims,
         decisions: snapshot.decisions,
+        discussions: snapshot.discussions,
         landings: snapshot.landings,
         lastSeq: snapshot.lastSeq,
         outbox: snapshot.outbox,
@@ -2100,6 +2133,7 @@ export const projectService = (
           attempts: [...writes.attempts.values()],
           claims: [...writes.claims.values()],
           decisions: [...writes.decisions.values()],
+          discussions: [...writes.discussions.values()],
           envValues: [...writes.envValues.values()],
           events: writes.events,
           landings: writes.landings,
@@ -5509,6 +5543,12 @@ export const projectService = (
             ),
           }))
         ),
+      listDiscussions: (caller) =>
+        checked(
+          MethodSchemas.listDiscussions,
+          [caller],
+          decided.listDiscussions
+        ),
       onAlarm: () => checked(MethodSchemas.onAlarm, [], alarmed(api)),
       openAsk: (caller, input) =>
         checked(
@@ -5517,6 +5557,12 @@ export const projectService = (
           write(api, openBody(caller, input))
         ),
       policy: () => checked(MethodSchemas.policy, [], policyStatus),
+      postDiscussion: (caller, input) =>
+        checked(
+          MethodSchemas.postDiscussion,
+          [caller, input],
+          decided.postDiscussion(api, caller, input)
+        ),
       proposeAsk: (caller, input) =>
         checked(
           MethodSchemas.proposeAsk,
@@ -5617,6 +5663,12 @@ export const projectService = (
               onSome: (ask) => Effect.succeed({ ask, brief: briefOf(ask) }),
             })
           )
+        ),
+      showDiscussion: (caller, discussion) =>
+        checked(
+          MethodSchemas.showDiscussion,
+          [caller, discussion],
+          decided.showDiscussion(discussion)
         ),
       showProposal: (caller, proposal) =>
         checked(
