@@ -10,6 +10,7 @@ import { forwarded } from "../src/features/agents/forward.ts";
 import { backend } from "../src/server/backend.ts";
 import { branchPage, personalPage } from "../src/server/cache-headers.ts";
 import {
+  EDGE_STALE_SECONDS,
   edgeEntry,
   forTheEdge,
   KEPT_NOWHERE,
@@ -162,8 +163,58 @@ describe("an answer to a request with no cookie", () => {
     expect([
       response.headers.get("cdn-cache-control"),
       response.headers.get("cloudflare-cdn-cache-control"),
-    ]).toStrictEqual([null, null]);
+    ]).toStrictEqual([
+      null,
+      `public, max-age=30, stale-while-revalidate=${EDGE_STALE_SECONDS}`,
+    ]);
   });
+
+  it.each([
+    ["a page at main", branchPage, "public, max-age=30"],
+    [
+      "an agent's document",
+      { "cache-control": "public, max-age=60" },
+      "public, max-age=60",
+    ],
+  ] as const)(
+    "serves %s stale at the edge for a day while it reads it again, and tells the browser what the route said",
+    (_, headers, fresh) => {
+      const response = forTheEdge(get("/oscabriel/datekit"), answer(headers));
+
+      expect({
+        browser: response.headers.get("cache-control"),
+        edge: response.headers.get("cloudflare-cdn-cache-control"),
+      }).toStrictEqual({
+        browser: new Headers(headers).get("cache-control"),
+        edge: `${fresh}, stale-while-revalidate=86400`,
+      });
+    }
+  );
+
+  it.each([
+    ["a page about its reader", get("/inbox"), answer(personalPage)],
+    [
+      "a page asked for with a session",
+      get("/oscabriel/datekit", { cookie: SIGNED_IN }),
+      answer(branchPage),
+    ],
+    ["a page not found", get("/nowhere"), answer(branchPage, 404)],
+    [
+      "a raw file at a commit",
+      get("/raw"),
+      answer({ "cache-control": "public, max-age=31536000, immutable" }),
+    ],
+    ["an answer with no age", get("/x"), answer({ "cache-control": "public" })],
+  ] as const)(
+    "gives the edge no longer window for %s",
+    (_, request, response) => {
+      expect(
+        forTheEdge(request, response).headers.get(
+          "cloudflare-cdn-cache-control"
+        )
+      ).toBeNull();
+    }
+  );
 
   it.effect("comes back with its status, its other headers and its body", () =>
     Effect.gen(function* () {
