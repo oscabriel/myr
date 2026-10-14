@@ -476,6 +476,7 @@ describe(optionsOf, () => {
   it.effect.each([
     [["--world", "node"], "World"],
     [["--stage", "dev-oscabriel"], "Stage"],
+    [["--stage", "prod", "--allow-fictional"], "Stage"],
   ] as const)("takes %j as a seed of the %s", ([argv, where]) =>
     Effect.map(optionsOf(argv), (options) => {
       expect(options.where._tag).toBe(where);
@@ -487,12 +488,49 @@ describe(optionsOf, () => {
     [[], "--world node or --stage"],
     [["--world", "node", "--stage", "dev-oscabriel"], "only one"],
     [["--world", "workerd"], "--world node"],
-    [["--stage", "prod"], "prod"],
+    [["--stage", "prod"], "--allow-fictional"],
+    [["--stage", "prod", "--world", "node"], "only one"],
     [["--world", "node", "--force"], "--force"],
   ] as const)("refuses %j, saying %s", ([argv, said]) =>
     Effect.map(Effect.flip(optionsOf(argv)), (failure) => {
       expect(failure.reason).toContain(said);
     })
+  );
+
+  it.effect(
+    "seeds prod only with --allow-fictional, and the flag changes no other stage's plan",
+    () =>
+      Effect.gen(function* () {
+        const refused = yield* Effect.flip(optionsOf(["--stage", "prod"]));
+
+        expect(refused.reason).toContain("fictional");
+
+        const allowed = yield* optionsOf([
+          "--stage",
+          "prod",
+          "--allow-fictional",
+        ]);
+
+        expect(allowed.where).toStrictEqual(
+          SeedWhere.cases.Stage.make({
+            stage: "prod",
+            tokens: { operator: "OPERATOR_TOKEN", sessions: "SESSION_TOKENS" },
+          })
+        );
+
+        const dev = yield* optionsOf([
+          "--stage",
+          "dev-oscabriel",
+          "--allow-fictional",
+        ]);
+
+        expect(dev.where).toStrictEqual(
+          SeedWhere.cases.Stage.make({
+            stage: "dev-oscabriel",
+            tokens: { operator: "OPERATOR_TOKEN", sessions: "SESSION_TOKENS" },
+          })
+        );
+      })
   );
 
   it.effect(
