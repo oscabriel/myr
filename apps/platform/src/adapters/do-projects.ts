@@ -95,9 +95,13 @@ const apiOf = (
     layerFacts: (caller) => on("layerFacts", [caller]),
     ledger: (caller) => assumingMade(on("ledger", [caller])),
     listAsks: (caller) => assumingMade(on("listAsks", [caller])),
+    listDiscussions: (caller) =>
+      assumingMade(on("listDiscussions", [caller])),
     onAlarm: () => on("onAlarm", []),
     openAsk: (caller, input) => assumingMade(on("openAsk", [caller, input])),
     policy: () => on("policy", []),
+    postDiscussion: (caller, input) =>
+      assumingMade(on("postDiscussion", [caller, input])),
     proposeAsk: (caller, input) =>
       assumingMade(on("proposeAsk", [caller, input])),
     recordAdmission: (input) => on("recordAdmission", [input]),
@@ -112,6 +116,8 @@ const apiOf = (
     scanForValues: (input) => on("scanForValues", [input]),
     setEnv: (caller, input) => assumingMade(on("setEnv", [caller, input])),
     showAsk: (caller, ask) => assumingMade(on("showAsk", [caller, ask])),
+    showDiscussion: (caller, discussion) =>
+      assumingMade(on("showDiscussion", [caller, discussion])),
     showProposal: (caller, proposal) =>
       assumingMade(on("showProposal", [caller, proposal])),
     standing: () => on("standing", []),

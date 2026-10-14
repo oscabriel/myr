@@ -13,6 +13,7 @@ import {
   AskId,
   CommitSha,
   DecisionId,
+  DiscussionId,
   Handle,
   LaneName,
   ProjectName,
@@ -29,6 +30,7 @@ import {
   UnknownAsk,
   UnknownCommit,
   UnknownDecision,
+  UnknownDiscussion,
   UnknownPath,
   UnknownProject,
   UnknownRevision,
@@ -415,6 +417,10 @@ const provoked = {
     args: { project: nowhere },
     refusal: new UnknownProject({ project: nowhere }),
   },
+  listDiscussions: {
+    args: { project: nowhere },
+    refusal: new UnknownProject({ project: nowhere }),
+  },
   listRefs: {
     args: { project: nowhere },
     refusal: new UnknownProject({ project: nowhere }),
@@ -426,6 +432,12 @@ const provoked = {
   openAsk: {
     args: { ask: nope, files: askFiles, project },
     refusal: new NotDecider({}),
+  },
+  postDiscussion: {
+    args: { discussion: DiscussionId.make("disc-000001"), body: "Hello", project },
+    refusal: new UnknownDiscussion({
+      discussion: DiscussionId.make("disc-000001"),
+    }),
   },
   projectPolicy: {
     args: { project: nowhere },
@@ -450,6 +462,12 @@ const provoked = {
   showAsk: {
     args: { ask: nope, project },
     refusal: new UnknownAsk({ ask: nope }),
+  },
+  showDiscussion: {
+    args: { discussion: DiscussionId.make("disc-000001"), project },
+    refusal: new UnknownDiscussion({
+      discussion: DiscussionId.make("disc-000001"),
+    }),
   },
   showProposal: {
     args: { project: nowhere, proposal: ProposalId.make("prop-000001") },

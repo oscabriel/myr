@@ -9,6 +9,7 @@ import type { Limited } from "../rate-limits.ts";
 export interface Limits {
   readonly claim: number;
   readonly draft: number;
+  readonly post: number;
   readonly proposal: number;
 }
 
@@ -16,12 +17,14 @@ export interface Limits {
 export const WorkerCaps = {
   claim: 10,
   draft: 2,
+  post: 5,
   proposal: 5,
 } as const satisfies Limits;
 
 const LIMIT_OF = {
   claim: "claims",
   draft: "drafts",
+  post: "discussions",
   proposal: "proposals",
 } as const satisfies Record<Limited, CapReached["limit"]>;
 
@@ -46,7 +49,10 @@ export const WorkerRateLimits = (bindings: {
     RateLimits.of({
       check: (kind, handle) =>
         Effect.tryPromise(() =>
-          bindings[kind].limit({ key: handle.toLowerCase() })
+          // A post is counted by the proposal binding, under its own cap.
+          bindings[kind === "post" ? "proposal" : kind].limit({
+            key: handle.toLowerCase(),
+          })
         ).pipe(
           Effect.orDie,
           Effect.flatMap(({ success }) =>

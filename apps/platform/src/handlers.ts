@@ -267,6 +267,10 @@ export const Handlers: Layer.Layer<
         ),
       ledger: ({ project }) =>
         Effect.flatMap(caller, (who) => on(project, (api) => api.ledger(who))),
+      listDiscussions: ({ project }) =>
+        Effect.flatMap(caller, (who) =>
+          on(project, (api) => api.listDiscussions(who))
+        ),
       listAsks: ({ project }) =>
         Effect.flatMap(caller, (who) =>
           on(project, (api) => api.listAsks(who))
@@ -301,6 +305,14 @@ export const Handlers: Layer.Layer<
         Effect.flatMap(person, (who) =>
           on(project, (api) => api.openAsk(who, input))
         ),
+      postDiscussion: ({ project, ...input }) =>
+        Effect.gen(function* () {
+          const who = yield* person;
+
+          yield* rateLimits.check("post", who.handle);
+
+          return yield* on(project, (api) => api.postDiscussion(who, input));
+        }),
       projectPolicy: ({ project }) => on(project, (api) => api.policy()),
       proposeAsk: ({ project, ...input }) =>
         Effect.gen(function* () {
@@ -338,6 +350,10 @@ export const Handlers: Layer.Layer<
         ),
       showCommit: ({ at, project, sha }) =>
         code(project, (of) => commitOf(of, sha, Option.fromUndefinedOr(at))),
+      showDiscussion: ({ discussion, project }) =>
+        Effect.flatMap(caller, (who) =>
+          on(project, (api) => api.showDiscussion(who, discussion))
+        ),
       showProposal: ({ project, proposal }) =>
         Effect.flatMap(caller, (who) =>
           on(project, (api) => api.showProposal(who, proposal))
