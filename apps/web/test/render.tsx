@@ -47,6 +47,7 @@ const routesFor = (view: ReactNode, options: RenderOptions) => {
         ["install", "site"],
         ["people/$handle", "project"],
         ["settings", "project"],
+        ["tour", "site"],
       ] as const
     ).map(([path, shell]) =>
       createRoute({ getParentRoute: () => root, path, staticData: { shell } })

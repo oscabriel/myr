@@ -89,6 +89,7 @@ describe("the web's own paths", () => {
       "settings",
       "terms",
       "today",
+      "tour",
     ]);
   });
 

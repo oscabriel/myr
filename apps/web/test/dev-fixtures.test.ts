@@ -5,6 +5,7 @@ import { DecisionSubject } from "@repo/protocol/domain/decision";
 import type { Decision } from "@repo/protocol/domain/decision";
 import { ProjectEvent } from "@repo/protocol/domain/event";
 import { Outcome } from "@repo/protocol/domain/outcome";
+import { RecentLanding } from "@repo/protocol/domain/recent-landing";
 import { LedgerEntry } from "@repo/protocol/domain/visibility";
 import {
   AskId,
@@ -12,7 +13,9 @@ import {
   Handle,
   ProjectName,
   ProposalId,
+  RepoPath,
 } from "@repo/protocol/ids";
+import { OutOfScope } from "@repo/protocol/refusal";
 import {
   Context,
   DateTime,
@@ -880,5 +883,68 @@ describe("the dev world's time", seededWorlds, () => {
         millisFrom(landed?.at ?? after, after) >= 0,
       ]).toStrictEqual([true, true]);
     })
+  );
+});
+
+const datekit = ProjectName.make("oscabriel/datekit");
+
+const WEEK_WANT = "parseISO accepts ISO week dates such as 2026-W41-3.";
+
+describe("the dev world's refused round", seededWorlds, () => {
+  it.live(
+    "refuses bram's first answer to parse-iso-week at Shape, for a path outside its territory, and holds his second at the merge",
+    () =>
+      inWorld({}, (as) =>
+        Effect.gen(function* () {
+          const anyone = yield* as();
+
+          const { verdict } = yield* anyone.verdict({
+            ask: ask("parse-iso-week"),
+            project: datekit,
+          });
+
+          const events = yield* Stream.runCollect(
+            anyone.watch({ project: datekit })
+          );
+
+          const progress = askStates(events).get(ask("parse-iso-week"));
+
+          expect([verdict?.stage, verdict?.lanes]).toStrictEqual(["shape", []]);
+          expect(refusalsOf(verdict?.outcome)).toStrictEqual([
+            new OutOfScope({ paths: [RepoPath.make("README.md")] }),
+          ]);
+          // The verdict stays with its round: the second push waits at the merge, judged by nothing yet.
+          expect(
+            progress?.rounds.map(({ head, outcome }) => [
+              head === verdict?.head,
+              outcome._tag,
+            ])
+          ).toStrictEqual([[true, "Refused"]]);
+          expect([
+            progress?.claimant,
+            progress?.lastPush !== undefined &&
+              progress.lastPush.head !== verdict?.head,
+          ]).toStrictEqual(["bram", true]);
+        })
+      )
+  );
+
+  it.live(
+    "lists that refusal among the latest landings by its tag alone, under the ask's want",
+    () =>
+      inWorld({}, (as) =>
+        Effect.gen(function* () {
+          const { landings } = yield* (yield* as()).recentLandings({});
+          const refused = landings.filter(RecentLanding.guards.Refused);
+
+          expect(refused).toHaveLength(1);
+          expect(refused[0]).toMatchObject({
+            ask: "parse-iso-week",
+            project: datekit,
+            refusals: [{ tag: "OutOfScope" }],
+            want: WEEK_WANT,
+          });
+        })
+      )
   );
 });

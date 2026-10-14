@@ -17,7 +17,7 @@ import type { AskProgress } from "../shared/ask-progress.ts";
 import { EmptyState } from "../shared/empty.tsx";
 import { FamilyStrip } from "../shared/family.tsx";
 import { AppLink } from "../shared/link.tsx";
-import { projectPath } from "../shared/paths.ts";
+import { projectPath, TOUR_PATH } from "../shared/paths.ts";
 import { PostureBadge } from "../shared/posture.tsx";
 import { AskRow, RowGroup, useRowSelection } from "../shared/row.tsx";
 import { Workspace } from "../shared/shell/workspace.tsx";
@@ -238,6 +238,12 @@ const Filters = ({
   );
 };
 
+const TakeTheTour = () => (
+  <AppLink className={LINK} to={TOUR_PATH}>
+    Take the tour
+  </AppLink>
+);
+
 const NoAsks = ({
   projects,
 }: {
@@ -246,11 +252,13 @@ const NoAsks = ({
   projects?.length === 0 ? (
     <EmptyState
       command={`${Brand.cli} init`}
+      onward={<TakeTheTour />}
       title="No open asks, and no project yet. Run init in a repo to bring it here."
     />
   ) : (
     <EmptyState
       command={`${Brand.cli} ask open <ask> --files <files>`}
+      onward={<TakeTheTour />}
       title="No open asks on any project. A maintainer opens one from an ask file."
     />
   );

@@ -10,6 +10,8 @@ import {
   EXPLORE_PATH,
   IMPORT_PATH,
   INSTALL_PATH,
+  LANDING_NOW_ANCHOR,
+  TOUR_PATH,
 } from "../shared/paths.ts";
 import { GUTTER } from "../shared/shell/gutter.ts";
 import { GateDrawing } from "./gate-drawing.tsx";
@@ -197,6 +199,9 @@ export const LandingView = ({
         <div className="max-w-full min-w-0">
           <CommandLine command={installCommand(webUrl)} />
         </div>
+        <AppLink className={`text-ui ${LINK}`} to={TOUR_PATH}>
+          Take the tour
+        </AppLink>
       </div>
       <div className="w-full max-w-(--container-figure)">
         <MusicBox />
@@ -213,7 +218,7 @@ export const LandingView = ({
 
     <Part
       aside={<More to={EXPLORE_PATH}>Explore projects</More>}
-      id="landing-now"
+      id={LANDING_NOW_ANCHOR}
       title="Landing now"
     >
       <LandingNowList landings={landings} />

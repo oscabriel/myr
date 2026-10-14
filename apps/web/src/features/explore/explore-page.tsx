@@ -6,9 +6,15 @@ import type { ReactNode } from "react";
 import { LandingProjects } from "../landing/projects.ts";
 import { RUN_A_PROJECT } from "../landing/words.ts";
 import { postureLabel } from "../project/posture-label.ts";
+import { LINK } from "../shared/classes.ts";
 import { EmptyState } from "../shared/empty.tsx";
 import { AppLink } from "../shared/link.tsx";
-import { ASKS_PATH, IMPORT_PATH, projectPath } from "../shared/paths.ts";
+import {
+  ASKS_PATH,
+  IMPORT_PATH,
+  projectPath,
+  TOUR_PATH,
+} from "../shared/paths.ts";
 import { UnreachableNotice } from "../shared/pending.tsx";
 import { PostureBadge } from "../shared/posture.tsx";
 import { GUTTER } from "../shared/shell/gutter.ts";
@@ -128,7 +134,14 @@ const Listed = ({
         note="Projects with asks open to claim."
       >
         {taking.length === 0 ? (
-          <EmptyState title="No project has an open ask right now." />
+          <EmptyState
+            onward={
+              <AppLink className={LINK} to={TOUR_PATH}>
+                Take the tour
+              </AppLink>
+            }
+            title="No project has an open ask right now."
+          />
         ) : (
           <CardGrid projects={taking} />
         )}

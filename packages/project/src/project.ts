@@ -3046,7 +3046,12 @@ export const projectService = (
           now: input.now,
           outcome: outcomeOf(state),
           policy: known.value.policy,
-          stage: command.refusals.length > 0 ? "checks" : "human",
+          // The stage the report names, as the metric reads it: the landing
+          // guard refuses at `shape`, a cheap lane at `cheap`.
+          stage:
+            command.refusals.length > 0
+              ? refusingStageOf(before, input.report)
+              : "human",
         }),
         (made) => ({ fresh: true, verdict: Option.some(made) })
       );

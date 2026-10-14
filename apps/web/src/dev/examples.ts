@@ -406,6 +406,74 @@ export const datekit = {
   ),
   files: library,
   project: ProjectName.make("oscabriel/datekit"),
+  /**
+   * Bram's two rounds on parse-iso-week: the first refused at Shape for a
+   * path outside the ask's territory, the second still checking.
+   */
+  rounds: {
+    ask: AskId.make("parse-iso-week"),
+    first: {
+      files: new Map([
+        [
+          "src/parse.ts",
+          [
+            "const WEEK = /^(?<year>\\d{4})-W(?<week>\\d{2})-(?<day>[1-7])$/u;",
+            "",
+            "/** An ISO 8601 date (`2026-10-07`), week date (`2026-W41-3`) or date-time, read as UTC. */",
+            "export const parseISO = (text: string): Date => {",
+            "  const week = WEEK.exec(text);",
+            "",
+            "  if (week === null) {",
+            '    return new Date(text.length === 10 ? text + "T00:00:00Z" : text);',
+            "  }",
+            "",
+            "  // The week's Monday, from the week holding 4 January, comes next.",
+            "  return new Date(Number.NaN);",
+            "};",
+            "",
+          ].join("\n"),
+        ],
+      ]) satisfies Files,
+      message: "Start on ISO week dates",
+    },
+    outside: RepoPath.make("README.md"),
+    second: {
+      files: new Map([
+        [
+          "src/parse.ts",
+          [
+            "const WEEK = /^(?<year>\\d{4})-W(?<week>\\d{2})-(?<day>[1-7])$/u;",
+            "",
+            "const DAY = 86_400_000;",
+            "",
+            "/** The Monday of ISO week 1: the week holding 4 January. */",
+            "const firstMonday = (year: number) => {",
+            "  const fourth = Date.UTC(year, 0, 4);",
+            "  const weekday = new Date(fourth).getUTCDay() || 7;",
+            "",
+            "  return fourth - (weekday - 1) * DAY;",
+            "};",
+            "",
+            "/** An ISO 8601 date (`2026-10-07`), week date (`2026-W41-3`) or date-time, read as UTC. */",
+            "export const parseISO = (text: string): Date => {",
+            "  const week = WEEK.exec(text)?.groups;",
+            "",
+            "  if (week === undefined) {",
+            '    return new Date(text.length === 10 ? text + "T00:00:00Z" : text);',
+            "  }",
+            "",
+            "  return new Date(",
+            "    firstMonday(Number(week.year)) +",
+            "      ((Number(week.week) - 1) * 7 + Number(week.day) - 1) * DAY",
+            "  );",
+            "};",
+            "",
+          ].join("\n"),
+        ],
+      ]) satisfies Files,
+      message: "Parse ISO week dates",
+    },
+  },
   stray: {
     files: new Map([
       [

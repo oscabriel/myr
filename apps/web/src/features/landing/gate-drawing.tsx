@@ -75,13 +75,14 @@ const Line = ({
   );
 };
 
-const Output = ({
+/** A transcript as a terminal prints it, with its caption under it. */
+export const Output = ({
   caption,
   outcome,
   transcript,
 }: {
   readonly caption: string;
-  readonly outcome: "landed" | "refused";
+  readonly outcome: "claimed" | "landed" | "refused";
   readonly transcript: Printed;
 }) => (
   <figure className="flex min-w-0 flex-col gap-2" data-output={outcome}>

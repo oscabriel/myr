@@ -211,6 +211,7 @@ export const reservedProjectNames = [
   "settings",
   "terms",
   "today",
+  "tour",
 ] as const;
 
 const isReservedOwner = (owner: string) =>
