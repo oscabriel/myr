@@ -24,6 +24,7 @@ const local = (path: string, summary: string): CommandDoc => ({
 
 const commands: readonly CommandDoc[] = [
   ...someCommands,
+  local("hook", "Answer a harness hook."),
   local("login", "Sign in to a platform."),
   local("mcp", "Serve the platform's tools over MCP on stdio."),
 ];
@@ -56,11 +57,59 @@ describe("the Install page's channels", () => {
   });
 
   it("install the CLI by script or from npm, then sign in to the platform", () => {
-    expect(textsOf(channel("cli"))).toStrictEqual([
+    expect(textsOf(channel("cli")).slice(0, 3)).toStrictEqual([
       `curl -fsSL ${webUrl}/install.sh | sh`,
       `npm install -g ${Brand.cliPackage}`,
       `${Brand.cli} login --url ${platformUrl}`,
     ]);
+  });
+
+  it("give Claude Code's settings.json a hook for each event the CLI answers, the edit tools guarded", () => {
+    const hooks = channel("cli").snippets.find(({ name }) => name === "Hooks");
+
+    expect(hooks?.language).toBe("json");
+    expect(JSON.parse(hooks?.text ?? "{}")).toStrictEqual({
+      hooks: {
+        PreToolUse: [
+          {
+            hooks: [
+              {
+                command: `${Brand.cli} hook pre-tool-use --json`,
+                type: "command",
+              },
+            ],
+            matcher: "Edit|Write|MultiEdit|NotebookEdit",
+          },
+        ],
+        SessionStart: [
+          {
+            hooks: [
+              {
+                command: `${Brand.cli} hook session-start --json`,
+                type: "command",
+              },
+            ],
+          },
+        ],
+        Stop: [
+          {
+            hooks: [
+              { command: `${Brand.cli} hook stop --json`, type: "command" },
+            ],
+          },
+        ],
+      },
+    });
+    expect(
+      channel(
+        "cli",
+        installChannels({
+          commands: commands.filter(({ path }) => path.join(" ") !== "hook"),
+          platformUrl,
+          webUrl,
+        })
+      ).snippets
+    ).toHaveLength(3);
   });
 
   it("give MCP one tab per client and stdio, with the snippets agentSetup gives", () => {

@@ -7,7 +7,7 @@ import { Array as Arr, Effect, Option, Order } from "effect";
 import type { CommandDoc } from "./command-doc.ts";
 import { frontmatter } from "./generated-file.ts";
 import type { GeneratedFile } from "./generated-file.ts";
-import { claudeEventOf, guardedTools, HookEvent } from "./hook-events.ts";
+import { claudeHooks } from "./hook-events.ts";
 import { refusalSection } from "./refusals.ts";
 import { loopSteps, unfencedSection } from "./sections.ts";
 import { code, page, printJson, table } from "./text.ts";
@@ -129,24 +129,7 @@ export const mcpServersFor = (
       : servers[flavour].remote(`${platformUrl}/mcp`),
 });
 
-const hookCommand = (event: HookEvent) => ({
-  hooks: [{ command: `${Brand.cli} hook ${event} --json`, type: "command" }],
-});
-
-// Each hook fails open: hooks are early feedback, and the gateway decides.
-const hooksJson = () =>
-  printJson({
-    hooks: Object.fromEntries(
-      HookEvent.literals.map((event) => [
-        claudeEventOf[event],
-        [
-          event === "pre-tool-use"
-            ? { ...hookCommand(event), matcher: guardedTools.join("|") }
-            : hookCommand(event),
-        ],
-      ])
-    ),
-  });
+const hooksJson = () => printJson(claudeHooks());
 
 const pluginDescription = `The ${Brand.name} CLI's skill, MCP server and hooks: the gate's scope guard before an edit, the claimed ask's brief at the start, and its verdict before you stop.`;
 

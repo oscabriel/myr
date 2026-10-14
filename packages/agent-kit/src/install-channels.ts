@@ -12,6 +12,8 @@ import {
   stdioMcp,
 } from "./agent-setup.ts";
 import type { SetupInput, SetupSnippet } from "./agent-setup.ts";
+import { claudeHooks } from "./hook-events.ts";
+import { printJson } from "./text.ts";
 
 /** A page of the web (`page`), or a file it serves, such as `/llms.txt`. */
 export interface InstallLink {
@@ -53,7 +55,15 @@ const npm: SetupSnippet = {
   text: `npm install -g ${Brand.cliPackage}`,
 };
 
-/** The script's snippet, said for the machines it has a build for, then npm beside it. */
+const hooks: SetupSnippet = {
+  label:
+    "Claude Code's hooks, in .claude/settings.json: the gate's scope guard before an edit, the claimed ask's brief at the start, and its verdict before you stop",
+  language: "json",
+  name: "Hooks",
+  text: printJson(claudeHooks()).trimEnd(),
+};
+
+/** The script's snippet, said for the machines it has a build for, then npm beside it, then sign-in and the harness hooks. */
 const cli = (input: SetupInput) =>
   channel({
     audience: "Terminal",
@@ -66,6 +76,7 @@ const cli = (input: SetupInput) =>
       },
       npm,
       ...signIn(input),
+      ...(hasCommand(input.commands, "hook") ? [hooks] : []),
     ],
     summary:
       "Find and claim asks, check an answer on your machine with the gate's first stage before you push, and read verdicts. You push with plain git.",
