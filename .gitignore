@@ -49,3 +49,5 @@ apps/web/e2e/out/
 
 # Agent worktrees Claude Code makes inside the checkout.
 .claude/worktrees/
+
+explainer/
