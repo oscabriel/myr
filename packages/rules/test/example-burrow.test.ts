@@ -1,10 +1,11 @@
 // The config folder is found as the one at burrow's root holding a
 // `project.ts`: its name is the brand's, which `rules` never spells.
-import { describe, expect, it } from "@effect/vitest";
+import { NodeServices } from "@effect/platform-node";
+import { expect, layer } from "@effect/vitest";
 import { CheckSpec, RatchetMeasure } from "@repo/protocol/domain/check";
 import { Command, SymbolName } from "@repo/protocol/domain/common";
 import { Policy } from "@repo/protocol/domain/policy";
-import { Effect, FileSystem, Path, Schema } from "effect";
+import { Context, Effect, FileSystem, Layer, Path, Schema } from "effect";
 
 import { EvaluationFacts, RulesEvaluator } from "../src/rules-evaluator.ts";
 import { at, bundleOf, bunEvaluator, configFolder, now } from "./world.ts";
@@ -141,6 +142,19 @@ const evaluated = () =>
     );
   });
 
+// Evaluated once for the file: each evaluation starts a Bun process, and a
+// test that started its own timed out while every workspace's tests ran.
+class Evaluated extends Context.Service<
+  Evaluated,
+  Effect.Success<ReturnType<typeof evaluated>>
+>()("test/Evaluated") {}
+
+const evaluatedOnce = Layer.effect(Evaluated, evaluated()).pipe(
+  // Its time limit is evaluate.test.ts's to test; here it only must not fire while every workspace's tests share the machine.
+  Layer.provide(bunEvaluator({ timeout: "60 seconds" })),
+  Layer.provideMerge(NodeServices.layer)
+);
+
 const modules = [
   {
     module: "@burrow/auth",
@@ -210,92 +224,95 @@ const migrateKind = {
   strength: "assertion",
 };
 
-describe("examples/burrow's config folder", () => {
-  it.live(
-    "evaluates to six modules, a ratchet on the rule's lint count, the migrate kind and one migrate ask",
-    () =>
-      Effect.gen(function* () {
-        const policy = yield* evaluated();
+layer(evaluatedOnce, { excludeTestServices: true, timeout: "60 seconds" })(
+  "examples/burrow's config folder",
+  (it) => {
+    it.effect(
+      "evaluates to six modules, a ratchet on the rule's lint count, the migrate kind and one migrate ask",
+      () =>
+        Effect.gen(function* () {
+          const policy = yield* Evaluated;
 
-        expect({
-          asks: policy.asks,
-          migrate: policy.kinds.filter(({ name }) => name === "migrate"),
-          modules: policy.modules,
-          ratchets: policy.ratchets,
-          source: policy.source,
-        }).toStrictEqual({
-          asks: [dropLegacyFetch],
-          migrate: [migrateKind],
-          modules,
-          ratchets: [
-            {
-              measure: RatchetMeasure.cases.Count.make({
-                command: Command.make("bun run lint --format json"),
-                rule: "burrow/no-module-level-mutable-state",
-              }),
-              name: "no-module-level-mutable-state",
+          expect({
+            asks: policy.asks,
+            migrate: policy.kinds.filter(({ name }) => name === "migrate"),
+            modules: policy.modules,
+            ratchets: policy.ratchets,
+            source: policy.source,
+          }).toStrictEqual({
+            asks: [dropLegacyFetch],
+            migrate: [migrateKind],
+            modules,
+            ratchets: [
+              {
+                measure: RatchetMeasure.cases.Count.make({
+                  command: Command.make("bun run lint --format json"),
+                  rule: "burrow/no-module-level-mutable-state",
+                }),
+                name: "no-module-level-mutable-state",
+              },
+            ],
+            source: "config",
+          });
+        })
+    );
+
+    it.effect(
+      "names its maintainers, the people who may claim, and the run block its hooks run",
+      () =>
+        Effect.gen(function* () {
+          const policy = yield* Evaluated;
+
+          expect({
+            deciders: policy.deciders,
+            run: policy.run,
+            vouches: policy.vouches.map(({ denounced, handle }) => [
+              handle,
+              denounced,
+            ]),
+          }).toStrictEqual({
+            deciders: [{ handles: ["okafor", "lin-h", "oscar"], paths: "**" }],
+            run: {
+              checks: {
+                lint: "bun run lint",
+                types: "bun run typecheck",
+                unit: "bun test",
+              },
+              setup: "bun install --frozen-lockfile",
+              test: "bun test {path}",
             },
-          ],
-          source: "config",
-        });
-      }).pipe(Effect.provide(bunEvaluator()))
-  );
+            vouches: [
+              ["okafor", false],
+              ["lin-h", false],
+              ["wren", false],
+              ["tamsin", false],
+              ["ivo", false],
+              ["marisol", false],
+              ["dagny", false],
+              ["pell", false],
+              ["quickclaim", true],
+            ],
+          });
+        })
+    );
 
-  it.live(
-    "names its maintainers, the people who may claim, and the run block its hooks run",
-    () =>
+    it.effect("spans every package with the migrate ask's territory", () =>
       Effect.gen(function* () {
-        const policy = yield* evaluated();
+        const policy = yield* Evaluated;
+        const globs = policy.asks.flatMap(({ territory }) => territory.paths);
 
-        expect({
-          deciders: policy.deciders,
-          run: policy.run,
-          vouches: policy.vouches.map(({ denounced, handle }) => [
-            handle,
-            denounced,
-          ]),
-        }).toStrictEqual({
-          deciders: [{ handles: ["okafor", "lin-h", "oscar"], paths: "**" }],
-          run: {
-            checks: {
-              lint: "bun run lint",
-              types: "bun run typecheck",
-              unit: "bun test",
-            },
-            setup: "bun install --frozen-lockfile",
-            test: "bun test {path}",
-          },
-          vouches: [
-            ["okafor", false],
-            ["lin-h", false],
-            ["wren", false],
-            ["tamsin", false],
-            ["ivo", false],
-            ["marisol", false],
-            ["dagny", false],
-            ["pell", false],
-            ["quickclaim", true],
-          ],
-        });
-      }).pipe(Effect.provide(bunEvaluator()))
-  );
+        const covered = policy.modules.filter(({ paths: [folder] }) =>
+          globs.some(
+            (glob) =>
+              glob.endsWith("/**") &&
+              folder.startsWith(glob.slice(0, -"**".length))
+          )
+        );
 
-  it.live("spans every package with the migrate ask's territory", () =>
-    Effect.gen(function* () {
-      const policy = yield* evaluated();
-      const globs = policy.asks.flatMap(({ territory }) => territory.paths);
-
-      const covered = policy.modules.filter(({ paths: [folder] }) =>
-        globs.some(
-          (glob) =>
-            glob.endsWith("/**") &&
-            folder.startsWith(glob.slice(0, -"**".length))
-        )
-      );
-
-      expect(covered.map(({ module }) => module)).toStrictEqual(
-        modules.map(({ module }) => module)
-      );
-    }).pipe(Effect.provide(bunEvaluator()))
-  );
-});
+        expect(covered.map(({ module }) => module)).toStrictEqual(
+          modules.map(({ module }) => module)
+        );
+      })
+    );
+  }
+);
