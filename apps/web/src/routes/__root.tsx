@@ -107,6 +107,10 @@ export const SITE_DESCRIPTION =
 
 const ICON_PATH = "/icons/icon.svg";
 
+// The unfurl's card: the repeat button emoji beside the domain, on the dark paper. A crawler reads
+// og:image only as an absolute URL, and the card names prod's domain, so it points there on every stage.
+export const OG_IMAGE_URL = `https://${Brand.domain}/og.png`;
+
 // Fonts are fetched without credentials whatever their origin, so the preload says so too,
 // or the browser fetches the file twice.
 const fontPreload = (href: string) =>
@@ -138,6 +142,11 @@ export const rootHead = () => ({
     { content: SITE_DESCRIPTION, property: "og:description" },
     { content: "website", property: "og:type" },
     { content: Brand.name, property: "og:site_name" },
+    { content: OG_IMAGE_URL, property: "og:image" },
+    { content: "1200", property: "og:image:width" },
+    { content: "630", property: "og:image:height" },
+    { content: Brand.domain, property: "og:image:alt" },
+    { content: "summary_large_image", name: "twitter:card" },
   ],
 });
 

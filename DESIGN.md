@@ -436,6 +436,8 @@ Square. The radius is 2 px (`--radius: 0.125rem`), and shadcn's base-lyra compon
 
 **No logomark.** The wordmark is the product's name set in the UI sans. Where a file must stand for the site (the favicon, `apple-touch-icon.png`, the manifest's icons), it is the repeat button emoji (U+1F501) drawn as text in `public/icons/icon.svg`, plain: in the reader's own emoji font and colours, filling the square, with no ground of its own. The rasters are that one drawing, rendered in headless Chromium at 1024 px on a transparent ground and downscaled with Lanczos: 512 and 192 for the manifest, 180 for iOS, and 16, 32 and 48 in `favicon.ico`. Since the emoji fills the square, the manifest offers no maskable icon. `apps/web/test/icons.test.ts` holds the text, the bare ground and the sizes.
 
+**The unfurl's card.** `public/og.png` (1200 × 630) is the repeat button emoji, in Noto Color Emoji, beside the domain in capitals, in IBM Plex Sans at weight 600, on the dark paper (`#0a0a0a`), rendered in headless Chromium. The root's head names it as `og:image` at prod's absolute URL, with `twitter:card` set to `summary_large_image`, so every page unfurls with it; `apps/web/test/head.test.ts` holds the metas and `icons.test.ts` the size.
+
 ## Components
 
 ### Top bar
