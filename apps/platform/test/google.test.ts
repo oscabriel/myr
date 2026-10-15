@@ -51,8 +51,10 @@ import type {
 import {
   authorizeUrl,
   codeOf,
+  cspOf,
   formOf,
   origin,
+  port,
   tokenRequest,
 } from "./oauth.fixtures.ts";
 
@@ -559,9 +561,10 @@ describe("Google sign-in, without a Google OAuth client", () => {
       expect(page.response.status).toBe(200);
       expect(Option.isSome(formOf(page.response, page.html))).toBeTruthy();
       expect(page.html).not.toContain("Google");
-      expect(
-        page.response.headers.get("content-security-policy")
-      ).not.toContain("accounts.google.com");
+      expect(cspOf(page.response)["form-action"]).toStrictEqual([
+        "'self'",
+        `http://127.0.0.1:${port}`,
+      ]);
     })
   );
 
@@ -612,9 +615,12 @@ describe("Google sign-in, with a Google OAuth client", () => {
         expect(Option.isSome(googleLinkIn(page))).toBeTruthy();
         expect(page.html).toContain("Continue with Google");
         expect(page.html).toContain('formaction="/oauth/google/link"');
-        expect(page.response.headers.get("content-security-policy")).toContain(
+        expect(cspOf(page.response)["form-action"]).toContain(
           "https://accounts.google.com"
         );
+        expect(cspOf(page.response)["frame-ancestors"]).toStrictEqual([
+          "'none'",
+        ]);
       })
   );
 

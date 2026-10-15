@@ -37,6 +37,7 @@ import {
   authorizeUrl,
   cliClient,
   codeOf,
+  cspOf,
   formOf,
   namedPerson,
   origin,
@@ -466,8 +467,13 @@ const accessTokenFor = (world: World, handle: string, secret: string) =>
 
 const alicePassword = "correct horse battery";
 
-const CSP =
-  "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'";
+// The page loads nothing, cannot be framed, and posts its forms only here and to where the code goes back.
+const lockedDown = (formAction: readonly string[]) => ({
+  "default-src": ["'none'"],
+  "form-action": ["'self'", ...formAction],
+  "frame-ancestors": ["'none'"],
+  "style-src": ["'unsafe-inline'"],
+});
 
 describe("the platform as its own OAuth authorization server", () => {
   it.live("publishes where to authorize and where to get a token", () =>
@@ -528,12 +534,12 @@ describe("the platform as its own OAuth authorization server", () => {
         expect([
           page.response.status,
           page.response.headers.get("content-type"),
-          page.response.headers.get("content-security-policy"),
+          cspOf(page.response),
           page.response.headers.get("x-frame-options"),
         ]).toStrictEqual([
           200,
           "text/html; charset=utf-8",
-          `${CSP} http://127.0.0.1:${port}`,
+          lockedDown([`http://127.0.0.1:${port}`]),
           "DENY",
         ]);
         expect(page.html).toContain(
@@ -592,10 +598,10 @@ describe("the platform as its own OAuth authorization server", () => {
           )
           .pipe(Effect.flatMap(read));
 
-        expect([
-          page.response.status,
-          page.response.headers.get("content-security-policy"),
-        ]).toStrictEqual([200, `${CSP} http:`]);
+        expect([page.response.status, cspOf(page.response)]).toStrictEqual([
+          200,
+          lockedDown(["http:"]),
+        ]);
       })
   );
 });

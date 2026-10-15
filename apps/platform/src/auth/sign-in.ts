@@ -185,9 +185,6 @@ export const csrfCookie = {
   secure: true,
 } as const;
 
-const BASE_CSP =
-  "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'";
-
 // CSP's host grammar cannot name an IPv6 literal host, so only its scheme.
 const redirectSource = (redirectUri: string) =>
   Option.fromNullishOr(URL.parse(redirectUri)).pipe(
@@ -197,18 +194,28 @@ const redirectSource = (redirectUri: string) =>
     )
   );
 
-// Browsers hold a form post's redirect to `form-action` too, so the client's redirect URI is allowed.
+// Browsers hold a form post's redirect to `form-action` too, so the client's
+// redirect URI is allowed there. Built by directive, so a source meant for
+// `form-action` never lands in the directive written after it.
 const contentSecurityPolicy = (
   redirectUri?: string,
   formActions: readonly string[] = []
 ) =>
   [
-    BASE_CSP,
-    ...Option.toArray(
-      Option.flatMap(Option.fromUndefinedOr(redirectUri), redirectSource)
-    ),
-    ...formActions,
-  ].join(" ");
+    ["default-src", "'none'"],
+    ["style-src", "'unsafe-inline'"],
+    [
+      "form-action",
+      "'self'",
+      ...Option.toArray(
+        Option.flatMap(Option.fromUndefinedOr(redirectUri), redirectSource)
+      ),
+      ...formActions,
+    ],
+    ["frame-ancestors", "'none'"],
+  ]
+    .map((directive) => directive.join(" "))
+    .join("; ");
 
 export const htmlPage = (
   body: string,

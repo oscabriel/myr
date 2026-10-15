@@ -151,6 +151,16 @@ export const formOf = (
     request: field(html, "request"),
   });
 
+// Each directive's sources, by name: a source counts only under the directive it was written in.
+export const cspOf = (response: Response) =>
+  Object.fromEntries(
+    (response.headers.get("content-security-policy") ?? "")
+      .split(";")
+      .map((directive) => directive.trim().split(/\s+/u))
+      .filter(([name]) => name !== undefined && name !== "")
+      .map(([name = "", ...sources]) => [name, sources])
+  );
+
 export const codeOf = (response: Response) =>
   Option.fromNullishOr(response.headers.get("location")).pipe(
     Option.flatMap((location) => Option.fromNullishOr(URL.parse(location))),
