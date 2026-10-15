@@ -1,6 +1,5 @@
 // The projects and their people are invented; any likeness to a real one is not meant.
 import { Brand } from "@repo/brand";
-import { cannedDraft } from "@repo/drafting/draft-runs/canned";
 import { CheckSpec, RatchetMeasure } from "@repo/protocol/domain/check";
 import { Command, SymbolName } from "@repo/protocol/domain/common";
 import type { AskKind } from "@repo/protocol/domain/kind";
@@ -229,19 +228,6 @@ const datekitAsks: readonly DatekitAsk[] = [
   }),
 ];
 
-const draftedAsk: StatedAsk = {
-  askedBy: datekitPeople.decider,
-  blockedBy: [],
-  brief: { current: cannedDraft.current, want: cannedDraft.want },
-  check: encodeCheck(
-    CheckSpec.cases.RedThenGreen.make({ path: cannedDraft.test.path })
-  ),
-  file: `${dir}/asks/${cannedDraft.id}.ask.ts`,
-  id: cannedDraft.id,
-  kind: cannedDraft.kind,
-  territory: { module: ".", paths: [...cannedDraft.territory] },
-};
-
 const library: Files = new Map([
   [
     "README.md",
@@ -356,12 +342,12 @@ const library: Files = new Map([
   [
     `${dir}/policy.json`,
     policyJson({
-      asks: [...datekitAsks.map(({ stated }) => stated), draftedAsk],
+      asks: datekitAsks.map(({ stated }) => stated),
       deciders: [
         { handles: [datekitPeople.decider], paths: "**" },
         { handles: [datekitPeople.zones], paths: "src/tz.ts" },
       ],
-      functions: { admit: false, opensAlone: false },
+      functions: { admit: false },
       kinds: [fix],
       ratchets: [],
       run: {
@@ -632,7 +618,7 @@ const monorepo: Files = new Map([
           paths: "**",
         },
       ],
-      functions: { admit: false, opensAlone: false },
+      functions: { admit: false },
       kinds: [
         {
           checkKind: "migrate",

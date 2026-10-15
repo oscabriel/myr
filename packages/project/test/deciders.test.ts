@@ -5,9 +5,8 @@ import { shaOf } from "@repo/checks/check-runner";
 import { authorLine, committerLine, parseTrailers } from "@repo/git/trailers";
 import type { Ask } from "@repo/protocol/domain/ask";
 import { CheckSpec } from "@repo/protocol/domain/check";
-import { Glob, RefNameText } from "@repo/protocol/domain/common";
+import { RefNameText } from "@repo/protocol/domain/common";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
-import { ProjectEvent } from "@repo/protocol/domain/event";
 import { Outcome } from "@repo/protocol/domain/outcome";
 import {
   AskId,
@@ -17,7 +16,6 @@ import {
   LandedSha,
   LaneName,
   ProjectName,
-  ProposalId,
   RepoName,
   RepoPath,
   keyOf,
@@ -25,14 +23,10 @@ import {
 } from "@repo/protocol/ids";
 import { Anonymous, Person } from "@repo/protocol/principal";
 import {
-  CapReached,
-  DecisionClosed,
   Denounced,
   NotDecider,
   NotVouched,
   TouchedJudge,
-  UnknownAsk,
-  VerifierBlocked,
 } from "@repo/protocol/refusal";
 import { RulesEvaluator } from "@repo/rules/rules-evaluator";
 import { parseVouchFile } from "@repo/rules/vouch";
@@ -44,10 +38,8 @@ import {
   withKind,
   withVouches,
 } from "@repo/testkit/scenarios";
-import { Array, DateTime, Effect, Exit, Layer, Option, Result } from "effect";
+import { Array, DateTime, Effect, Exit, Layer, Option } from "effect";
 
-import { ScheduledAlarm } from "../src/alarms/memory.ts";
-import { platformHandle } from "../src/attention/effects.ts";
 import { ProjectStore } from "../src/project-store.ts";
 import type { ProjectApi } from "../src/project.ts";
 import { projectService } from "../src/project.ts";
@@ -95,10 +87,6 @@ const carol = person("carol");
 const dave = person("dave");
 
 const erin = person("erin");
-
-const eve = person("eve");
-
-const frank = person("frank");
 
 const anyone = Anonymous.make({});
 
@@ -174,8 +162,6 @@ const commitOf = (sha: CommitSha) =>
 
     return { author, committer, parents, trailers: parseTrailers(message) };
   });
-
-const scheduled = ScheduledAlarm.use(({ at }) => at);
 
 const stored = ProjectStore.use((store) => store.load());
 
@@ -289,309 +275,6 @@ const answered = (
   });
 
 const firstDecision = DecisionId.make("dec-000001");
-
-const proposing = (api: ProjectApi) =>
-  Effect.gen(function* () {
-    const files = askFiles("trim-input");
-
-    const proposed = yield* api.proposeAsk(carol, {
-      files,
-      territory: "packages/trim",
-      want: askOf("trim-input").brief.want,
-    });
-
-    const onToday = yield* api.today(alice);
-    const alarm = yield* scheduled;
-
-    // The cap is for the public: dave is not vouched, carol is.
-    const second = yield* api.proposeAsk(dave, { want: "Trim tabs too" });
-
-    yield* api.proposeAsk(dave, { want: "Trim spaces too" });
-
-    const third = yield* api
-      .proposeAsk(dave, { want: "Trim newlines too" })
-      .pipe(Effect.flip);
-
-    const beyondCap = yield* api
-      .proposeAsk(carol, { want: "Trim carriage returns too" })
-      .pipe(Effect.result, Effect.map(Result.isSuccess));
-
-    yield* redOnMain(files);
-
-    const accepted = yield* api.decide(alice, {
-      choice: "accept",
-      decision: firstDecision,
-    });
-
-    const landed = yield* mainTip;
-
-    return {
-      accepted,
-      again: yield* api
-        .decide(alice, { choice: "decline", decision: firstDecision })
-        .pipe(Effect.flip),
-      alarm,
-      beyondCap,
-      bobDecides: yield* api
-        .decide(bob, {
-          choice: "accept",
-          decision: DecisionId.make("dec-000002"),
-        })
-        .pipe(Effect.flip),
-      commit: yield* commitOf(landed),
-      listed: yield* api.listAsks(anyone),
-      onToday,
-      proposals: (yield* stored).proposals,
-      proposed,
-      second,
-      third,
-    };
-  });
-
-const expiring = (api: ProjectApi) =>
-  Effect.gen(function* () {
-    yield* api.proposeAsk(carol, { want: "Trim tabs too" });
-    yield* advanceTo("2026-10-21T12:00:00Z");
-    yield* api.onAlarm();
-
-    const { decisions, proposals } = yield* stored;
-    const events = yield* api.events(0, 100);
-
-    return {
-      decided: events.flatMap(({ event }) =>
-        ProjectEvent.guards.Decided(event)
-          ? [{ choice: event.choice, decision: event.decision }]
-          : []
-      ),
-      decisions,
-      proposals,
-      today: yield* api.today(alice),
-    };
-  });
-
-const acceptingBlocked = (api: ProjectApi) =>
-  Effect.gen(function* () {
-    const files = askFiles("trim-input");
-
-    yield* api.proposeAsk(carol, {
-      files,
-      territory: "packages/trim",
-      want: askOf("trim-input").brief.want,
-    });
-
-    const blocked = yield* api
-      .decide(alice, { choice: "accept", decision: firstDecision })
-      .pipe(Effect.result, Effect.map(Result.getFailure));
-
-    const between = yield* stored;
-
-    yield* redOnMain(files);
-
-    const accepted = yield* api
-      .decide(alice, { choice: "accept", decision: firstDecision })
-      .pipe(
-        Effect.result,
-        Effect.map(Result.getSuccess),
-        Effect.map(Option.map(({ decision }) => decision.decided?.choice))
-      );
-
-    return {
-      accepted,
-      blocked,
-      decided: between.decisions.map(({ decided }) => decided),
-      listed: (yield* api.listAsks(anyone)).asks.map(({ ask }) => ask),
-      proposals: between.proposals.map(({ state }) => state),
-    };
-  });
-
-const splitDeciders = {
-  policy: {
-    ...scenario.policy,
-    deciders: [
-      { handles: Array.make(alice.handle), paths: Glob.make("packages/**") },
-      {
-        handles: Array.make(frank.handle),
-        paths: Glob.make(`${Brand.configDir}/**`),
-      },
-    ],
-  },
-};
-
-const askedToDecide = Effect.gen(function* () {
-  const api = yield* begun;
-
-  const { proposal } = yield* api.proposeAsk(carol, {
-    files: askFiles("trim-input"),
-    territory: "packages/trim",
-    want: askOf("trim-input").brief.want,
-  });
-
-  return {
-    alice: (yield* api.today(alice)).decisions.map(({ deciders, subject }) => ({
-      deciders,
-      subject,
-    })),
-    frank: (yield* api.today(frank)).decisions,
-    proposal: proposal.id,
-  };
-});
-
-describe("a proposal", () => {
-  const world = worldOf(scenario, "memory");
-  const proposal = ProposalId.make("prop-000001");
-  const seen = Effect.flatMap(begun, proposing).pipe(Effect.provide(world));
-
-  it.effect(
-    "is a decision on Today for its maintainers, with a default, expiring in fourteen days, and held to a cap",
-    () =>
-      Effect.map(seen, (run) => {
-        expect(run.proposed.proposal).toStrictEqual({
-          expiresAt: daysAfter(noon, 14),
-          files: askFiles("trim-input").map(({ path }) => path),
-          id: proposal,
-          openedAt: noon,
-          project,
-          proposer: carol.handle,
-          state: "open",
-          territory: "packages/trim",
-          want: askOf("trim-input").brief.want,
-        });
-        expect(
-          run.onToday.decisions.map(
-            ({ default: fallback, deciders, subject }) => ({
-              deciders,
-              fallback,
-              subject,
-            })
-          )
-        ).toStrictEqual([
-          {
-            deciders: [alice.handle],
-            fallback: "decline",
-            subject: DecisionSubject.cases.OpenProposal.make({ proposal }),
-          },
-        ]);
-        expect(run.alarm).toStrictEqual(Option.some(daysAfter(noon, 14)));
-        expect([
-          run.second.proposal.state,
-          run.third,
-          run.beyondCap,
-        ]).toStrictEqual([
-          "open",
-          new CapReached({ cap: 2, limit: "proposals" }),
-          true,
-        ]);
-      })
-  );
-
-  it.effect(
-    "accepted, opens its ask red first, asked by its proposer and decided by the maintainer",
-    () =>
-      Effect.map(seen, (run) => {
-        expect(run.accepted.decision.decided).toStrictEqual({
-          at: noon,
-          by: alice.handle,
-          choice: "accept",
-        });
-        expect({
-          author: run.commit.author,
-          committer: run.commit.committer,
-          credits: run.commit.trailers.filter(({ key }) =>
-            ["Asked-by", "Decided-by"].includes(key)
-          ),
-        }).toStrictEqual({
-          author: authorLine(carol.handle),
-          committer: committerLine,
-          credits: [
-            { key: "Asked-by", value: userOf("carol") },
-            { key: "Decided-by", value: userOf("alice") },
-          ],
-        });
-        expect(run.listed.asks.map(({ ask }) => ask)).toStrictEqual([
-          AskId.make("trim-input"),
-        ]);
-        expect(run.proposals.map(({ id, state }) => [id, state])).toStrictEqual(
-          [
-            [proposal, "accepted"],
-            [ProposalId.make("prop-000002"), "open"],
-            [ProposalId.make("prop-000003"), "open"],
-            [ProposalId.make("prop-000004"), "open"],
-          ]
-        );
-      })
-  );
-
-  it.effect("decided once, is closed, and only its maintainers decide it", () =>
-    Effect.map(seen, (run) => {
-      expect(run.again).toStrictEqual(
-        new DecisionClosed({ decision: firstDecision })
-      );
-      expect(run.bobDecides).toStrictEqual(new NotDecider({}));
-    })
-  );
-
-  it.effect(
-    "accepted while its check cannot run, decides nothing and stays open, so it can be accepted again",
-    () =>
-      Effect.map(
-        Effect.flatMap(begun, acceptingBlocked).pipe(Effect.provide(world)),
-        (run) => {
-          expect(run.blocked).toStrictEqual(
-            Option.some(new VerifierBlocked({}))
-          );
-          expect([run.decided, run.proposals]).toStrictEqual([
-            [undefined],
-            ["open"],
-          ]);
-          expect([run.accepted, run.listed]).toStrictEqual([
-            Option.some("accept"),
-            [AskId.make("trim-input")],
-          ]);
-        }
-      )
-  );
-
-  it.effect(
-    "is put to the maintainers of its territory, not to those of the config folder its ask file sits in",
-    () =>
-      Effect.map(
-        askedToDecide.pipe(Effect.provide(worldOf(splitDeciders, "memory"))),
-        (run) => {
-          expect(run.alice).toStrictEqual([
-            {
-              deciders: [alice.handle],
-              subject: DecisionSubject.cases.OpenProposal.make({
-                proposal: run.proposal,
-              }),
-            },
-          ]);
-          expect(run.frank).toStrictEqual([]);
-        }
-      )
-  );
-
-  it.effect(
-    "left alone for fourteen days expires, and its decision takes its default by the platform's hand",
-    () =>
-      Effect.map(
-        Effect.flatMap(begun, expiring).pipe(Effect.provide(world)),
-        (run) => {
-          const expiredAt = daysAfter(noon, 14);
-
-          expect(run.proposals.map(({ state }) => state)).toStrictEqual([
-            "expired",
-          ]);
-          expect(run.decisions.map(({ decided }) => decided)).toStrictEqual([
-            { at: expiredAt, by: platformHandle, choice: "decline" },
-          ]);
-          expect(run.decided).toStrictEqual([
-            { choice: "decline", decision: firstDecision },
-          ]);
-          expect(run.today.decisions).toStrictEqual([]);
-        }
-      )
-  );
-});
 
 const finishing = (api: ProjectApi) =>
   Effect.gen(function* () {
@@ -1118,16 +801,25 @@ describe("a vouch", () => {
   );
 });
 
+// Six deletions of main, an hour apart: each is a decision, and deciding one
+// moves nothing.
 const filling = (api: ProjectApi) =>
   Effect.gen(function* () {
-    const proposers = [carol, eve, frank, carol, eve, frank];
+    const first = yield* mainTip;
 
     yield* Effect.forEach(
-      proposers,
-      (who, index) =>
+      Array.range(1, 6),
+      (n) =>
         Effect.andThen(
-          advanceTo(DateTime.formatIso(DateTime.add(noon, { hours: index }))),
-          api.proposeAsk(who, { want: `Want number ${index + 1}` })
+          advanceTo(DateTime.formatIso(DateTime.add(noon, { hours: n - 1 }))),
+          api.recordPush({
+            after: CommitSha.make("0".repeat(40)),
+            before: Option.some(first),
+            eventId: `evt-deleted-${n}`,
+            pusher: anyone,
+            ref: "refs/heads/main",
+            repo,
+          })
         ),
       { discard: true }
     );
@@ -1140,18 +832,9 @@ const filling = (api: ProjectApi) =>
       note: "Not this one",
     });
 
-    const flag = yield* api.flagAsk(carol, {
-      ask: AskId.make("parse-iso"),
-      reason: "Its check reads the wall clock",
-    });
-
     return {
       afterOne: yield* api.today(alice),
       bobToday: yield* api.today(bob).pipe(Effect.flip),
-      flag,
-      flagUnknown: yield* api
-        .flagAsk(eve, { ask: AskId.make("no-such-ask"), reason: "Gone" })
-        .pipe(Effect.flip),
       full,
     };
   });
@@ -1166,12 +849,12 @@ const decisionIds = (from: number, to: number) =>
 
 describe("Today", () => {
   it.effect(
-    "shows a maintainer every open decision, soonest to expire first; one taken leaves the list and a flag raised joins it",
+    "shows a maintainer every open decision, soonest to expire first; one taken leaves the list",
     () =>
       Effect.map(
-        Effect.flatMap(begun, (api) =>
-          Effect.andThen(openRed(api, "parse-iso"), filling(api))
-        ).pipe(Effect.provide(worldOf(scenario, "memory"))),
+        Effect.flatMap(begun, filling).pipe(
+          Effect.provide(worldOf(scenario, "memory"))
+        ),
         (seen) => {
           expect({
             decider: seen.full.decider,
@@ -1181,31 +864,9 @@ describe("Today", () => {
             decisions: decisionIds(1, 6),
           });
           expect(idsOf(seen.afterOne.decisions)).toStrictEqual(
-            decisionIds(2, 7)
+            decisionIds(2, 6)
           );
           expect(seen.bobToday).toStrictEqual(new NotDecider({}));
-        }
-      )
-  );
-
-  it.effect(
-    "holds a flag on an open ask as a proposal for its maintainers",
-    () =>
-      Effect.map(
-        Effect.flatMap(begun, (api) =>
-          Effect.andThen(openRed(api, "parse-iso"), filling(api))
-        ).pipe(Effect.provide(worldOf(scenario, "memory"))),
-        (seen) => {
-          expect(seen.flag.proposal).toMatchObject({
-            files: [],
-            flags: AskId.make("parse-iso"),
-            proposer: carol.handle,
-            state: "open",
-            want: "Its check reads the wall clock",
-          });
-          expect(seen.flagUnknown).toStrictEqual(
-            new UnknownAsk({ ask: AskId.make("no-such-ask") })
-          );
         }
       )
   );

@@ -3,7 +3,6 @@ import type {
   Discussion,
   DiscussionPost,
 } from "@repo/protocol/domain/discussion";
-import type { ProjectName, ProposalId } from "@repo/protocol/ids";
 import type { DateTime } from "effect";
 import type { ReactNode } from "react";
 
@@ -11,14 +10,12 @@ import { CommandLine } from "../shared/command.tsx";
 import { FactBlock } from "../shared/facts.tsx";
 import { HandleLink } from "../shared/handle.tsx";
 import { AppLink } from "../shared/link.tsx";
+import { askPath } from "../shared/paths.ts";
 import { Workspace } from "../shared/shell/workspace.tsx";
 import { When } from "../shared/time.tsx";
 import { replyCommand, STATE_LABEL } from "./discussions-view.tsx";
 
 const LINK = "decoration-rule underline hover:decoration-current";
-
-const proposalPath = (project: ProjectName, proposal: ProposalId) =>
-  `/${project}/proposals/${proposal}`;
 
 const Post = ({
   now,
@@ -43,16 +40,16 @@ const Post = ({
 );
 
 const Became = ({ discussion }: { readonly discussion: Discussion }) =>
-  discussion.proposal === undefined ? null : (
-    <p className="text-ui" data-became={discussion.proposal}>
-      {"A maintainer turned this discussion into "}
+  discussion.ask === undefined ? null : (
+    <p className="text-ui" data-became={discussion.ask}>
+      {"A maintainer opened the ask "}
       <AppLink
         className={`text-mono font-mono ${LINK}`}
-        to={proposalPath(discussion.project, discussion.proposal)}
+        to={askPath(discussion.project, discussion.ask)}
       >
-        {discussion.proposal}
+        {discussion.ask}
       </AppLink>
-      , which expires unless a maintainer accepts it.
+      {" from this discussion."}
     </p>
   );
 
@@ -61,9 +58,9 @@ const ThreadFacts = ({ discussion }: { readonly discussion: Discussion }) => (
     {discussion.state === "open" ? (
       <>
         <p className="text-ui">
-          Reply from a terminal; anyone not denounced may. A maintainer may turn
-          the thread into a proposal with{" "}
-          <code className="text-mono font-mono">{`${Brand.cli} propose --discussion ${discussion.id}`}</code>
+          Reply from a terminal; anyone not denounced may. A maintainer may open
+          an ask from the thread with{" "}
+          <code className="text-mono font-mono">{`${Brand.cli} ask open <ask> --discussion ${discussion.id}`}</code>
           .
         </p>
         <CommandLine command={replyCommand(discussion)} numbered />
@@ -72,7 +69,7 @@ const ThreadFacts = ({ discussion }: { readonly discussion: Discussion }) => (
       <p className="text-ui">
         {discussion.state === "closed"
           ? "This discussion is closed: it takes no more posts."
-          : "This discussion became a proposal: it takes no more posts."}
+          : "This discussion became an ask: it takes no more posts."}
       </p>
     )}
   </FactBlock>

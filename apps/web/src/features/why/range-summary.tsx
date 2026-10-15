@@ -9,13 +9,7 @@ import { HandleLink } from "../shared/handle.tsx";
 import { AppLink } from "../shared/link.tsx";
 import { answerPath, askPath } from "../shared/paths.ts";
 import { LandingWords } from "./band.tsx";
-import {
-  askOf,
-  linesWords,
-  priorHref,
-  proposeHref,
-  verdictWords,
-} from "./rows.ts";
+import { askOf, linesWords, priorHref, verdictWords } from "./rows.ts";
 import type { WhyRow } from "./rows.ts";
 
 const LINK = "decoration-rule underline hover:decoration-current";
@@ -49,16 +43,6 @@ export const BandLinks = ({
           why, one step back
         </AppLink>
       )}
-      <a
-        className={LINK}
-        href={proposeHref(project, {
-          at: view.at,
-          line: row.range.start,
-          path: view.path,
-        })}
-      >
-        Propose an ask about this line
-      </a>
     </span>
   );
 };

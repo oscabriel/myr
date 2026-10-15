@@ -10,13 +10,11 @@ import { Ask } from "@repo/protocol/domain/ask";
 import type { AskListing } from "@repo/protocol/domain/ask";
 import { ClaimView } from "@repo/protocol/domain/claim";
 import { ForkRef } from "@repo/protocol/domain/code";
-import { ConfigFile } from "@repo/protocol/domain/common";
 import { Decision } from "@repo/protocol/domain/decision";
 import type { Choice, Today } from "@repo/protocol/domain/decision";
 import { EnvSchemaView } from "@repo/protocol/domain/env";
 import { ProjectEvent } from "@repo/protocol/domain/event";
 import { LandingView } from "@repo/protocol/domain/landing";
-import { Proposal } from "@repo/protocol/domain/proposal";
 import type { CreditSummary } from "@repo/protocol/domain/record";
 import { Ledger } from "@repo/protocol/domain/visibility";
 import { sameHandle } from "@repo/protocol/ids";
@@ -26,7 +24,6 @@ import type {
   DecisionId,
   Handle,
   LandedSha,
-  ProposalId,
 } from "@repo/protocol/ids";
 import {
   DecisionClosed,
@@ -36,11 +33,6 @@ import {
 import { Array, DateTime, Effect, Option, Schema } from "effect";
 
 import { present } from "./story.ts";
-
-export interface HeldProposal {
-  readonly files: readonly ConfigFile[];
-  readonly proposal: Proposal;
-}
 
 export interface KeptLog {
   readonly claimant: Handle;
@@ -64,7 +56,6 @@ export interface FixtureRecord {
   readonly landings: readonly LandingView[];
   readonly ledger: Ledger;
   readonly logs: ReadonlyMap<string, KeptLog>;
-  readonly proposals: ReadonlyMap<ProposalId, HeldProposal>;
   readonly verdicts: ReadonlyMap<AskId, readonly Verdict[]>;
 }
 
@@ -88,14 +79,6 @@ export const decodeRecord = (
     yield* many(Decision, record.decisions);
     yield* many(ClaimView, record.claims);
     yield* many(ForkRef, record.forks);
-    yield* many(
-      Proposal,
-      [...record.proposals.values()].map((held) => held.proposal)
-    );
-    yield* many(
-      ConfigFile,
-      [...record.proposals.values()].flatMap(({ files }) => files)
-    );
     yield* asType(Ledger)(record.ledger);
     yield* asType(EnvSchemaView)(record.env);
 

@@ -149,8 +149,7 @@ const web = () =>
     audience: "Browser",
     id: "web",
     links: [{ label: "Sign in", page: false, path: "/auth/signin" }],
-    summary:
-      "Sign in to read your inbox, take a maintainer's decisions and propose asks.",
+    summary: "Sign in to read your inbox and take a maintainer's decisions.",
     title: "The web",
   });
 

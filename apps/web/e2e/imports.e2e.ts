@@ -389,15 +389,15 @@ const pages = ({ dir, entry, evaluated, file, project, readme }: Imported) => {
       })
     ));
 
-  test(`${project}'s people show ${evaluated ? "the defaults policy" : "that its policy is not evaluated"}`, ({
+  test(`${project}'s policy page shows ${evaluated ? "the defaults policy" : "that its policy is not evaluated"}`, ({
     page: browser,
   }) =>
     Effect.runPromise(
       visit(
         browser,
         project,
-        `${homeOf(project)}/people`,
-        "people",
+        `${homeOf(project)}/policy`,
+        "policy",
         evaluated
           ? { selectors: ['[data-paths="**"]'] }
           : {

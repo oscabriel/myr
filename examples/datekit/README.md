@@ -96,7 +96,7 @@ git push myr HEAD:main           # offer your answer
 
 The platform runs the ask's test and the rest of the suite on your answer, and lands it on main with your name on it when both pass. An answer changes only the files its ask names. `format-ordinal` is kept for newcomers, with okonkwo as mentor.
 
-Claiming needs a vouch: a line in `.myr/vouched.td`. Anyone not denounced there may propose an ask with `myr propose`.
+Claiming needs a vouch: a line in `.myr/vouched.td`. Anyone not denounced there may ask for one in a discussion with `myr discussion post`, and a maintainer opens the ask from it.
 
 Run the tests with `bun test`. On main, the three asks' tests fail; everything else passes.
 

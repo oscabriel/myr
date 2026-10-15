@@ -52,7 +52,7 @@ export const FinishColumn = () => {
             Inbox
           </AppLink>
           {project === undefined ? null : (
-            <AppLink className={ROW} to={`/${project}/people`}>
+            <AppLink className={ROW} to={`/${project}/policy`}>
               Who decides in {project}
             </AppLink>
           )}

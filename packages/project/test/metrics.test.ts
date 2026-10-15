@@ -8,7 +8,6 @@ import {
   LandedSha,
   LaneName,
   ProjectName,
-  ProposalId,
   RepoName,
   RepoPath,
   keyOf,
@@ -16,7 +15,6 @@ import {
 } from "@repo/protocol/ids";
 import type { CommitSha } from "@repo/protocol/ids";
 import { Person } from "@repo/protocol/principal";
-import { NotRedFirst } from "@repo/protocol/refusal";
 import { advanceTo } from "@repo/testkit/clock";
 import type { Files } from "@repo/testkit/git-client";
 import { aProject, withAsk, withVouches } from "@repo/testkit/scenarios";
@@ -34,7 +32,6 @@ import {
 import { AnswerRuns } from "../src/answer-runs.ts";
 import type { AnswerQueue } from "../src/answer-runs.ts";
 import { drive, isStep, nextSteps, runStep } from "../src/answer-runs/steps.ts";
-import { DraftResult } from "../src/draft-runs.ts";
 import type { Lander } from "../src/lander.ts";
 import { LandingCommand, LandingState } from "../src/landing.ts";
 import { MetricPoint, Metrics } from "../src/metrics.ts";
@@ -94,12 +91,6 @@ describe("the Analytics Engine adapter", () => {
             project: datekit,
             waitedMs: 120_000,
           }),
-          MetricPoint.cases.Drafted.make({
-            attempts: 2,
-            latencyMs: 95_000,
-            project: datekit,
-            ready: true,
-          }),
         ]);
 
         expect(rows).toStrictEqual([
@@ -122,11 +113,6 @@ describe("the Analytics Engine adapter", () => {
           {
             blobs: ["ChecksWaited"],
             doubles: [120_000],
-            indexes: ["alice/datekit"],
-          },
-          {
-            blobs: ["Drafted", "ready"],
-            doubles: [95_000, 2],
             indexes: ["alice/datekit"],
           },
         ]);
@@ -755,59 +741,5 @@ describe("a project's metrics, settled by a call and by the alarm at once", () =
           MetricPoint.cases.Landed.make({ project }),
         ]);
       }).pipe(Effect.provide(Layer.mergeAll(world, gatedReadModel)))
-  );
-});
-
-const proposal = ProposalId.make("prop-000001");
-
-const drafted = Effect.gen(function* () {
-  yield* advanceTo("2026-10-08T12:00:00Z");
-
-  const api = yield* projectService(project);
-
-  yield* api.initProject(alice, {});
-
-  const first = yield* Pusher.use((pusher) =>
-    pusher.push(repo, Option.none(), start, "Start")
-  );
-
-  yield* api.recordFirstPush(alice, first);
-  yield* api.proposeAsk(bob, {
-    draft: true,
-    territory: "packages/parser",
-    want: "Parse an ISO week date such as 2026-W41",
-  });
-
-  return api;
-});
-
-const failedRound = DraftResult.cases.Failed.make({
-  attempts: 3,
-  model: "@cf/moonshotai/kimi-k2.7-code",
-  refusal: new NotRedFirst({}),
-});
-
-describe("a draft round's metrics", () => {
-  it.effect(
-    "time the round from its start to its settle, once however often it settles",
-    () =>
-      Effect.gen(function* () {
-        const api = yield* drafted;
-
-        yield* advanceTo("2026-10-08T12:01:35Z");
-        yield* api.draftSettled(proposal, 1, failedRound);
-        yield* advanceTo("2026-10-08T12:03:00Z");
-        yield* api.draftSettled(proposal, 1, failedRound);
-
-        expect(yield* pointsSoFar).toStrictEqual([
-          MetricPoint.cases.Landed.make({ project }),
-          MetricPoint.cases.Drafted.make({
-            attempts: 3,
-            latencyMs: 95_000,
-            project,
-            ready: false,
-          }),
-        ]);
-      }).pipe(Effect.provide(world))
   );
 });

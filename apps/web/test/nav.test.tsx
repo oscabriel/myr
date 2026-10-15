@@ -23,17 +23,15 @@ const tabs = (current: string) =>
   [
     { href: "/oscabriel/datekit", text: "Overview" },
     { href: "/oscabriel/datekit/tree/main", text: "Code" },
-    { href: "/oscabriel/datekit#open-asks", text: "Asks" },
+    { href: "/oscabriel/datekit/asks", text: "Asks" },
     { href: "/oscabriel/datekit/commits/main?show=landings", text: "Landings" },
-    { href: "/oscabriel/datekit#proposals", text: "Proposals" },
     { href: "/oscabriel/datekit/discussions", text: "Discussions" },
-    { href: "/oscabriel/datekit#who-decides", text: "People" },
-    { href: "/oscabriel/datekit/people", text: "Policy" },
+    { href: "/oscabriel/datekit/policy", text: "Policy" },
     { href: "/oscabriel/datekit/visibility", text: "Visibility" },
   ].map((link) => ({ current: link.text === current, ...link }));
 
 describe("a project's tabs", () => {
-  it("links all nine, in ADR 0041's order, and marks only the page being read", () => {
+  it("links all seven, in ADR 0041's order, and marks only the page being read", () => {
     const markup = renderToStaticMarkup(
       <ProjectTabs current="code" project={datekit} />
     );
@@ -52,8 +50,7 @@ describe("a project's tabs", () => {
     );
 
     expect(
-      linksOf(markup).find(({ href }) => href?.endsWith("#open-asks") === true)
-        ?.text
+      linksOf(markup).find(({ href }) => href?.endsWith("/asks") === true)?.text
     ).toBe("Asks5");
   });
 
@@ -85,21 +82,19 @@ describe("a project's tabs", () => {
       })
   );
 
-  it.effect(
-    "never lets the router mark a second tab where a tab opens a region of Overview",
-    () =>
-      Effect.gen(function* () {
-        const markup = yield* renderAt(
-          "/oscabriel/datekit",
-          <ProjectTabs current="overview" project={datekit} />
-        );
+  it.effect("never lets the router mark a second tab on Overview", () =>
+    Effect.gen(function* () {
+      const markup = yield* renderAt(
+        "/oscabriel/datekit",
+        <ProjectTabs current="overview" project={datekit} />
+      );
 
-        expect(
-          linksOf(markup)
-            .filter(({ current }) => current)
-            .map(({ text }) => text)
-        ).toStrictEqual(["Overview"]);
-      })
+      expect(
+        linksOf(markup)
+          .filter(({ current }) => current)
+          .map(({ text }) => text)
+      ).toStrictEqual(["Overview"]);
+    })
   );
 
   it.effect(
@@ -164,6 +159,7 @@ describe(projectTabOf, () => {
     ["/oscabriel/datekit/blob/main/README.md", "code"],
     ["/oscabriel/datekit/why/main/README.md", "code"],
     ["/oscabriel/datekit/refs", "code"],
+    ["/oscabriel/datekit/asks", "asks"],
     ["/oscabriel/datekit/asks/fix-week-start", "asks"],
     ["/oscabriel/datekit/decisions/dec-000001", "asks"],
     ["/oscabriel/datekit/answers/fix-week-start", "landings"],
@@ -173,8 +169,8 @@ describe(projectTabOf, () => {
       "/oscabriel/datekit/commit/1111111111111111111111111111111111111111",
       "landings",
     ],
-    ["/oscabriel/datekit/proposals/prop-000001", "proposals"],
-    ["/oscabriel/datekit/people", "policy"],
+    ["/oscabriel/datekit/discussions/disc-000001", "discussions"],
+    ["/oscabriel/datekit/policy", "policy"],
     ["/oscabriel/datekit/visibility", "visibility"],
   ])("puts %s under %s", (pathname, tab) => {
     expect(projectTabOf(pathname)).toBe(tab);

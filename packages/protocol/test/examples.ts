@@ -8,7 +8,6 @@ import {
   EnvKey,
   Handle,
   ProjectName,
-  ProposalId,
   RepoPath,
 } from "../src/ids.ts";
 import {
@@ -22,7 +21,6 @@ import {
   Denounced,
   DirectPush,
   DiscussionClosed,
-  DraftInProgress,
   Flake,
   HeldBackFailed,
   ImportFailed,
@@ -39,7 +37,6 @@ import {
   PrivatePathInPublicTree,
   NotYourNamespace,
   ProjectExists,
-  ProposalClosed,
   ReachedInternals,
   RepoBusy,
   SecretInOutput,
@@ -53,7 +50,6 @@ import {
   UnknownEnvItem,
   UnknownPath,
   UnknownProject,
-  UnknownProposal,
   UnknownRevision,
   UnstatedRequirement,
   ValueTooShort,
@@ -76,8 +72,6 @@ const project = ProjectName.make("oscabriel/datekit");
 const decision = DecisionId.make("dec-000001");
 
 const key = EnvKey.make("PAYMENTS_KEY");
-
-const proposal = ProposalId.make("prop-000001");
 
 const discussion = DiscussionId.make("disc-000001");
 
@@ -127,8 +121,6 @@ export const examples: readonly Refusal[] = [
   new PostureChange({ from: "open", to: "openCore" }),
   new NotDecider({}),
   new DecisionClosed({ decision }),
-  new ProposalClosed({ proposal }),
-  DraftInProgress.of(proposal),
   new DiscussionClosed({ discussion }),
   new UnknownProject({ project }),
   new UnknownAsk({ ask }),
@@ -136,7 +128,6 @@ export const examples: readonly Refusal[] = [
   new UnknownDecision({ decision }),
   new UnknownPath({ commit: main, path }),
   new UnknownRevision({ rev: "v9.9.9" }),
-  new UnknownProposal({ proposal }),
   new UnknownDiscussion({ discussion }),
   new ProjectExists({ project }),
   NotYourNamespace.of(project, Handle.make("bob")),

@@ -83,10 +83,7 @@ const home = Effect.gen(function* () {
       ),
       Layer.succeed(
         HostInfo,
-        HostInfo.of({
-          draftModel: "@cf/test/drafter",
-          webUrl: Option.some("https://web.example"),
-        })
+        HostInfo.of({ webUrl: Option.some("https://web.example") })
       )
     )
   )

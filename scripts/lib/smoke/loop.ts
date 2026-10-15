@@ -21,16 +21,14 @@ import {
   resources,
 } from "../../../infra/stages.ts";
 import {
-  acceptDraft,
-  awaitDraft,
   awaitLanding,
   claimAsk,
   initProject,
   LoopFailed,
   openAsk,
+  openDiscussion,
   personAt,
   projectIsFree,
-  proposeDraft,
   pushAnswer,
   pushOutOfScope,
   readLanding,
@@ -55,14 +53,6 @@ export interface StepTiming {
   readonly ms: number;
 }
 
-export interface DraftReport {
-  readonly model: string;
-  readonly attempts: number;
-  // ms
-  readonly ms: number;
-  readonly trailers: readonly string[];
-}
-
 export interface SmokeLoopReport {
   readonly project: ProjectName;
   readonly refusedWith: readonly string[];
@@ -72,7 +62,6 @@ export interface SmokeLoopReport {
   readonly trailers: readonly string[];
   readonly noteFound: boolean;
   readonly timings: readonly StepTiming[];
-  readonly draft?: DraftReport;
 }
 
 export interface LoopInput {
@@ -82,7 +71,6 @@ export interface LoopInput {
   readonly decider: Redacted.Redacted;
   readonly answerer: Redacted.Redacted;
   readonly patience?: Patience;
-  readonly draft?: boolean;
 }
 
 const PATIENCE: Patience = {
@@ -216,10 +204,15 @@ export const smokeLoop = (
       })
     );
 
+    const [discussion, talked] = yield* timed(
+      stage,
+      "discussion"
+    )(openDiscussion(answerer, project));
+
     const [, opened] = yield* timed(
       stage,
       "open-ask"
-    )(openAsk(decider, project));
+    )(openAsk({ decider, discussion, project }));
 
     const [claim, claimed] = yield* timed(
       stage,
@@ -303,6 +296,7 @@ export const smokeLoop = (
     const timings = [
       people,
       init,
+      talked,
       opened,
       claimed,
       refused,
@@ -311,7 +305,7 @@ export const smokeLoop = (
       noted,
     ];
 
-    const report = {
+    return {
       author: read.author,
       committer: read.committer,
       landed,
@@ -320,50 +314,5 @@ export const smokeLoop = (
       refusedWith,
       timings,
       trailers: read.trailers,
-    };
-
-    if (input.draft !== true) {
-      return report;
-    }
-
-    const [proposal, proposed] = yield* timed(
-      stage,
-      "draft-propose"
-    )(proposeDraft(answerer, project));
-
-    const [ready, drafted] = yield* timed(
-      stage,
-      "draft-ready"
-    )(
-      awaitDraft({
-        patience: input.patience ?? PATIENCE,
-        project,
-        proposal,
-        reader: answerer,
-      })
-    );
-
-    const [trailers, accepted] = yield* timed(
-      stage,
-      "draft-accept"
-    )(
-      acceptDraft({
-        decider,
-        dir: `${dir}/start`,
-        origin,
-        project,
-        proposal,
-        proposer: answerer.handle,
-      })
-    );
-
-    return {
-      ...report,
-      draft: {
-        ...ready,
-        ms: proposed.ms + drafted.ms,
-        trailers,
-      },
-      timings: [...timings, proposed, drafted, accepted],
     };
   }).pipe(Effect.scoped);

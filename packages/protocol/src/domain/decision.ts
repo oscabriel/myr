@@ -7,7 +7,6 @@ import {
   EnvKey,
   Handle,
   ProjectName,
-  ProposalId,
   RatchetName,
 } from "../ids.ts";
 import { Posture } from "../posture.ts";
@@ -16,7 +15,6 @@ import { LandingView } from "./landing.ts";
 
 export const DecisionSubject = Schema.TaggedUnion({
   Finish: { ask: AskId, head: CommitSha },
-  OpenProposal: { proposal: ProposalId },
   PostureChange: { from: Posture, to: Posture },
   ProxyWidened: { hosts: Schema.Array(Hostname), item: EnvKey },
   RaiseRatchet: {

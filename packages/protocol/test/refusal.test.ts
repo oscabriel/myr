@@ -74,13 +74,13 @@ describe("the refusal union", () => {
   });
 
   it("sends a cap's limit and wait as JSON keys, and decodes one without them as before", () => {
-    const rate = new CapReached({ cap: 2, limit: "drafts", retryAfter: 60 });
+    const rate = new CapReached({ cap: 2, limit: "claims", retryAfter: 60 });
     const held = new CapReached({ cap: 3 });
 
     expect(JSON.parse(overTheWire(rate))).toStrictEqual({
       _tag: rate._tag,
       cap: 2,
-      limit: "drafts",
+      limit: "claims",
       next: `${Brand.cli} status`,
       retryAfter: 60,
       retryable: true,
@@ -179,8 +179,6 @@ describe("the refusal union", () => {
       "PostureChange",
       "NotDecider",
       "DecisionClosed",
-      "ProposalClosed",
-      "DraftInProgress",
       "DiscussionClosed",
       "UnknownProject",
       "UnknownAsk",
@@ -188,7 +186,6 @@ describe("the refusal union", () => {
       "UnknownDecision",
       "UnknownPath",
       "UnknownRevision",
-      "UnknownProposal",
       "UnknownDiscussion",
       "ProjectExists",
       "NotYourNamespace",
@@ -234,7 +231,6 @@ describe("the refusal union", () => {
       Denounced: false,
       DirectPush: false,
       DiscussionClosed: false,
-      DraftInProgress: true,
       Flake: true,
       HeldBackFailed: false,
       ImportFailed: true,
@@ -251,7 +247,6 @@ describe("the refusal union", () => {
       PostureChange: false,
       PrivatePathInPublicTree: false,
       ProjectExists: false,
-      ProposalClosed: false,
       ReachedInternals: false,
       RepoBusy: true,
       SecretInOutput: false,
@@ -265,7 +260,6 @@ describe("the refusal union", () => {
       UnknownEnvItem: false,
       UnknownPath: false,
       UnknownProject: false,
-      UnknownProposal: false,
       UnknownRevision: false,
       UnstatedRequirement: false,
       ValueTooShort: false,

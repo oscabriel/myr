@@ -6,18 +6,12 @@ import type { RepoHost } from "@repo/artifacts/repo-host";
 import { CheckRunner, shaOf } from "@repo/checks/check-runner";
 import type { CheckAt } from "@repo/checks/check-runner";
 import { CheckRunnerLocal } from "@repo/checks/check-runner/local";
-import { cannedDrafter } from "@repo/drafting/draft-runs/canned";
-import { draftRunsInline } from "@repo/drafting/draft-runs/inline";
-import type { InlinePorts } from "@repo/drafting/draft-runs/inline";
-import type { Drafter } from "@repo/drafting/drafter";
 import { Projects } from "@repo/project/projects";
 import { VerifierBlocked } from "@repo/protocol/refusal";
 import { git } from "@repo/testkit/git";
 import { untouchable } from "@repo/testkit/untouchable";
 import {
   Console,
-  Context,
-  Deferred,
   Duration,
   Effect,
   FileSystem,
@@ -126,25 +120,6 @@ const cartridgesOver =
     };
   };
 
-const withDrafts = (
-  plugIn: PlugIn,
-  ready: Deferred.Deferred<Context.Context<InlinePorts>>,
-  drafter: Context.Context<Drafter>
-): PlugIn => ({
-  project: Layer.merge(
-    plugIn.project ?? Layer.empty,
-    draftRunsInline(Deferred.await(ready))
-  ),
-  worker: Layer.merge(
-    plugIn.worker ?? Layer.empty,
-    Layer.effectDiscard(
-      Effect.flatMap(Effect.context<Projects | RepoHost>(), (ports) =>
-        Deferred.succeed(ready, Context.merge(drafter, ports))
-      )
-    )
-  ),
-});
-
 const CARRY_EVERY = Duration.millis(250);
 
 const serve = Effect.gen(function* () {
@@ -162,13 +137,11 @@ const serve = Effect.gen(function* () {
     () => import("../src/platform.ts")
   );
 
-  const drafter = yield* Layer.build(cannedDrafter);
-  const ready = yield* Deferred.make<Context.Context<InlinePorts>>();
   const plugged = cartridgesOver(cartridges, decodeEnv);
 
   const world = yield* coreLoopWorld({
     checker: localChecker,
-    plugIn: (aside) => withDrafts(plugged(aside), ready, drafter),
+    plugIn: plugged,
     sessions,
   });
 

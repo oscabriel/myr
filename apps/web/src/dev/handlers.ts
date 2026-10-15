@@ -166,10 +166,6 @@ export const devHandlers: Layer.Layer<
         Effect.flatMap(person, (who) =>
           on(project, (api) => api.decide(who, input))
         ),
-      draftAsk: ({ project, ...input }) =>
-        Effect.flatMap(person, (who) =>
-          on(project, (api) => api.draftAsk(who, input))
-        ),
       evidence: ({ project, ref }) =>
         Effect.flatMap(person, (who) =>
           on(project, (api) =>
@@ -186,10 +182,6 @@ export const devHandlers: Layer.Layer<
       finish: ({ project, ...input }) =>
         Effect.flatMap(person, (who) =>
           on(project, (api) => api.finish(who, input))
-        ),
-      flagAsk: ({ project, ...input }) =>
-        Effect.flatMap(person, (who) =>
-          on(project, (api) => api.flagAsk(who, input))
         ),
       fork: ({ project }) =>
         Effect.gen(function* () {
@@ -270,10 +262,6 @@ export const devHandlers: Layer.Layer<
           on(project, (api) => api.postDiscussion(who, input))
         ),
       projectPolicy: ({ project }) => on(project, (api) => api.policy()),
-      proposeAsk: ({ project, ...input }) =>
-        Effect.flatMap(person, (who) =>
-          on(project, (api) => api.proposeAsk(who, input))
-        ),
       readFile: ({ at, path, project }) =>
         code(project, (of) => fileOf(of, Option.fromUndefinedOr(at), path)),
       readTree: ({ at, path, project }) =>
@@ -300,10 +288,6 @@ export const devHandlers: Layer.Layer<
       showDiscussion: ({ discussion, project }) =>
         Effect.flatMap(caller, (who) =>
           on(project, (api) => api.showDiscussion(who, discussion))
-        ),
-      showProposal: ({ project, proposal }) =>
-        Effect.flatMap(caller, (who) =>
-          on(project, (api) => api.showProposal(who, proposal))
         ),
       status: ({ project }) =>
         Effect.gen(function* () {

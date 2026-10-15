@@ -13,7 +13,6 @@ import {
   Handle,
   LandedSha,
   ProjectName,
-  ProposalId,
   RepoPath,
   RequestId,
 } from "@repo/protocol/ids";
@@ -111,12 +110,10 @@ const counter = (prefix: string) => {
 
 export const ids = () => {
   const request = counter("req");
-  const proposal = counter("prop");
   const decision = counter("dec");
 
   return {
     decision: () => DecisionId.make(decision()),
-    proposal: () => ProposalId.make(proposal()),
     request: () => RequestId.make(request()),
   };
 };
@@ -175,11 +172,11 @@ export const aProject = (
     agents: "trailer",
     asks: [],
     at: landed,
-    caps: { claimsPerPerson: 3, proposalsPerPerson: 2 },
+    caps: { claimsPerPerson: 3 },
     claims: { lapseAfterMs: 86_400_000, warnAfterMs: 7_200_000 },
     deciders: [{ handles: deciders, paths: "**" }],
     decisions: { expireDays: 14 },
-    functions: { admit: false, opensAlone: false },
+    functions: { admit: false },
     judge: {
       paths: [`${Brand.configDir}/**`],
       pointers: ["package.json#/scripts"],

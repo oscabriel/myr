@@ -27,7 +27,7 @@ import {
   afterImport,
   useImporter,
 } from "../src/features/import/use-importer.tsx";
-import { ProposalFailure } from "../src/features/proposal/failure.tsx";
+import { CallFailure } from "../src/features/shared/call-failure.tsx";
 import { importHeaders, importSearch, Route } from "../src/routes/import.tsx";
 import { ContractsClient, webContracts } from "../src/surfaces.ts";
 import { markupOf, textIn } from "./markup.ts";
@@ -287,7 +287,7 @@ describe("a refused import", () => {
         handle={oscabriel}
         here="/import"
         refusal={
-          <ProposalFailure
+          <CallFailure
             cause={Cause.fail(refusal)}
             doing="import it"
             here="/import"

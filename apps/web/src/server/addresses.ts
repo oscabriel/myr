@@ -11,7 +11,9 @@ import { Option, Schema } from "effect";
 
 import {
   INBOX_PATH,
+  MOVED_TO_POLICY,
   MOVED_TO_VISIBILITY,
+  policyHref,
   segmentsOf,
   visibilityHref,
 } from "../features/shared/paths.ts";
@@ -125,7 +127,20 @@ const movedPage = (
       );
 };
 
-// A project's old ledger and env pages folded into its Visibility tab (ADR 0041): one move from an old or miscased name too.
+// A project's old ledger and env pages folded into its Visibility tab (ADR 0041), and its old `/people` is its policy
+// page: one move from an old or miscased name too.
+const movedProjectHref = (
+  name: string,
+  page: string,
+  search: string
+): Option.Option<string> =>
+  page === MOVED_TO_POLICY
+    ? Option.some(policyHref(name, search))
+    : Option.map(
+        Option.fromUndefinedOr(MOVED_TO_VISIBILITY.get(page)),
+        (anchor) => visibilityHref(name, anchor, search)
+      );
+
 const movedProjectPage = (
   name: string,
   rest: readonly string[],
@@ -135,10 +150,7 @@ const movedProjectPage = (
 
   return page === undefined || below.length > 0
     ? Option.none()
-    : Option.map(
-        Option.fromUndefinedOr(MOVED_TO_VISIBILITY.get(page)),
-        (anchor) => movedTo(visibilityHref(name, anchor, search))
-      );
+    : Option.map(movedProjectHref(name, page, search), movedTo);
 };
 
 export const canonicalAddress = (request: Request): Option.Option<Response> => {

@@ -196,7 +196,6 @@ export const ProjectStoreSqlite = Layer.effect(
                 ),
                 outbox: yield* all(Tables.outbox),
                 project: Array.head(yield* all(ProjectTable)),
-                proposals: yield* all(Tables.proposals),
                 queue: Option.getOrNull(Array.head(yield* all(QueueTable))),
                 ratchets: yield* all(Tables.ratchets),
               };

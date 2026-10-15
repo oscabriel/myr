@@ -21,7 +21,6 @@ import {
   PolicyInput,
   PolicyPending,
 } from "../src/domain/policy.ts";
-import { DraftNote, Proposal } from "../src/domain/proposal.ts";
 import { CreditSummary } from "../src/domain/record.ts";
 import { RunBlock } from "../src/domain/run.ts";
 import { Territory } from "../src/domain/territory.ts";
@@ -46,7 +45,6 @@ import {
   LayerName,
   PatchId,
   ProjectName,
-  ProposalId,
   RatchetName,
   RepoName,
   RequestId,
@@ -98,7 +96,6 @@ const schemas = {
   Principal,
   ProjectEvent,
   ProjectListing,
-  Proposal,
   RatchetSpec,
   RunBlock,
   Territory,
@@ -164,7 +161,6 @@ describe("the domain schemas", () => {
     ["LayerManifest", LayerManifest],
     ["LandingView", LandingView],
     ["PolicyPending", PolicyPending],
-    ["Proposal", Proposal],
   ] as const)(
     "%s has a JSON Schema with no non-finite numbers and no nulls",
     (_name, schema) => {
@@ -174,19 +170,12 @@ describe("the domain schemas", () => {
     }
   );
 
-  it("keep a draft's note to 2,000 characters", () => {
-    expect([
-      refuses(DraftNote, "x".repeat(2000)),
-      refuses(DraftNote, "x".repeat(2001)),
-    ]).toStrictEqual([false, true]);
-  });
-
   it("fill the defaults for every key the config folder may leave out", () => {
     expect(
       Schema.decodeUnknownSync(PolicyInput)(fixture.withoutDefaults)
     ).toMatchObject({
       agents: "trailer",
-      caps: { claimsPerPerson: 20, proposalsPerPerson: 20 },
+      caps: { claimsPerPerson: 20 },
       claims: { lapseAfterMs: 86_400_000, warnAfterMs: 7_200_000 },
       decisions: { expireDays: 14 },
       record: { countsAfterDays: 30, windowDays: 365 },
@@ -200,8 +189,7 @@ describe("the domain schemas", () => {
 
   it.each([
     ["decisions", { decisions: { expireDays: 0 } }],
-    ["caps", { caps: { claimsPerPerson: 0, proposalsPerPerson: 2 } }],
-    ["caps", { caps: { claimsPerPerson: 3, proposalsPerPerson: -1 } }],
+    ["caps", { caps: { claimsPerPerson: 0 } }],
     ["claims", { claims: { lapseAfterMs: 0, warnAfterMs: 7_200_000 } }],
     ["claims", { claims: { lapseAfterMs: 86_400_000, warnAfterMs: -1 } }],
     ["record", { record: { countsAfterDays: -1, windowDays: 365 } }],
@@ -219,11 +207,11 @@ describe("the domain schemas", () => {
     ).toBeTruthy();
   });
 
-  it("let a project turn proposals off and count a landing at once", () => {
+  it("let a project count a landing at once", () => {
     expect(
       refuses(PolicyInput, {
         ...wire.withoutDefaults,
-        caps: { claimsPerPerson: 1, proposalsPerPerson: 0 },
+        caps: { claimsPerPerson: 1 },
         record: { countsAfterDays: 0, windowDays: 1 },
       })
     ).toBeFalsy();
@@ -279,13 +267,10 @@ describe("names and ids", () => {
     }
   );
 
-  it.each(["me", "layer", "open", "flag"])(
-    "an ask may not be named %j",
-    (name) => {
-      expect(refuses(AskId, name)).toBeTruthy();
-      expect(refuses(ProjectName, `oscabriel/${name}`)).toBeFalsy();
-    }
-  );
+  it.each(["me", "layer", "open"])("an ask may not be named %j", (name) => {
+    expect(refuses(AskId, name)).toBeTruthy();
+    expect(refuses(ProjectName, `oscabriel/${name}`)).toBeFalsy();
+  });
 
   it.each([
     "agents",
@@ -317,7 +302,6 @@ describe("names and ids", () => {
     ["BlobSha", tree, `${tree}0`, BlobSha],
     ["PatchId", patchId, tree, PatchId],
     ["RequestId", "push-33333333", "short", RequestId],
-    ["ProposalId", "prop-000001", "prop-1", ProposalId],
     ["DecisionId", "dec-0a1b2c", "dec_0a1b2c", DecisionId],
     ["LandingId", "land-000001", "-000001", LandingId],
     ["KindName", "lintToZero", "1fix", KindName],

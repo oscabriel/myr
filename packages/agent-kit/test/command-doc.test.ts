@@ -156,21 +156,8 @@ describe(commandDocs, () => {
   it("sorts the commands by their words, so a command's subcommands follow it", () => {
     expect(
       words.filter((name) => name.startsWith("ask") || name.startsWith("env"))
-    ).toStrictEqual([
-      "ask",
-      "ask draft",
-      "ask flag",
-      "ask open",
-      "asks",
-      "env set",
-      "env shape",
-    ]);
-    expect(words.slice(0, 4)).toStrictEqual([
-      "ask",
-      "ask draft",
-      "ask flag",
-      "ask open",
-    ]);
+    ).toStrictEqual(["ask", "ask open", "asks", "env set", "env shape"]);
+    expect(words.slice(0, 2)).toStrictEqual(["ask", "ask open"]);
   });
 
   it("gives a contract a hand-written command calls no row of its own", () => {

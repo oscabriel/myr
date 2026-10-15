@@ -6,26 +6,14 @@ import { Effect, Layer, Ref } from "effect";
 import { RateLimits } from "../rate-limits.ts";
 import type { Limited } from "../rate-limits.ts";
 
-export interface Limits {
-  readonly claim: number;
-  readonly draft: number;
-  readonly post: number;
-  readonly proposal: number;
-}
+export type Limits = Readonly<Record<Limited, number>>;
 
 // Mirrors each binding's `simple.limit` in wrangler.jsonc: a binding can't say its own limit.
-export const WorkerCaps = {
-  claim: 10,
-  draft: 2,
-  post: 5,
-  proposal: 5,
-} as const satisfies Limits;
+export const WorkerCaps = { claim: 10, post: 5 } as const satisfies Limits;
 
 const LIMIT_OF = {
   claim: "claims",
-  draft: "drafts",
   post: "discussions",
-  proposal: "proposals",
 } as const satisfies Record<Limited, CapReached["limit"]>;
 
 // A binding can't say when its window resets, so the whole 60 s period is the honest upper bound.
@@ -39,18 +27,15 @@ const capped = (limits: Limits, kind: Limited) =>
   });
 
 // A binding that fails is a defect: a call it could not count is not let through.
-export const WorkerRateLimits = (bindings: {
-  readonly claim: RateLimit;
-  readonly draft: RateLimit;
-  readonly proposal: RateLimit;
-}): Layer.Layer<RateLimits> =>
+export const WorkerRateLimits = (
+  bindings: Readonly<Record<Limited, RateLimit>>
+): Layer.Layer<RateLimits> =>
   Layer.succeed(
     RateLimits,
     RateLimits.of({
       check: (kind, handle) =>
         Effect.tryPromise(() =>
-          // A post is counted by the proposal binding, under its own cap.
-          bindings[kind === "post" ? "proposal" : kind].limit({
+          bindings[kind].limit({
             key: handle.toLowerCase(),
           })
         ).pipe(

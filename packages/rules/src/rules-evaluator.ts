@@ -1,7 +1,7 @@
 import type { Policy } from "@repo/protocol/domain/policy";
 import type { LandedSha } from "@repo/protocol/ids";
 import { Handle, ProjectName, RepoPath } from "@repo/protocol/ids";
-import { ClaimantFacts, ProposalFacts } from "@repo/sdk/functions";
+import { ClaimantFacts } from "@repo/sdk/functions";
 import { Context, Effect, Schema } from "effect";
 
 /** An empty `modules` means the project has no config folder, so it runs on the defaults. */
@@ -48,23 +48,18 @@ export class RulesFailed extends Schema.TaggedError<RulesFailed>()(
   }
 ) {}
 
-export const RuleName = Schema.Literals(["opensAlone", "admit"]);
+export const RuleName = Schema.Literals(["admit"]);
 
 export type RuleName = typeof RuleName.Type;
 
-export type RuleCall =
-  | { readonly rule: "opensAlone"; readonly facts: ProposalFacts }
-  | { readonly rule: "admit"; readonly facts: ClaimantFacts };
+export interface RuleCall {
+  readonly rule: "admit";
+  readonly facts: ClaimantFacts;
+}
 
-export const factsOf = (call: RuleCall): Effect.Effect<Schema.Json> => {
-  const encoded: Effect.Effect<Schema.Json, Schema.SchemaError> =
-    call.rule === "opensAlone"
-      ? Schema.encodeEffect(ProposalFacts)(call.facts)
-      : Schema.encodeEffect(ClaimantFacts)(call.facts);
-
-  // The facts were typed by the same schemas, so encoding them can't fail.
-  return Effect.orDie(encoded);
-};
+// The facts were typed by the same schema, so encoding them can't fail.
+export const factsOf = (call: RuleCall): Effect.Effect<Schema.Json> =>
+  Effect.orDie(Schema.encodeEffect(ClaimantFacts)(call.facts));
 
 export class RulesEvaluator extends Context.Service<
   RulesEvaluator,

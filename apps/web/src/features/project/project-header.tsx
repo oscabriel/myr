@@ -198,20 +198,19 @@ const Actions = ({
               ? "Its open asks"
               : `${plural(open.takeable, "ask", "asks")} open to take now`
           }
-          hash="open-asks"
-          to={`/${project}`}
+          to={`/${project}/asks`}
         >
           Take an open ask
         </MenuLink>
         <MenuLink
-          detail="A change you want, with a check the agent can draft"
-          to={`/${project}/proposals/new`}
+          detail="A change you want, talked over before it is an ask"
+          to={`/${project}/discussions`}
         >
-          Propose an ask
+          Start a discussion
         </MenuLink>
         <MenuLink
           detail="What lands here and who decides"
-          to={`/${project}/people`}
+          to={`/${project}/policy`}
         >
           Read the policy
         </MenuLink>
@@ -266,21 +265,13 @@ const Facts = ({ facts }: { readonly facts: ProjectHeaderFacts }) => {
 const TAB =
   "text-ui text-muted-foreground hover:text-foreground data-current:border-foreground data-current:text-foreground -mb-px flex h-(--tabs) shrink-0 items-center gap-1.5 border-b-2 border-transparent px-3 whitespace-nowrap no-underline transition-colors duration-[120ms] first:pl-0 focus-visible:outline-offset-[-2px] data-current:font-medium";
 
-/**
- * The router marks a link to the page being read. A tab that opens a region
- * of Overview counts the fragment, so the router marks it only in the browser
- * once the reader has opened that region; every other tab counts the path.
- */
-const activeFor = (hash: string | undefined) => ({
-  exact: true,
-  includeHash: hash !== undefined,
-  includeSearch: false,
-});
+/** The router marks a link to the page being read, by its path. */
+const ACTIVE = { exact: true, includeSearch: false } as const;
 
 /**
  * Text tabs, the current one ink with the 2 px underline. The current tab
  * follows the page's path alone, so the server and the browser draw the same
- * mark, and a region of Overview opened by its tab leaves Overview current.
+ * mark.
  */
 export const ProjectTabs = ({
   current,
@@ -302,15 +293,14 @@ export const ProjectTabs = ({
       data-tabs-fade=""
     >
       <div className="flex [scrollbar-width:none] overflow-x-auto overscroll-x-contain">
-        {projectSections(project).map(({ hash, label, search, tab, to }) => (
+        {projectSections(project).map(({ label, search, tab, to }) => (
           <AppLink
-            activeOptions={activeFor(hash)}
+            activeOptions={ACTIVE}
             aria-current={tab === current ? "page" : undefined}
             className={TAB}
             data-current={tab === current ? "" : undefined}
             key={tab}
             to={to}
-            {...(hash === undefined ? {} : { hash })}
             {...(search === undefined ? {} : { search })}
           >
             {label}

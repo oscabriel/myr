@@ -12,7 +12,7 @@ import { EmptyState } from "../shared/empty.tsx";
 import { FactBlock } from "../shared/facts.tsx";
 import { HandleLink } from "../shared/handle.tsx";
 import { AppLink } from "../shared/link.tsx";
-import { discussionPath } from "../shared/paths.ts";
+import { askPath, discussionPath } from "../shared/paths.ts";
 import { Workspace } from "../shared/shell/workspace.tsx";
 import { When } from "../shared/time.tsx";
 
@@ -23,9 +23,9 @@ const plural = (count: number, one: string, many: string) =>
 
 /** Every state reads as a word beside its mark, never by colour alone. */
 export const STATE_LABEL = {
+  asked: "Became an ask",
   closed: "Closed",
   open: "Open",
-  proposed: "Became a proposal",
 } as const satisfies Record<DiscussionState, string>;
 
 export const openCommand = (project: ProjectName) =>
@@ -68,6 +68,14 @@ const Row = ({
         <When at={listing.lastPostAt} now={now} />
       </span>
       <span>{STATE_LABEL[listing.state]}</span>
+      {listing.ask === undefined ? null : (
+        <AppLink
+          className={`text-mono font-mono ${LINK}`}
+          to={askPath(listing.project, listing.ask)}
+        >
+          {listing.ask}
+        </AppLink>
+      )}
     </p>
   </li>
 );
@@ -76,8 +84,7 @@ const PostFacts = ({ project }: { readonly project: ProjectName }) => (
   <FactBlock label="How to post">
     <p className="text-ui">
       Anyone not denounced may open a thread or reply, from a terminal. A
-      discussion lands nothing itself; a maintainer may turn one into a
-      proposal.
+      discussion lands nothing itself; a maintainer may open an ask from one.
     </p>
     <CommandLine command={openCommand(project)} numbered />
   </FactBlock>

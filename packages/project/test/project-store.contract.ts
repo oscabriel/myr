@@ -8,7 +8,6 @@ import {
   CommitSha,
   Handle,
   LayerName,
-  ProposalId,
   RepoPath,
 } from "@repo/protocol/ids";
 import { DateTime, Effect, Exit, Option, Schema, Struct } from "effect";
@@ -31,7 +30,6 @@ import {
   LedgerRow,
   OutboxRow,
   ProjectRow,
-  ProposalRow,
   PushEventRow,
   RatchetRow,
 } from "../src/project-store/rows.ts";
@@ -139,28 +137,31 @@ const landingOf = (n: number) =>
     sha: sha(n + 1),
   }) satisfies (typeof LandingRow)["Encoded"];
 
-const proposal = {
-  expiresAt: at(30),
-  files: ["asks/time-zones.ask.ts"],
-  id: "prop-000001",
+const discussion = {
+  id: "disc-000001",
   openedAt: at(3),
+  opener: "carol",
+  posts: [
+    {
+      at: at(3),
+      body: "Dates keep their time zone when formatted",
+      by: "carol",
+    },
+  ],
   project: "alice/datekit",
-  proposer: "carol",
   state: "open",
-  want: "Dates keep their time zone when formatted",
-} satisfies (typeof ProposalRow)["Encoded"];
+  title: "Time zones",
+} satisfies (typeof DiscussionRow)["Encoded"];
 
 const decision = {
   deciders: ["alice"],
   default: "decline",
-  evidence: [{ label: "proposer", value: "carol" }],
+  evidence: [{ label: "vouch", value: "carol" }],
   expiresAt: at(30),
   id: "dec-000001",
   openedAt: at(3),
   project: "alice/datekit",
-  subject: DecisionSubject.cases.OpenProposal.make({
-    proposal: ProposalId.make("prop-000001"),
-  }),
+  subject: DecisionSubject.cases.Vouch.make({ handle: Handle.make("carol") }),
 } satisfies (typeof DecisionRow)["Encoded"];
 
 const ratchet = {
@@ -281,7 +282,6 @@ const EncodedSnapshot = Schema.Struct({
   ledger: Schema.Array(LedgerRow),
   outbox: Schema.Array(OutboxRow),
   project: Schema.OptionFromNullOr(ProjectRow),
-  proposals: Schema.Array(ProposalRow),
   queue: Schema.Json,
   ratchets: Schema.Array(RatchetRow),
 });
@@ -300,7 +300,6 @@ const empty = {
   ledger: [],
   outbox: [],
   project: null,
-  proposals: [],
   queue: null,
   ratchets: [],
 };
@@ -375,22 +374,22 @@ export const describeProjectStore = (
       }).pipe(Effect.provide(layer))
     );
 
-    it.effect("loads landings, proposals, decisions and ratchets", () =>
+    it.effect("loads landings, discussions, decisions and ratchets", () =>
       Effect.gen(function* () {
         const store = yield* ProjectStore;
 
         yield* store.commit({
           decisions: decodedAll(DecisionRow, [decision]),
+          discussions: decodedAll(DiscussionRow, [discussion]),
           landings: decodedAll(LandingRow, [landingOf(1), landingOf(2)]),
-          proposals: decodedAll(ProposalRow, [proposal]),
           ratchets: decodedAll(RatchetRow, [ratchet]),
         });
 
         expect(yield* loaded).toStrictEqual({
           ...empty,
           decisions: [decision],
+          discussions: [discussion],
           landings: [landingOf(2), landingOf(1)],
-          proposals: [proposal],
           ratchets: [ratchet],
         });
       }).pipe(Effect.provide(layer))

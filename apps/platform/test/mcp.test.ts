@@ -17,7 +17,6 @@ import {
   Handle,
   LaneName,
   ProjectName,
-  ProposalId,
   RepoPath,
   keyOf,
   RequestId,
@@ -381,17 +380,9 @@ const provoked = {
     args: { project: nowhere },
     refusal: new UnknownProject({ project: nowhere }),
   },
-  draftAsk: {
-    args: { project: nowhere, proposal: ProposalId.make("prop-000001") },
-    refusal: new UnknownProject({ project: nowhere }),
-  },
   finish: {
     args: { ask: fixWeek, base, head, project, requestId },
     refusal: new NotDecider({}),
-  },
-  flagAsk: {
-    args: { ask: nope, project, reason: "the want names a file" },
-    refusal: new UnknownAsk({ ask: nope }),
   },
   fork: {
     args: { project: nowhere },
@@ -447,10 +438,6 @@ const provoked = {
     args: { project: nowhere },
     refusal: new UnknownProject({ project: nowhere }),
   },
-  proposeAsk: {
-    args: { project: nowhere, want },
-    refusal: new UnknownProject({ project: nowhere }),
-  },
   readFile: {
     args: { at: untagged, path: RepoPath.make("README.md"), project },
     refusal: new UnknownRevision({ rev: untagged }),
@@ -472,10 +459,6 @@ const provoked = {
     refusal: new UnknownDiscussion({
       discussion: DiscussionId.make("disc-000001"),
     }),
-  },
-  showProposal: {
-    args: { project: nowhere, proposal: ProposalId.make("prop-000001") },
-    refusal: new UnknownProject({ project: nowhere }),
   },
   status: {
     args: { project: nowhere },

@@ -1,10 +1,5 @@
 // Each key is one string: Reactivity treats every element of a key list as a key of its own.
-import type {
-  AskId,
-  DiscussionId,
-  ProjectName,
-  ProposalId,
-} from "@repo/protocol/ids";
+import type { AskId, DiscussionId, ProjectName } from "@repo/protocol/ids";
 
 export const keys = {
   ask: (project: ProjectName, ask: AskId): readonly string[] => [
@@ -28,9 +23,5 @@ export const keys = {
   ledger: (project: ProjectName): readonly string[] => [`ledger:${project}`],
   policy: (project: ProjectName): readonly string[] => [`policy:${project}`],
   project: (project: ProjectName): readonly string[] => [`project:${project}`],
-  proposal: (project: ProjectName, proposal: ProposalId): readonly string[] => [
-    `proposal:${project}/${proposal}`,
-    `project:${project}`,
-  ],
   today: (): readonly string[] => ["today"],
 };

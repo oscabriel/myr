@@ -76,7 +76,7 @@ const directPush: Rule = (facts) => {
 
 /**
  * A denounced person pushes nothing. An unvouched one pushes to a working
- * fork (a sealed answer, a maintainer's own change) only when the mode says so.
+ * fork (a maintainer's own change) only when the mode says so.
  * A push to a claim's fork is not judged on the vouch again: the claim
  * already passed the kind's `claimers` rule, which may admit a person no one
  * vouched for (an `anyone` kind, a record, a newcomer's mentor).

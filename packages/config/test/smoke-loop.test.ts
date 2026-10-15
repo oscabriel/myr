@@ -20,7 +20,7 @@ import {
   PublicStageRefused,
   smokeLoop,
 } from "../../../scripts/lib/smoke/loop.ts";
-import { DraftNeedsLoop, main } from "../../../scripts/smoke.ts";
+import { main } from "../../../scripts/smoke.ts";
 import { Brand } from "../../brand/src/index.ts";
 import { Handle } from "../../protocol/src/ids.ts";
 
@@ -123,6 +123,7 @@ describe("smokeLoop, against the Node world", () => {
           steps: [
             "people",
             "init",
+            "discussion",
             "open-ask",
             "claim",
             "out-of-scope",
@@ -418,95 +419,5 @@ describe("smoke --loop on prod", () => {
         spawned: [],
       });
     }).pipe(Effect.provide(NodeServices.layer))
-  );
-});
-
-describe("smokeLoop --draft, against the Node world", () => {
-  it.live(
-    "after the loop, the answerer's want is drafted red first by the memory drafter, the maintainer accepts it, and the ask opens disclosing the drafter beside the asker",
-    () =>
-      Effect.gen(function* () {
-        const fs = yield* FileSystem.FileSystem;
-        const path = yield* Path.Path;
-        const dir = yield* fs.makeTempDirectoryScoped({ prefix: "drafting-" });
-
-        const report = yield* Effect.scoped(
-          Effect.gen(function* () {
-            const origin = yield* servedWorld(
-              new Map([
-                [decider, tokens.decider],
-                [answerer, tokens.answerer],
-              ])
-            );
-
-            return yield* smokeLoop({
-              answerer: tokens.answerer,
-              decider: tokens.decider,
-              draft: true,
-              origin,
-              run: "r2",
-              stage: "node",
-            });
-          })
-        ).pipe(
-          Effect.provideService(LedgerFile, path.join(dir, "created.jsonl"))
-        );
-
-        expect({
-          attempts: report.draft?.attempts,
-          model: report.draft?.model,
-          steps: report.timings.map(({ step }) => step).slice(-3),
-          timed: (report.draft?.ms ?? -1) >= 0,
-          trailers: report.draft?.trailers.filter((trailer) =>
-            /^(?:Ask|Asked-by|Assisted-by):/u.test(trailer)
-          ),
-        }).toStrictEqual({
-          attempts: 1,
-          model: "memory",
-          steps: ["draft-propose", "draft-ready", "draft-accept"],
-          timed: true,
-          trailers: [
-            `Asked-by: ${credited("bram")}`,
-            `Assisted-by: ${Brand.cli}-drafter:memory (verified)`,
-            "Ask: ines-v/smoke-r2/parse-ordinal",
-          ],
-        });
-      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
-    240_000
-  );
-});
-
-describe("smoke --draft without --loop", () => {
-  it.live(
-    "is refused with DraftNeedsLoop before any request or process: only the loop has a project to draft on",
-    () =>
-      Effect.gen(function* () {
-        const fetched: string[] = [];
-        const spawner = yield* refusing;
-
-        const result = yield* main([
-          "--stage",
-          "dev-oscabriel",
-          "--draft",
-        ]).pipe(
-          Effect.provide(spawner.layer),
-          Effect.provideService(FetchHttpClient.Fetch, (input) => {
-            fetched.push(new Request(input).url);
-
-            return Promise.reject(new Error("smoke --draft fetched"));
-          }),
-          Effect.result
-        );
-
-        expect({
-          fetched,
-          result,
-          spawned: yield* spawner.asked,
-        }).toStrictEqual({
-          fetched: [],
-          result: Result.fail(new DraftNeedsLoop({ flag: "--draft" })),
-          spawned: [],
-        });
-      }).pipe(Effect.provide(NodeServices.layer))
   );
 });

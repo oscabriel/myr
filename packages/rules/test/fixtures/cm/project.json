@@ -1,13 +1,13 @@
 {
   "agents": "trailer",
   "asks": [],
-  "caps": { "claimsPerPerson": 3, "proposalsPerPerson": 2 },
+  "caps": { "claimsPerPerson": 3 },
   "deciders": [
     { "handles": ["priya"], "paths": "packages/parse/src/public/**" },
     { "handles": "owners", "paths": "**" }
   ],
   "decisions": { "expireDays": 14 },
-  "functions": { "admit": false, "opensAlone": true },
+  "functions": { "admit": true },
   "kinds": [
     {
       "checkKind": "redThenGreen",

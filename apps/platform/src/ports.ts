@@ -5,9 +5,6 @@ import { RepoHostBinding } from "@repo/artifacts/repo-host/binding";
 import type { CheckRunner } from "@repo/checks/check-runner";
 import type { EvidenceStore } from "@repo/checks/evidence-store";
 import { EvidenceStoreR2 } from "@repo/checks/evidence-store/r2";
-import type { Drafter } from "@repo/drafting/drafter";
-import { DrafterWorkersAi } from "@repo/drafting/drafter/binding";
-import { DraftModel } from "@repo/drafting/run";
 import type { Upstream } from "@repo/git/upstream";
 import { UpstreamRepoHost } from "@repo/git/upstream/repo-host";
 import { CodeStoreR2 } from "@repo/project/code-store/binding";
@@ -34,7 +31,6 @@ import { Layer, Option, Redacted } from "effect";
 
 import { CheckRunnerSandbox } from "./adapters/check-runner-sandbox.ts";
 import { DoProjects } from "./adapters/do-projects.ts";
-import { DraftRunsWorkflow } from "./adapters/draft-runs-workflow.ts";
 import { WorkerFetch } from "./adapters/fetch.ts";
 import { LanderSandbox } from "./adapters/lander-sandbox.ts";
 import { WorkerRateLimits } from "./adapters/rate-limits.ts";
@@ -113,17 +109,11 @@ const corePorts = (config: PlatformConfig): Layer.Layer<WorkerPorts> => {
     ),
     DoProjects(config.PROJECT).pipe(Layer.provide(listed)),
     Layer.succeed(ProjectSockets, Option.some(config.PROJECT)),
-    WorkerRateLimits({
-      claim: config.CLAIM_LIMIT,
-      draft: config.DRAFT_LIMIT,
-      proposal: config.PROPOSAL_LIMIT,
-    }),
+    WorkerRateLimits({ claim: config.CLAIM_LIMIT, post: config.POST_LIMIT }),
     EvidenceStoreR2(config.EVIDENCE),
     CodeCacheLive(CODE_READS_KEPT.light, CODE_READS_KEPT.heavy),
     CodeStoreR2(config.CODE_CACHE, coloCache),
-    MetricsBinding(config.METRICS),
-    // Without this entry a draft proposal starts no run, and stays drafting.
-    DraftRunsWorkflow(config.ANSWER)
+    MetricsBinding(config.METRICS)
   ).pipe(
     Layer.provideMerge(RepoHostBinding.layer(config.ARTIFACTS)),
     Layer.provideMerge(WorkerFetch)
@@ -153,9 +143,3 @@ const secretsOf = (config: PlatformConfig): readonly Redacted.Redacted[] => [
 // and a defect's text may name a layer's repo or quote a sealed path.
 export const telemetryOf = (config: PlatformConfig): Layer.Layer<never> =>
   Telemetry({ defects: "name", secrets: secretsOf(config), tracing });
-
-export const draftPorts = (config: PlatformConfig): Layer.Layer<Drafter> =>
-  Layer.merge(
-    DrafterWorkersAi(config.AI, config.DRAFT_MODEL),
-    Layer.succeed(DraftModel, config.DRAFT_MODEL)
-  );

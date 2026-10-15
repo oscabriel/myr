@@ -224,6 +224,36 @@ describe(`${Brand.cli} ask open`, () => {
     { timeout: 30_000 }
   );
 
+  it.live(
+    "sends the discussion --discussion names, so the thread it came from is marked asked",
+    () =>
+      Effect.gen(function* () {
+        const repo = yield* aRepo({});
+        const platform = yield* aPlatform(Effect.succeed(opened));
+
+        const given = [{ content: "given", path: ASK_FILE }];
+
+        const ran = yield* cli(repo, platform.layer, [
+          ...argv,
+          "--files",
+          JSON.stringify(given),
+          "--discussion",
+          "disc-000001",
+        ]);
+
+        expect(ran.code).toBe(0);
+        expect(yield* platform.calls).toStrictEqual([
+          {
+            ask: ASK,
+            discussion: "disc-000001",
+            files: given,
+            project: PROJECT,
+          },
+        ]);
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+    { timeout: 30_000 }
+  );
+
   it.live.each([
     {
       files: {},

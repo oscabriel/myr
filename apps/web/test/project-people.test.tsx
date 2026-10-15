@@ -7,13 +7,16 @@ import { Ledger } from "@repo/protocol/domain/visibility";
 import { ProjectName } from "@repo/protocol/ids";
 import { UnknownProject } from "@repo/protocol/refusal";
 import { asTester, unanswered } from "@repo/protocol/testing";
-import { isNotFound } from "@tanstack/react-router";
+import { isNotFound, isRedirect } from "@tanstack/react-router";
 import { Effect, Layer, Option, Ref, Schema } from "effect";
 import { RpcTest } from "effect/rpc";
 
+import { movedToPolicy } from "../src/features/project-people/moved.ts";
 import { PeopleView } from "../src/features/project-people/people-view.tsx";
 import { projectSections } from "../src/features/shared/shell/sections.ts";
-import { readPeople } from "../src/routes/$owner/$project/people.tsx";
+import { Route as PeopleRoute } from "../src/routes/$owner/$project/people.tsx";
+import { readPeople } from "../src/routes/$owner/$project/policy.tsx";
+import { canonicalAddress } from "../src/server/addresses.ts";
 import { inOrder, markupOf, plainText, textOf } from "./ask-fixtures.ts";
 import { elementWith, elementsWith, factsOf, mainOf } from "./records.ts";
 import { renderAt } from "./render.tsx";
@@ -39,7 +42,7 @@ const datekitPolicy = decodePolicy({
   ...unshown,
   agents: "trailer",
   at: sha,
-  caps: { claimsPerPerson: 3, proposalsPerPerson: 2 },
+  caps: { claimsPerPerson: 3 },
   claims: { lapseAfterMs: 86_400_000, warnAfterMs: 7_200_000 },
   deciders: [
     { handles: ["ines-v"], paths: "**" },
@@ -53,7 +56,7 @@ const datekitPolicy = decodePolicy({
   vouches: [
     { denounced: false, handle: "bram", note: "first answer landed in 0.4.0" },
     { denounced: false, handle: "ines-v", note: "maintainer" },
-    { denounced: true, handle: "spam-bot", note: "opened 40 proposals" },
+    { denounced: true, handle: "spam-bot", note: "opened 40 spam discussions" },
   ],
 });
 
@@ -81,7 +84,7 @@ const burrowPolicy = decodePolicy({
   ...unshown,
   agents: "trailer",
   at: sha,
-  caps: { claimsPerPerson: 3, proposalsPerPerson: 2 },
+  caps: { claimsPerPerson: 3 },
   claims: { lapseAfterMs: 86_400_000, warnAfterMs: 7_200_000 },
   deciders: [{ handles: ["wren"], paths: "**" }],
   decisions: { expireDays: 14 },
@@ -160,17 +163,17 @@ describe("a project's policy page", () => {
   });
 
   it.effect(
-    "reads Policy in the crumbs and the project's sections, at the address it has always had",
+    "reads Policy in the crumbs and the project's sections, at its own address",
     () =>
       Effect.gen(function* () {
-        const markup = yield* renderAt("/oscabriel/datekit/people", page);
+        const markup = yield* renderAt("/oscabriel/datekit/policy", page);
         const crumbs = elementWith(markup, 'aria-label="Breadcrumb"');
 
         expect(plainText(crumbs)).toContain("Policy");
         expect(plainText(crumbs)).not.toContain("People");
         expect(
           projectSections("oscabriel/datekit").find(
-            ({ to }) => to === "/oscabriel/datekit/people"
+            ({ to }) => to === "/oscabriel/datekit/policy"
           )?.label
         ).toBe("Policy");
       })
@@ -206,7 +209,7 @@ describe("a project's policy page", () => {
         "maintainer",
         "Denounced",
         "spam-bot",
-        "opened 40 proposals",
+        "opened 40 spam discussions",
       ])
     ).toBeTruthy();
     expect(vouching).toContain('data-vouch="spam-bot"');
@@ -253,7 +256,6 @@ describe("a project's policy page", () => {
     for (const words of [
       "3 claims at once for a person nobody has vouched for",
       "a vouched person and a maintainer are never held",
-      "2 proposals open at once for a person nobody has vouched for",
       "an undecided one takes its default after 14 days",
       "2 hours",
       "24 hours",
@@ -310,7 +312,7 @@ describe("a project's policy page", () => {
 
     expect(vouching).toContain("Bans only: nobody needs a vouch");
     expect(vouching).toContain(
-      "a denounced person still may not claim, push or propose"
+      "a denounced person still may not claim, push or post"
     );
   });
 
@@ -359,8 +361,10 @@ describe("a project's policy page", () => {
       const doc = commandOf(line);
       const given = line.split(" ").filter((word) => word.startsWith("--"));
 
+      // `--discussion` names the thread an ask came from; a change to the config folder comes from none.
       const payload = (doc?.flags ?? []).filter(
-        (flag) => !["--dry-run", "--json", "--yes"].includes(flag)
+        (flag) =>
+          !["--dry-run", "--json", "--yes", "--discussion"].includes(flag)
       );
 
       expect(
@@ -668,4 +672,44 @@ describe("the people view", () => {
       )
     ).toStrictEqual([]);
   });
+});
+
+const movedTo = (path: string) =>
+  Option.map(
+    canonicalAddress(new Request(`https://web.test${path}`)),
+    (response) => [response.status, response.headers.get("location")]
+  );
+
+describe("the old People address", () => {
+  it("is a 301 to the policy page, the query kept, from an old or miscased name too", () => {
+    expect(movedTo("/oscabriel/datekit/people")).toStrictEqual(
+      Option.some([301, "/oscabriel/datekit/policy"])
+    );
+    expect(movedTo("/datekit/people?x=1")).toStrictEqual(
+      Option.some([301, "/oscabriel/datekit/policy?x=1"])
+    );
+    expect(movedTo("/oscabriel/datekit/people/extra")).toStrictEqual(
+      Option.none()
+    );
+  });
+
+  // The worker answers a document load with its 301; a page kept before the move may still link here.
+  it.effect("sends a navigation inside the app on to the policy page", () =>
+    Effect.gen(function* () {
+      expect(PeopleRoute.options.beforeLoad).toBe(movedToPolicy);
+      expect(
+        yield* Effect.tryPromise({
+          catch: (thrown) =>
+            isRedirect(thrown)
+              ? [thrown.status, thrown.headers.get("location")]
+              : ["not a redirect"],
+          try: () =>
+            movedToPolicy({
+              location: { searchStr: "?x=1" },
+              params: { project: "oscabriel/datekit" },
+            }),
+        }).pipe(Effect.flip)
+      ).toStrictEqual([301, "/oscabriel/datekit/policy?x=1"]);
+    })
+  );
 });

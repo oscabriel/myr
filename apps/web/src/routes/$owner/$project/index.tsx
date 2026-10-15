@@ -17,7 +17,6 @@ import {
 import { SeededAtoms, seedSuccess } from "../../../client/seeded.ts";
 import type { Seed } from "../../../client/seeded.ts";
 import { watchAtom } from "../../../client/watch.ts";
-import { useSignedIn } from "../../../features/auth/session-slot.tsx";
 import { ledeOf } from "../../../features/front/head.ts";
 import {
   markdownAlternateLink,
@@ -110,11 +109,9 @@ const valueOr = <A, E, B>(
 const LiveProject = ({
   data,
   platformUrl,
-  signedIn,
 }: {
   readonly data: ProjectPageData;
   readonly platformUrl: string;
-  readonly signedIn: boolean;
 }) => {
   const { project } = data;
 
@@ -172,7 +169,6 @@ const LiveProject = ({
       now={data.now}
       parents={data.parents}
       platformUrl={platformUrl}
-      signedIn={signedIn}
       stamps={stamps}
       states={states}
       unreachable={AsyncResult.isFailure(asksRead)}
@@ -189,7 +185,6 @@ const ProjectPage = () => {
   );
 
   const { platformUrl } = root.useLoaderData();
-  const signedIn = useSignedIn();
   const { project } = data;
 
   const seeds: readonly Seed[] = [
@@ -212,7 +207,7 @@ const ProjectPage = () => {
 
   return (
     <SeededAtoms id={project} seeds={seeds}>
-      <LiveProject data={data} platformUrl={platformUrl} signedIn={signedIn} />
+      <LiveProject data={data} platformUrl={platformUrl} />
     </SeededAtoms>
   );
 };

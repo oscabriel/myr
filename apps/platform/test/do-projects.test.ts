@@ -1,7 +1,6 @@
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { LogRef } from "@repo/checks/evidence-store";
 import { envSchemaMethod } from "@repo/project/deciders";
-import { DraftResult } from "@repo/project/draft-runs";
 import { FrontPage } from "@repo/project/front-page";
 import { FrontPageMemory } from "@repo/project/front-page/memory";
 import { LandingCommand } from "@repo/project/landing";
@@ -17,14 +16,9 @@ import {
   LandedSha,
   LayerName,
   ProjectName,
-  ProposalId,
   RequestId,
 } from "@repo/protocol/ids";
-import {
-  NotRedFirst,
-  ProjectExists,
-  UnknownProject,
-} from "@repo/protocol/refusal";
+import { ProjectExists, UnknownProject } from "@repo/protocol/refusal";
 import { advanceTo } from "@repo/testkit/clock";
 import { Effect, Fiber, Layer, Option, Redacted, Ref, Schema } from "effect";
 
@@ -93,26 +87,6 @@ const everyMethod = (api: ProjectApi) =>
         decision: DecisionId.make("dec-none0001"),
       })
     ),
-    draftAsk: settled(
-      "draftAsk",
-      api.draftAsk(carol, { proposal: ProposalId.make("prop-000001") })
-    ),
-    draftContext: settled(
-      "draftContext",
-      api.draftContext(ProposalId.make("prop-000001"), 1)
-    ),
-    draftSettled: settled(
-      "draftSettled",
-      api.draftSettled(
-        ProposalId.make("prop-000001"),
-        1,
-        DraftResult.cases.Failed.make({
-          attempts: 1,
-          model: "test-model",
-          refusal: new NotRedFirst({}),
-        })
-      )
-    ),
     [envSchemaMethod]: settled(envSchemaMethod, api[envSchemaMethod](anyone)),
     events: settled("events", api.events(0, 100)),
     evidence: settled(
@@ -124,10 +98,6 @@ const everyMethod = (api: ProjectApi) =>
       api.finish(bob, { ask: parseIso, base: sha, head: sha, requestId })
     ),
     firstPusher: settled("firstPusher", api.firstPusher()),
-    flagAsk: settled(
-      "flagAsk",
-      api.flagAsk(bob, { ask: parseIso, reason: "It names no format." })
-    ),
     fork: settled("fork", api.fork(carol)),
     forks: settled("forks", api.forks()),
     head: settled("head", api.head()),
@@ -154,10 +124,6 @@ const everyMethod = (api: ProjectApi) =>
     postDiscussion: settled(
       "postDiscussion",
       api.postDiscussion(carol, { title: "Which day starts a week?" })
-    ),
-    proposeAsk: settled(
-      "proposeAsk",
-      api.proposeAsk(carol, { want: "Parse ISO week dates." })
     ),
     recordAdmission: settled(
       "recordAdmission",
@@ -187,7 +153,6 @@ const everyMethod = (api: ProjectApi) =>
         repo: forkOf(bob),
       })
     ),
-    rehearseOpen: settled("rehearseOpen", api.rehearseOpen(askFiles())),
     release: settled("release", api.release(bob, parseIso)),
     scanForValues: settled(
       "scanForValues",
@@ -204,10 +169,6 @@ const everyMethod = (api: ProjectApi) =>
     showDiscussion: settled(
       "showDiscussion",
       api.showDiscussion(anyone, DiscussionId.make("disc-000001"))
-    ),
-    showProposal: settled(
-      "showProposal",
-      api.showProposal(anyone, ProposalId.make("prop-000001"))
     ),
     standing: settled("standing", api.standing()),
     status: settled("status", api.status(bob)),

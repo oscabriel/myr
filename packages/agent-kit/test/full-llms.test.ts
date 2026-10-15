@@ -117,8 +117,6 @@ const eventTags: readonly ProjectEvent["_tag"][] = [
   "Landed",
   "Lapsed",
   "LedgerAppended",
-  "ProposalDrafted",
-  "ProposalOpened",
   "Pushed",
   "Released",
   "Warned",
@@ -165,7 +163,7 @@ describe(fullLlms, () => {
     expect(refusals).toContainEqual(
       expect.stringMatching(
         new RegExp(
-          `^\\| \`DraftInProgress\` \\| Decision \\| yes \\| 75 \\| \`${Brand.cli} proposal <proposal>\` \\| .+ \\|$`,
+          `^\\| \`ClaimLapsed\` \\| Push and claim \\| yes \\| 75 \\| \`${Brand.cli} claim <ask>\` \\| .+ \\|$`,
           "u"
         )
       )

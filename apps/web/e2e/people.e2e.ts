@@ -36,7 +36,7 @@ test.describe("the deployed policy page", () => {
         const web = Option.getOrElse(settings.web, () => "");
 
         const response = yield* Effect.promise(() =>
-          browser.goto(`${web}/${project}/people`)
+          browser.goto(`${web}/${project}/policy`)
         );
 
         expect(response?.status()).toBe(200);

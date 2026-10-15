@@ -9,7 +9,6 @@ import {
   KindName,
   LandedSha,
   ProjectName,
-  ProposalId,
 } from "@repo/protocol/ids";
 import { UnknownProject } from "@repo/protocol/refusal";
 import { Clock, DateTime, Effect, Layer, Queue, Ref, Stream } from "effect";
@@ -179,12 +178,11 @@ describe(watchAtom, () => {
   );
 
   it.effect(
-    "invalidates the code and policy reads on Landed, and the proposal's on ProposalDrafted",
+    "invalidates the code and policy reads on Landed, and the discussions on AskOpened, since a thread may have become the ask",
     () =>
       Effect.gen(function* () {
         const reactivity = yield* Reactivity.make;
         const fired: string[] = [];
-        const proposal = ProposalId.make("prop-000001");
 
         const listen = (key: string | undefined, kind: string) =>
           reactivity.registerUnsafe([key ?? ""], () => {
@@ -193,7 +191,7 @@ describe(watchAtom, () => {
 
         listen(keys.code(datekit)[0], "code");
         listen(keys.policy(datekit)[0], "policy");
-        listen(keys.proposal(datekit, proposal)[0], "proposal");
+        listen(keys.discussions(datekit)[0], "discussions");
         listen(keys.project(datekit)[0], projectKey);
 
         const events = yield* Queue.unbounded<ProjectEvent>();
@@ -209,16 +207,22 @@ describe(watchAtom, () => {
 
         yield* Queue.offer(
           events,
-          ProjectEvent.cases.ProposalDrafted.make({
+          ProjectEvent.cases.AskOpened.make({
+            ask: {
+              ask: parseIso,
+              blockedBy: [],
+              claimed: false,
+              kind: KindName.make("fix"),
+              territory: "src/parse.ts",
+              want: "parse reads the year",
+            },
             at,
-            proposal,
-            ready: true,
             seq: 2,
           })
         );
 
-        expect({ drafted: yield* firedNow(fired), landed }).toStrictEqual({
-          drafted: [projectKey, "proposal"],
+        expect({ asked: yield* firedNow(fired), landed }).toStrictEqual({
+          asked: ["discussions", projectKey],
           landed: ["code", "policy", projectKey],
         });
       })

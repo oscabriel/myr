@@ -12,7 +12,6 @@ import {
   kind,
   kinds,
   project,
-  ProposalFacts,
   run,
   territory,
   toAskInput,
@@ -35,8 +34,6 @@ const decodePolicy = Schema.decodeSync(PolicyInput);
 const decodeAsk = Schema.decodeSync(AskInput);
 
 // The rules evaluator is handed facts as unknown JSON and decodes them so.
-const decodeProposal = Schema.decodeUnknownSync(ProposalFacts);
-
 const decodeClaimant = Schema.decodeUnknownSync(ClaimantFacts);
 
 describe("the config folder's project file", () => {
@@ -47,12 +44,11 @@ describe("the config folder's project file", () => {
       checkKind: "redThenGreen",
       claimers: { record: { area: "src/parser", atLeast: 1 } },
       name: "fixBug",
-      opensAlone: (proposal) => proposal.record >= 3,
     });
 
     const definition = project({
       agents: "trailer",
-      caps: { claimsPerPerson: 3, proposalsPerPerson: 2 },
+      caps: { claimsPerPerson: 3 },
       deciders: { "**": "owners", "src/public/**": ["priya"] },
       decisions: { expire: "14 days" },
       kinds: [fixBug],
@@ -66,14 +62,14 @@ describe("the config folder's project file", () => {
     expect(policy).toStrictEqual({
       agents: "trailer",
       asks: [],
-      caps: { claimsPerPerson: 3, proposalsPerPerson: 2 },
+      caps: { claimsPerPerson: 3 },
       claims: { lapseAfterMs: 86_400_000, warnAfterMs: 7_200_000 },
       deciders: [
         { handles: "owners", paths: "**" },
         { handles: ["priya"], paths: "src/public/**" },
       ],
       decisions: { expireDays: 14 },
-      functions: { admit: false, opensAlone: true },
+      functions: { admit: false },
       kinds: [
         {
           checkKind: "redThenGreen",
@@ -199,7 +195,7 @@ describe("the config folder's project file", () => {
       toPolicyInput(
         project({
           agents: "none",
-          caps: { claimsPerPerson: 1, proposalsPerPerson: 4 },
+          caps: { claimsPerPerson: 1 },
           decisions: { expire: "3 weeks" },
           record: { countsAfter: "1 week", window: "180 days" },
           vouch: { file: "MAINTAINERS/vouched.td", mode: "all" },
@@ -209,7 +205,7 @@ describe("the config folder's project file", () => {
 
     expect(written).toMatchObject({
       agents: "none",
-      caps: { claimsPerPerson: 1, proposalsPerPerson: 4 },
+      caps: { claimsPerPerson: 1 },
       decisions: { expireDays: 21 },
       record: { countsAfterDays: 7, windowDays: 180 },
       vouch: { file: "MAINTAINERS/vouched.td", mode: "all" },
@@ -252,11 +248,11 @@ describe("the config folder's project file", () => {
     expect(policy).toStrictEqual({
       agents: "trailer",
       asks: [],
-      caps: { claimsPerPerson: 20, proposalsPerPerson: 20 },
+      caps: { claimsPerPerson: 20 },
       claims: { lapseAfterMs: 86_400_000, warnAfterMs: 7_200_000 },
       deciders: [{ handles: "owners", paths: "**" }],
       decisions: { expireDays: 14 },
-      functions: { admit: false, opensAlone: false },
+      functions: { admit: false },
       kinds: [
         {
           checkKind: "redThenGreen",
@@ -449,69 +445,38 @@ describe("an ask file", () => {
 });
 
 describe("function-valued rules", () => {
-  const trusted = kind({
-    args: { path: Schema.NonEmptyString },
-    check: ({ path }) => check.redThenGreen(path),
-    checkKind: "redThenGreen",
-    name: "trusted",
-    opensAlone: (proposal) => proposal.record >= 3,
+  const definition = project({
+    admit: (claimant) => claimant.vouched || claimant.record > 0,
+    kinds: [kinds.fix],
   });
-
-  const definition = project({ kinds: [kinds.fix, trusted] });
 
   it("are flagged in the data, and left out of it", () => {
     const encoded = toPolicyInput(definition);
     const json = JSON.stringify(encoded);
 
-    expect(encoded.functions).toStrictEqual({
-      admit: false,
-      opensAlone: true,
-    });
+    expect(encoded.functions).toStrictEqual({ admit: true });
     expect(JSON.parse(json)).toStrictEqual(encoded);
     expect(JSON.stringify(definition)).toBe(json);
   });
 
-  it("answer opensAlone on demand, by the proposal's kind", () => {
-    const { opensAlone } = functionsOf(definition);
-
-    const facts = {
-      kind: "trusted",
-      proposer: "carol",
-      record: 3,
-      territory: ".",
-    };
-
-    expect(opensAlone?.(decodeProposal(facts))).toBeTruthy();
-    expect(opensAlone?.(decodeProposal({ ...facts, record: 2 }))).toBeFalsy();
-    expect(opensAlone?.(decodeProposal({ ...facts, kind: "fix" }))).toBeFalsy();
-  });
-
   it("are told only facts that decode as the domain's handles, kinds and counts", () => {
     const facts = {
-      kind: "trusted",
-      proposer: "carol",
-      record: 3,
+      handle: "bram",
+      kind: "fix",
+      record: 0,
       territory: ".",
+      vouched: true,
     };
 
-    expect(() => decodeProposal({ ...facts, proposer: "@carol" })).toThrow(
+    expect(() => decodeClaimant({ ...facts, handle: "bram smith" })).toThrow(
       Schema.SchemaError
     );
-    expect(() => decodeProposal({ ...facts, kind: "Trusted Kind" })).toThrow(
+    expect(() => decodeClaimant({ ...facts, kind: "Trusted Kind" })).toThrow(
       Schema.SchemaError
     );
-    expect(() => decodeProposal({ ...facts, record: -1 })).toThrow(
+    expect(() => decodeClaimant({ ...facts, record: -1 })).toThrow(
       Schema.SchemaError
     );
-    expect(() =>
-      decodeClaimant({
-        handle: "bram smith",
-        kind: "fix",
-        record: 0,
-        territory: ".",
-        vouched: true,
-      })
-    ).toThrow(Schema.SchemaError);
   });
 
   it("flag admit when the project writes one", () => {
@@ -519,10 +484,7 @@ describe("function-valued rules", () => {
       admit: (claimant) => claimant.vouched || claimant.record > 0,
     });
 
-    expect(toPolicyInput(admitting).functions).toStrictEqual({
-      admit: true,
-      opensAlone: false,
-    });
+    expect(toPolicyInput(admitting).functions).toStrictEqual({ admit: true });
     expect(
       functionsOf(admitting).admit?.(
         decodeClaimant({

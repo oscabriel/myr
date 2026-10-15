@@ -1,5 +1,5 @@
 import type { Discussion } from "@repo/protocol/domain/discussion";
-import type { DiscussionId, ProjectName, ProposalId } from "@repo/protocol/ids";
+import type { AskId, DiscussionId, ProjectName } from "@repo/protocol/ids";
 import type { Person } from "@repo/protocol/principal";
 import {
   CapReached,
@@ -118,7 +118,7 @@ const reply = (
   );
 };
 
-/** `transition(state, command, now)`: an open thread takes a post; a closed or proposed one refuses it. */
+/** `transition(state, command, now)`: an open thread takes a post; a closed or asked one refuses it. */
 export const post = (
   command: DiscussionCommand,
   now: DateTime.Utc
@@ -128,11 +128,11 @@ export const post = (
     Reply: (replying) => reply(replying, now),
   });
 
-/** A maintainer's proposal from a thread marks it proposed; only an open thread can be. */
-export const promoted = (
+/** An ask a maintainer opens from a thread marks it asked; only an open thread can be. */
+export const askedFrom = (
   discussion: Discussion,
-  proposal: ProposalId
+  ask: AskId
 ): Result.Result<Discussion, DiscussionClosed> =>
   discussion.state === "open"
-    ? Result.succeed({ ...discussion, proposal, state: "proposed" })
+    ? Result.succeed({ ...discussion, ask, state: "asked" })
     : Result.fail(new DiscussionClosed({ discussion: discussion.id }));

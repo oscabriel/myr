@@ -50,7 +50,6 @@ export const StageName = Schema.String.check(
 export const LanderAdapter = Schema.Literals(["container", "isogit"]);
 
 export const PlatformBindings = Schema.Struct({
-  AI: binding<Env["AI"]>("Workers AI"),
   ANSWER: binding<Env["ANSWER"]>("the Answer Workflow"),
   ARTIFACTS: binding<Env["ARTIFACTS"]>("an Artifacts namespace"),
   ARTIFACTS_PRIVATE: binding<Env["ARTIFACTS_PRIVATE"]>(
@@ -58,7 +57,6 @@ export const PlatformBindings = Schema.Struct({
   ),
   CLAIM_LIMIT: binding<Env["CLAIM_LIMIT"]>("a rate limit"),
   CODE_CACHE: binding<Env["CODE_CACHE"]>("an R2 bucket"),
-  DRAFT_LIMIT: binding<Env["DRAFT_LIMIT"]>("a rate limit"),
   EMAIL: binding<Env["EMAIL"]>("Email Service's send_email"),
   EVIDENCE: binding<Env["EVIDENCE"]>("an R2 bucket"),
   FRONT_PAGE: binding<Env["FRONT_PAGE"]>("a D1 database"),
@@ -66,8 +64,8 @@ export const PlatformBindings = Schema.Struct({
   METRICS: binding<Env["METRICS"]>("an Analytics Engine dataset"),
   OAUTH_KV: binding<Env["OAUTH_KV"]>("a KV namespace"),
   ON_PUSH: binding<Env["ON_PUSH"]>("the OnPush Workflow"),
+  POST_LIMIT: binding<Env["POST_LIMIT"]>("a rate limit"),
   PROJECT: binding<Env["PROJECT"]>("the Project Durable Object"),
-  PROPOSAL_LIMIT: binding<Env["PROPOSAL_LIMIT"]>("a rate limit"),
   RELEASES: binding<Env["RELEASES"]>("an R2 bucket"),
   // The generated `Env` types this as a plain `Fetcher` (an app's types may not name
   // another app's entrypoint), so its methods are declared here by their wire.
@@ -76,7 +74,6 @@ export const PlatformBindings = Schema.Struct({
 });
 
 export const PlatformVars = Schema.Struct({
-  DRAFT_MODEL: Schema.NonEmptyString,
   LANDER_ADAPTER: LanderAdapter.pipe(
     Schema.withDecodingDefaultKey(Effect.succeed("container"))
   ),
@@ -181,10 +178,7 @@ export const platformOn = (
     Layer.succeed(Stage, Stage.of({ name: config.STAGE })),
     Layer.succeed(
       HostInfo,
-      HostInfo.of({
-        draftModel: config.DRAFT_MODEL,
-        webUrl: Option.fromUndefinedOr(config.PUBLIC_WEB_URL),
-      })
+      HostInfo.of({ webUrl: Option.fromUndefinedOr(config.PUBLIC_WEB_URL) })
     )
   ).pipe(Layer.provideMerge(ports));
 

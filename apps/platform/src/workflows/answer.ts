@@ -1,8 +1,5 @@
-// The class name is frozen. Params tagged `Admission` or `Draft` run admissions and
-// draft rounds on this same Workflow, so neither adds a Workflow binding.
-import type { RepoHost } from "@repo/artifacts/repo-host";
-import type { Drafter } from "@repo/drafting/drafter";
-import type { Projects } from "@repo/project/projects";
+// The class name is frozen. Params tagged `Admission` run admissions on this
+// same Workflow, so they add no Workflow binding.
 import { Outcome } from "@repo/protocol/domain/outcome";
 import { annotateInvocation, refusedWith } from "@repo/telemetry/spans";
 import type { InvocationIds } from "@repo/telemetry/spans";
@@ -11,14 +8,12 @@ import type { WorkflowEvent } from "cloudflare:workers";
 import { Effect, Layer, Schema } from "effect";
 
 import type { WorkflowParams } from "../answer-runs.ts";
-import { AdmissionParams, AnswerParams, DraftParams } from "../answer-runs.ts";
+import { AdmissionParams, AnswerParams } from "../answer-runs.ts";
 import { decodeEnv } from "../platform.ts";
-import { draftPorts, telemetryOf, workerPorts } from "../ports.ts";
+import { telemetryOf, workerPorts } from "../ports.ts";
 import { admissionSteps } from "./admission-steps.ts";
 import { runAnswer } from "./answer/program.ts";
 import type { AnswerPorts } from "./answer/program.ts";
-import { draftSteps, timedSteps } from "./draft-steps.ts";
-import type { EngineSteps } from "./draft-steps.ts";
 import { instance, invocation } from "./instance.ts";
 import { workflowSteps } from "./step.ts";
 import type { StepRunner, WorkflowSteps } from "./step.ts";
@@ -79,29 +74,7 @@ export const runAdmission = <E>(
     )
   );
 
-export const runDraftWorkflow = <E>(
-  ports: Layer.Layer<Projects | Drafter | RepoHost, E>,
-  payload: typeof DraftParams.Encoded,
-  steps: EngineSteps
-): Promise<null> =>
-  Effect.runPromise(
-    Effect.gen(function* () {
-      const params = yield* Schema.decodeEffect(DraftParams)(payload);
-
-      return yield* draftSteps(params).pipe(
-        Effect.as(null),
-        invocation({ project: params.project })
-      );
-    }).pipe(
-      instance("Draft.run"),
-      Effect.provide(Layer.merge(ports, workflowSteps(timedSteps(steps)))),
-      Effect.orDie
-    )
-  );
-
 const admits = Schema.is(Schema.toEncoded(AdmissionParams));
-
-const drafts = Schema.is(Schema.toEncoded(DraftParams));
 
 export class Answer extends WorkflowEntrypoint<
   Env,
@@ -109,26 +82,10 @@ export class Answer extends WorkflowEntrypoint<
 > {
   override run(
     event: Readonly<WorkflowEvent<typeof WorkflowParams.Encoded>>,
-    step: EngineSteps
+    step: WorkflowSteps
   ): Promise<OutcomeEncoded | null> {
     const config = decodeEnv(this.env);
     const { payload } = event;
-
-    if (drafts(payload)) {
-      return runDraftWorkflow(
-        Layer.unwrap(
-          Effect.map(config, (decoded) =>
-            Layer.mergeAll(
-              workerPorts(decoded),
-              draftPorts(decoded),
-              telemetryOf(decoded)
-            )
-          )
-        ),
-        payload,
-        step
-      );
-    }
 
     const ports = Layer.unwrap(
       Effect.map(config, (decoded) =>

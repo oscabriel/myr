@@ -49,7 +49,12 @@ export const keysOf = (
 ): readonly string[] =>
   ProjectEvent.match(event, {
     AskClosed: () => [...keys.project(project), ...keys.front()],
-    AskOpened: () => [...keys.project(project), ...keys.front()],
+    // An ask a maintainer opens from a discussion marks that thread asked.
+    AskOpened: () => [
+      ...keys.project(project),
+      ...keys.front(),
+      ...keys.discussions(project),
+    ],
     Claimed: () => keys.project(project),
     Decided: () => keys.project(project),
     DiscussionPosted: ({ discussion }) => [
@@ -65,8 +70,6 @@ export const keysOf = (
     ],
     Lapsed: () => keys.project(project),
     LedgerAppended: () => keys.ledger(project),
-    ProposalDrafted: ({ proposal }) => keys.proposal(project, proposal),
-    ProposalOpened: () => keys.project(project),
     Pushed: ({ ask }) => keys.ask(project, ask),
     Released: () => keys.project(project),
     Warned: ({ ask }) => keys.ask(project, ask),

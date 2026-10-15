@@ -4,13 +4,8 @@ import { Duration, Predicate } from "effect";
 import type { Types } from "effect";
 
 import type { RatchetMeasure } from "./check.ts";
-import { functionsOf, withFunctions } from "./functions.ts";
-import type {
-  Admit,
-  OpensAlone,
-  ProjectFunctions,
-  WithFunctions,
-} from "./functions.ts";
+import { withFunctions } from "./functions.ts";
+import type { Admit, ProjectFunctions, WithFunctions } from "./functions.ts";
 import { kinds as defaultKinds } from "./kind.ts";
 import type { DeclaredKind } from "./kind.ts";
 import { run as runFrom } from "./run.ts";
@@ -36,8 +31,9 @@ export type Span = `${number} ${
 export type Days = `${number} ${"day" | "days" | "week" | "weeks"}`;
 
 /**
- * What a vouch gates: claims and sealed answers (`forCode`), proposals too
- * (`all`), or nothing but denouncements (`bansOnly`).
+ * What a vouch gates: claims (`forCode`, and `all`, which gates nothing more
+ * now that a project takes no proposals), or nothing but denouncements
+ * (`bansOnly`).
  */
 export type VouchMode = PolicyInputEncoded["vouch"] extends
   | { readonly mode: infer M }
@@ -65,12 +61,11 @@ export interface ProjectConfig {
     readonly expire: Days;
   };
   /**
-   * How many claims and open proposals one person nobody has vouched for may hold at once;
-   * a vouched person and a maintainer are never held. Default 20 claims, 20 proposals.
+   * How many claims one person nobody has vouched for may hold at once;
+   * a vouched person and a maintainer are never held. Default 20.
    */
   readonly caps?: {
     readonly claimsPerPerson: number;
-    readonly proposalsPerPerson: number;
   };
   /** How long a claim may go without a push before it is warned, and before it lapses. Default `"2 hours"`, `"24 hours"`. */
   readonly claims?: {
@@ -165,24 +160,6 @@ const ratchetsOf = (
     "measure" in entry ? { ...entry, name } : { measure: entry, name }
   );
 
-// One `opensAlone` for the project: it asks the proposal's kind, and a kind
-// without the rule says no.
-const opensAloneOf = (
-  declared: readonly DeclaredKind[]
-): OpensAlone | undefined => {
-  const rules = new Map(
-    declared.flatMap((each) => {
-      const rule = functionsOf(each).opensAlone;
-
-      return rule === undefined ? [] : [[each.askKind.name, rule] as const];
-    })
-  );
-
-  return rules.size === 0
-    ? undefined
-    : (proposal) => rules.get(proposal.kind)?.(proposal) ?? false;
-};
-
 const define = (
   config: ProjectConfig,
   source: PolicyInputEncoded["source"]
@@ -191,7 +168,6 @@ const define = (
 
   const functions: ProjectFunctions = {
     admit: config.admit,
-    opensAlone: opensAloneOf(declared),
   };
 
   return withFunctions(
@@ -203,7 +179,6 @@ const define = (
       ),
       functions: {
         admit: functions.admit !== undefined,
-        opensAlone: functions.opensAlone !== undefined,
       },
       kinds: declared.map((each) => each.askKind),
       ratchets: ratchetsOf(config.ratchets ?? {}),

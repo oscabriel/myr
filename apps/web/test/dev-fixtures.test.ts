@@ -12,7 +12,6 @@ import {
   DecisionId,
   Handle,
   ProjectName,
-  ProposalId,
   RepoPath,
 } from "@repo/protocol/ids";
 import { OutOfScope } from "@repo/protocol/refusal";
@@ -474,7 +473,7 @@ describe("the dev world's fixtures", seededWorlds, () => {
           }).toStrictEqual({
             dueToday: 1,
             shown: true,
-            waiting: 6,
+            waiting: 4,
           });
           expect([
             mine.newcomers.length > 0,
@@ -650,35 +649,6 @@ describe("the dev world's fixtures", seededWorlds, () => {
     )
   );
 
-  it.live("draft proposals into every state a draft settles in", () =>
-    inWorld(withFixtures, (as) =>
-      Effect.gen(function* () {
-        const anyone = yield* as();
-
-        const shown = yield* Effect.forEach(
-          ["prop-000002", "prop-000003", "prop-000004", "prop-000005"],
-          (id) =>
-            anyone.showProposal({
-              project: vellum,
-              proposal: ProposalId.make(id),
-            })
-        );
-
-        expect(
-          shown.map(({ files, proposal }) => [
-            proposal.draft?._tag,
-            files.length,
-          ])
-        ).toStrictEqual([
-          ["Ready", 3],
-          ["Failed", 0],
-          ["Failed", 3],
-          ["Drafting", 0],
-        ]);
-      })
-    )
-  );
-
   it.live(
     "list landings across three days, tags, and claim forks in every state",
     () =>
@@ -756,22 +726,22 @@ const timesIn = (options: DevWorldOptions) =>
       const ines = yield* as(signedIn("ines-v"));
       const { decisions } = yield* ines.today({});
 
-      const proposedAt = (handle: string, want: string) =>
+      const openedAt = (handle: string, title: string) =>
         Effect.flatMap(as(signedIn(handle)), (client) =>
           Effect.map(
-            client.proposeAsk({
+            client.postDiscussion({
               project: ProjectName.make("oscabriel/datekit"),
-              want,
+              title,
             }),
-            ({ proposal }) => proposal.openedAt
+            ({ discussion }) => discussion.openedAt
           )
         );
 
-      const first = yield* proposedAt("tove", "datekit prints ISO weeks.");
+      const first = yield* openedAt("tove", "ISO weeks in format?");
 
       yield* Effect.sleep(Duration.millis(20));
 
-      const second = yield* proposedAt("sefa", "datekit reads RFC 2822 dates.");
+      const second = yield* openedAt("wren", "RFC 2822 dates?");
 
       return { decisions, first, second };
     })

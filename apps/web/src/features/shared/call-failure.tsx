@@ -4,14 +4,14 @@ import { Cause, Option, Schema } from "effect";
 import { LogIn } from "lucide-react";
 
 import { signInHref } from "../auth/session-slot.tsx";
-import { UnreachableNotice } from "../shared/pending.tsx";
-import { RefusalView } from "../shared/refusal.tsx";
+import { UnreachableNotice } from "./pending.tsx";
+import { RefusalView } from "./refusal.tsx";
 
 const isUnauthenticated = Schema.is(Unauthenticated);
 
 const isRefusal = Schema.is(Refusal);
 
-export const ProposalFailure = ({
+export const CallFailure = ({
   cause,
   doing,
   here,

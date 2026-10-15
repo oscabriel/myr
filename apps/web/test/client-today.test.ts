@@ -48,7 +48,7 @@ describe("Today, through the web's atoms", seededWorld, () => {
         decider: "ines-v",
         newcomers: ["bram"],
         projects: ["oscabriel/datekit"],
-        subjects: ["OpenProposal", "OpenProposal", "OpenProposal", "StrayPush"],
+        subjects: ["StrayPush"],
         unattended: ["diff-in-days-dst"],
       });
     })
@@ -57,7 +57,7 @@ describe("Today, through the web's atoms", seededWorld, () => {
   // The page's atoms live in a registry of the page's own (`SeededAtoms`),
   // the rail's in the root's: a decision taken on the page refetches both.
   it.live(
-    "closes a decision the maintainer declines, and Today refetches without it, on the page and in the rail",
+    "closes a decision the maintainer takes, and Today refetches without it, on the page and in the rail",
     () =>
       Effect.gen(function* () {
         const registry = registryAs(DECIDER);
@@ -68,15 +68,15 @@ describe("Today, through the web's atoms", seededWorld, () => {
         // Read in the rail before the decision, so a refetch is what changes it.
         yield* settled(rail, todayAtom);
 
-        const proposal = Exit.isSuccess(before)
+        const stray = Exit.isSuccess(before)
           ? before.value.decisions.find(({ subject }) =>
-              DecisionSubject.guards.OpenProposal(subject)
+              DecisionSubject.guards.StrayPush(subject)
             )
           : undefined;
 
-        expect(proposal).toBeDefined();
+        expect(stray).toBeDefined();
 
-        if (proposal === undefined) {
+        if (stray === undefined) {
           return;
         }
 
@@ -84,11 +84,11 @@ describe("Today, through the web's atoms", seededWorld, () => {
 
         registry.set(decide, {
           payload: {
-            choice: "decline",
-            decision: proposal.id,
-            project: proposal.project,
+            choice: "adopt",
+            decision: stray.id,
+            project: stray.project,
           },
-          reactivityKeys: [...keys.today(), ...keys.project(proposal.project)],
+          reactivityKeys: [...keys.today(), ...keys.project(stray.project)],
         });
 
         const decided = yield* settled(registry, decide);
@@ -97,7 +97,7 @@ describe("Today, through the web's atoms", seededWorld, () => {
           ? decided.value.decision.decided
           : undefined;
 
-        expect(taken?.choice).toBe("decline");
+        expect(taken?.choice).toBe("adopt");
         expect(
           taken === undefined ? undefined : DateTime.formatIso(taken.at)
         ).toBe("2026-10-07T09:27:00.000Z");
@@ -107,7 +107,7 @@ describe("Today, through the web's atoms", seededWorld, () => {
             Exit.isSuccess(today)
               ? {
                   holds: today.value.decisions.some(
-                    ({ id }) => id === proposal.id
+                    ({ id }) => id === stray.id
                   ),
                 }
               : undefined

@@ -22,8 +22,6 @@ const askOf = (event: ProjectEvent): readonly AskId[] =>
     Lapsed: ({ ask }) => [ask],
     DiscussionPosted: () => [],
     LedgerAppended: () => [],
-    ProposalDrafted: () => [],
-    ProposalOpened: () => [],
     Pushed: ({ ask }) => [ask],
     Released: ({ ask }) => [ask],
     Warned: ({ ask }) => [ask],

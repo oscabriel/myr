@@ -10,7 +10,6 @@ const yesOrNo: readonly Choice[] = ["accept", "decline"];
  */
 export const allowedChoices = DecisionSubject.match({
   Finish: () => yesOrNo,
-  OpenProposal: () => yesOrNo,
   PostureChange: () => yesOrNo,
   ProxyWidened: () => yesOrNo,
   RaiseRatchet: () => yesOrNo,
@@ -27,7 +26,6 @@ export const refWords = (ref: string) => ref.replace(/^refs\/heads\//u, "");
 export const describeSubject = DecisionSubject.match({
   Finish: ({ ask, head }) =>
     `Finish the passing answer to ${ask}, at ${short(head)}`,
-  OpenProposal: ({ proposal }) => `Open the ask proposed in ${proposal}`,
   PostureChange: ({ from, to }) =>
     `Change the project's posture from ${from} to ${to}`,
   ProxyWidened: ({ hosts, item }) =>
@@ -45,7 +43,6 @@ export const describeSubject = DecisionSubject.match({
 
 export const subjectKind = DecisionSubject.match({
   Finish: () => "finish",
-  OpenProposal: () => "proposal",
   PostureChange: () => "posture change",
   ProxyWidened: () => "proxy",
   RaiseRatchet: () => "ratchet",
@@ -69,10 +66,6 @@ const linesOf = (subject: DecisionSubject): Lines =>
       Finish: (): Lines => ({
         no: "Nothing lands; the answer keeps waiting for a finish.",
         yes: "Lands the answer as it is, with you as Finished-by.",
-      }),
-      OpenProposal: (): Lines => ({
-        no: "The proposal closes; nothing lands.",
-        yes: "Opens the ask: its file and check land on main, with you as Decided-by.",
       }),
       PostureChange: ({ from }): Lines => ({
         no: `The answer that changes it is refused; the posture stays ${from}.`,

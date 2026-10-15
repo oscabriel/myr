@@ -21,7 +21,7 @@ export const configFolder = ".cfg";
 export const defaultVouchFile = Schema.decodeSync(PolicyInput)({
   asks: [],
   deciders: [],
-  functions: { admit: false, opensAlone: false },
+  functions: { admit: false },
   kinds: [],
   ratchets: [],
   run: FromCI.make({}),
