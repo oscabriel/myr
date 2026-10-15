@@ -217,7 +217,11 @@ const originOf = (given: string) =>
     }
   );
 
-/** `Credentials` reads back only the current profile, so another profile needs `--url`. */
+/**
+ * The flag, then the variable, then the current profile's platform, then the
+ * platform itself. `Credentials` reads back only the current profile, so
+ * another profile with no flag signs in to the platform itself.
+ */
 const platformOf = (
   flag: Option.Option<string>,
   profile: Option.Option<string>,
@@ -232,20 +236,17 @@ const platformOf = (
       return yield* originOf(named.value);
     }
 
-    const name = profileName(profile, env);
-
     const current =
-      name === profileName(Option.none(), env)
+      profileName(profile, env) === profileName(Option.none(), env)
         ? yield* (yield* Credentials).current
         : Option.none<Profile>();
 
-    if (Option.isSome(current)) {
-      return yield* originOf(current.value.url);
-    }
-
-    return yield* new LoginUsage({
-      reason: `no platform to log in to for profile ${name}: run ${Brand.cli} login --url https://git.${Brand.domain}${Option.isSome(profile) ? ` --profile ${name}` : ""}`,
-    });
+    return yield* originOf(
+      Option.match(current, {
+        onNone: () => Brand.platformUrl,
+        onSome: ({ url }) => url,
+      })
+    );
   });
 
 const tokenFromStdin = Effect.gen(function* () {
@@ -509,7 +510,7 @@ export const login = Command.make(
     ),
     url: Flag.String("url").pipe(
       Flag.withDescription(
-        `The platform's origin, e.g. https://<host> (default: $${SLUG}_URL, else the profile's)`
+        `The platform's origin, e.g. https://<host> (default: $${SLUG}_URL, else the profile's, else ${Brand.platformUrl})`
       ),
       Flag.optional
     ),
@@ -563,7 +564,7 @@ export const login = Command.make(
     })
 ).pipe(
   Command.withDescription(
-    "Sign in to a platform; git and this CLI then use its token."
+    "Sign in (to the platform itself unless --url names another); git and this CLI then use its token."
   )
 );
 

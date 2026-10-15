@@ -28,7 +28,7 @@ export const packageReadme = (input: {
     "## Start",
     "",
     ...fence([
-      `${brand.cli} login --url <platform>`,
+      `${brand.cli} login             # sign in; --url <platform> names another platform`,
       `${brand.cli} asks          # list the open asks you could take`,
       `${brand.cli} claim <ask>   # take one; you get a fork to push your answer to`,
       `${brand.cli} check         # run the gate's checks locally before you push`,

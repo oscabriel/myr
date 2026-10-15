@@ -50,7 +50,7 @@ The CLI comes from the platform itself: the web at `https://myr.technology` serv
 
 ```sh
 curl -fsSL https://myr.technology/install.sh | sh
-myr login --url https://git.myr.technology
+myr login
 myr asks --project oscabriel/datekit
 myr claim <ask> --project oscabriel/datekit
 ```

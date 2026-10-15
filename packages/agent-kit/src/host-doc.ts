@@ -6,7 +6,7 @@ import type { Posture } from "@repo/protocol/posture";
 import { Array as Arr, Option } from "effect";
 
 import type { CommandDoc } from "./command-doc.ts";
-import { installCommand, pushCommand } from "./install.ts";
+import { installCommand, loginCommand, pushCommand } from "./install.ts";
 
 type Command = CommandDoc;
 
@@ -182,7 +182,7 @@ export const frontLlms = (input: {
         "Then sign in once; git pushes to the platform with your token from then on:",
         "",
         "```sh",
-        `${Brand.cli} login --url ${platformUrl}`,
+        loginCommand(platformUrl),
         "```",
         "",
       ],

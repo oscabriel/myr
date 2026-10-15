@@ -4,7 +4,7 @@ import { groups } from "@repo/protocol/refusal";
 import { Array as Arr, Schema } from "effect";
 
 import type { CommandDoc } from "./command-doc.ts";
-import { installCommand } from "./install.ts";
+import { installCommand, loginCommand } from "./install.ts";
 import { mcpServersFor } from "./platform.ts";
 import { span } from "./sections.ts";
 import { code, listed, page, printJson, table } from "./text.ts";
@@ -94,7 +94,7 @@ export const signIn = ({
           label: "Sign in once; git pushes with your token from then on",
           language: "sh",
           name: "Sign in",
-          text: `${Brand.cli} login --url ${platformUrl}`,
+          text: loginCommand(platformUrl),
         },
       ]
     : [];

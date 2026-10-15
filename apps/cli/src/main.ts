@@ -14,7 +14,6 @@ import { holdStdout, Output, OutputLive } from "./output.ts";
 import { CurrentMode, Policy } from "./policy.ts";
 import {
   isTransportFailure,
-  noPlatformOf,
   RemoteClient,
   transportMessage,
 } from "./remote.ts";
@@ -86,9 +85,7 @@ const usageLine = (failure: Failure): Option.Option<string> => {
     return Option.some(hinted(failure) ?? failure.message);
   }
 
-  return isTransportFailure(failure)
-    ? Option.map(noPlatformOf(failure), ({ message }) => message)
-    : Option.none();
+  return Option.none();
 };
 
 const noteFor = (failure: Failure) => {

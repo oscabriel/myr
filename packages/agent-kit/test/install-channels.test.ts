@@ -65,6 +65,17 @@ describe("the Install page's channels", () => {
     ).toStrictEqual([]);
   });
 
+  it("sign in with a bare login on the platform itself, which login defaults to", () => {
+    expect(
+      textsOf(
+        channel(
+          "cli",
+          installChannels({ commands, platformUrl: Brand.platformUrl, webUrl })
+        )
+      )[1]
+    ).toBe(`${Brand.cli} login`);
+  });
+
   it("give Claude Code's settings.json a hook for each event the CLI answers, the edit tools guarded", () => {
     const hooks = channel("cli").snippets.find(({ name }) => name === "Hooks");
 
