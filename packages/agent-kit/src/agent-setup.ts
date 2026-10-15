@@ -248,11 +248,6 @@ export const agentLimits = (): readonly Limit[] => {
       value: `${caps.claimsPerPerson} by default; a vouched person and a maintainer are never held`,
     },
     {
-      limit:
-        "Open proposals one person nobody has vouched for holds, in a project",
-      value: `${caps.proposalsPerPerson} by default; 0 turns proposals off`,
-    },
-    {
       limit: "A claim without a push",
       value: `Warned after ${span(claims.warnAfterMs)}, lapses after ${span(claims.lapseAfterMs)}, by default`,
     },
@@ -261,7 +256,7 @@ export const agentLimits = (): readonly Limit[] => {
       value: `${span(decisions.expireDays * 86_400_000)} by default, then it takes its default`,
     },
     {
-      limit: "Claims, proposals and drafts across the platform, per person",
+      limit: "Claims and discussion posts across the platform, per person",
       value:
         "A set number a minute; past it, CapReached says when to try again",
     },

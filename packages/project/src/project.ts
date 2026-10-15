@@ -4,11 +4,7 @@ import {
   RepoHost,
   Revision,
 } from "@repo/artifacts/repo-host";
-import type {
-  ObjectId,
-  RepoNotFound,
-  TreeEntry,
-} from "@repo/artifacts/repo-host";
+import type { RepoNotFound } from "@repo/artifacts/repo-host";
 import { memoryFs } from "@repo/artifacts/repo-host/memory-fs";
 import { Brand } from "@repo/brand";
 import {
@@ -53,11 +49,9 @@ import {
   Claim as ClaimContract,
   Credits,
   Decide,
-  DraftAsk,
   EnvSchemaOf,
   EvidenceOf,
   Finish,
-  FlagAsk,
   Fork,
   InitProject,
   Land,
@@ -68,12 +62,10 @@ import {
   OpenAsk,
   PolicyOf,
   PostDiscussion,
-  ProposeAsk,
   Release,
   SetEnv,
   ShowAsk,
   ShowDiscussion,
-  ShowProposal,
   Status,
   SubmitAnswer,
   TodayOf,
@@ -90,12 +82,7 @@ import type { Ask, AskListing } from "@repo/protocol/domain/ask";
 import { CheckSpec } from "@repo/protocol/domain/check";
 import type { ClaimView } from "@repo/protocol/domain/claim";
 import { ForkRef } from "@repo/protocol/domain/code";
-import {
-  AtLeastOne,
-  ConfigFile,
-  NoneOrMore,
-  RefNameText,
-} from "@repo/protocol/domain/common";
+import { NoneOrMore, RefNameText } from "@repo/protocol/domain/common";
 import type { Evidence } from "@repo/protocol/domain/common";
 import type { AgentTrailer, Credit } from "@repo/protocol/domain/credit";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
@@ -108,7 +95,6 @@ import { Outcome } from "@repo/protocol/domain/outcome";
 import type { StageName } from "@repo/protocol/domain/outcome";
 import type { ImportSource, PublicPolicy } from "@repo/protocol/domain/policy";
 import { Policy } from "@repo/protocol/domain/policy";
-import type { Proposal } from "@repo/protocol/domain/proposal";
 import {
   AskId,
   CommitSha,
@@ -117,7 +103,6 @@ import {
   Handle,
   LandedSha,
   LayerName,
-  ProposalId,
   RepoName,
   RepoPath,
   RequestId,
@@ -143,14 +128,13 @@ import {
   NotRedFirst,
   NotYourNamespace,
   ProjectExists,
-  ProposalClosed,
   Refusal,
   StaleBase,
   TouchedJudge,
   UnknownAsk,
   UnknownCommit,
+  UnknownDiscussion,
   UnknownProject,
-  UnknownProposal,
   VerifierBlocked,
   WeakCheck,
 } from "@repo/protocol/refusal";
@@ -159,6 +143,7 @@ import type {
   CapReached,
   ClaimLapsed,
   Denounced,
+  DiscussionClosed,
   OutOfScope,
   PrivatePathInPublicTree,
   ReachedInternals,
@@ -199,6 +184,7 @@ import {
 import type { AnswerQueue, AnswerRuns, RunnableEffect } from "./answer-runs.ts";
 import { isStep } from "./answer-runs/steps.ts";
 import { openDecision } from "./attention/decisions.ts";
+import { askedFrom } from "./attention/discussions.ts";
 import { recordOf } from "./attention/record.ts";
 import { capFor, capped, mayClaim, standing } from "./attention/vouch.ts";
 import { Background } from "./background.ts";
@@ -211,7 +197,6 @@ import {
 } from "./claim.ts";
 import type { ClaimStep, Live } from "./claim.ts";
 import {
-  askIdOf,
   deciderDeadlines,
   deciders,
   decidersOn,
@@ -219,18 +204,9 @@ import {
   envSchemaMethod,
   isDecider,
   nextDecisionId,
-  pathsOf,
   strayDecision,
 } from "./deciders.ts";
 import type { DeciderApi, Opening } from "./deciders.ts";
-import {
-  DraftContextData,
-  DraftResult,
-  DraftRuns,
-  EXCERPT_BYTES,
-  Rehearsal,
-} from "./draft-runs.ts";
-import type { Diagnosis } from "./draft-runs.ts";
 import { ProjectEnv } from "./env-port.ts";
 import {
   askClosed,
@@ -403,18 +379,6 @@ export interface ProjectApi extends AnswerQueue, DeciderApi {
   readonly forks: () => Effect.Effect<readonly ForkRef[]>;
   readonly standing: () => Effect.Effect<StandingNow>;
   readonly policy: () => Effect.Effect<PolicyStatus>;
-  readonly draftContext: (
-    proposal: ProposalId,
-    round: number
-  ) => Effect.Effect<DraftContextData, UnknownProposal | ProposalClosed>;
-  readonly rehearseOpen: (
-    files: readonly ConfigFile[]
-  ) => Effect.Effect<Rehearsal, VerifierBlocked | StaleBase>;
-  readonly draftSettled: (
-    proposal: ProposalId,
-    round: number,
-    result: DraftResult
-  ) => Effect.Effect<void>;
   readonly evidence: (
     caller: Principal,
     ref: LogRef
@@ -451,10 +415,12 @@ export interface ProjectApi extends AnswerQueue, DeciderApi {
     caller: Person,
     head: CommitSha
   ) => Effect.Effect<{ readonly landed: LandedSha }, DirectPush>;
+  /** With a discussion named, the thread is marked asked by the ask it became, in the same commit. */
   readonly openAsk: (
     caller: Person,
     input: {
       readonly ask: AskId;
+      readonly discussion?: DiscussionId;
       readonly files: Array.NonEmptyReadonlyArray<AskFile>;
     }
   ) => Effect.Effect<
@@ -466,6 +432,8 @@ export interface ProjectApi extends AnswerQueue, DeciderApi {
     | TouchedJudge
     | VerifierBlocked
     | StaleBase
+    | UnknownDiscussion
+    | DiscussionClosed
   >;
   readonly claim: (
     caller: Person,
@@ -519,8 +487,6 @@ export interface ProjectApi extends AnswerQueue, DeciderApi {
   ) => Effect.Effect<Option.Option<EnvKey>>;
 }
 
-const MAX_DRAFT_PATHS = 50_000;
-
 export type PolicyStatus = typeof PolicyOf.successSchema.Type;
 
 export const MAX_LANDINGS = 100;
@@ -567,21 +533,6 @@ export const MethodSchemas = {
     error: Decide.errorSchema,
     success: Decide.successSchema,
   },
-  draftAsk: {
-    args: [Person, DraftAsk.payloadSchema.mapFields(Struct.omit(["project"]))],
-    error: DraftAsk.errorSchema,
-    success: DraftAsk.successSchema,
-  },
-  draftContext: {
-    args: [ProposalId, AtLeastOne],
-    error: Schema.Union([UnknownProposal, ProposalClosed]),
-    success: DraftContextData,
-  },
-  draftSettled: {
-    args: [ProposalId, AtLeastOne, DraftResult],
-    error: Schema.Never,
-    success: Schema.Void,
-  },
   events: {
     args: [Schema.Int, Schema.Int],
     error: Schema.Never,
@@ -603,11 +554,6 @@ export const MethodSchemas = {
     args: [],
     error: Schema.Never,
     success: Schema.Option(Handle),
-  },
-  flagAsk: {
-    args: [Person, FlagAsk.payloadSchema.mapFields(Struct.omit(["project"]))],
-    error: FlagAsk.errorSchema,
-    success: FlagAsk.successSchema,
   },
   fork: {
     args: [Person],
@@ -676,10 +622,7 @@ export const MethodSchemas = {
   },
   onAlarm: { args: [], error: Schema.Never, success: Schema.Void },
   openAsk: {
-    args: [
-      Person,
-      Schema.Struct({ ask: AskId, files: OpenAsk.payloadSchema.fields.files }),
-    ],
+    args: [Person, OpenAsk.payloadSchema.mapFields(Struct.omit(["project"]))],
     error: OpenAsk.errorSchema,
     success: OpenAsk.successSchema,
   },
@@ -695,17 +638,6 @@ export const MethodSchemas = {
     ],
     error: PostDiscussion.errorSchema,
     success: PostDiscussion.successSchema,
-  },
-  proposeAsk: {
-    args: [
-      Person,
-      // The check reads only `draft`, `files` and `sealed`, which it keeps.
-      ProposeAsk.payloadSchema.mapFields(Struct.omit(["project"]), {
-        unsafePreserveChecks: true,
-      }),
-    ],
-    error: ProposeAsk.errorSchema,
-    success: ProposeAsk.successSchema,
   },
   recordAdmission: {
     args: [AdmissionReport],
@@ -740,11 +672,6 @@ export const MethodSchemas = {
     error: Schema.Never,
     success: Schema.Array(Refusal),
   },
-  rehearseOpen: {
-    args: [Schema.Array(ConfigFile)],
-    error: Schema.Union([VerifierBlocked, StaleBase]),
-    success: Rehearsal,
-  },
   release: {
     args: [Person, AskId],
     error: Release.errorSchema,
@@ -774,11 +701,6 @@ export const MethodSchemas = {
     args: [Principal, DiscussionId],
     error: ShowDiscussion.errorSchema,
     success: ShowDiscussion.successSchema,
-  },
-  showProposal: {
-    args: [Principal, ProposalId],
-    error: ShowProposal.errorSchema,
-    success: ShowProposal.successSchema,
   },
   standing: {
     args: [],
@@ -963,7 +885,6 @@ interface Hydrated {
   readonly outbox: readonly OutboxRow[];
   readonly policy: Option.Option<Policy>;
   readonly project: Option.Option<ProjectRow>;
-  readonly proposals: readonly Proposal[];
   readonly queue: LandingQueue;
   readonly ratchets: readonly RatchetRow[];
   readonly snapshot: ProjectSnapshot;
@@ -985,7 +906,6 @@ interface Writes {
   readonly ledger: Map<number, LedgerRow>;
   readonly outbox: OutboxRow[];
   readonly project: Map<"row", ProjectRow>;
-  readonly proposals: Map<ProposalId, Proposal>;
   readonly pushEvents: PushEventRow[];
   readonly queue: Map<"queue", LandingQueue>;
   readonly ratchets: Map<string, RatchetRow>;
@@ -1006,7 +926,6 @@ const writesOf = (): Writes => ({
   ledger: new Map(),
   outbox: [],
   project: new Map(),
-  proposals: new Map(),
   pushEvents: [],
   queue: new Map(),
   ratchets: new Map(),
@@ -1028,7 +947,6 @@ const isEmpty = (writes: Writes) =>
     writes.ledger.size,
     writes.outbox.length,
     writes.project.size,
-    writes.proposals.size,
     writes.pushEvents.length,
     writes.queue.size,
     writes.ratchets.size,
@@ -1106,11 +1024,6 @@ const snapshotNow = (h: Hydrated, writes: Writes): ProjectSnapshot => {
     project: Option.orElse(
       Option.fromUndefinedOr(writes.project.get("row")),
       () => held.project
-    ),
-    proposals: overlaid(
-      Tables.proposals,
-      held.proposals,
-      writes.proposals.values()
     ),
     ratchets: overlaid(
       Tables.ratchets,
@@ -1616,98 +1529,6 @@ const startOther = (
     }
   );
 
-interface Watch {
-  readonly ran: (
-    lane: LaneName,
-    runs: readonly [CheckRun, CheckRun]
-  ) => Effect.Effect<void>;
-  readonly stdout: boolean;
-}
-
-const unwatched: Watch = { ran: () => Effect.void, stdout: false };
-
-interface Seen {
-  readonly lane: LaneName;
-  readonly runs: readonly [CheckRun, CheckRun];
-}
-
-type FinalRefusal =
-  | IncompleteBrief
-  | NotDecider
-  | NotRedFirst
-  | TouchedJudge
-  | WeakCheck;
-
-const readingOf = (run: CheckRun, lane: LaneName) => {
-  const result = run.lanes.find((each) => each.lane === lane)?.result;
-
-  const signed = run.evidence.some(
-    (each) => each.lane === lane && each.signature !== undefined
-  );
-
-  return result === "failed" && !signed ? "loadError" : (result ?? "blocked");
-};
-
-const notRedBecause = ({ lane, runs }: Seen): Diagnosis => {
-  const readings = runs.map((run) => readingOf(run, lane));
-
-  if (readings.every((reading) => reading === "passed")) {
-    return "Passed";
-  }
-
-  if (readings.includes("blocked")) {
-    return "Blocked";
-  }
-
-  return readings.includes("loadError") ? "LoadError" : "Flaky";
-};
-
-const diagnosisOf = (
-  refusal: FinalRefusal,
-  seen: Option.Option<Seen>
-): Diagnosis =>
-  Match.valueTags(refusal, {
-    IncompleteBrief: (): Diagnosis => "Brief",
-    NotDecider: (): Diagnosis => "Brief",
-    NotRedFirst: () =>
-      Option.match(seen, {
-        onNone: (): Diagnosis => "Brief",
-        onSome: notRedBecause,
-      }),
-    TouchedJudge: (): Diagnosis => "Judge",
-    WeakCheck: ({ weakness }): Diagnosis =>
-      weakness === "no assertion" ? "NoTests" : "Weak",
-  });
-
-const excerptOf = (seen: Option.Option<Seen>) =>
-  Option.match(
-    Option.flatMap(seen, ({ lane, runs: [first, second] }) =>
-      Option.orElse(outputOf(second, lane), () => outputOf(first, lane))
-    ),
-    {
-      onNone: () => "",
-      onSome: (printed) => tailOf(printed, EXCERPT_BYTES).text,
-    }
-  );
-
-const rehearsalRefused = (
-  refusal: FinalRefusal,
-  seen: Option.Option<Seen>
-): Rehearsal =>
-  Rehearsal.cases.Refused.make({
-    diagnosis: diagnosisOf(refusal, seen),
-    excerpt: excerptOf(seen),
-    refusal,
-  });
-
-const redOf = ({ lane, runs }: Seen) => ({
-  lane,
-  signature: Result.match(redFirstOfRuns(runs, lane), {
-    onFailure: () => "red by its count",
-    onSuccess: ({ signature }) => signature,
-  }),
-});
-
 const weakness = (ask: Ask, files: readonly AskFile[]) => {
   const { check } = ask;
 
@@ -1870,7 +1691,6 @@ export const projectService = (
     const generate = yield* ProjectGenerator;
     const visibility = yield* ProjectVisibility;
     const envPort = yield* ProjectEnv;
-    const draftRuns = yield* DraftRuns;
     const metrics = yield* Metrics;
     const background = yield* Background;
     const lock = yield* Semaphore.make(1);
@@ -1917,7 +1737,6 @@ export const projectService = (
         outbox: snapshot.outbox,
         policy,
         project: snapshot.project,
-        proposals: snapshot.proposals,
         queue: yield* queueOf(snapshot.queue),
         ratchets: snapshot.ratchets,
         snapshot,
@@ -2141,7 +1960,6 @@ export const projectService = (
           layers: [...writes.layers.values()],
           ledger: [...writes.ledger.values()],
           outbox,
-          proposals: [...writes.proposals.values()],
           pushEvents: writes.pushEvents,
           ratchets: [...writes.ratchets.values()],
           ...field(
@@ -2205,10 +2023,7 @@ export const projectService = (
       Effect.gen(function* () {
         const ran = yield* withPorts(
           runOutbox(rows, queue, now, store.ackOutbox)
-        ).pipe(
-          Effect.provideService(DraftRuns, draftRuns),
-          Effect.provideService(Metrics, metrics)
-        );
+        ).pipe(Effect.provideService(Metrics, metrics));
 
         yield* store.ackOutbox(ran.done);
 
@@ -3874,12 +3689,7 @@ export const projectService = (
         (refusals) => Array.findFirst(refusals, isTouchedJudge)
       );
 
-    const runTwice = (
-      policy: Policy,
-      ask: Ask,
-      composed: CommitSha,
-      watch: Watch
-    ) =>
+    const runTwice = (policy: Policy, ask: Ask, composed: CommitSha) =>
       Effect.gen(function* () {
         const lane = askCheckLane(policy, ask);
 
@@ -3896,11 +3706,7 @@ export const projectService = (
         const job = {
           ...env,
           at: CheckAt.cases.Commit.make({ commit: composed }),
-          lanes: [
-            watch.stdout
-              ? CheckLane.make({ ...lane.value, output: "stdout" })
-              : lane.value,
-          ],
+          lanes: [lane.value],
           project: name,
           repo,
           run: policy.run,
@@ -3908,19 +3714,12 @@ export const projectService = (
 
         const runs = [yield* runner.run(job), yield* runner.run(job)] as const;
 
-        yield* watch.ran(lane.value.lane, runs);
-
         return { lane: lane.value.lane, runs };
       });
 
-    const redTwice = (
-      policy: Policy,
-      ask: Ask,
-      composed: CommitSha,
-      watch: Watch
-    ) =>
+    const redTwice = (policy: Policy, ask: Ask, composed: CommitSha) =>
       Effect.gen(function* () {
-        const { lane, runs } = yield* runTwice(policy, ask, composed, watch);
+        const { lane, runs } = yield* runTwice(policy, ask, composed);
 
         if (CheckSpec.guards.LintToZero(ask.check)) {
           return yield* redByCount({
@@ -3937,14 +3736,9 @@ export const projectService = (
         return [];
       });
 
-    const callersTwice = (
-      policy: Policy,
-      ask: Ask,
-      composed: CommitSha,
-      watch: Watch
-    ) =>
+    const callersTwice = (policy: Policy, ask: Ask, composed: CommitSha) =>
       Effect.gen(function* () {
-        const { lane, runs } = yield* runTwice(policy, ask, composed, watch);
+        const { lane, runs } = yield* runTwice(policy, ask, composed);
 
         const read = (run: CheckRun) =>
           Effect.fromOption(
@@ -3997,18 +3791,12 @@ export const projectService = (
       readonly h: Hydrated;
       readonly main: LandedSha;
       readonly policy: Policy;
-      readonly watch: Watch;
       readonly writes: Writes;
     }) =>
       Effect.gen(function* () {
         const { ask, composed, files, policy } = input;
 
-        const counts = yield* callersTwice(
-          policy,
-          ask,
-          composed.commit,
-          input.watch
-        );
+        const counts = yield* callersTwice(policy, ask, composed.commit);
 
         const callers: readonly RatchetCount[] = CheckSpec.guards.Migrate(
           ask.check
@@ -4117,8 +3905,7 @@ export const projectService = (
       h: Hydrated,
       writes: Writes,
       now: DateTime.Utc,
-      opening: Opening,
-      watch: Watch
+      opening: Opening
     ) =>
       Effect.gen(function* () {
         const live = liveRow(h);
@@ -4209,14 +3996,13 @@ export const projectService = (
               h,
               main,
               policy,
-              watch,
               writes,
             })
           : {
               asks: Array.make(ask),
               callers: [],
               children: [],
-              counted: yield* redTwice(policy, ask, composed.commit, watch),
+              counted: yield* redTwice(policy, ask, composed.commit),
               files,
               tree: composed.tree,
             };
@@ -4231,13 +4017,7 @@ export const projectService = (
       opening: Opening
     ) =>
       Effect.gen(function* () {
-        const prepared = yield* prepareOpening(
-          h,
-          writes,
-          now,
-          opening,
-          unwatched
-        );
+        const prepared = yield* prepareOpening(h, writes, now, opening);
 
         if (Result.isFailure(prepared)) {
           return prepared.failure;
@@ -4309,177 +4089,48 @@ export const projectService = (
         return { ask: Array.headNonEmpty(opened), landed: landed.sha };
       });
 
-    const openBody =
-      (
-        caller: Person,
-        input: {
-          readonly ask: AskId;
-          readonly files: Array.NonEmptyReadonlyArray<AskFile>;
-        }
-      ) =>
-      (h: Hydrated, writes: Writes, now: DateTime.Utc) =>
-        openFrom(h, writes, now, {
-          ask: input.ask,
-          asker: caller.handle,
-          assisted: [],
-          credits: [{ handle: caller.handle, role: "Asked-by" }],
-          decider: caller,
-          files: input.files,
-        });
-
-    const rehearse = (
-      h: Hydrated,
-      now: DateTime.Utc,
-      files: readonly ConfigFile[]
-    ) =>
-      Effect.gen(function* () {
-        const live = liveRow(h);
-
-        if (Option.isNone(live) || Option.isNone(h.policy)) {
-          return yield* new VerifierBlocked({});
-        }
-
-        const policy = h.policy.value;
-        const ask = askIdOf(files);
-
-        if (Option.isNone(ask) || !Array.isReadonlyArrayNonEmpty(files)) {
-          return rehearsalRefused(
-            new IncompleteBrief({ missing: ["want"] }),
-            Option.none()
-          );
-        }
-
-        const [first] = decidersOn(
-          policy,
-          pathsOf(
-            policy,
-            files.map(({ path }) => path),
-            Option.none()
-          ),
-          live.value.row.initializer
-        );
-
-        const decider = Person.make({ handle: first });
-        const seen = yield* Ref.make(Option.none<Seen>());
-
-        const watch: Watch = {
-          ran: (lane, runs) => Ref.set(seen, Option.some({ lane, runs })),
-          stdout: true,
-        };
-
-        const refused = (refusal: FinalRefusal) =>
-          Effect.map(Ref.get(seen), (runs): Rehearsal =>
-            rehearsalRefused(refusal, runs)
-          );
-
-        return yield* prepareOpening(
-          h,
-          writesOf(),
-          now,
-          {
-            ask: ask.value,
-            asker: decider.handle,
-            assisted: [],
-            credits: [],
-            decider,
-            files,
-          },
-          watch
-        ).pipe(
-          Effect.flatMap((prepared) =>
-            Result.match(prepared, {
-              // An ask by that name is open: its file is the judge now.
-              onFailure: (open) =>
-                refused(new TouchedJudge({ paths: [open.ask.file] })),
-              // Red first ran the check, so the watch saw it.
-              onSuccess: ({ opens }) =>
-                Effect.map(
-                  Effect.orDie(
-                    Effect.flatMap(Ref.get(seen), Effect.fromOption)
-                  ),
-                  (ran): Rehearsal =>
-                    Rehearsal.cases.Red.make({
-                      ...redOf(ran),
-                      tree: opens.tree,
-                    })
-                ),
-            })
-          ),
-          Effect.catchTags({
-            IncompleteBrief: refused,
-            NotDecider: refused,
-            NotRedFirst: refused,
-            TouchedJudge: refused,
-            WeakCheck: refused,
-          })
-        );
-      });
-
-    const pathsAt = (at: LandedSha) => {
-      const walk = (
-        prefix: string,
-        tree: ObjectId
-      ): Effect.Effect<readonly RepoPath[]> =>
-        Effect.flatMap(Effect.orDie(host.readTree(repo, tree)), (entries) =>
-          Effect.map(
-            Effect.forEach(
-              Option.getOrElse(entries, (): readonly TreeEntry[] => []),
-              ({ name: entry, sha, type }) =>
-                type === "tree"
-                  ? walk(`${prefix}${entry}/`, sha)
-                  : Effect.succeed(
-                      type === "blob"
-                        ? [RepoPath.make(`${prefix}${entry}`)]
-                        : []
-                    )
-            ),
-            Array.flatten
-          )
-        );
-
-      return Effect.flatMap(Effect.orDie(host.readCommit(repo, at)), (read) =>
-        Option.match(read, {
-          onNone: () => Effect.succeed([]),
-          onSome: (landed) =>
-            Effect.map(walk("", landed.tree), (paths) =>
-              Array.sort(paths, Order.String).slice(0, MAX_DRAFT_PATHS)
-            ),
-        })
+    const threadOf = (h: Hydrated, writes: Writes, named: DiscussionId) =>
+      Option.orElse(Option.fromUndefinedOr(writes.discussions.get(named)), () =>
+        Array.findFirst(h.discussions, ({ id }) => id === named)
       );
-    };
 
-    const draftContextOf = (proposal: ProposalId, round: number) =>
-      Effect.gen(function* () {
-        const h = yield* hydrate;
-        const found = Array.findFirst(h.proposals, ({ id }) => id === proposal);
+    const openBody =
+      (caller: Person, input: Parameters<ProjectApi["openAsk"]>[1]) =>
+      (h: Hydrated, writes: Writes, now: DateTime.Utc) =>
+        Effect.gen(function* () {
+          // The thread is read before the check runs: only an open one becomes an ask.
+          const thread = yield* Option.match(
+            Option.fromUndefinedOr(input.discussion),
+            {
+              onNone: () => Effect.succeedNone,
+              onSome: (named) =>
+                Option.match(threadOf(h, writes, named), {
+                  onNone: () =>
+                    Effect.fail(new UnknownDiscussion({ discussion: named })),
+                  onSome: (found) =>
+                    Effect.map(
+                      Effect.fromResult(askedFrom(found, input.ask)),
+                      Option.some
+                    ),
+                }),
+            }
+          );
 
-        const live = Option.all({
-          policy: h.policy,
-          row: liveRow(h),
-          wanted: found,
+          const opened = yield* openFrom(h, writes, now, {
+            ask: input.ask,
+            asker: caller.handle,
+            assisted: [],
+            credits: [{ handle: caller.handle, role: "Asked-by" }],
+            decider: caller,
+            files: input.files,
+          });
+
+          if (Option.isSome(thread)) {
+            writes.discussions.set(thread.value.id, thread.value);
+          }
+
+          return opened;
         });
-
-        if (Option.isNone(live)) {
-          return yield* new UnknownProposal({ proposal });
-        }
-
-        const { policy, row, wanted } = live.value;
-
-        if (wanted.state !== "open") {
-          return yield* new ProposalClosed({ proposal });
-        }
-
-        return {
-          at: row.landed,
-          paths: yield* pathsAt(row.landed),
-          policy: publicPolicy(policy),
-          project: name,
-          proposal,
-          round,
-          ...field("territory", Option.fromUndefinedOr(wanted.territory)),
-          want: wanted.want,
-        };
-      });
 
     const trustOf = (
       h: Hydrated,
@@ -5329,7 +4980,6 @@ export const projectService = (
         advanceBody(requestId, command)(h, writes, now),
       enqueue: queueAnswer,
       name,
-      open: openFrom,
       policyAt: withPolicyAt,
       read: hydrate,
       remote: (fork) =>
@@ -5401,24 +5051,6 @@ export const projectService = (
           [caller, input],
           decided.decide(api, caller, input)
         ),
-      draftAsk: (caller, input) =>
-        checked(
-          MethodSchemas.draftAsk,
-          [caller, input],
-          decided.draftAsk(api, caller, input)
-        ),
-      draftContext: (proposal, round) =>
-        checked(
-          MethodSchemas.draftContext,
-          [proposal, round],
-          draftContextOf(proposal, round)
-        ),
-      draftSettled: (proposal, round, result) =>
-        checked(
-          MethodSchemas.draftSettled,
-          [proposal, round, result],
-          decided.draftSettled(api, { proposal, result, round })
-        ),
       events: (since, limit) =>
         checked(
           MethodSchemas.events,
@@ -5446,12 +5078,6 @@ export const projectService = (
                 : Option.none()
             )
           )
-        ),
-      flagAsk: (caller, input) =>
-        checked(
-          MethodSchemas.flagAsk,
-          [caller, input],
-          decided.flagAsk(api, caller, input)
         ),
       fork: (caller) =>
         checked(MethodSchemas.fork, [caller], decided.fork(api, caller)),
@@ -5563,12 +5189,6 @@ export const projectService = (
           [caller, input],
           decided.postDiscussion(api, caller, input)
         ),
-      proposeAsk: (caller, input) =>
-        checked(
-          MethodSchemas.proposeAsk,
-          [caller, input],
-          decided.proposeAsk(api, caller, input)
-        ),
       recordAdmission: (input) =>
         checked(
           MethodSchemas.recordAdmission,
@@ -5624,17 +5244,6 @@ export const projectService = (
         ),
       recordPush: (input) =>
         checked(MethodSchemas.recordPush, [input], write(api, pushBody(input))),
-      rehearseOpen: (files) =>
-        checked(
-          MethodSchemas.rehearseOpen,
-          [files],
-          // Outside the lock: it reads, and writes nothing.
-          Effect.gen(function* () {
-            const h = yield* hydrate;
-
-            return yield* rehearse(h, yield* DateTime.now, files);
-          })
-        ),
       release: (caller, id) =>
         checked(
           MethodSchemas.release,
@@ -5669,12 +5278,6 @@ export const projectService = (
           MethodSchemas.showDiscussion,
           [caller, discussion],
           decided.showDiscussion(discussion)
-        ),
-      showProposal: (caller, proposal) =>
-        checked(
-          MethodSchemas.showProposal,
-          [caller, proposal],
-          decided.showProposal(proposal)
         ),
       standing: () =>
         checked(

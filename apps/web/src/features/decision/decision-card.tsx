@@ -1,8 +1,5 @@
 import type { Decide } from "@repo/protocol/contracts";
-import { DecisionSubject } from "@repo/protocol/domain/decision";
 import type { Choice, Decision } from "@repo/protocol/domain/decision";
-import { DraftState } from "@repo/protocol/domain/proposal";
-import type { ProposalId } from "@repo/protocol/ids";
 import type { DateTime } from "effect";
 import { Option } from "effect";
 import { ChevronDown, Hourglass, Shield } from "lucide-react";
@@ -11,10 +8,9 @@ import type { ReactNode } from "react";
 
 import { Textarea } from "../../components/ui/textarea.tsx";
 import { changedFiles, isFinishDecision, patchOf } from "../finish/patch.ts";
-import { DraftRead, useLiveDraft } from "../proposal/live-draft.ts";
 import { When } from "../shared/time.tsx";
 import { Choices, DecisionRecord } from "./choices.tsx";
-import type { ChoicesLayout, Held } from "./choices.tsx";
+import type { ChoicesLayout } from "./choices.tsx";
 import { DecisionEvidence, FinishLink } from "./evidence.tsx";
 import { describeDefault } from "./subject.ts";
 
@@ -26,24 +22,6 @@ export {
 } from "./subject.ts";
 
 export type DecideInput = typeof Decide.payloadSchema.Type;
-
-const opensAsk = DecisionSubject.isAnyOf(["OpenProposal"]);
-
-const isDraftingNow = DraftState.isAnyOf(["Drafting"]);
-
-const acceptHeld = (read: DraftRead): Option.Option<Held> =>
-  DraftRead.$match(read, {
-    Read: ({ draft }) =>
-      Option.exists(draft, isDraftingNow)
-        ? Option.some({ reason: "Drafting…", waiting: true })
-        : Option.none(),
-    Unread: ({ failed }) =>
-      Option.some(
-        failed
-          ? { reason: "Draft not read; reload", waiting: false }
-          : { reason: "Reading the draft…", waiting: true }
-      ),
-  });
 
 export const ExpiryLines = ({
   decision,
@@ -124,34 +102,11 @@ interface ChoiceProps {
   readonly layout: ChoicesLayout;
 }
 
-/**
- * Read in the browser, so the server never renders an Accept the browser might
- * then hold.
- */
-const ProposalChoices = ({
-  proposal,
-  ...props
-}: ChoiceProps & { readonly proposal: ProposalId }) => {
-  const read = useLiveDraft(props.decision.project, proposal);
-
-  return (
-    <Choices
-      busy={props.busy}
-      decision={props.decision}
-      held={acceptHeld(read)}
-      layout={props.layout}
-      onChoose={props.handleChoose}
-    />
-  );
-};
-
 const Ending = ({
-  draft,
   now,
   stamp,
   ...props
 }: ChoiceProps & {
-  readonly draft: DraftRead | undefined;
   readonly now: DateTime.Utc;
   readonly stamp: boolean;
 }) => {
@@ -164,20 +119,6 @@ const Ending = ({
         decision={decision}
         now={now}
         stamp={stamp}
-      />
-    );
-  }
-
-  if (opensAsk(decision.subject)) {
-    return draft === undefined ? (
-      <ProposalChoices {...props} proposal={decision.subject.proposal} />
-    ) : (
-      <Choices
-        busy={props.busy}
-        decision={decision}
-        held={acceptHeld(draft)}
-        layout={props.layout}
-        onChoose={props.handleChoose}
       />
     );
   }
@@ -202,7 +143,6 @@ export const DecisionCard = ({
   children,
   choices,
   decision,
-  draft,
   expiry = true,
   finishLink = true,
   layout = "grid",
@@ -222,7 +162,6 @@ export const DecisionCard = ({
   readonly finishLink?: boolean;
   readonly layout?: ChoicesLayout;
   readonly stamp?: boolean;
-  readonly draft?: DraftRead | undefined;
 }) => {
   const [note, setNote] = useState("");
 
@@ -242,7 +181,6 @@ export const DecisionCard = ({
     <Ending
       busy={busy}
       decision={decision}
-      draft={draft}
       handleChoose={handleChoose}
       layout={layout}
       now={now}

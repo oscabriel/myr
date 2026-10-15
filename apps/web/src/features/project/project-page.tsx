@@ -1,5 +1,4 @@
 import { IMPORTED_NOTE } from "@repo/agent-kit/docs/imported-note";
-import { Brand } from "@repo/brand";
 import type { Ask, AskListing } from "@repo/protocol/domain/ask";
 import type { FileView, TreeListing } from "@repo/protocol/domain/code";
 import type { Glob } from "@repo/protocol/domain/common";
@@ -17,15 +16,11 @@ import type { DateTime } from "effect";
 import { LockKeyhole } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { signInHref } from "../auth/session-slot.tsx";
 import { ForAgents, Onward, plural } from "../front/facts.tsx";
 import { stillWaiting } from "../front/families.ts";
-import { ProposeLink } from "../propose/propose-link.tsx";
-import { proposeFormPath } from "../propose/propose-view.tsx";
 import type { AskProgress } from "../shared/ask-progress.ts";
 import { LINK } from "../shared/classes.ts";
 import { CommandLine } from "../shared/command.tsx";
-import { EmptyState } from "../shared/empty.tsx";
 import { CommandSlotProvider } from "../shared/keys.tsx";
 import { AppLink } from "../shared/link.tsx";
 import {
@@ -33,11 +28,11 @@ import {
   LEDGER_ANCHOR,
   visibilityPath,
 } from "../shared/paths.ts";
-import { ReadingRows, UnreachableNotice } from "../shared/pending.tsx";
 import { MetaCode, useRowSelection } from "../shared/row.tsx";
 import { GUTTER } from "../shared/shell/gutter.ts";
 import { stageNames, stageRuns } from "../shared/status-line.tsx";
-import { AskList, askListIds, openAsks, openToTake } from "./asks.tsx";
+import { askListIds, OpenAskRows, openAsks, openCount } from "./asks.tsx";
+import type { OpenAskRowsProps } from "./asks.tsx";
 import { LandingList, recentShown } from "./landings.tsx";
 import { CloneSteps } from "./project-header.tsx";
 import { ReadmeSection } from "./readme-section.tsx";
@@ -125,7 +120,6 @@ export interface ProjectViewProps {
   readonly parents?: readonly Ask[];
   readonly states?: ReadonlyMap<AskId, AskProgress>;
   readonly stamps?: ReadonlySet<AskId>;
-  readonly signedIn?: boolean;
 }
 
 /** A plain bordered surface, its headline first (DESIGN.md "Cards"). */
@@ -215,7 +209,7 @@ const WhoDecides = ({
           ) : null}
         </ul>
       )}
-      <Onward to={`/${project}/people`}>Policy</Onward>
+      <Onward to={`/${project}/policy`}>Policy</Onward>
     </AboutCard>
   );
 };
@@ -406,106 +400,21 @@ const RecentLandings = ({
   );
 };
 
-const countOf = (open: readonly AskListing[]) =>
-  `${plural(open.length, "open ask", "open asks")}, ${
-    open.filter(openToTake).length
-  } open to take`;
-
-const AsksSection = ({
-  asks,
-  now,
-  parents,
-  project,
-  selected,
-  stamps,
-  states,
-  unreachable,
-}: {
-  readonly asks: readonly AskListing[] | undefined;
-  readonly now: DateTime.Utc;
-  readonly unreachable: boolean;
-  readonly project: ProjectName;
-  readonly parents: readonly Ask[];
-  readonly states: ReadonlyMap<AskId, AskProgress>;
-  readonly stamps: ReadonlySet<AskId>;
-  readonly selected: string | undefined;
-}) => {
-  let list: ReactNode;
-
-  if (asks === undefined) {
-    list = unreachable ? <UnreachableNotice /> : <ReadingRows />;
-  } else if (asks.length === 0) {
-    list = (
-      <EmptyState
-        command={`${Brand.cli} ask open <ask> --files <files>`}
-        title="No open asks. A maintainer opens one from an ask file."
-      />
-    );
-  } else {
-    list = (
-      <AskList
-        asks={asks}
-        now={now}
-        parents={parents}
-        project={project}
-        selected={selected}
-        stamps={stamps}
-        states={states}
-      />
-    );
-  }
-
-  return (
-    <section
-      aria-labelledby="open-asks"
-      className="flex min-w-0 flex-col gap-2"
-    >
-      <SectionHead
-        count={asks === undefined ? undefined : countOf(openAsks(asks))}
-        id="open-asks"
-        title="Open asks"
-      />
-      {list}
-    </section>
-  );
-};
-
-/**
- * The Proposals tab opens this region until a project's proposals have a
- * page of their own, so the tab keeps the project's header and tabs.
- */
-const ProposalsSection = ({
-  project,
-  signedIn,
-}: {
-  readonly project: ProjectName;
-  readonly signedIn: boolean;
-}) => (
-  <section aria-labelledby="proposals" className="flex min-w-0 flex-col gap-2">
+const AsksSection = (props: OpenAskRowsProps) => (
+  <section aria-labelledby="open-asks" className="flex min-w-0 flex-col gap-2">
     <SectionHead
-      action={signedIn ? <ProposeLink project={project} /> : undefined}
-      id="proposals"
-      title="Proposals"
+      count={
+        props.asks === undefined ? undefined : openCount(openAsks(props.asks))
+      }
+      id="open-asks"
+      title="Open asks"
     />
-    <p className="text-ui text-muted-foreground max-w-(--measure)">
-      A proposal asks a maintainer to open an ask. An agent on the platform
-      drafts its ask file and check, and it expires unless a maintainer accepts
-      it.
-      {signedIn ? null : (
-        <>
-          {" "}
-          <a className={LINK} href={signInHref(proposeFormPath(project))}>
-            Sign in
-          </a>{" "}
-          to propose one.
-        </>
-      )}
-    </p>
+    <OpenAskRows {...props} />
   </section>
 );
 
 /**
- * Overview: open asks, recent landings, proposals and the README in the main column,
+ * Overview: open asks, recent landings and the README in the main column,
  * and the about column beside it from `columns`, under it below.
  */
 const ProjectPanes = ({
@@ -548,10 +457,6 @@ const ProjectPanes = ({
               now={props.now}
               platformUrl={props.platformUrl}
               project={project}
-            />
-            <ProposalsSection
-              project={project}
-              signedIn={props.signedIn === true}
             />
             {code?.readme === undefined ? null : (
               <div className="max-w-(--measure) min-w-0">

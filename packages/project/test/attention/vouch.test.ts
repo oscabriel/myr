@@ -17,7 +17,7 @@ import type { AskKindEncoded } from "@repo/testkit/scenarios";
 import { Result } from "effect";
 
 import type { RecordEntry } from "../../src/attention/record.ts";
-import { mayClaim, mayPropose, standing } from "../../src/attention/vouch.ts";
+import { mayClaim, standing } from "../../src/attention/vouch.ts";
 import type { Standing } from "../../src/attention/vouch.ts";
 
 const now = at("2026-10-07T12:00:00Z");
@@ -409,29 +409,6 @@ describe("the bansOnly mode", () => {
     expect(claim("first-iso", "unknown", { rules: bansOnly })).toStrictEqual(
       allowed
     );
-  });
-});
-
-describe("who may propose", () => {
-  it("lets anyone not denounced propose under forCode, the default", () => {
-    expect(mayPropose(policy, "unknown")).toStrictEqual(allowed);
-    expect(mayPropose(policy, "vouched")).toStrictEqual(allowed);
-    expect(mayPropose(policy, "denounced")).toStrictEqual(denounced);
-  });
-
-  it("needs a vouch under the all mode", () => {
-    const all = inMode("all");
-
-    expect(mayPropose(all, "unknown")).toStrictEqual(notVouched);
-    expect(mayPropose(all, "vouched")).toStrictEqual(allowed);
-    expect(mayPropose(all, "denounced")).toStrictEqual(denounced);
-  });
-
-  it("refuses only the denounced under bansOnly", () => {
-    const bansOnly = inMode("bansOnly");
-
-    expect(mayPropose(bansOnly, "unknown")).toStrictEqual(allowed);
-    expect(mayPropose(bansOnly, "denounced")).toStrictEqual(denounced);
   });
 });
 

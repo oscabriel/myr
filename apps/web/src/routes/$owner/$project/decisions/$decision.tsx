@@ -46,7 +46,7 @@ import {
   marksKey,
   useReadMarks,
 } from "../../../../features/finish/read-marks.ts";
-import { ProposalFailure } from "../../../../features/proposal/failure.tsx";
+import { CallFailure } from "../../../../features/shared/call-failure.tsx";
 import { pageHead } from "../../../../features/shared/head.ts";
 import { personalPage } from "../../../../server/cache-headers.ts";
 import { serverClient } from "../../../../server/client.ts";
@@ -247,11 +247,7 @@ const DecisionPage = () => {
   const here = useLocation({ select: hereOf });
 
   const failure = AsyncResult.isFailure(decided) ? (
-    <ProposalFailure
-      cause={decided.cause}
-      doing="take this decision"
-      here={here}
-    />
+    <CallFailure cause={decided.cause} doing="take this decision" here={here} />
   ) : undefined;
 
   const waiverFiles = useMemo(

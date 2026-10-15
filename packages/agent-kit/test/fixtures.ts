@@ -109,11 +109,11 @@ const encoded: typeof Policy.Encoded = {
     },
   ],
   at: landed,
-  caps: { claimsPerPerson: 3, proposalsPerPerson: 2 },
+  caps: { claimsPerPerson: 3 },
   claims: { lapseAfterMs: 86_400_000, warnAfterMs: 7_200_000 },
   deciders: [{ handles: [askedBy], paths: "**" }],
   decisions: { expireDays: 14 },
-  functions: { admit: false, opensAlone: false },
+  functions: { admit: false },
   judge: {
     paths: [`${Brand.configDir}/**`, "bunfig.toml", "tsconfig.json"],
     pointers: ["package.json#/scripts"],

@@ -135,8 +135,6 @@ const outcomeText = (outcome: Outcome) =>
 const subjectText = (subject: DecisionSubject) =>
   DecisionSubject.match(subject, {
     Finish: ({ ask, head }) => `finish the answer to ${ask} at ${short(head)}`,
-    OpenProposal: ({ proposal }) =>
-      `open the ask proposal ${proposal} asks for`,
     PostureChange: ({ from, to }) => `change the posture from ${from} to ${to}`,
     ProxyWidened: ({ hosts, item }) =>
       `let ${item}'s placeholder reach ${hosts.join(", ")}`,
@@ -204,9 +202,9 @@ const asks = viewOf(ListAsks.successSchema, ({ asks: listed }) =>
 const ask = viewOf(ShowAsk.successSchema, ({ brief }) => prose(brief));
 
 const discussionStates = {
+  asked: "became the ask",
   closed: "closed",
   open: "open",
-  proposed: "became a proposal",
 } as const satisfies Record<Discussion["state"], string>;
 
 const discussions = viewOf(
@@ -216,15 +214,15 @@ const discussions = viewOf(
       table(
         ["discussion", "title", "opener", "posts", "last post", "state"],
         listed.map(
-          ({ id, lastPostAt, opener, posts, proposal, state, title }) => [
+          ({ ask: became, id, lastPostAt, opener, posts, state, title }) => [
             id,
             title,
             opener,
             String(posts),
             when(lastPostAt),
-            proposal === undefined
+            became === undefined
               ? discussionStates[state]
-              : `${discussionStates[state]} ${proposal}`,
+              : `${discussionStates[state]} ${became}`,
           ]
         ),
         "No discussions yet."
@@ -240,9 +238,9 @@ const onward = (discussion: Discussion) => {
     return `Reply with \`${Brand.cli} discussion post ${discussion.id} --body "<post>"\`.`;
   }
 
-  return discussion.proposal === undefined
+  return discussion.ask === undefined
     ? "This discussion is closed."
-    : `This discussion became ${discussion.proposal}: read it with \`${Brand.cli} proposal ${discussion.proposal}\`.`;
+    : `This discussion became the ask ${discussion.ask}: read it with \`${Brand.cli} ask ${discussion.ask}\`.`;
 };
 
 const thread = (discussion: Discussion): View =>
@@ -253,9 +251,9 @@ const thread = (discussion: Discussion): View =>
       ["Opened by", `${discussion.opener} at ${when(discussion.openedAt)}`],
       [
         "State",
-        discussion.proposal === undefined
+        discussion.ask === undefined
           ? discussionStates[discussion.state]
-          : `${discussionStates[discussion.state]} ${discussion.proposal}`,
+          : `${discussionStates[discussion.state]} ${discussion.ask}`,
       ],
     ]),
     ...discussion.posts.map(({ at, body, by }) =>
@@ -467,11 +465,11 @@ const spanOf = (ms: number) => {
 const PROJECT_FILE = `${Brand.configDir}/project.ts`;
 
 const vouchModes = {
-  all: "For everything: claiming an ask, offering a sealed answer and proposing an ask all need a vouch.",
+  all: "For everything, which today gates what for code does: claiming an ask needs a vouch; anyone not denounced may post in a discussion.",
   bansOnly:
-    "Bans only: nobody needs a vouch, but a denounced person still may not claim, push or propose.",
+    "Bans only: nobody needs a vouch, but a denounced person still may not claim, push or post.",
   forCode:
-    "For code: claiming an ask or offering a sealed answer needs a vouch; anyone not denounced may propose an ask.",
+    "For code: claiming an ask needs a vouch; anyone not denounced may post in discussions.",
 } as const satisfies Record<PublicPolicy["vouch"]["mode"], string>;
 
 const evaluated = (policy: PublicPolicy) => {
@@ -499,12 +497,6 @@ const evaluated = (policy: PublicPolicy) => {
       [
         "Claims",
         `${plural(caps.claimsPerPerson, "claim", "claims")} at once for a person nobody has vouched for; a vouched person and a maintainer are never held`,
-      ],
-      [
-        "Proposals",
-        caps.proposalsPerPerson === 0
-          ? "Proposals are off"
-          : `${plural(caps.proposalsPerPerson, "proposal", "proposals")} open at once for a person nobody has vouched for`,
       ],
       [
         "Decisions",

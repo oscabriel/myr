@@ -131,10 +131,7 @@ const defaults = Layer.mergeAll(
   FrontPageMemory.layer({ credits: [], entries: [], projects: [] }),
   Layer.succeed(RepoHost, untouchable<RepoHost["Service"]>("RepoHost")),
   Layer.succeed(Stage, Stage.of({ name: "local" })),
-  Layer.succeed(
-    HostInfo,
-    HostInfo.of({ draftModel: "test-model", webUrl: Option.none() })
-  )
+  Layer.succeed(HostInfo, HostInfo.of({ webUrl: Option.none() }))
 );
 
 export const noProjects = Handlers.pipe(

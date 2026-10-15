@@ -48,13 +48,13 @@ Instead of landing an answer, the platform answers with refusals. Git prints the
 | `NotClaimed` | yes | 75 | `__CLI__ claim <ask>` | Claim the ask, then push again. |
 | `ClaimLapsed` | yes | 75 | `__CLI__ claim <ask>` | Your claim lapsed after a spell without a push: claim the ask again if it is still open. |
 | `NotVouched` | no | 77 | `__CLI__ policy --project <owner>/<name>` | Ask a member of the project to vouch for you. |
-| `CapReached` | yes | 75 | `__CLI__ status` | Read `limit`: for claims, release or land a claim you hold; for proposals, wait for an open one to be decided; for drafts, the proposal has had every draft round it takes; with `retryAfter`, wait that many seconds and try again. |
+| `CapReached` | yes | 75 | `__CLI__ status` | Read `limit`: for claims, release or land a claim you hold; for discussions, wait for one of yours to close; with `retryAfter`, wait that many seconds and try again. |
 | `AskFull` | yes | 75 | `__CLI__ asks` | Someone else holds the claim: pick another ask. |
 | `NoAsk` | no | 66 | `__CLI__ asks` | Push to the fork your claim gave you, which names its ask. |
 | `RepoBusy` | yes | 75 | `git push` | Push again. |
 | `DirectPush` | no | 77 | `__CLI__ fork --project <owner>/<name>` | Main moves only by a landing. A contributor pushes the answer to the claim's fork; a maintainer makes a working fork with `next` and lands it with `land`. |
 | `AskBlocked` | yes | 75 | `__CLI__ asks` | Wait for the asks it names to land, or answer one of them first. |
-| `Denounced` | no | 77 | `__CLI__ policy --project <owner>/<name>` | The project's vouch file denounces you: it takes no claims, proposals or posts from you. |
+| `Denounced` | no | 77 | `__CLI__ policy --project <owner>/<name>` | The project's vouch file denounces you: it takes no claims or posts from you. |
 | `OutOfScope` | no | 65 | `__CLI__ check` | Undo your changes to the paths it names: they are outside the ask's territory. |
 | `TouchedJudge` | no | 65 | `__CLI__ check` | Undo your changes to the paths it names: they decide what the checks do. |
 | `Weakened` | no | 65 | `__CLI__ check` | Take the marker out; a marker without a reason may get one after ` -- ` for a maintainer to weigh, but one a maintainer declined stays out; never raise a ratchet. |

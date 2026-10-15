@@ -4,15 +4,12 @@ import { Contracts } from "@repo/protocol/contracts";
 import { RefNameText } from "@repo/protocol/domain/common";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
 import type { Choice, Decision, Today } from "@repo/protocol/domain/decision";
-import { DraftState } from "@repo/protocol/domain/proposal";
 import {
   AskId,
   CommitSha,
   DecisionId,
   Handle,
-  LaneName,
   ProjectName,
-  ProposalId,
   RepoPath,
 } from "@repo/protocol/ids";
 import { DecisionClosed } from "@repo/protocol/refusal";
@@ -27,7 +24,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { decideAtom } from "../src/client/decide.ts";
 import { keys } from "../src/client/keys.ts";
 import { todayAtom } from "../src/client/today.ts";
-import { DecisionCard } from "../src/features/decision/decision-card.tsx";
 import {
   DecisionRead,
   DecisionView,
@@ -37,12 +33,7 @@ import { patchFiles } from "../src/features/finish/files.ts";
 import { waiverPatchOf } from "../src/features/finish/patch.ts";
 import { InboxView } from "../src/features/inbox/inbox-page.tsx";
 import { Decisions, InboxRead, Takeable } from "../src/features/inbox/read.ts";
-import { ProposalFailure } from "../src/features/proposal/failure.tsx";
-import {
-  DraftRead,
-  draftReadOf,
-  readDraft,
-} from "../src/features/proposal/live-draft.ts";
+import { CallFailure } from "../src/features/shared/call-failure.tsx";
 import { RefusalView } from "../src/features/shared/refusal.tsx";
 import { ContractsClient, webContracts } from "../src/surfaces.ts";
 
@@ -302,194 +293,6 @@ describe("the decide atom", () => {
   );
 });
 
-const acceptOf = (markup: string) =>
-  /<button[^>]*data-choice="accept"[^>]*>/u.exec(markup)?.[0] ?? "";
-
-describe("DecisionCard for an OpenProposal", () => {
-  const askFile = `${Brand.configDir}/asks/x.ask.ts`;
-
-  const proposal = ProposalId.make("prop-000007");
-
-  const opening: Decision = {
-    deciders: [okonkwo],
-    default: "decline",
-    evidence: [
-      { label: "want", value: "formatISO keeps the offset it was given." },
-      {
-        label: askFile,
-        value: 'export default ask({ id: "x", kind: kinds.fix });\n',
-      },
-      { label: "red first", value: "unit: expected '+02:00', got 'Z'" },
-    ],
-    expiresAt: DateTime.makeUnsafe("2026-10-08T10:00:00Z"),
-    id: DecisionId.make("dec-000003"),
-    openedAt: DateTime.makeUnsafe("2026-10-06T10:00:00Z"),
-    project: datekit,
-    subject: DecisionSubject.cases.OpenProposal.make({ proposal }),
-  };
-
-  const card = (draft: DraftState) =>
-    markupOf(
-      <DecisionCard
-        decision={opening}
-        draft={readDraft(draft)}
-        now={now}
-        onDecide={() => {}}
-      />
-    );
-
-  const shown = (draft?: DraftState) => {
-    const wanted = {
-      expiresAt: opening.expiresAt,
-      files: [],
-      id: proposal,
-      openedAt: opening.openedAt,
-      project: datekit,
-      proposer: Handle.make("lin-h"),
-      state: "open" as const,
-      want: "formatISO keeps the offset it was given.",
-    };
-
-    return {
-      files: [],
-      proposal: draft === undefined ? wanted : { ...wanted, draft },
-    };
-  };
-
-  const cardRead = (draft?: DraftState) =>
-    markupOf(
-      <DecisionCard
-        decision={opening}
-        draft={draftReadOf(AsyncResult.success(shown(draft)))}
-        now={now}
-        onDecide={() => {}}
-      />
-    );
-
-  const drafting = DraftState.cases.Drafting.make({
-    round: 2,
-    startedAt: now,
-  });
-
-  const ready = DraftState.cases.Ready.make({
-    attempts: 1,
-    model: "@cf/moonshotai/kimi-k2.7-code",
-    red: { lane: LaneName.make("unit"), signature: "expected '+02:00'" },
-    round: 1,
-  });
-
-  const failed = DraftState.cases.Failed.make({
-    attempts: 3,
-    model: "@cf/moonshotai/kimi-k2.7-code",
-    refusal: "NotRedFirst",
-    round: 2,
-  });
-
-  it("shows a file's path as a heading and its content in a pre", () => {
-    const markup = card(ready);
-
-    expect(markup).toMatch(new RegExp(`<h4[^>]*>${askFile}</h4>`, "u"));
-    expect(markup).toMatch(
-      /<pre[^>]*>export default ask\(\{ id: &quot;x&quot;, kind: kinds\.fix \}\);\n<\/pre>/u
-    );
-    expect(markup).not.toMatch(new RegExp(`<dt[^>]*>${askFile}</dt>`, "u"));
-    expect(markup).toMatch(/<dt[^>]*>red first<\/dt>/u);
-  });
-
-  it("holds Accept while the proposal's draft is drafting", () => {
-    const markup = card(drafting);
-
-    expect(acceptOf(markup)).toContain('disabled=""');
-    expect(markup).toContain("Drafting…");
-    expect(
-      /<button[^>]*data-choice="decline"[^>]*>/u.exec(markup)?.[0]
-    ).not.toContain('disabled=""');
-  });
-
-  it("holds Accept on the server, until the browser has read the draft", () => {
-    const markup = markupOf(
-      <DecisionCard decision={opening} now={now} onDecide={() => {}} />
-    );
-
-    expect(acceptOf(markup)).toContain('disabled=""');
-    expect(markup).toContain("Reading the draft…");
-    expect(draftReadOf(AsyncResult.initial(true))).toStrictEqual(
-      DraftRead.Unread({ failed: false })
-    );
-  });
-
-  it("holds Accept, without a spinner, when the browser could not read the draft", () => {
-    const read = draftReadOf(AsyncResult.failure(Cause.fail("offline")));
-
-    const markup = markupOf(
-      <DecisionCard
-        decision={opening}
-        draft={read}
-        now={now}
-        onDecide={() => {}}
-      />
-    );
-
-    expect(read).toStrictEqual(DraftRead.Unread({ failed: true }));
-    expect(acceptOf(markup)).toContain('disabled=""');
-    expect(markup).toContain("Draft not read; reload");
-    expect(markup).not.toContain("Reading the draft…");
-    expect(
-      /<button[^>]*data-choice="accept"[^>]*>.*?<\/button>/u.exec(markup)?.[0]
-    ).not.toContain('data-slot="spinner"');
-  });
-
-  it("offers Accept once the read draft is ready, failed (an earlier ready draft or the want alone), or the proposal is a want alone", () => {
-    for (const markup of [cardRead(ready), cardRead(failed), cardRead()]) {
-      expect(acceptOf(markup)).not.toContain('disabled=""');
-      expect(markup).not.toContain("Reading the draft…");
-      expect(markup).not.toContain("Drafting…");
-    }
-  });
-
-  it("holds Accept, saying why, while the read draft is drafting", () => {
-    const markup = cardRead(drafting);
-
-    expect(acceptOf(markup)).toContain('disabled=""');
-    expect(markup).toContain("Drafting…");
-    expect(markup).not.toContain("Reading the draft…");
-  });
-
-  it("offers Accept once the draft is ready", () => {
-    const markup = card(ready);
-
-    expect(acceptOf(markup)).not.toContain('disabled=""');
-    expect(markup).not.toContain("Drafting…");
-  });
-
-  it("shows a check at the repo's root as code too", () => {
-    const markup = markupOf(
-      <DecisionCard
-        decision={{
-          ...opening,
-          evidence: [
-            ...opening.evidence,
-            { label: "offset.test.ts", value: "test('keeps +02:00');\n" },
-          ],
-        }}
-        draft={readDraft(ready)}
-        now={now}
-        onDecide={() => {}}
-      />
-    );
-
-    expect(markup).toMatch(/<h4[^>]*>offset\.test\.ts<\/h4>/u);
-    expect(markup).not.toMatch(/<dt[^>]*>offset\.test\.ts<\/dt>/u);
-    expect(markup).toMatch(/<dt[^>]*>want<\/dt>/u);
-  });
-
-  it("links the proposal's page", () => {
-    expect(card(ready)).toContain(
-      'href="/oscabriel/datekit/proposals/prop-000007"'
-    );
-  });
-});
-
 const vellum = ProjectName.make("oscabriel/vellum");
 
 const waiver: Decision = {
@@ -642,7 +445,7 @@ describe(DecisionView, () => {
     const markup = pageOf(
       found,
       undefined,
-      <ProposalFailure
+      <CallFailure
         cause={Cause.fail(closed)}
         doing="take this decision"
         here="/oscabriel/vellum/decisions/dec-000002"
@@ -662,7 +465,7 @@ describe(DecisionView, () => {
     expect(markup).not.toContain("data-choice=");
     expect(markup).not.toContain(".skip(");
     expect(text).toContain("A maintainer takes it on their Today");
-    expect(markup).toContain('href="/oscabriel/vellum/people"');
+    expect(markup).toContain('href="/oscabriel/vellum/policy"');
     expect(text).toContain(`${Brand.cli} today --project oscabriel/vellum`);
   });
 });

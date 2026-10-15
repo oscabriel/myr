@@ -75,6 +75,19 @@ export const visibilityHref = (
   search: string
 ) => `/${project}/visibility${search}#${anchor}`;
 
+/** A project's policy page, which was `/people` until the People tab folded into it. */
+export const policyPath = (project: ProjectName) => `/${project}/policy`;
+
+/** A project's own Asks tab, beside the site's `/asks`. */
+export const projectAsksPath = (project: ProjectName) => `/${project}/asks`;
+
+/** The page of a project that moved to its policy page. */
+export const MOVED_TO_POLICY = "people";
+
+/** Where the old `/people` goes: the policy page, the query as it was spelled. */
+export const policyHref = (project: string, search: string) =>
+  `/${project}/policy${search}`;
+
 export const decisionPath = (project: ProjectName, decision: DecisionId) =>
   `/${project}/decisions/${decision}`;
 

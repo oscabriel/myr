@@ -138,13 +138,3 @@ export const mayClaim = (question: ClaimQuestion): TrustAnswer => {
     ? allowed
     : Result.fail(new NotVouched({}));
 };
-
-export const mayPropose = (policy: Policy, who: Standing): TrustAnswer => {
-  if (who === "denounced") {
-    return Result.fail(new Denounced({}));
-  }
-
-  return policy.vouch.mode === "all" && who !== "vouched"
-    ? Result.fail(new NotVouched({}))
-    : allowed;
-};

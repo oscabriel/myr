@@ -7,7 +7,6 @@ import {
   DiscussionId,
   Handle,
   LandedSha,
-  ProposalId,
 } from "../ids.ts";
 import { AskListing } from "./ask.ts";
 import { Choice } from "./decision.ts";
@@ -27,8 +26,6 @@ export const ProjectEvent = Schema.TaggedUnion({
   Landed: { ...stamp, landing: LandingView },
   Lapsed: { ...stamp, ask: AskId },
   LedgerAppended: { ...stamp, entry: LedgerEntry },
-  ProposalDrafted: { ...stamp, proposal: ProposalId, ready: Schema.Boolean },
-  ProposalOpened: { ...stamp, proposal: ProposalId },
   Pushed: { ...stamp, ask: AskId, head: CommitSha },
   Released: { ...stamp, ask: AskId },
   Warned: { ...stamp, ask: AskId },

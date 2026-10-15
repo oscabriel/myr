@@ -66,33 +66,8 @@
           "openedAt": "2026-10-07T12:00:00.000Z",
           "project": "oscabriel/datekit",
           "subject": {
-            "_tag": "OpenProposal",
-            "proposal": "prop-000001"
-          }
-        }
-      }
-    },
-    "draftAsk": {
-      "payload": {
-        "note": "The test should use UTC.",
-        "project": "oscabriel/datekit",
-        "proposal": "prop-000001"
-      },
-      "success": {
-        "proposal": {
-          "expiresAt": "2026-10-21T12:00:00.000Z",
-          "files": [],
-          "id": "prop-000001",
-          "openedAt": "2026-10-07T12:00:00.000Z",
-          "project": "oscabriel/datekit",
-          "proposer": "dave",
-          "state": "open",
-          "territory": "@datekit/parse",
-          "want": "An ISO week date parses to the Monday of that week.",
-          "draft": {
-            "_tag": "Drafting",
-            "round": 2,
-            "startedAt": "2026-10-07T12:00:00.000Z"
+            "_tag": "Vouch",
+            "handle": "dave"
           }
         }
       }
@@ -149,27 +124,6 @@
         },
         "project": "oscabriel/datekit",
         "requestId": "finish-0001"
-      }
-    },
-    "flagAsk": {
-      "payload": {
-        "ask": "iso-week",
-        "project": "oscabriel/datekit",
-        "reason": "The want names a file."
-      },
-      "success": {
-        "proposal": {
-          "expiresAt": "2026-10-21T12:00:00.000Z",
-          "files": ["config/asks/iso-week.ask.ts"],
-          "id": "prop-000001",
-          "openedAt": "2026-10-07T12:00:00.000Z",
-          "project": "oscabriel/datekit",
-          "proposer": "dave",
-          "state": "open",
-          "territory": "@datekit/parse",
-          "want": "An ISO week date parses to the Monday of that week.",
-          "flags": "iso-week"
-        }
       }
     },
     "postDiscussion": {
@@ -632,8 +586,7 @@
             "expireDays": 14
           },
           "caps": {
-            "claimsPerPerson": 3,
-            "proposalsPerPerson": 2
+            "claimsPerPerson": 3
           },
           "claims": {
             "lapseAfterMs": 86400000,
@@ -712,39 +665,6 @@
           ],
           "weakening": {
             "markers": [".skip(", "@ts-ignore"]
-          }
-        }
-      }
-    },
-    "proposeAsk": {
-      "payload": {
-        "files": [
-          {
-            "content": "export default ask({ want: \"An ISO week date parses.\" });\n",
-            "path": "config/asks/iso-week.ask.ts"
-          }
-        ],
-        "project": "oscabriel/datekit",
-        "sealed": {
-          "head": "3333333333333333333333333333333333333333"
-        },
-        "territory": "@datekit/parse",
-        "want": "An ISO week date parses to the Monday of that week."
-      },
-      "success": {
-        "proposal": {
-          "expiresAt": "2026-10-21T12:00:00.000Z",
-          "files": ["config/asks/iso-week.ask.ts"],
-          "id": "prop-000001",
-          "openedAt": "2026-10-07T12:00:00.000Z",
-          "project": "oscabriel/datekit",
-          "proposer": "dave",
-          "state": "open",
-          "territory": "@datekit/parse",
-          "want": "An ISO week date parses to the Monday of that week.",
-          "sealed": {
-            "fork": "datekit--me--dave",
-            "head": "3333333333333333333333333333333333333333"
           }
         }
       }
@@ -969,41 +889,6 @@
         "truncated": false
       }
     },
-    "showProposal": {
-      "payload": {
-        "project": "oscabriel/datekit",
-        "proposal": "prop-000001"
-      },
-      "success": {
-        "files": [
-          {
-            "content": "export default ask({ want: \"An ISO week date parses.\" });\n",
-            "path": "config/asks/iso-week.ask.ts"
-          }
-        ],
-        "proposal": {
-          "expiresAt": "2026-10-21T12:00:00.000Z",
-          "files": ["config/asks/iso-week.ask.ts"],
-          "id": "prop-000001",
-          "openedAt": "2026-10-07T12:00:00.000Z",
-          "project": "oscabriel/datekit",
-          "proposer": "dave",
-          "state": "open",
-          "territory": "@datekit/parse",
-          "want": "An ISO week date parses to the Monday of that week.",
-          "draft": {
-            "_tag": "Ready",
-            "attempts": 2,
-            "model": "@cf/moonshotai/kimi-k2.7-code",
-            "red": {
-              "lane": "unit",
-              "signature": "expected 2026-01-05, got undefined"
-            },
-            "round": 1
-          }
-        }
-      }
-    },
     "listDiscussions": {
       "payload": {
         "project": "oscabriel/datekit"
@@ -1017,9 +902,9 @@
             "opener": "dave",
             "posts": 2,
             "project": "oscabriel/datekit",
-            "state": "proposed",
-            "proposal": "prop-000001",
-            "title": "Which day starts a week?"
+            "state": "asked",
+            "title": "Which day starts a week?",
+            "ask": "iso-week"
           }
         ]
       }
@@ -1047,9 +932,9 @@
             }
           ],
           "project": "oscabriel/datekit",
-          "state": "proposed",
-          "proposal": "prop-000001",
-          "title": "Which day starts a week?"
+          "state": "asked",
+          "title": "Which day starts a week?",
+          "ask": "iso-week"
         }
       }
     },
@@ -1122,8 +1007,8 @@
             "openedAt": "2026-10-07T12:00:00.000Z",
             "project": "oscabriel/datekit",
             "subject": {
-              "_tag": "OpenProposal",
-              "proposal": "prop-000001"
+              "_tag": "Vouch",
+              "handle": "dave"
             }
           }
         ],

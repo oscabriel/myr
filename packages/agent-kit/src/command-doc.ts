@@ -73,13 +73,20 @@ export const localCommandDocs: readonly CommandDoc[] = [
   },
   {
     contract: "openAsk",
-    flags: ["--files", "--project", "--yes", "--dry-run", "--json"],
+    flags: [
+      "--files",
+      "--discussion",
+      "--project",
+      "--yes",
+      "--dry-run",
+      "--json",
+    ],
     needsApproval: true,
     path: ["ask", "open"],
     positional: ["ask"],
     readOnly: false,
     source: "local",
-    summary: `Open an ask by landing its file and its check, read from the ask's own file under ${Brand.configDir}/asks/ and the path it names unless --files gives them, once the check fails on main by an assertion, twice in the same way.`,
+    summary: `Open an ask by landing its file and its check, read from the ask's own file under ${Brand.configDir}/asks/ and the path it names unless --files gives them, once the check fails on main by an assertion, twice in the same way; --discussion names the thread it comes from, and marks it asked.`,
   },
   {
     flags: [

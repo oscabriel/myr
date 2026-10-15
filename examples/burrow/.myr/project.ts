@@ -3,7 +3,7 @@ import { check, kinds, project, territory } from "@myr/cli/rules";
 // The run block `myr init` found in this repo's own files, each command with
 // where it was found; deciders, kinds and the ratchet added since.
 export default project({
-  deciders: { "**": ["okafor", "lin-h"] },
+  deciders: { "**": ["okafor", "lin-h", "oscar"] },
   kinds: [kinds.fix, kinds.lintToZero, kinds.ratchetDown, kinds.migrate],
   modules: territory.fromWorkspaces(),
   ratchets: {

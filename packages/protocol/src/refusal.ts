@@ -11,7 +11,6 @@ import {
   Handle,
   LandedSha,
   ProjectName,
-  ProposalId,
   RepoPath,
   shortNameOf,
 } from "./ids.ts";
@@ -84,10 +83,8 @@ export class CapReached extends Schema.TaggedError<CapReached>()("CapReached", {
   ...Retryable,
   ...nextIs(cli("status")),
   cap: Schema.Int,
-  /** Which limit: claims held (also when absent), proposals, drafts, or discussions. */
-  limit: Schema.optionalKey(
-    Schema.Literals(["claims", "proposals", "drafts", "discussions"])
-  ),
+  /** Which limit: claims held (also when absent), or discussions. */
+  limit: Schema.optionalKey(Schema.Literals(["claims", "discussions"])),
   /** For a rate limit: seconds until one more is let through. */
   retryAfter: Schema.optionalKey(
     Schema.Int.check(Schema.isGreaterThanOrEqualTo(1))
@@ -308,23 +305,10 @@ export class DecisionClosed extends Schema.TaggedError<DecisionClosed>()(
   { ...Final, ...nextIs(cli("today")), decision: DecisionId }
 ) {}
 
-export class ProposalClosed extends Schema.TaggedError<ProposalClosed>()(
-  "ProposalClosed",
-  { ...Final, ...nextIs(cli("today")), proposal: ProposalId }
-) {}
-
 export class DiscussionClosed extends Schema.TaggedError<DiscussionClosed>()(
   "DiscussionClosed",
   { ...Final, ...nextIs(cli("discussions")), discussion: DiscussionId }
 ) {}
-
-export class DraftInProgress extends Schema.TaggedError<DraftInProgress>()(
-  "DraftInProgress",
-  { ...Retryable, proposal: ProposalId }
-) {
-  static readonly of = (proposal: ProposalId) =>
-    new DraftInProgress({ next: cli("proposal", proposal), proposal });
-}
 
 export class UnknownProject extends Schema.TaggedError<UnknownProject>()(
   "UnknownProject",
@@ -364,11 +348,6 @@ export class UnknownRevision extends Schema.TaggedError<UnknownRevision>()(
     ...nextIs(tool("listRefs", { project: PROJECT })),
     rev: Schema.String,
   }
-) {}
-
-export class UnknownProposal extends Schema.TaggedError<UnknownProposal>()(
-  "UnknownProposal",
-  { ...Final, ...nextIs(cli("today")), proposal: ProposalId }
 ) {}
 
 export class UnknownDiscussion extends Schema.TaggedError<UnknownDiscussion>()(
@@ -472,8 +451,6 @@ const decision = [
   PostureChange,
   NotDecider,
   DecisionClosed,
-  ProposalClosed,
-  DraftInProgress,
   DiscussionClosed,
 ] as const;
 
@@ -484,7 +461,6 @@ const lookup = [
   UnknownDecision,
   UnknownPath,
   UnknownRevision,
-  UnknownProposal,
   UnknownDiscussion,
 ] as const;
 

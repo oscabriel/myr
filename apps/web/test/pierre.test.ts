@@ -97,7 +97,7 @@ describe("the drawings of code", () => {
   );
 
   it("each take their options from the one module", () => {
-    expect(drawings.length).toBeGreaterThanOrEqual(6);
+    expect(drawings.length).toBeGreaterThanOrEqual(5);
 
     expect(
       drawings.flatMap(([path, source]) => (shared.test(source) ? [] : [path]))

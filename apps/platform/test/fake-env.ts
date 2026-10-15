@@ -119,15 +119,12 @@ export const fakeProjects = (made: readonly string[] = []): Env["PROJECT"] => {
 };
 
 export const fakeEnv = (): Env => ({
-  AI: untouchable("AI"),
   ANSWER: untouchable("ANSWER"),
   ARTIFACTS: untouchable("ARTIFACTS"),
   ARTIFACTS_PRIVATE: untouchable("ARTIFACTS_PRIVATE"),
   CLAIM_LIMIT: untouchable("CLAIM_LIMIT"),
   CODE_CACHE: untouchable("CODE_CACHE"),
   COOKIE_KEY: cookieKey,
-  DRAFT_LIMIT: untouchable("DRAFT_LIMIT"),
-  DRAFT_MODEL: "@cf/moonshotai/kimi-k2.7-code",
   EMAIL: untouchable("EMAIL"),
   EVIDENCE: untouchable("EVIDENCE"),
   // Lists nothing: the Project DO adapter reads the listing before it probes a project.
@@ -141,8 +138,8 @@ export const fakeEnv = (): Env => ({
   OPERATOR_HANDLE: "oscabriel",
   OPERATOR_TOKEN: operatorToken,
   PASSWORD_PEPPER: passwordPepper,
+  POST_LIMIT: untouchable("POST_LIMIT"),
   PROJECT: fakeProjects(),
-  PROPOSAL_LIMIT: untouchable("PROPOSAL_LIMIT"),
   PUBLIC_WEB_URL: "http://localhost:5173",
   RELEASES: untouchable("RELEASES"),
   SANDBOX: untouchable("SANDBOX"),

@@ -1,11 +1,15 @@
+import { Brand } from "@repo/brand";
 import type { Ask, AskListing } from "@repo/protocol/domain/ask";
 import type { AskId, ProjectName } from "@repo/protocol/ids";
 import type { DateTime } from "effect";
 import type { ReactNode } from "react";
 
+import { plural } from "../front/facts.tsx";
 import { arrange } from "../front/families.ts";
 import type { AskProgress } from "../shared/ask-progress.ts";
+import { EmptyState } from "../shared/empty.tsx";
 import { FamilyStrip } from "../shared/family.tsx";
+import { ReadingRows, UnreachableNotice } from "../shared/pending.tsx";
 import { AskRow, RowList } from "../shared/row.tsx";
 
 export const openToTake = (listing: AskListing) =>
@@ -95,3 +99,39 @@ export const askListIds = (asks: readonly AskListing[]) =>
   arrange(asks).map((item) =>
     item.kind === "ask" ? item.listing.ask : item.parent.ask
   );
+
+export const openCount = (open: readonly AskListing[]) =>
+  `${plural(open.length, "open ask", "open asks")}, ${
+    open.filter(openToTake).length
+  } open to take`;
+
+export interface OpenAskRowsProps {
+  readonly asks: readonly AskListing[] | undefined;
+  readonly now: DateTime.Utc;
+  readonly unreachable: boolean;
+  readonly project: ProjectName;
+  readonly parents: readonly Ask[];
+  readonly states: ReadonlyMap<AskId, AskProgress>;
+  readonly stamps: ReadonlySet<AskId>;
+  readonly selected: string | undefined;
+}
+
+/** A project's open asks, or why there are none to show yet. */
+export const OpenAskRows = ({
+  asks,
+  unreachable,
+  ...props
+}: OpenAskRowsProps): ReactNode => {
+  if (asks === undefined) {
+    return unreachable ? <UnreachableNotice /> : <ReadingRows />;
+  }
+
+  return asks.length === 0 ? (
+    <EmptyState
+      command={`${Brand.cli} ask open <ask> --files <files>`}
+      title="No open asks. A maintainer opens one from an ask file."
+    />
+  ) : (
+    <AskList asks={asks} {...props} />
+  );
+};

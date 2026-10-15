@@ -4,10 +4,8 @@ import { Brand } from "@repo/brand";
 import type { FrontPageSeed } from "@repo/project/front-page/memory";
 import { Projects } from "@repo/project/projects";
 import { Contracts } from "@repo/protocol/contracts";
-import { DecisionSubject } from "@repo/protocol/domain/decision";
 import type { Decision } from "@repo/protocol/domain/decision";
 import type { FrontPageEntry } from "@repo/protocol/domain/front-page";
-import type { Proposal } from "@repo/protocol/domain/proposal";
 import {
   AskId,
   CommitSha,
@@ -16,8 +14,10 @@ import {
   Handle,
   KindName,
   ProjectName,
+  RepoName,
   RepoPath,
   RequestId,
+  keyOf,
 } from "@repo/protocol/ids";
 import {
   Anonymous,
@@ -46,6 +46,7 @@ import {
   Exit,
   FileSystem,
   Layer,
+  Option,
   Redacted,
   Result,
   Stream,
@@ -56,7 +57,7 @@ import { RpcTest } from "effect/rpc";
 import { WorkerCaps, WorkerRateLimits } from "../src/adapters/rate-limits.ts";
 import { Handlers } from "../src/handlers.ts";
 import { RateLimits } from "../src/rate-limits.ts";
-import { as, seeded, worldOf } from "./handlers.fixtures.ts";
+import { as, askFiles, seeded, worldOf } from "./handlers.fixtures.ts";
 import type { WorldOptions } from "./handlers.fixtures.ts";
 
 const people = ["bob", "carol"];
@@ -105,18 +106,25 @@ const reachedAt =
       HttpServerRequest.fromWeb(new Request(url, { method: "POST" }))
     );
 
-const decisionOn = (
-  decisions: readonly Decision[],
-  proposal: Pick<Proposal, "id">
-) =>
-  Effect.fromOption(
-    Array.findFirst(
-      decisions,
-      ({ subject }) =>
-        DecisionSubject.guards.OpenProposal(subject) &&
-        subject.proposal === proposal.id
-    )
-  );
+// A push that deleted main, as OnPush reports it: a decision for the
+// project's maintainers, and deciding it moves nothing.
+const mainDeleted = (project: ProjectName, eventId: string) =>
+  Effect.gen(function* () {
+    const api = yield* Projects.use((projects) => projects.get(project));
+    const { landed } = yield* api.head();
+
+    yield* api.recordPush({
+      after: CommitSha.make("0".repeat(40)),
+      before: Option.fromUndefinedOr(landed),
+      eventId,
+      pusher: Anonymous.make({}),
+      ref: "refs/heads/main",
+      repo: RepoName.make(keyOf(project)),
+    });
+  }).pipe(Effect.orDie);
+
+const firstOf = (decisions: readonly Decision[]) =>
+  Effect.fromOption(Array.head(decisions));
 
 describe("project reads", () => {
   it.effect("list and show a project's asks, and know no other project", () =>
@@ -303,46 +311,7 @@ describe("claims", () => {
           new CapReached({ cap: 1, limit: "claims", retryAfter: 60 })
         );
         expect(bobs.claim.claimant).toBe("bob");
-      }).pipe(Effect.provide(platform({ limits: { claim: 1, proposal: 5 } })))
-  );
-});
-
-describe("proposals and flags", () => {
-  it.effect("share one rate limit per person", () =>
-    Effect.gen(function* () {
-      yield* made;
-
-      const bob = yield* as("bob");
-      const carol = yield* as("carol");
-
-      const proposed = yield* bob.proposeAsk({
-        project: datekit.project,
-        want: "Parse ISO week dates.",
-      });
-
-      const flagged = yield* Effect.flip(
-        bob.flagAsk({
-          ask: parseIso,
-          project: datekit.project,
-          reason: "The want names a file.",
-        })
-      );
-
-      const carols = yield* carol.flagAsk({
-        ask: parseIso,
-        project: datekit.project,
-        reason: "The want names a file.",
-      });
-
-      expect(proposed.proposal.proposer).toBe("bob");
-      expect(flagged).toStrictEqual(
-        new CapReached({ cap: 1, limit: "proposals", retryAfter: 60 })
-      );
-      expect({
-        flags: carols.proposal.flags,
-        proposer: carols.proposal.proposer,
-      }).toStrictEqual({ flags: "parse-iso", proposer: "carol" });
-    }).pipe(Effect.provide(platform({ limits: { claim: 5, proposal: 1 } })))
+      }).pipe(Effect.provide(platform({ limits: { claim: 1 } })))
   );
 });
 
@@ -417,7 +386,7 @@ describe("discussions", () => {
   );
 
   it.effect(
-    "become a proposal by a maintainer alone, and then take no more posts",
+    "become an ask by a maintainer alone, and then take no more posts",
     () =>
       Effect.gen(function* () {
         yield* made;
@@ -427,22 +396,24 @@ describe("discussions", () => {
 
         const { discussion } = yield* bob.postDiscussion({
           project: datekit.project,
-          title: "Parse ISO week dates?",
+          title: "Trim tabs too?",
         });
 
-        const bobProposes = yield* Effect.flip(
-          bob.proposeAsk({
-            discussion: discussion.id,
-            project: datekit.project,
-            want: "Parse ISO week dates.",
-          })
+        const ask = Option.getOrThrow(
+          Array.findFirst(datekit.policy.asks, ({ id }) => id === trimInput)
         );
 
-        const { proposal } = yield* alice.proposeAsk({
+        // trim-input is open already: opening it again lands nothing, and
+        // names it as the ask the thread became.
+        const asked = {
+          ask: trimInput,
           discussion: discussion.id,
+          files: askFiles(ask),
           project: datekit.project,
-          want: "Parse ISO week dates.",
-        });
+        };
+
+        const bobAsks = yield* Effect.flip(bob.openAsk(asked));
+        const opened = yield* alice.openAsk(asked);
 
         const after = yield* bob.showDiscussion({
           discussion: discussion.id,
@@ -457,10 +428,11 @@ describe("discussions", () => {
           })
         );
 
-        expect(bobProposes).toStrictEqual(new NotDecider({}));
+        expect(bobAsks).toStrictEqual(new NotDecider({}));
+        expect(opened.ask.id).toBe(trimInput);
         expect(after.discussion).toMatchObject({
-          proposal: proposal.id,
-          state: "proposed",
+          ask: trimInput,
+          state: "asked",
         });
         expect(reply).toStrictEqual(
           new DiscussionClosed({ discussion: discussion.id })
@@ -490,9 +462,7 @@ describe("discussions", () => {
         new CapReached({ cap: 1, limit: "discussions", retryAfter: 60 })
       );
       expect(carols.discussion.id).toBe(DiscussionId.make("disc-000002"));
-    }).pipe(
-      Effect.provide(platform({ limits: { claim: 5, post: 1, proposal: 5 } }))
-    )
+    }).pipe(Effect.provide(platform({ limits: { post: 1 } })))
   );
 });
 
@@ -546,32 +516,21 @@ describe("calls that name no project", () => {
 
         const alice = yield* as("alice");
         const bob = yield* as("bob");
-        const carol = yield* as("carol");
 
         yield* bob.claim({ ask: parseIso, project: datekit.project });
         yield* bob.claim({ ask: lexTokens, project: burrow.project });
 
-        const declined = yield* bob.proposeAsk({
-          project: datekit.project,
-          want: "Parse ISO week dates.",
-        });
-
+        yield* mainDeleted(datekit.project, "evt-deleted-1");
         yield* advanceTo("2026-10-07T12:05:00Z");
-        yield* carol.proposeAsk({
-          project: datekit.project,
-          want: "Trim tabs too.",
-        });
+        yield* mainDeleted(datekit.project, "evt-deleted-2");
         yield* advanceTo("2026-10-07T12:10:00Z");
-        yield* bob.proposeAsk({
-          project: burrow.project,
-          want: "Lex comments.",
-        });
+        yield* mainDeleted(burrow.project, "evt-deleted-3");
 
         const { decisions: inDatekit } = yield* alice.today({
           project: datekit.project,
         });
 
-        const first = yield* decisionOn(inDatekit, declined.proposal);
+        const first = yield* firstOf(inDatekit);
 
         yield* alice.decide({
           choice: "decline",
@@ -763,14 +722,11 @@ describe("each call", () => {
           .fork({ project })
           .pipe(reachedAt("https://platform-dev.example.workers.dev/rpc"));
 
-        const { proposal } = yield* bob.proposeAsk({
-          project,
-          want: "Parse ISO week dates.",
-        });
+        yield* mainDeleted(project, "evt-deleted-1");
 
         const today = yield* alice.today({ project });
 
-        const decision = yield* decisionOn(today.decisions, proposal);
+        const decision = yield* firstOf(today.decisions);
 
         const bobDecides = yield* Effect.flip(
           bob.decide({ choice: "decline", decision: decision.id, project })
@@ -961,12 +917,11 @@ const fakeLimit = (allowed: number) => {
 
 describe("the Worker's rate limits", () => {
   it.effect(
-    "count claims, proposals and drafts apart, per person whatever the case of their handle",
+    "count claims and posts apart, per person whatever the case of their handle",
     () =>
       Effect.gen(function* () {
         const claims = fakeLimit(2);
-        const proposals = fakeLimit(1);
-        const drafts = fakeLimit(1);
+        const posts = fakeLimit(1);
 
         const spent = yield* RateLimits.use(({ check }) =>
           Effect.all([
@@ -974,18 +929,12 @@ describe("the Worker's rate limits", () => {
             Effect.result(check("claim", Handle.make("alice"))),
             Effect.result(check("claim", Handle.make("alice"))),
             Effect.result(check("claim", Handle.make("bob"))),
-            Effect.result(check("proposal", Handle.make("alice"))),
-            Effect.result(check("proposal", Handle.make("alice"))),
-            Effect.result(check("draft", Handle.make("alice"))),
-            Effect.result(check("draft", Handle.make("Alice"))),
+            Effect.result(check("post", Handle.make("alice"))),
+            Effect.result(check("post", Handle.make("Alice"))),
           ])
         ).pipe(
           Effect.provide(
-            WorkerRateLimits({
-              claim: claims.binding,
-              draft: drafts.binding,
-              proposal: proposals.binding,
-            })
+            WorkerRateLimits({ claim: claims.binding, post: posts.binding })
           )
         );
 
@@ -1003,23 +952,14 @@ describe("the Worker's rate limits", () => {
           Result.void,
           Result.fail(
             new CapReached({
-              cap: WorkerCaps.proposal,
-              limit: "proposals",
-              retryAfter: 60,
-            })
-          ),
-          Result.void,
-          Result.fail(
-            new CapReached({
-              cap: WorkerCaps.draft,
-              limit: "drafts",
+              cap: WorkerCaps.post,
+              limit: "discussions",
               retryAfter: 60,
             })
           ),
         ]);
         expect(claims.keys).toStrictEqual(["alice", "alice", "alice", "bob"]);
-        expect(proposals.keys).toStrictEqual(["alice", "alice"]);
-        expect(drafts.keys).toStrictEqual(["alice", "alice"]);
+        expect(posts.keys).toStrictEqual(["alice", "alice"]);
       })
   );
 
@@ -1033,9 +973,7 @@ describe("the Worker's rate limits", () => {
         RateLimits.use(({ check }) =>
           check("claim", Handle.make("alice"))
         ).pipe(
-          Effect.provide(
-            WorkerRateLimits({ claim: broken, draft: broken, proposal: broken })
-          )
+          Effect.provide(WorkerRateLimits({ claim: broken, post: broken }))
         )
       );
 
@@ -1068,10 +1006,10 @@ describe("the Worker's rate limits", () => {
           WorkerCaps.claim,
           WorkerCaps.claim,
         ]);
-        expect(limitsOf("PROPOSAL_LIMIT")).toStrictEqual([
-          WorkerCaps.proposal,
-          WorkerCaps.proposal,
-          WorkerCaps.proposal,
+        expect(limitsOf("POST_LIMIT")).toStrictEqual([
+          WorkerCaps.post,
+          WorkerCaps.post,
+          WorkerCaps.post,
         ]);
       }).pipe(Effect.provide(NodeServices.layer))
   );

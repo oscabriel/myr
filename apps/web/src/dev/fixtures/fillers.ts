@@ -159,7 +159,7 @@ const filesOf = (project: Filler, stated: readonly StatedAsk[]): Files =>
       policyJson({
         asks: [...stated],
         deciders: [{ handles: [project.decider], paths: "**" }],
-        functions: { admit: false, opensAlone: false },
+        functions: { admit: false },
         kinds: [
           {
             checkKind: "redThenGreen",
@@ -229,8 +229,9 @@ export const seedFillers = (minute: number) =>
         const clock = yield* DevClock;
 
         yield* clock.set(devMinute(at + 2));
-        yield* api.proposeAsk(Person.make({ handle: visitors.regular }), {
-          want: `${project.project} sheds load by route, not only in total.`,
+        yield* api.postDiscussion(Person.make({ handle: visitors.regular }), {
+          body: `Could ${project.project} shed load by route, not only in total?`,
+          title: "Shed load by route",
         });
       }),
     { discard: true }

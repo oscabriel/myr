@@ -15,7 +15,6 @@ import {
   UnknownAsk,
   UnknownCommit,
   UnknownProject,
-  UnknownProposal,
 } from "@repo/protocol/refusal";
 import {
   Clock,
@@ -329,12 +328,6 @@ const overlay: Layer.Layer<
           Effect.fromOption(Option.fromUndefinedOr(asks.get(id))).pipe(
             Effect.mapError(() => new UnknownAsk({ ask: id })),
             Effect.map((ask) => ({ ask, brief: briefOf(ask) }))
-          )
-        ),
-      showProposal: (_caller, id) =>
-        Effect.flatMap(current, ({ proposals }) =>
-          Effect.fromOption(Option.fromUndefinedOr(proposals.get(id))).pipe(
-            Effect.mapError(() => new UnknownProposal({ proposal: id }))
           )
         ),
       standing: () =>

@@ -383,11 +383,11 @@ describe("the gateway's own reading of a path", () => {
     agents: "trailer",
     asks: [askWire],
     at: landedSha,
-    caps: { claimsPerPerson: 3, proposalsPerPerson: 2 },
+    caps: { claimsPerPerson: 3 },
     claims: { lapseAfterMs: 86_400_000, warnAfterMs: 7_200_000 },
     deciders: [{ handles: ["bob"], paths: "**" }],
     decisions: { expireDays: 14 },
-    functions: { admit: false, opensAlone: false },
+    functions: { admit: false },
     judge: judgeClosure(
       Schema.decodeSync(RunBlock)({
         checks: { lint: "bun run lint" },

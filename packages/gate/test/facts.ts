@@ -90,11 +90,11 @@ export const policy = Schema.decodeSync(Policy)({
   agents: "trailer",
   asks: [askWire],
   at: landedSha,
-  caps: { claimsPerPerson: 3, proposalsPerPerson: 2 },
+  caps: { claimsPerPerson: 3 },
   claims: { lapseAfterMs: 86_400_000, warnAfterMs: 7_200_000 },
   deciders: [{ handles: [alice], paths: "**" }],
   decisions: { expireDays: 14 },
-  functions: { admit: false, opensAlone: false },
+  functions: { admit: false },
   judge: {
     paths: [
       `${configDir}/**`,

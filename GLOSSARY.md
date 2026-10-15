@@ -29,7 +29,7 @@ The fork a claim is made of, at `<owner>/<name>--<ask>--<handle>`, to which the 
 _Avoid_: branch, feature branch
 
 **Working fork**:
-A person's own fork of a project, at `<owner>/<name>--me--<handle>`, that holds a maintainer's own changes before they land and a proposer's sealed answers.
+A person's own fork of a project, at `<owner>/<name>--me--<handle>`, that holds a maintainer's own changes before they land.
 _Avoid_: personal fork, scratch repo
 
 **Check**:
@@ -56,19 +56,8 @@ One or more members of the closed, typed union the platform returns instead of l
 _Avoid_: rejection, error, failure, CI failure
 
 **Discussion**:
-A public, freeform thread in a project, open to anyone not denounced, that lands nothing itself; a maintainer may turn it into a proposal.
-_Avoid_: issue, forum topic, comments
-
-**Proposal**:
-A request to open an ask, or to flag an existing one, from anyone not denounced, or made by a maintainer from a discussion; it expires unless a maintainer accepts it.
-_Avoid_: feature request, suggestion
-
-**Draft**:
-An ask file and its check that the platform's agent wrote for a proposal, run red first before it is put to a maintainer. It lands only when a maintainer accepts it.
-_Avoid_: AI suggestion, auto-ask
-
-**Sealed answer**:
-An answer recorded with a proposal and judged after the ask opens, without the maintainer reading its diff.
+A public, freeform thread in a project, open to anyone not denounced, that lands nothing itself; a maintainer may open an ask from it, which closes the thread as asked.
+_Avoid_: issue, forum topic, comments, proposal, feature request
 
 **Finish**:
 A maintainer's own commits on a passing answer before it lands, re-checked and credited with Finished-by.
@@ -129,7 +118,7 @@ The accountable human who signs an answer; any agent works through their token.
 _Avoid_: contributor (when meaning this role), agent identity
 
 **Maintainer**:
-A person whose decisions open asks, accept proposals and finish answers for an area; a path may name several, and may ask that more than one of them agree.
+A person whose decisions open asks and finish answers for an area; a path may name several, and may ask that more than one of them agree.
 _Avoid_: decider, reviewer, approver, owner, delegate
 
 **Decision**:
@@ -145,11 +134,11 @@ A person's own page on the web: the decisions waiting for them (their Today), th
 _Avoid_: home, notifications, dashboard
 
 **Vouch**:
-A line in the project's vouch file by which a member admits a person to claim and to submit sealed answers; it may carry the member's reason and the landing it followed, and it is read as a line, never counted.
+A line in the project's vouch file by which a member admits a person to claim; it may carry the member's reason and the landing it followed, and it is read as a line, never counted.
 _Avoid_: approval, whitelist, endorsement, trust score
 
 **Denouncement**:
-A line in the project's vouch file that bars a person from making proposals and posting in discussions; it is shown as the line it is, never as a warning beside the person's name.
+A line in the project's vouch file that bars a person from claiming and posting in discussions; it is shown as the line it is, never as a warning beside the person's name.
 _Avoid_: ban, block, flag
 
 **Record**:

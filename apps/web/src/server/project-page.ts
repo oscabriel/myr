@@ -158,6 +158,21 @@ const headerOf = (
 
 const AT_ONCE = 4;
 
+const parentsOf = (
+  client: Client["Service"],
+  project: ProjectName,
+  asks: readonly AskListing[]
+) =>
+  Effect.forEach(
+    familiesIn(asks),
+    ({ parent }) =>
+      client.showAsk({ ask: parent, project }).pipe(
+        Effect.map((shown) => Option.some(shown.ask)),
+        Effect.orElseSucceed(() => Option.none<Ask>())
+      ),
+    { concurrency: AT_ONCE }
+  ).pipe(Effect.map(Arr.getSomes));
+
 export const readProjectPage = (name: string) =>
   Effect.gen(function* () {
     const project = yield* Effect.fromOption(decodeName(name));
@@ -175,14 +190,10 @@ export const readProjectPage = (name: string) =>
 
     const asks = Option.map(read.asks, (listed) => listed.asks);
 
-    const parents = yield* Effect.forEach(
-      familiesIn(Option.getOrElse(asks, () => [])),
-      ({ parent }) =>
-        client.showAsk({ ask: parent, project }).pipe(
-          Effect.map((shown) => Option.some(shown.ask)),
-          Effect.orElseSucceed(() => Option.none<Ask>())
-        ),
-      { concurrency: AT_ONCE }
+    const parents = yield* parentsOf(
+      client,
+      project,
+      Option.getOrElse(asks, () => [])
     );
 
     const now = yield* DateTime.now;
@@ -201,7 +212,49 @@ export const readProjectPage = (name: string) =>
       ...onlySome(read.ledger, (ledger) => ({ ledger })),
       header: headerOf(project, now, read),
       now,
-      parents: Arr.getSomes(parents),
+      parents,
+      project,
+    }).pipe(Effect.orDie);
+  }).pipe(Effect.catchTag("NoSuchElementError", () => Effect.fail(notFound())));
+
+/** The Asks tab: the project's open asks, its events for each ask's progress, and each family's parent. */
+export const ProjectAsksData = Schema.Struct({
+  asks: Schema.optionalKey(Schema.Array(AskListing)),
+  events: Schema.optionalKey(Schema.Array(ProjectEvent)),
+  now: Schema.DateTimeUtcFromString,
+  parents: Schema.Array(Ask),
+  project: ProjectName,
+});
+
+export type ProjectAsksData = typeof ProjectAsksData.Type;
+
+export const readProjectAsks = (name: string) =>
+  Effect.gen(function* () {
+    const project = yield* Effect.fromOption(decodeName(name));
+    const client = yield* Client;
+
+    const read = yield* Effect.all(
+      {
+        asks: optional(client.listAsks({ project })),
+        events: optional(
+          Stream.runCollect(client.watch({ project, since: 0 }))
+        ),
+      },
+      { concurrency: "unbounded" }
+    );
+
+    const asks = Option.map(read.asks, (listed) => listed.asks);
+
+    // What the platform sent decoded, so it encodes; a failure is a defect.
+    return yield* Schema.encodeEffect(ProjectAsksData)({
+      ...onlySome(asks, (listed) => ({ asks: listed })),
+      ...onlySome(read.events, (events) => ({ events })),
+      now: yield* DateTime.now,
+      parents: yield* parentsOf(
+        client,
+        project,
+        Option.getOrElse(asks, () => [])
+      ),
       project,
     }).pipe(Effect.orDie);
   }).pipe(Effect.catchTag("NoSuchElementError", () => Effect.fail(notFound())));

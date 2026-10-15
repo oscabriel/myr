@@ -8,23 +8,20 @@ import type { Decision, DecisionSubject } from "@repo/protocol/domain/decision";
 import { DecisionSubject as Subject } from "@repo/protocol/domain/decision";
 import type { EnvSchemaView } from "@repo/protocol/domain/env";
 import { Outcome } from "@repo/protocol/domain/outcome";
-import { DraftState } from "@repo/protocol/domain/proposal";
-import type { Proposal } from "@repo/protocol/domain/proposal";
 import { Territory } from "@repo/protocol/domain/territory";
 import { LedgerEntry } from "@repo/protocol/domain/visibility";
 import type { Ledger } from "@repo/protocol/domain/visibility";
-import type { Handle, LandedSha } from "@repo/protocol/ids";
+import type { LandedSha } from "@repo/protocol/ids";
 import {
   AreaName,
   AskId,
   DecisionId,
   EnvKey,
+  Handle,
   KindName,
-  LaneName,
   keyOf,
   LayerName,
   ProjectName,
-  ProposalId,
   RatchetName,
   RepoName,
   RepoPath,
@@ -65,8 +62,8 @@ const people = {
   lin: burrowPeople.second,
   okafor: burrowPeople.decider,
   okonkwo: datekitPeople.zones,
-  sefa: visitors.flagger,
-  tove: visitors.proposer,
+  sefa: Handle.make("sefa"),
+  tove: visitors.asker,
   wren: visitors.regular,
 } as const;
 
@@ -195,7 +192,7 @@ const HOUR_MS = 3_600_000;
 
 const policy = policyJson({
   asks: [],
-  caps: { claimsPerPerson: 3, proposalsPerPerson: 2 },
+  caps: { claimsPerPerson: 3 },
   claims: {
     lapseAfterMs: CLAIMS.lapseAfter.hours * HOUR_MS,
     warnAfterMs: CLAIMS.warnAfter.hours * HOUR_MS,
@@ -208,7 +205,7 @@ const policy = policyJson({
     { handles: [people.okonkwo], paths: `${dir}/vouched.td` },
   ],
   decisions: { expireDays: 3 },
-  functions: { admit: false, opensAlone: false },
+  functions: { admit: false },
   kinds: [
     {
       checkKind: "redThenGreen",
@@ -355,7 +352,7 @@ export const vellumFiles: Files = new Map([
       people.lin,
       `${people.tove} Started with the CLI docs.`,
       `${people.sefa} Came from the parser's issue thread.`,
-      `-${people.wren} Opened proposals that advertised a paid fork.`,
+      `-${people.wren} Opened discussions that advertised a paid fork.`,
       "",
     ].join("\n"),
   ],
@@ -647,9 +644,6 @@ const allPassed = (askLane: string) =>
 const decisionId = (n: number) =>
   DecisionId.make(`dec-${String(n).padStart(6, "0")}`);
 
-const proposalId = (n: number) =>
-  ProposalId.make(`prop-${String(n).padStart(6, "0")}`);
-
 const EXPIRY = { days: 3 } as const;
 
 const decision = (input: {
@@ -783,42 +777,6 @@ const envAt = (at: LandedSha, setAt: DateTime.Utc): EnvSchemaView => ({
   ],
   project: vellum,
 });
-
-const proposal = (input: {
-  readonly n: number;
-  readonly at: DateTime.Utc;
-  readonly proposer: Handle;
-  readonly want: string;
-  readonly files: readonly RepoPath[];
-  readonly draft?: Proposal["draft"];
-  readonly state?: Proposal["state"];
-}): Proposal => ({
-  expiresAt: DateTime.add(input.at, { days: 14 }),
-  files: input.files,
-  id: proposalId(input.n),
-  openedAt: input.at,
-  project: vellum,
-  proposer: input.proposer,
-  state: input.state ?? "open",
-  want: input.want,
-  ...present("draft", input.draft),
-});
-
-const draftedFiles = (id: string, module: Module, want: string) => {
-  const stated = fix({ id, module, want });
-  const [askFile, testFile] = [...filesOf([stated])];
-
-  const fixture = [
-    `packages/${module}/test/fixtures/${id}.vm`,
-    "- a list item\n  > a quote inside it\n",
-  ] as const;
-
-  return [askFile, testFile, fixture].flatMap((entry) =>
-    entry === undefined
-      ? []
-      : [{ content: entry[1], path: RepoPath.make(entry[0]) }]
-  );
-};
 
 const childEntry = (module: Module): Files =>
   new Map([[`packages/${module}/src/index.ts`, entryOf(module, "tokenize")]]);
@@ -1225,30 +1183,6 @@ export const tellVellum = (base: LandedSha) =>
       changes: childPage("themes"),
     });
 
-    // The lint ask came from tove's proposal.
-    story.propose({
-      files: [],
-      proposal: proposal({
-        at: t("2026-10-05T13:00"),
-        files: [],
-        n: 1,
-        proposer: people.tove,
-        want: ask.headings.brief.want,
-      }),
-    });
-    story.decision(
-      decision({
-        at: t("2026-10-05T13:00"),
-        deciders: [people.ines, people.lin],
-        evidence: [
-          { label: "want", value: ask.headings.brief.want },
-          { label: "territory", value: "@vellum/lint" },
-        ],
-        n: 3,
-        subject: Subject.cases.OpenProposal.make({ proposal: proposalId(1) }),
-      })
-    );
-
     const wrapHead = story.push(ask.wrap.id, t("2026-10-05T14:00"), 2);
 
     story.judge(ask.wrap.id, wrapHead, {
@@ -1314,59 +1248,6 @@ export const tellVellum = (base: LandedSha) =>
         files: filesOf([stated]),
       });
     }
-
-    const ready = draftedFiles(
-      "parse-nested-quotes",
-      "parser",
-      "The parser reads a blockquote nested inside a list item."
-    );
-
-    story.propose(
-      {
-        files: ready,
-        proposal: proposal({
-          at: t("2026-10-05T15:30"),
-          draft: DraftState.cases.Ready.make({
-            attempts: 1,
-            model: "memory",
-            red: {
-              lane: LaneName.make("redThenGreen"),
-              signature: "expected 1 blockquote, received 0",
-            },
-            round: 1,
-          }),
-          files: ready.map(({ path }) => path),
-          n: 2,
-          proposer: people.bram,
-          want: "The parser reads a blockquote nested inside a list item.",
-        }),
-      },
-      { at: t("2026-10-05T16:00"), ready: true }
-    );
-    story.decision(
-      decision({
-        at: t("2026-10-05T16:00"),
-        deciders: [people.ines],
-        evidence: [
-          {
-            label: "want",
-            value: "The parser reads a blockquote nested inside a list item.",
-          },
-          { label: "territory", value: "@vellum/parser" },
-          ...ready.map(({ content, path }) => ({
-            label: path,
-            value: content,
-          })),
-          {
-            label: "red first",
-            value: "redThenGreen: expected 1 blockquote, received 0",
-          },
-          { label: "drafted by", value: "memory, attempt 1 of 3" },
-        ],
-        n: 5,
-        subject: Subject.cases.OpenProposal.make({ proposal: proposalId(2) }),
-      })
-    );
 
     story.claim(
       tokenizer.child("parser"),
@@ -1572,45 +1453,6 @@ export const tellVellum = (base: LandedSha) =>
       })
     );
 
-    story.propose(
-      {
-        files: [],
-        proposal: proposal({
-          at: t("2026-10-06T14:30"),
-          draft: DraftState.cases.Failed.make({
-            attempts: 3,
-            model: "memory",
-            refusal: "NotRedFirst",
-            round: 1,
-          }),
-          files: [],
-          n: 3,
-          proposer: people.sefa,
-          want: "Themes can set their own font for code blocks.",
-        }),
-      },
-      { at: t("2026-10-06T15:00"), ready: false }
-    );
-    story.decision(
-      decision({
-        at: t("2026-10-06T15:00"),
-        deciders: [people.ines, people.lin],
-        evidence: [
-          {
-            label: "want",
-            value: "Themes can set their own font for code blocks.",
-          },
-          {
-            label: "draft failed",
-            value:
-              "The check passed on main, so it proves nothing about an answer.",
-          },
-        ],
-        n: 9,
-        subject: Subject.cases.OpenProposal.make({ proposal: proposalId(3) }),
-      })
-    );
-
     // The parser child: every lane passed, one held-back check in the parser did not.
     const parserHead = story.push(
       tokenizer.child("parser"),
@@ -1687,7 +1529,7 @@ export const tellVellum = (base: LandedSha) =>
       path: RepoPath.make("packages/export/test/epub.test.ts"),
     };
 
-    const carryReason = "EPUB 2 readers come later; their own ask is drafted.";
+    const carryReason = "EPUB 2 readers come later, in an ask of their own.";
 
     story.judge(ask.carry.id, carryHead, {
       at: t("2026-10-06T18:00"),
@@ -1719,57 +1561,6 @@ export const tellVellum = (base: LandedSha) =>
           marker: ".todo(",
           reason: carryReason,
         }),
-      })
-    );
-
-    const subsets = draftedFiles(
-      "export-font-subsets",
-      "export",
-      "Export embeds only the font subsets a document uses."
-    );
-
-    story.propose(
-      {
-        files: subsets,
-        proposal: proposal({
-          at: t("2026-10-06T18:30"),
-          draft: DraftState.cases.Failed.make({
-            attempts: 1,
-            model: "memory",
-            refusal: "VerifierBlocked",
-            round: 2,
-          }),
-          files: subsets.map(({ path }) => path),
-          n: 4,
-          proposer: people.okafor,
-          want: "Export embeds only the font subsets a document uses.",
-        }),
-      },
-      { at: t("2026-10-06T19:00"), ready: true }
-    );
-    story.drafted(proposalId(4), t("2026-10-06T20:00"), false);
-    story.decision(
-      decision({
-        at: t("2026-10-06T20:00"),
-        deciders: [people.okonkwo],
-        evidence: [
-          {
-            label: "want",
-            value: "Export embeds only the font subsets a document uses.",
-          },
-          { label: "territory", value: "@vellum/export" },
-          ...subsets.map(({ content, path }) => ({
-            label: path,
-            value: content,
-          })),
-          {
-            label: "draft failed",
-            value:
-              "The Checker was busy; the platform could not run the check this round.",
-          },
-        ],
-        n: 12,
-        subject: Subject.cases.OpenProposal.make({ proposal: proposalId(4) }),
       })
     );
 
@@ -1821,7 +1612,7 @@ export const tellVellum = (base: LandedSha) =>
           { label: "handle", value: people.wren },
           {
             label: "line",
-            value: `${people.wren} Asks to come back; proposals since are on topic.`,
+            value: `${people.wren} Asks to come back; posts since are on topic.`,
           },
         ],
         n: 14,
@@ -1831,13 +1622,6 @@ export const tellVellum = (base: LandedSha) =>
 
     story.push(ask.numbers.id, t("2026-10-07T08:15"));
 
-    story.decide(decisionId(3), {
-      at: t("2026-10-07T08:30"),
-      by: people.ines,
-      choice: "accept",
-      note: "Clear want; tove's test covers the skip.",
-    });
-    story.accepted(proposalId(1));
     yield* story.open({
       asks: [ask.headings],
       at: t("2026-10-07T08:30"),
@@ -1868,21 +1652,6 @@ export const tellVellum = (base: LandedSha) =>
       lanes: { migrate: "passed", types: "passed" },
       outcome: Outcome.cases.Checking.make({ stage: "checks" }),
       stage: "checks",
-    });
-
-    story.propose({
-      files: [],
-      proposal: proposal({
-        at: t("2026-10-07T09:50"),
-        draft: DraftState.cases.Drafting.make({
-          round: 1,
-          startedAt: t("2026-10-07T09:50"),
-        }),
-        files: [],
-        n: 5,
-        proposer: people.lin,
-        want: "The CLI prints a table of contents with --toc.",
-      }),
     });
 
     const apart = {

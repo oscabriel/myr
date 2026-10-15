@@ -1,9 +1,9 @@
 import { Array, Schema } from "effect";
 
-import { DiscussionId, Handle, ProjectName, ProposalId } from "../ids.ts";
+import { AskId, DiscussionId, Handle, ProjectName } from "../ids.ts";
 import { NoneOrMore } from "./common.ts";
 
-export const DiscussionState = Schema.Literals(["open", "closed", "proposed"]);
+export const DiscussionState = Schema.Literals(["open", "closed", "asked"]);
 
 export type DiscussionState = typeof DiscussionState.Type;
 
@@ -21,14 +21,14 @@ export const DiscussionPost = Schema.Struct({
 
 export type DiscussionPost = typeof DiscussionPost.Type;
 
-/** A thread: its first post is the opener's, and `proposal` names the proposal a maintainer turned it into. */
+/** A thread: its first post is the opener's, and `ask` names the ask a maintainer opened from it. */
 export const Discussion = Schema.Struct({
+  ask: Schema.optionalKey(AskId),
   id: DiscussionId,
   openedAt: Schema.DateTimeUtcFromString,
   opener: Handle,
   posts: Schema.NonEmptyArray(DiscussionPost),
   project: ProjectName,
-  proposal: Schema.optionalKey(ProposalId),
   state: DiscussionState,
   title: DiscussionTitle,
 });
@@ -37,13 +37,13 @@ export type Discussion = typeof Discussion.Type;
 
 /** A thread in a list: its posts counted, not carried. */
 export const DiscussionListing = Schema.Struct({
+  ask: Schema.optionalKey(AskId),
   id: DiscussionId,
   lastPostAt: Schema.DateTimeUtcFromString,
   openedAt: Schema.DateTimeUtcFromString,
   opener: Handle,
   posts: NoneOrMore,
   project: ProjectName,
-  proposal: Schema.optionalKey(ProposalId),
   state: DiscussionState,
   title: DiscussionTitle,
 });
@@ -62,7 +62,7 @@ export const listingOf = (discussion: Discussion): DiscussionListing => {
     title: discussion.title,
   };
 
-  return discussion.proposal === undefined
+  return discussion.ask === undefined
     ? listing
-    : { ...listing, proposal: discussion.proposal };
+    : { ...listing, ask: discussion.ask };
 };

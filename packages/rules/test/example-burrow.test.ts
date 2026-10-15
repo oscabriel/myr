@@ -255,7 +255,7 @@ describe("examples/burrow's config folder", () => {
             denounced,
           ]),
         }).toStrictEqual({
-          deciders: [{ handles: ["okafor", "lin-h"], paths: "**" }],
+          deciders: [{ handles: ["okafor", "lin-h", "oscar"], paths: "**" }],
           run: {
             checks: {
               lint: "bun run lint",

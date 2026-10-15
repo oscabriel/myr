@@ -16,7 +16,7 @@ const decodeSuccess = Schema.decodeSync(PolicyOf.successSchema);
 const datekitPolicy = {
   agents: "trailer",
   at: sha,
-  caps: { claimsPerPerson: 3, proposalsPerPerson: 2 },
+  caps: { claimsPerPerson: 3 },
   claims: { lapseAfterMs: 86_400_000, warnAfterMs: 7_200_000 },
   deciders: [
     { handles: ["ines-v"], paths: "**" },
@@ -92,9 +92,7 @@ describe("policy's text view", () => {
   it("states the vouch rule in words, with how many are vouched for and denounced", () => {
     const text = textOf(datekit);
 
-    expect(text).toContain(
-      "For code: claiming an ask or offering a sealed answer needs a vouch"
-    );
+    expect(text).toContain("For code: claiming an ask needs a vouch");
     expect(text).toContain(
       `${Brand.configDir}/vouched.td vouches for 2 and denounces 1`
     );
@@ -115,7 +113,6 @@ describe("policy's text view", () => {
 
     for (const line of [
       "Claims 3 claims at once for a person nobody has vouched for; a vouched person and a maintainer are never held",
-      "Proposals 2 proposals open at once for a person nobody has vouched for",
       "Decisions an undecided one takes its default after 14 days",
       "Claim timing warned after 2 hours without a push; lapses after 24 hours",
       "Record a landing counts once it has stood 30 days, for 365 days",

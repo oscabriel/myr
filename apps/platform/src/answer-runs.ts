@@ -1,4 +1,3 @@
-import { DraftParams as DraftRun } from "@repo/project/draft-runs";
 import {
   CommitSha,
   keyOf,
@@ -23,15 +22,7 @@ export const AdmissionParams = Schema.TaggedStruct("Admission", {
 
 export type AdmissionParams = typeof AdmissionParams.Type;
 
-export const DraftParams = Schema.TaggedStruct("Draft", DraftRun.fields);
-
-export type DraftParams = typeof DraftParams.Type;
-
-export const WorkflowParams = Schema.Union([
-  AdmissionParams,
-  DraftParams,
-  AnswerParams,
-]);
+export const WorkflowParams = Schema.Union([AdmissionParams, AnswerParams]);
 
 export type WorkflowParams = typeof WorkflowParams.Type;
 
@@ -67,12 +58,4 @@ export const admissionId = (params: AdmissionParams) =>
   instanceId(
     `admit-${keyOf(params.project)}-${params.layer}`,
     `-${params.head}`
-  );
-
-export const draftId = (
-  params: Pick<DraftParams, "project" | "proposal" | "round">
-) =>
-  instanceId(
-    `draft-${keyOf(params.project)}`,
-    `-${params.proposal}-r${params.round}`
   );

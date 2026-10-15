@@ -8,7 +8,6 @@ import { Ask } from "@repo/protocol/domain/ask";
 import { Decision, DecisionSubject } from "@repo/protocol/domain/decision";
 import type { ProjectEvent } from "@repo/protocol/domain/event";
 import { Outcome } from "@repo/protocol/domain/outcome";
-import { Proposal } from "@repo/protocol/domain/proposal";
 import { CommitSha, DecisionId, ProjectName } from "@repo/protocol/ids";
 import type { AskId } from "@repo/protocol/ids";
 import { Posture } from "@repo/protocol/posture";
@@ -35,7 +34,6 @@ export const DecisionRead = Schema.TaggedUnion({
     posture: Schema.optionalKey(
       Schema.Struct({ label: Schema.String, posture: Posture })
     ),
-    proposal: Schema.optionalKey(Proposal),
     soon: Schema.Boolean,
     verdict: Schema.optionalKey(Verdict),
   },
@@ -89,7 +87,6 @@ export const newerThan = (
 
 const askOf = DecisionSubject.match({
   Finish: ({ ask }) => Option.some(ask),
-  OpenProposal: () => Option.none(),
   PostureChange: () => Option.none(),
   ProxyWidened: () => Option.none(),
   RaiseRatchet: ({ ask }) => Option.some(ask),
@@ -112,15 +109,6 @@ const concerning = (decision: Decision, soon: boolean) =>
           Effect.orElseSucceed(() => Option.none())
         ),
     });
-
-    const proposal = DecisionSubject.guards.OpenProposal(subject)
-      ? yield* client
-          .showProposal({ project, proposal: subject.proposal })
-          .pipe(
-            Effect.map(({ proposal: shown }) => Option.some(shown)),
-            Effect.orElseSucceed(() => Option.none())
-          )
-      : Option.none();
 
     const posture = DecisionSubject.guards.PostureChange(subject)
       ? yield* client.ledger({ project }).pipe(
@@ -161,10 +149,6 @@ const concerning = (decision: Decision, soon: boolean) =>
       ...Option.match(ask, {
         onNone: () => ({}),
         onSome: (shown) => ({ ask: shown }),
-      }),
-      ...Option.match(proposal, {
-        onNone: () => ({}),
-        onSome: (shown) => ({ proposal: shown }),
       }),
       ...Option.match(posture, {
         onNone: () => ({}),

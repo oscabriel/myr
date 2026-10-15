@@ -214,7 +214,7 @@ describe(Definitions, () => {
     const element = (
       <Definitions label="Limits">
         <Definition term="Claims at once">2</Definition>
-        <Definition term="Proposals a week">5</Definition>
+        <Definition term="Posts a week">5</Definition>
       </Definitions>
     );
 
@@ -222,7 +222,7 @@ describe(Definitions, () => {
 
     expect(markup).toMatch(/^<dl\b[^>]*aria-label="Limits"/u);
     expect(markup.match(/<dt\b/gu)).toHaveLength(2);
-    expect(textOf(element)).toBe("Claims at once2Proposals a week5");
+    expect(textOf(element)).toBe("Claims at once2Posts a week5");
   });
 });
 

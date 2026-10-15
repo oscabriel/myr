@@ -12,9 +12,9 @@ const GitId = /^[0-9a-f]{40}$/u;
 
 const Minted = /^[a-z]+-[0-9a-z]{6,26}$/u;
 
-// `me` and `layer` name working forks and layer repos; `open` and `flag` are
-// subcommands of `<cli> ask <ask>`, which would shadow an ask so named.
-const reservedAskIds = ["me", "layer", "open", "flag"] as const;
+// `me` and `layer` name working forks and layer repos; `open` is a
+// subcommand of `<cli> ask <ask>`, which would shadow an ask so named.
+const reservedAskIds = ["me", "layer", "open"] as const;
 
 const isReserved = (name: string) =>
   reservedAskIds.some((reserved) => reserved === name);
@@ -86,13 +86,6 @@ export type RequestId = typeof RequestId.Type;
 export const ClaimToken = Schema.RedactedFromValue(Schema.String);
 
 export type ClaimToken = typeof ClaimToken.Type;
-
-export const ProposalId = Schema.String.pipe(
-  Schema.check(Schema.isPattern(Minted)),
-  Schema.brand("ProposalId")
-);
-
-export type ProposalId = typeof ProposalId.Type;
 
 export const DiscussionId = Schema.String.pipe(
   Schema.check(Schema.isPattern(Minted)),

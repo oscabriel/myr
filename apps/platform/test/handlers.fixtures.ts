@@ -45,7 +45,7 @@ const start = (name: string): Files => [
   ["packages/trim/src/trim.ts", "export const trim = (s) => s;\n"],
 ];
 
-const askFiles = ({ check, file, id, territory }: Ask) =>
+export const askFiles = ({ check, file, id, territory }: Ask) =>
   Array.make(
     { content: `export default "${id}";\n`, path: file },
     {
@@ -116,10 +116,8 @@ const rulesOf = (scenarios: readonly Scenario[]) =>
 export interface WorldOptions {
   readonly frontPage?: FrontPageSeed;
   readonly limits?: {
-    readonly claim: number;
-    readonly draft?: number;
+    readonly claim?: number;
     readonly post?: number;
-    readonly proposal: number;
   };
 }
 
@@ -143,9 +141,7 @@ export const worldOf = (
     FrontPageMemory.layer(options.frontPage ?? noFrontPage),
     MemoryRateLimits({
       claim: options.limits?.claim ?? 100,
-      draft: options.limits?.draft ?? 100,
       post: options.limits?.post ?? 100,
-      proposal: options.limits?.proposal ?? 100,
     }),
     EvidenceStoreMemory
   ).pipe(Layer.provideMerge(RepoHostMemory));

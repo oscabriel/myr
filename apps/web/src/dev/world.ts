@@ -2,8 +2,6 @@ import type { RepoHost } from "@repo/artifacts/repo-host";
 import { RepoHostMemory } from "@repo/artifacts/repo-host/memory";
 import type { EvidenceStore } from "@repo/checks/evidence-store";
 import { EvidenceStoreMemory } from "@repo/checks/evidence-store/memory";
-import { cannedDrafter } from "@repo/drafting/draft-runs/canned";
-import { withDraftRunsInline } from "@repo/drafting/draft-runs/inline";
 import { AlarmsMemory } from "@repo/project/alarms/memory";
 import { CodeStoreMemory } from "@repo/project/code-store/memory";
 import { CodeCacheLive } from "@repo/project/code/cache";
@@ -33,7 +31,6 @@ const CODE_READS_KEPT = { heavy: 40, light: 2000 };
 const ports = Layer.mergeAll(
   AlarmsMemory,
   DevAnswerRunsLayer,
-  cannedDrafter,
   CodeCacheLive(CODE_READS_KEPT.light, CODE_READS_KEPT.heavy),
   CodeStoreMemory,
   DevProjection,
@@ -43,9 +40,7 @@ const ports = Layer.mergeAll(
   Layer.provideMerge(RepoHostMemory)
 );
 
-const core = withDraftRunsInline(ProjectsMemory).pipe(
-  Layer.provideMerge(ports)
-);
+const core = ProjectsMemory.pipe(Layer.provideMerge(ports));
 
 export type DevCore = Layer.Success<typeof core> | DevClock;
 

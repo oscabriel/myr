@@ -29,7 +29,6 @@ const acceptOrDecline: Words = { no: "decline", yes: "accept" };
 
 const wordsFor = DecisionSubject.match({
   Finish: () => acceptOrDecline,
-  OpenProposal: () => acceptOrDecline,
   PostureChange: () => acceptOrDecline,
   ProxyWidened: () => acceptOrDecline,
   RaiseRatchet: () => acceptOrDecline,
@@ -65,9 +64,7 @@ const consequences = (
       : [];
   }
 
-  return DecisionSubject.guards.OpenProposal(subject)
-    ? [AttentionEffect.OpenAsk({ proposal: subject.proposal })]
-    : [AttentionEffect.Land({ subject })];
+  return [AttentionEffect.Land({ subject })];
 };
 
 export interface Decided {

@@ -1,7 +1,7 @@
 /**
  * The four frames a page is drawn in (ADR 0041). A route names its own in
- * `staticData.shell`; the deepest route that names one wins, so a project's
- * new proposal can be focused inside the project's routes.
+ * `staticData.shell`; the deepest route that names one wins, so a page can
+ * be focused inside routes that name another frame.
  */
 import { useMatches } from "@tanstack/react-router";
 import { createContext, useContext } from "react";

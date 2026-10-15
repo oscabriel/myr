@@ -1,13 +1,11 @@
-import type { Evidence as Fact } from "@repo/protocol/domain/common";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
 import type { Decision } from "@repo/protocol/domain/decision";
 import type { Posture } from "@repo/protocol/posture";
-import { ArrowRight, FileDiff, FileText } from "lucide-react";
+import { ArrowRight, FileDiff } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { commitHref, shortSha } from "../code/paths.ts";
 import { FORK_LABEL, PATCH_LABEL } from "../finish/patch.ts";
-import { DraftedCode } from "../proposal/client-file.tsx";
 import { HandleLink } from "../shared/handle.tsx";
 import { AppLink } from "../shared/link.tsx";
 import { POSTURE_MARKS } from "../shared/mark-look.ts";
@@ -23,17 +21,6 @@ import { refWords } from "./subject.ts";
 const LINK = "decoration-rule underline hover:decoration-current";
 
 const CODE = "text-mono font-mono [overflow-wrap:anywhere]";
-
-/**
- * A label that is a path: one word with a slash or a dot, where every other
- * label is words.
- */
-const isFileFact = ({ label }: Fact) => /^\S*[./]\S*$/u.test(label);
-
-const opensAsk = DecisionSubject.isAnyOf(["OpenProposal"]);
-
-export const filesOf = (decision: Decision): readonly Fact[] =>
-  opensAsk(decision.subject) ? decision.evidence.filter(isFileFact) : [];
 
 const FactRow = ({
   children,
@@ -65,7 +52,7 @@ const PageLink = ({
   to,
 }: {
   readonly children: ReactNode;
-  readonly icon: typeof FileText;
+  readonly icon: typeof FileDiff;
   readonly to: string;
 }) => (
   <AppLink
@@ -133,14 +120,6 @@ const SubjectFacts = ({ decision }: { readonly decision: Decision }) =>
           </code>
         </FactRow>
       </FactList>
-    ),
-    OpenProposal: ({ proposal }) => (
-      <PageLink
-        icon={FileText}
-        to={`/${decision.project}/proposals/${proposal}`}
-      >
-        Read the draft of {proposal}
-      </PageLink>
     ),
     PostureChange: ({ from, to }) => (
       <FactList>
@@ -274,15 +253,9 @@ const SHOWN_ELSEWHERE: ReadonlySet<string> = new Set([
   "ratchet",
 ]);
 
-const OtherFacts = ({
-  decision,
-  files,
-}: {
-  readonly decision: Decision;
-  readonly files: readonly Fact[];
-}) => {
+const OtherFacts = ({ decision }: { readonly decision: Decision }) => {
   const facts = decision.evidence.filter(
-    (fact) => !SHOWN_ELSEWHERE.has(fact.label) && !files.includes(fact)
+    (fact) => !SHOWN_ELSEWHERE.has(fact.label)
   );
 
   return facts.length === 0 ? null : (
@@ -323,25 +296,11 @@ export const FinishLink = ({
 
 export const DecisionEvidence = ({
   decision,
-  heading = "h4",
 }: {
   readonly decision: Decision;
-  readonly heading?: "h3" | "h4";
-}) => {
-  const files = filesOf(decision);
-
-  return (
-    <div className="@container flex min-w-0 flex-col gap-3" data-evidence="">
-      <SubjectFacts decision={decision} />
-      <OtherFacts decision={decision} files={files} />
-      {files.map(({ label, value }) => (
-        <DraftedCode
-          content={value}
-          heading={heading}
-          key={label}
-          path={label}
-        />
-      ))}
-    </div>
-  );
-};
+}) => (
+  <div className="@container flex min-w-0 flex-col gap-3" data-evidence="">
+    <SubjectFacts decision={decision} />
+    <OtherFacts decision={decision} />
+  </div>
+);

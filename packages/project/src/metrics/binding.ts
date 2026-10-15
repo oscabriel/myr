@@ -8,7 +8,6 @@
  * | `Refused`      | `Refused`      | the refusal tag | stage   | area  | 1            |            |
  * | `LaneRan`      | `LaneRan`      | lane            | result  |       | `durationMs` |            |
  * | `ChecksWaited` | `ChecksWaited` |                 |         |       | `waitedMs`   |            |
- * | `Drafted`      | `Drafted`      | ready or failed |         |       | `latencyMs`  | `attempts` |
  *
  * `index1` is the project's name, cut to the 96 bytes an index holds.
  */
@@ -42,8 +41,6 @@ const columns = (
 export const dataPointOf = (point: MetricPoint): DataPoint => {
   const { blobs, doubles } = MetricPoint.match(point, {
     ChecksWaited: ({ waitedMs }) => columns([], [waitedMs]),
-    Drafted: ({ attempts, latencyMs, ready }) =>
-      columns([ready ? "ready" : "failed"], [latencyMs, attempts]),
     Landed: () => columns([], [1]),
     LaneRan: ({ durationMs, lane, result }) =>
       columns([lane, result], [durationMs]),

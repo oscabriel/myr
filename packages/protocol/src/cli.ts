@@ -147,13 +147,7 @@ export const endRefused = (
 
 interface FieldSpec {
   readonly description: string | undefined;
-  readonly kind:
-    | "string"
-    | "number"
-    | "boolean"
-    | "switch"
-    | "literals"
-    | "json";
+  readonly kind: "string" | "number" | "boolean" | "literals" | "json";
   readonly literals: readonly string[];
   readonly optional: boolean;
 }
@@ -204,11 +198,6 @@ const describe = (field: Plain): FieldSpec => {
     }
   }
 
-  // A field that is `true` or absent is a switch: named, it is on.
-  if (SchemaAST.isLiteral(ast) && ast.literal === true) {
-    return { description, kind: "switch", literals: [], optional };
-  }
-
   const literal = literalOf(ast);
 
   if (literal !== undefined) {
@@ -230,7 +219,7 @@ const fieldsOf = (payload: Plain): readonly (readonly [string, Plain])[] =>
     : [];
 
 const isRequired = (spec: FieldSpec) =>
-  !spec.optional && spec.kind !== "boolean" && spec.kind !== "switch";
+  !spec.optional && spec.kind !== "boolean";
 
 const jsonFlag = (name: string, field: Plain) =>
   Flag.String(name).pipe(
@@ -246,11 +235,6 @@ const flagBuilders = {
   // The field's own schema checks the text, so a malformed value is refused
   // by the parser, naming its flag, before anything is called.
   string: (name, field) => Flag.String(name).pipe(Flag.withSchema(field)),
-  switch: (name) =>
-    Flag.Boolean(name).pipe(
-      Flag.withDefault(false),
-      Flag.map((on) => (on ? true : undefined))
-    ),
 } satisfies Record<
   FieldSpec["kind"],
   (name: string, field: Plain, spec: FieldSpec) => Flag.Flag<unknown>
@@ -278,9 +262,7 @@ const flagFor = (
   const described =
     help === undefined ? base : base.pipe(Flag.withDescription(help));
 
-  return (spec.optional || fallback !== undefined) &&
-    spec.kind !== "boolean" &&
-    spec.kind !== "switch"
+  return (spec.optional || fallback !== undefined) && spec.kind !== "boolean"
     ? described.pipe(Flag.optional, Flag.map(Option.getOrUndefined))
     : described;
 };
@@ -297,7 +279,6 @@ const argumentBuilders = {
   literals: (name, _field, spec) => Argument.Literals(name, spec.literals),
   number: (name) => Argument.Finite(name),
   string: (name) => Argument.String(name),
-  switch: (name, field) => schemaArgument(name, field, "true"),
 } satisfies Record<
   FieldSpec["kind"],
   (name: string, field: Plain, spec: FieldSpec) => Argument.Argument<unknown>

@@ -89,10 +89,9 @@ export const creditsByProject = (
     project: Array.headNonEmpty(inProject).project,
   }));
 
-/** The Landings tab's own address, with the filter or region it opens. */
+/** The Landings tab's own address, with the filter it opens. */
 const landingsOf = (project: ProjectName) =>
   projectSections(project).find(({ tab }) => tab === "landings") ?? {
-    hash: undefined,
     search: undefined,
     to: projectPath(project),
   };
@@ -106,7 +105,6 @@ const Project = ({ credit }: { readonly credit: ProjectCredit }) => (
     {credit.areas.map(({ area, roles }) => (
       <Row
         data={{ "data-area": area, "data-project": credit.project }}
-        hash={landingsOf(credit.project).hash}
         href={landingsOf(credit.project).to}
         search={landingsOf(credit.project).search}
         id={`${credit.project}/${area}`}

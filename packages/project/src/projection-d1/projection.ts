@@ -230,8 +230,6 @@ export const ProjectionD1: Layer.Layer<Projection, never, SqlClient> =
               : []),
             ...unkept,
           ],
-          ProposalDrafted: () => [],
-          ProposalOpened: () => [],
           Pushed: () => [],
           Released: ({ ask }) => [claims(ask, -1)],
           Warned: () => [],

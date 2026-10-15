@@ -54,9 +54,8 @@ const root = getRouteApi("__root__");
 const decodeHeader = Schema.decodeSync(ProjectHeaderData);
 
 /**
- * The layout reads the header for every page drawn under it, but Overview,
- * which reads its header with its own reads, and a focused page (a new
- * proposal), which draws none.
+ * The layout reads the header for every page drawn under it but Overview,
+ * which reads its header with its own reads.
  */
 export const headerLoader =
   (
@@ -128,7 +127,7 @@ const ProjectLayout = () => {
   // The current tab and the title's element follow the path alone: a fragment never reaches the server.
   const pathname = useLocation({ select: (location) => location.pathname });
 
-  // A focused page under a project (a new proposal) draws no project frame.
+  // A page under a project that names another shell draws no project frame.
   if (shell !== "project") {
     return <Outlet />;
   }
@@ -154,9 +153,6 @@ const ProjectLayout = () => {
 /**
  * How long the header's facts stand before a move between the project's pages
  * reads them again: without it the router reads the six facts on every move.
- * A reader who enters at a page with no header of its own (a new proposal)
- * and moves to a tab within this time sees the frame without a header until
- * the next read.
  */
 export const HEADER_STALE_MS = 60_000;
 

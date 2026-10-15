@@ -3,55 +3,41 @@ import { Option } from "effect";
 
 import { INBOX_PATH, segmentsOf } from "../paths.ts";
 
-/** A project's nine tabs (ADR 0041, with Discussions), in the header's order. */
+/** A project's seven tabs (ADR 0041, with Discussions), in the header's order. */
 export type ProjectTab =
   | "asks"
   | "code"
   | "discussions"
   | "landings"
   | "overview"
-  | "people"
   | "policy"
-  | "proposals"
   | "visibility";
 
 export interface Section {
   readonly label: string;
   readonly tab: ProjectTab;
   readonly to: string;
-  /** A tab whose own page has not been built yet opens the region of Overview that holds it. */
-  readonly hash?: string;
   /** A tab that opens a page's filtered view carries the filter in the query. */
   readonly search?: Readonly<Record<string, string>>;
 }
 
 /**
- * Each tab opens a page inside the project's frame that exists today: Asks,
- * Proposals and People open their regions of Overview, Landings the history
- * of main shown as its landings (the Code tab's History, filtered), Policy
- * the policy at the address it has always had, and Visibility its own page.
- * Starting a proposal is a focused page of its own, so it is Contribute's,
- * not a tab's.
+ * Each tab opens a page of its own inside the project's frame: Landings is
+ * the history of main shown as its landings (the Code tab's History,
+ * filtered), and Policy holds who decides as well as the limits.
  */
 export const projectSections = (project: string): readonly Section[] => [
   { label: "Overview", tab: "overview", to: `/${project}` },
   { label: "Code", tab: "code", to: `/${project}/tree/main` },
-  { hash: "open-asks", label: "Asks", tab: "asks", to: `/${project}` },
+  { label: "Asks", tab: "asks", to: `/${project}/asks` },
   {
     label: "Landings",
     search: { show: "landings" },
     tab: "landings",
     to: `/${project}/commits/main`,
   },
-  {
-    hash: "proposals",
-    label: "Proposals",
-    tab: "proposals",
-    to: `/${project}`,
-  },
   { label: "Discussions", tab: "discussions", to: `/${project}/discussions` },
-  { hash: "who-decides", label: "People", tab: "people", to: `/${project}` },
-  { label: "Policy", tab: "policy", to: `/${project}/people` },
+  { label: "Policy", tab: "policy", to: `/${project}/policy` },
   { label: "Visibility", tab: "visibility", to: `/${project}/visibility` },
 ];
 
@@ -64,8 +50,7 @@ const TAB_OF = {
   commits: "landings",
   decisions: "asks",
   discussions: "discussions",
-  people: "policy",
-  proposals: "proposals",
+  policy: "policy",
   raw: "code",
   refs: "code",
   tree: "code",
@@ -75,33 +60,35 @@ const TAB_OF = {
 
 /** A crumb names the page itself, which may be narrower than its tab. */
 type PageSection =
+  | "asks"
   | "code"
   | "discussions"
   | "landings"
   | "overview"
-  | "people"
+  | "policy"
   | "refs"
   | "visibility";
 
 const PAGE_TO = (project: string) =>
   ({
+    asks: `/${project}/asks`,
     code: `/${project}/tree/main`,
     discussions: `/${project}/discussions`,
     landings: `/${project}/commits/main`,
     overview: `/${project}`,
-    people: `/${project}/people`,
+    policy: `/${project}/policy`,
     refs: `/${project}/refs`,
     visibility: `/${project}/visibility`,
   }) as const satisfies Record<PageSection, string>;
 
 const SECTION_OF = {
-  answers: "overview",
-  asks: "overview",
+  answers: "asks",
+  asks: "asks",
   blob: "code",
   commit: "landings",
   commits: "landings",
   discussions: "discussions",
-  people: "people",
+  policy: "policy",
   refs: "refs",
   tree: "code",
   visibility: "visibility",
@@ -137,25 +124,9 @@ export const projectTabOf = (pathname: string): ProjectTab | undefined => {
     : Object.entries(TAB_OF).find(([segment]) => segment === page)?.[1];
 };
 
-/**
- * The pages under a project that its route draws in another shell: starting
- * a proposal is focused (`staticData.shell` is `focus`), so it has no header.
- */
-const OUTSIDE_FRAME: readonly (readonly string[])[] = [["proposals", "new"]];
-
 /** Whether a path is a project's page drawn in the project's frame, under its header. */
-export const inProjectFrame = (pathname: string): boolean => {
-  const address = addressOf(pathname);
-
-  return (
-    address !== undefined &&
-    !OUTSIDE_FRAME.some(
-      (page) =>
-        page.length === address.rest.length &&
-        page.every((segment, at) => address.rest[at] === segment)
-    )
-  );
-};
+export const inProjectFrame = (pathname: string): boolean =>
+  addressOf(pathname) !== undefined;
 
 const sectionOf = (pathname: string): PageSection | undefined => {
   const address = addressOf(pathname);
@@ -178,11 +149,12 @@ export interface Crumb {
 }
 
 const SECTION_LABEL = {
+  asks: "Asks",
   code: "Code",
   discussions: "Discussions",
   landings: "Landings",
-  overview: "Asks",
-  people: "Policy",
+  overview: "Overview",
+  policy: "Policy",
   refs: "Refs",
   visibility: "Visibility",
 } as const satisfies Record<PageSection, string>;
@@ -226,12 +198,12 @@ const SITE_CRUMBS = {
 
 const SUBJECT_CRUMBS = {
   answers: (project: string, ask: string) => [
-    ...projectCrumbs(project, "overview", true),
+    ...projectCrumbs(project, "asks", true),
     { label: ask, mono: true, to: `/${project}/asks/${ask}` },
     { label: "Answer" },
   ],
   asks: (project: string, ask: string) => [
-    ...projectCrumbs(project, "overview", true),
+    ...projectCrumbs(project, "asks", true),
     { label: ask, mono: true },
   ],
   blob: (project: string, _rev: string, path: string) =>
@@ -248,10 +220,6 @@ const SUBJECT_CRUMBS = {
     { label: project, to: `/${project}` },
     { label: "Inbox", to: INBOX_PATH },
     { label: decision, mono: true },
-  ],
-  proposals: (project: string, proposal: string) => [
-    ...projectCrumbs(project, "overview", true),
-    proposal === "new" ? { label: "Propose" } : { label: proposal, mono: true },
   ],
   tree: (project: string, _rev: string, path: string) =>
     pathCrumbs(project, path),

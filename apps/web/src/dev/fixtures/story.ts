@@ -33,17 +33,12 @@ import {
   SuiteRoot,
   TreeSha,
 } from "@repo/protocol/ids";
-import type {
-  AskId,
-  Handle,
-  ProjectName,
-  ProposalId,
-} from "@repo/protocol/ids";
+import type { AskId, Handle, ProjectName } from "@repo/protocol/ids";
 import { Array, DateTime, Effect, Option, Record } from "effect";
 
 import { overlay, personIdentity, platformIdentity, scratch } from "../git.ts";
 import type { Files } from "../git.ts";
-import type { FixtureRecord, HeldProposal, KeptLog } from "./record.ts";
+import type { FixtureRecord, KeptLog } from "./record.ts";
 
 const MODULUS = 4_294_967_291;
 
@@ -139,7 +134,6 @@ export const storyOf = (input: {
     const claims = new Map<AskId, Held[]>();
     const decisions: Decision[] = [];
     const ledger: LedgerEntry[] = [];
-    const proposals = new Map<ProposalId, HeldProposal>();
     const logs = new Map<string, KeptLog>();
     const firstClaims = new Map<Handle, DateTime.Utc>();
     const forked = new Set<RepoName>();
@@ -654,53 +648,6 @@ export const storyOf = (input: {
         );
       },
 
-      propose: (
-        held: HeldProposal,
-        settled?: { readonly at: DateTime.Utc; readonly ready: boolean }
-      ) => {
-        proposals.set(held.proposal.id, held);
-        tell((seq) =>
-          ProjectEvent.cases.ProposalOpened.make({
-            at: held.proposal.openedAt,
-            proposal: held.proposal.id,
-            seq,
-          })
-        );
-
-        if (settled !== undefined) {
-          tell((seq) =>
-            ProjectEvent.cases.ProposalDrafted.make({
-              at: settled.at,
-              proposal: held.proposal.id,
-              ready: settled.ready,
-              seq,
-            })
-          );
-        }
-      },
-
-      drafted: (id: ProposalId, at: DateTime.Utc, ready: boolean) => {
-        tell((seq) =>
-          ProjectEvent.cases.ProposalDrafted.make({
-            at,
-            proposal: id,
-            ready,
-            seq,
-          })
-        );
-      },
-
-      accepted: (id: ProposalId) => {
-        const held = proposals.get(id);
-
-        if (held !== undefined) {
-          proposals.set(id, {
-            ...held,
-            proposal: { ...held.proposal, state: "accepted" },
-          });
-        }
-      },
-
       tag: (name: string, sha: LandedSha) =>
         Effect.gen(function* () {
           const into = yield* scratch;
@@ -805,7 +752,6 @@ export const storyOf = (input: {
           landings: [...landings],
           ledger: { ...apart.ledger, entries: [...ledger] },
           logs: new Map(logs),
-          proposals: new Map(proposals),
           verdicts: new Map(verdicts),
         };
       },

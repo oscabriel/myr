@@ -45,7 +45,6 @@ import { ProjectEvent } from "./domain/event.ts";
 import { FrontPageEntry, ProjectListing } from "./domain/front-page.ts";
 import { LandingView } from "./domain/landing.ts";
 import { ImportSource, PolicyPending, PublicPolicy } from "./domain/policy.ts";
-import { DraftNote, Proposal } from "./domain/proposal.ts";
 import { RecentLandings } from "./domain/recent-landing.ts";
 import { CreditSummary } from "./domain/record.ts";
 import { Ledger } from "./domain/visibility.ts";
@@ -60,7 +59,6 @@ import {
   LandedSha,
   LaneName,
   ProjectName,
-  ProposalId,
   RepoName,
   RepoPath,
   RequestId,
@@ -74,7 +72,6 @@ import {
   DecisionClosed,
   Denounced,
   DiscussionClosed,
-  DraftInProgress,
   ImportFailed,
   NotYourNamespace,
   IncompleteBrief,
@@ -86,7 +83,6 @@ import {
   OutOfScope,
   PrivatePathInPublicTree,
   ProjectExists,
-  ProposalClosed,
   ReachedInternals,
   RepoBusy,
   StaleBase,
@@ -98,7 +94,6 @@ import {
   UnknownEnvItem,
   UnknownPath,
   UnknownProject,
-  UnknownProposal,
   UnknownRevision,
   ValueTooShort,
   VerifierBlocked,
@@ -126,12 +121,10 @@ const servedOn = {
   claim: ["rpc", "mcp", "cli"],
   credits: SurfaceName.literals,
   decide: SurfaceName.literals,
-  draftAsk: SurfaceName.literals,
   [envSchemaTag]: SurfaceName.literals,
   // A log may hold text an agent's transcript should not carry: never MCP.
   evidence: ["rpc", "cli"],
   finish: ["rpc", "mcp", "cli"],
-  flagAsk: ["rpc", "mcp", "cli"],
   fork: ["rpc", "mcp", "cli"],
   frontPage: SurfaceName.literals,
   initProject: ["rpc", "mcp", "cli", "web"],
@@ -150,7 +143,6 @@ const servedOn = {
   // The web adds no form for what the CLI does: a post is made from a terminal.
   postDiscussion: ["rpc", "mcp", "cli"],
   projectPolicy: SurfaceName.literals,
-  proposeAsk: SurfaceName.literals,
   readFile: ["rpc", "mcp", "web"],
   readTree: ["rpc", "mcp", "web"],
   // A list with no command: an agent asks it over MCP, a person reads it on the landing.
@@ -161,7 +153,6 @@ const servedOn = {
   showAsk: SurfaceName.literals,
   showCommit: ["rpc", "web"],
   showDiscussion: SurfaceName.literals,
-  showProposal: SurfaceName.literals,
   status: SurfaceName.literals,
   submitAnswer: ["rpc", "mcp", "cli"],
   today: SurfaceName.literals,
@@ -638,27 +629,6 @@ export class PolicyOf extends Rpc.make("projectPolicy", {
   .annotate(Cli, { name: "policy" })
   .annotate(Surfaces, servedOn.projectPolicy) {}
 
-export class ShowProposal extends Rpc.make("showProposal", {
-  error: Schema.Union([UnknownProject, UnknownProposal]),
-  payload: { project: ProjectName, proposal: ProposalId },
-  success: Schema.Struct({
-    files: Schema.Array(ConfigFile),
-    proposal: Proposal,
-  }),
-})
-  .annotate(
-    Description,
-    "Show one proposal, its draft's state and the ask files it holds."
-  )
-  .annotate(Audience, "public")
-  .annotate(Visibility, "public")
-  .annotate(ReadOnly, true)
-  .annotate(Idempotent, true)
-  .annotate(Destructive, false)
-  .annotate(NeedsApproval, false)
-  .annotate(Cli, { name: "proposal", positional: ["proposal"] })
-  .annotate(Surfaces, servedOn.showProposal) {}
-
 export class ListDiscussions extends Rpc.make("listDiscussions", {
   error: UnknownProject,
   payload: { project: ProjectName },
@@ -666,7 +636,7 @@ export class ListDiscussions extends Rpc.make("listDiscussions", {
 })
   .annotate(
     Description,
-    "List a project's discussions, newest post first: each thread's title, opener, state and the proposal it became."
+    "List a project's discussions, newest post first: each thread's title, opener, state and the ask it became."
   )
   .annotate(Audience, "public")
   .annotate(Visibility, "public")
@@ -687,7 +657,7 @@ export class ShowDiscussion extends Rpc.make("showDiscussion", {
 })
   .annotate(
     Description,
-    "Show one discussion: its posts in order, its state and the proposal it became."
+    "Show one discussion: its posts in order, its state and the ask it became."
   )
   .annotate(Audience, "public")
   .annotate(Visibility, "public")
@@ -733,9 +703,17 @@ export class OpenAsk extends Rpc.make("openAsk", {
     TouchedJudge,
     VerifierBlocked,
     StaleBase,
+    UnknownDiscussion,
+    DiscussionClosed,
   ]),
   payload: {
     ask: AskId,
+    discussion: Schema.optionalKey(
+      described(
+        DiscussionId,
+        "The discussion this ask comes from; opening it marks the thread asked"
+      )
+    ),
     files: described(
       Schema.NonEmptyArray(ConfigFile),
       "The ask file and its check, as JSON [{path, content}]; the CLI reads both from your working tree when it is left out"
@@ -746,7 +724,7 @@ export class OpenAsk extends Rpc.make("openAsk", {
 })
   .annotate(
     Description,
-    "Open an ask by landing its file, once its check fails on main by an assertion, twice in the same way."
+    "Open an ask by landing its file, once its check fails on main by an assertion, twice in the same way; name the discussion it comes from to mark that thread asked."
   )
   .annotate(Audience, "decider")
   .annotate(Visibility, "public")
@@ -756,137 +734,6 @@ export class OpenAsk extends Rpc.make("openAsk", {
   .annotate(NeedsApproval, true)
   .annotate(Cli, { name: "ask open", positional: ["ask"] })
   .annotate(Surfaces, servedOn.openAsk) {}
-
-const draftsAlone = Schema.makeFilter(
-  (payload: {
-    readonly draft?: true;
-    readonly files?: unknown;
-    readonly sealed?: unknown;
-  }) =>
-    payload.draft === undefined ||
-    (payload.files === undefined && payload.sealed === undefined)
-      ? true
-      : "a drafted proposal carries neither files nor a sealed answer"
-);
-
-export class ProposeAsk extends Rpc.make("proposeAsk", {
-  error: Schema.Union([
-    UnknownProject,
-    Denounced,
-    CapReached,
-    NotVouched,
-    NotDecider,
-    UnknownDiscussion,
-    DiscussionClosed,
-  ]),
-  payload: Schema.Struct({
-    /** The discussion this proposal comes from; a maintainer alone may name one, and it marks the thread proposed. */
-    discussion: Schema.optionalKey(
-      described(
-        DiscussionId,
-        "The discussion this proposal comes from; a maintainer alone may name one"
-      )
-    ),
-    draft: Schema.optionalKey(
-      described(
-        Schema.Literal(true),
-        "Have the platform's agent draft the ask file and its failing check"
-      )
-    ),
-    files: Schema.optionalKey(
-      described(
-        Schema.NonEmptyArray(ConfigFile),
-        "Your own ask file and check, as JSON [{path, content}]"
-      )
-    ),
-    project: ProjectName,
-    sealed: Schema.optionalKey(
-      described(
-        Schema.Struct({ head: CommitSha }),
-        "An answer you already have, sealed until the ask opens, as JSON {head}"
-      )
-    ),
-    territory: Schema.optionalKey(
-      described(
-        Schema.NonEmptyString,
-        "The paths an answer may change, in your words"
-      )
-    ),
-    want: described(
-      Schema.NonEmptyString,
-      "What should be true once the ask is answered"
-    ),
-  }).check(draftsAlone),
-  success: Schema.Struct({ proposal: Proposal }),
-})
-  .annotate(
-    Description,
-    "Propose an ask, optionally with a sealed answer, or, as a maintainer, from a discussion; the proposal expires unless a maintainer accepts it."
-  )
-  .annotate(Audience, "signedIn")
-  .annotate(Visibility, "public")
-  .annotate(ReadOnly, false)
-  .annotate(Idempotent, false)
-  .annotate(Destructive, false)
-  .annotate(NeedsApproval, false)
-  .annotate(Cli, { name: "propose" })
-  .annotate(Surfaces, servedOn.proposeAsk) {}
-
-export class DraftAsk extends Rpc.make("draftAsk", {
-  error: Schema.Union([
-    UnknownProject,
-    UnknownProposal,
-    ProposalClosed,
-    NotDecider,
-    DraftInProgress,
-    CapReached,
-  ]),
-  payload: {
-    note: Schema.optionalKey(
-      described(DraftNote, "What the next round should change, for the agent")
-    ),
-    project: ProjectName,
-    proposal: ProposalId,
-  },
-  success: Schema.Struct({ proposal: Proposal }),
-})
-  .annotate(
-    Description,
-    "Have the platform's agent draft, or draft again, an open proposal's ask and its failing check; the proposer or a maintainer may ask."
-  )
-  .annotate(Audience, "signedIn")
-  .annotate(Visibility, "public")
-  .annotate(ReadOnly, false)
-  .annotate(Idempotent, false)
-  .annotate(Destructive, false)
-  .annotate(NeedsApproval, false)
-  .annotate(Cli, { name: "ask draft", positional: ["proposal"] })
-  .annotate(Surfaces, servedOn.draftAsk) {}
-
-export class FlagAsk extends Rpc.make("flagAsk", {
-  error: Schema.Union([UnknownProject, UnknownAsk, Denounced, CapReached]),
-  payload: {
-    ask: AskId,
-    project: ProjectName,
-    reason: described(
-      Schema.NonEmptyString,
-      "What is wrong with the ask, for its maintainers"
-    ),
-  },
-  success: Schema.Struct({ proposal: Proposal }),
-})
-  .annotate(
-    Description,
-    "Flag an open ask to its maintainers with a reason, as a proposal that expires unless a maintainer accepts it."
-  )
-  .annotate(Audience, "signedIn")
-  .annotate(Visibility, "public")
-  .annotate(ReadOnly, false)
-  .annotate(Idempotent, false)
-  .annotate(Destructive, false)
-  .annotate(NeedsApproval, false)
-  .annotate(Cli, { name: "ask flag", positional: ["ask"] })
-  .annotate(Surfaces, servedOn.flagAsk) {}
 
 const titleOrBody = Schema.makeFilter(
   (payload: {
@@ -1144,7 +991,7 @@ export class Vouch extends Rpc.make("vouch", {
     project: ProjectName,
     verdict: described(
       Schema.Literals(["vouch", "denounce"]),
-      "vouch admits them to claim; denounce bars them from claiming and proposing"
+      "vouch admits them to claim; denounce bars them from claiming and posting"
     ),
   },
   success: Schema.Struct({ landed: LandedSha }),
@@ -1249,14 +1096,10 @@ export class Contracts extends RpcGroup.make(
   ShowCommit,
   WhyOf,
   PolicyOf,
-  ShowProposal,
   ListDiscussions,
   ShowDiscussion,
   InitProject,
   OpenAsk,
-  ProposeAsk,
-  DraftAsk,
-  FlagAsk,
   PostDiscussion,
   Decide,
   Claim,

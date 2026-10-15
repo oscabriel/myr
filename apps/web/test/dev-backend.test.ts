@@ -1,8 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Brand } from "@repo/brand";
 import { Client, Contracts } from "@repo/protocol/contracts";
 import { forkRev } from "@repo/protocol/domain/code";
-import { DecisionSubject } from "@repo/protocol/domain/decision";
 import { ProjectEvent } from "@repo/protocol/domain/event";
 import { Handle, ProjectName } from "@repo/protocol/ids";
 import { Unauthenticated } from "@repo/protocol/principal";
@@ -516,68 +514,37 @@ describe("the dev world's answer forks", seededWorlds, () => {
   );
 });
 
-const drafted = inFreshWorld((as) =>
+const discussed = inFreshWorld((as) =>
   Effect.gen(function* () {
     const anyone = yield* clientOf(as());
-    const ines = yield* clientOf(as(decider));
-    const bram = yield* clientOf(as(contributor));
     const project = ProjectName.make("oscabriel/datekit");
-    const before = yield* ines.today({ project });
+    const { discussions } = yield* anyone.listDiscussions({ project });
 
-    const { proposal } = yield* bram.proposeAsk({
-      draft: true,
-      project,
-      want: "datekit reads ordinal dates such as 2026-280.",
-    });
-
-    const shown = yield* anyone.showProposal({
-      project,
-      proposal: proposal.id,
-    });
-
-    return {
-      after: yield* ines.today({ project }),
-      before,
-      proposed: proposal,
-      shown,
-    };
+    return discussions.map(({ ask, state, title }) => ({ ask, state, title }));
   })
 );
 
-describe("a draft in the dev world", seededWorlds, () => {
+describe("the dev world's discussions", seededWorlds, () => {
   it.live(
-    "is drafted as it is proposed, red first on the scripted Checker, and its decision joins the maintainer's Today",
+    "hold a thread a maintainer opened an ask from, and one still open",
     () =>
       Effect.gen(function* () {
-        const { after, before, proposed, shown } = yield* drafted;
-
-        // Today holds every open decision, so the draft's joins the seeded ones.
-        const joined = after.decisions.filter(
-          ({ id }) => !before.decisions.some((was) => was.id === id)
-        );
-
-        expect({
-          files: shown.files.map(({ path }) => path),
-          joined: joined.map(({ subject }) => subject),
-          kept: before.decisions.every(({ id }) =>
-            after.decisions.some((now) => now.id === id)
-          ),
-          proposed: proposed.draft?._tag,
-          ready: shown.proposal.draft?._tag,
-        }).toStrictEqual({
-          files: [
-            `${Brand.configDir}/asks/parse-ordinal.ask.ts`,
-            "test/asks/parse-ordinal.test.ts",
-          ],
-          joined: [
-            DecisionSubject.cases.OpenProposal.make({
-              proposal: proposed.id,
-            }),
-          ],
-          kept: true,
-          proposed: "Drafting",
-          ready: "Ready",
-        });
+        expect(
+          (yield* discussed).toSorted((one, other) =>
+            one.title.localeCompare(other.title)
+          )
+        ).toStrictEqual([
+          {
+            ask: "parse-iso-week",
+            state: "asked",
+            title: "ISO week dates",
+          },
+          {
+            ask: undefined,
+            state: "open",
+            title: "Which day starts a week?",
+          },
+        ]);
       })
   );
 });

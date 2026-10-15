@@ -12,7 +12,6 @@ import {
   LandedSha,
   ProjectName,
   DiscussionId,
-  ProposalId,
   RepoPath,
   RequestId,
 } from "../src/ids.ts";
@@ -20,18 +19,15 @@ import {
   CapReached,
   ChecksFailed,
   DirectPush,
-  DraftInProgress,
   NotDecider,
   OutOfScope,
   PrivatePathInPublicTree,
   DiscussionClosed,
-  ProposalClosed,
   ReachedInternals,
   StaleBase,
   TouchedJudge,
   UnknownPath,
   UnknownDiscussion,
-  UnknownProposal,
   UnknownRevision,
   ValueTooShort,
   WeakCheck,
@@ -123,12 +119,12 @@ describe(explain, () => {
 
   it.each([
     {
-      ends: "; put those files back, or flag the ask if the want needs them",
+      ends: "; put those files back, or say why the want needs them in a discussion",
       refusal: outOfScope,
       starts: "OutOfScope: changes paths outside the ask's territory: src/a.ts",
     },
     {
-      ends: "; the checks are fixed for this ask, so put them back, or flag the ask if a check is wrong",
+      ends: "; the checks are fixed for this ask, so put them back, or say why a check is wrong in a discussion",
       refusal: touchedJudge,
       starts:
         "TouchedJudge: changes files that decide what the checks do: src/a.ts",
@@ -195,10 +191,10 @@ describe(explain, () => {
     ] as const;
 
     expect(explain(refusals)).toStrictEqual([
-      "OutOfScope: changes paths outside the ask's territory: packages/b/src/y.ts; put those files back, or flag the ask if the want needs them",
+      "OutOfScope: changes paths outside the ask's territory: packages/b/src/y.ts; put those files back, or say why the want needs them in a discussion",
       `  next: ${Brand.cli} check`,
       "  retryable: no",
-      "TouchedJudge: changes files that decide what the checks do: oxlint.config.ts; the checks are fixed for this ask, so put them back, or flag the ask if a check is wrong",
+      "TouchedJudge: changes files that decide what the checks do: oxlint.config.ts; the checks are fixed for this ask, so put them back, or say why a check is wrong in a discussion",
       `  next: ${Brand.cli} check`,
       "  retryable: no",
       'Weakened: adds .skip( without a reason; remove it, or give a reason after " -- " for a maintainer to weigh',
@@ -286,26 +282,6 @@ describe(explain, () => {
     },
     {
       reason:
-        "you made 5 proposals in the last minute, the most the platform allows; try again in 60s",
-      refusal: new CapReached({ cap: 5, limit: "proposals", retryAfter: 60 }),
-    },
-    {
-      reason:
-        "you made 1 proposal in the last minute, the most the platform allows; try again in 60s",
-      refusal: new CapReached({ cap: 1, limit: "proposals", retryAfter: 60 }),
-    },
-    {
-      reason:
-        "you already have 2 open proposals here, the most this project allows",
-      refusal: new CapReached({ cap: 2, limit: "proposals" }),
-    },
-    {
-      reason:
-        "you already have 1 open proposal here, the most this project allows",
-      refusal: new CapReached({ cap: 1, limit: "proposals" }),
-    },
-    {
-      reason:
         "you already have 20 open discussions here, the most this project allows",
       refusal: new CapReached({ cap: 20, limit: "discussions" }),
     },
@@ -313,26 +289,6 @@ describe(explain, () => {
       reason:
         "you made 5 posts in the last minute, the most the platform allows; try again in 60s",
       refusal: new CapReached({ cap: 5, limit: "discussions", retryAfter: 60 }),
-    },
-    {
-      reason:
-        "you started 2 drafts in the last minute, the most the platform allows; try again in 60s",
-      refusal: new CapReached({ cap: 2, limit: "drafts", retryAfter: 60 }),
-    },
-    {
-      reason:
-        "you started 1 draft in the last minute, the most the platform allows; try again in 30s",
-      refusal: new CapReached({ cap: 1, limit: "drafts", retryAfter: 30 }),
-    },
-    {
-      reason:
-        "this proposal was already drafted 3 times, the most one proposal takes",
-      refusal: new CapReached({ cap: 3, limit: "drafts" }),
-    },
-    {
-      reason:
-        "this proposal was already drafted once, the most one proposal takes",
-      refusal: new CapReached({ cap: 1, limit: "drafts" }),
     },
   ])("reads CapReached as: $reason", ({ refusal, reason }) => {
     expect(explain([refusal])).toStrictEqual([
@@ -361,24 +317,6 @@ describe(explain, () => {
     },
     {
       lines: [
-        "UnknownProposal: this project has no proposal prop-000007",
-        `  next: ${Brand.cli} today`,
-        "  retryable: no",
-      ],
-      refusal: new UnknownProposal({
-        proposal: ProposalId.make("prop-000007"),
-      }),
-    },
-    {
-      lines: [
-        "ProposalClosed: prop-000007 was already accepted, declined or expired",
-        `  next: ${Brand.cli} today`,
-        "  retryable: no",
-      ],
-      refusal: new ProposalClosed({ proposal: ProposalId.make("prop-000007") }),
-    },
-    {
-      lines: [
         "UnknownDiscussion: this project has no discussion disc-000007",
         `  next: ${Brand.cli} discussions`,
         "  retryable: no",
@@ -389,21 +327,13 @@ describe(explain, () => {
     },
     {
       lines: [
-        "DiscussionClosed: disc-000007 is closed, or became a proposal, so it takes no more posts",
+        "DiscussionClosed: disc-000007 is closed, or became an ask, so it takes no more posts",
         `  next: ${Brand.cli} discussions`,
         "  retryable: no",
       ],
       refusal: new DiscussionClosed({
         discussion: DiscussionId.make("disc-000007"),
       }),
-    },
-    {
-      lines: [
-        "DraftInProgress: the platform is already drafting prop-000007's ask",
-        `  next: ${Brand.cli} proposal prop-000007`,
-        "  retryable: yes",
-      ],
-      refusal: DraftInProgress.of(ProposalId.make("prop-000007")),
     },
     {
       lines: [

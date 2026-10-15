@@ -4,7 +4,7 @@ import { CheckSpec } from "@repo/protocol/domain/check";
 import { Policy } from "@repo/protocol/domain/policy";
 import type { VisibilityPolicy } from "@repo/protocol/domain/visibility";
 import { RepoPath } from "@repo/protocol/ids";
-import { ClaimantFacts, ProposalFacts } from "@repo/sdk";
+import { ClaimantFacts } from "@repo/sdk";
 import { Duration, Effect, Layer, Result, Schema } from "effect";
 
 import { Finishers } from "../src/finish.ts";
@@ -24,14 +24,13 @@ import {
   now,
 } from "./world.ts";
 
-const decodeProposal = Schema.decodeUnknownSync(ProposalFacts);
-
 const decodeClaimant = Schema.decodeUnknownSync(ClaimantFacts);
 
-const fixBugProposal = {
+const fixBugClaimant = {
+  handle: "bram",
   kind: "fixBug",
-  proposer: "carol",
   territory: "@datekit/parse",
+  vouched: true,
 };
 
 const redThenGreen = (path: string) =>
@@ -110,14 +109,14 @@ const exampleEncoded = {
       territory: { module: "@datekit/parse", paths: ["packages/parse/**"] },
     },
   ],
-  caps: { claimsPerPerson: 3, proposalsPerPerson: 2 },
+  caps: { claimsPerPerson: 3 },
   claims: { lapseAfterMs: 86_400_000, warnAfterMs: 7_200_000 },
   deciders: [
     { handles: ["priya"], paths: "packages/parse/src/public/**" },
     { handles: ["olivia"], paths: "**" },
   ],
   decisions: { expireDays: 14 },
-  functions: { admit: false, opensAlone: true },
+  functions: { admit: true },
   judge: judgeFor("bun test {path}"),
   kinds: [fixBug],
   ratchets: [],
@@ -144,11 +143,11 @@ const jsonEncoded = {
       territory: { module: ".", paths: ["**"] },
     },
   ],
-  caps: { claimsPerPerson: 20, proposalsPerPerson: 20 },
+  caps: { claimsPerPerson: 20 },
   claims: { lapseAfterMs: 86_400_000, warnAfterMs: 7_200_000 },
   deciders: [{ handles: ["olivia"], paths: "**" }],
   decisions: { expireDays: 7 },
-  functions: { admit: false, opensAlone: false },
+  functions: { admit: false },
   judge: judgeFor("npx vitest run {path}"),
   kinds: [
     {
@@ -178,11 +177,11 @@ const defaultsEncoded = {
   ...fromFacts,
   agents: "trailer",
   asks: [],
-  caps: { claimsPerPerson: 20, proposalsPerPerson: 20 },
+  caps: { claimsPerPerson: 20 },
   claims: { lapseAfterMs: 86_400_000, warnAfterMs: 7_200_000 },
   deciders: [{ handles: ["olivia"], paths: "**" }],
   decisions: { expireDays: 14 },
-  functions: { admit: false, opensAlone: false },
+  functions: { admit: false },
   judge: judgeFor("bun test {path}"),
   kinds: [
     {
@@ -501,17 +500,9 @@ describe("the /bun adapter", () => {
     "project.ts": [
       'import { check, kind, kinds, project } from "@repo/sdk";',
       "",
-      "const trusted = kind({",
-      "  args: {},",
-      '  check: () => check.redThenGreen("test/trusted.test.ts"),',
-      '  checkKind: "redThenGreen",',
-      '  name: "trusted",',
-      "  opensAlone: (proposal) => proposal.record >= 3,",
-      "});",
-      "",
       "export default project({",
       "  admit: (claimant) => claimant.vouched || claimant.record > 0,",
-      "  kinds: [kinds.fix, trusted],",
+      "  kinds: [kinds.fix],",
       "});",
     ].join("\n"),
   });
@@ -520,19 +511,6 @@ describe("the /bun adapter", () => {
     Effect.gen(function* () {
       const evaluator = yield* RulesEvaluator;
       const modules = sdkProject;
-
-      const proposal = (kind: string, record: number) =>
-        evaluator.call({
-          at,
-          facts: decodeProposal({
-            kind,
-            proposer: "carol",
-            record,
-            territory: ".",
-          }),
-          modules,
-          rule: "opensAlone",
-        });
 
       const claimant = (vouched: boolean, record: number) =>
         evaluator.call({
@@ -549,13 +527,10 @@ describe("the /bun adapter", () => {
         });
 
       expect([
-        yield* proposal("trusted", 3),
-        yield* proposal("trusted", 2),
-        yield* proposal("fix", 9),
         yield* claimant(true, 0),
         yield* claimant(false, 1),
         yield* claimant(false, 0),
-      ]).toStrictEqual([true, false, false, true, true, false]);
+      ]).toStrictEqual([true, true, false]);
     }).pipe(Effect.provide(bunEvaluator()))
   );
 
@@ -582,32 +557,15 @@ describe("the /bun adapter", () => {
       const evaluator = yield* RulesEvaluator;
       const modules = yield* folder("cm");
 
-      const opensAlone = (record: number) =>
+      const admit = (record: number) =>
         evaluator.call({
           at,
-          facts: decodeProposal({ ...fixBugProposal, record }),
+          facts: decodeClaimant({ ...fixBugClaimant, record }),
           modules,
-          rule: "opensAlone",
+          rule: "admit",
         });
 
-      const admit = evaluator.call({
-        at,
-        facts: decodeClaimant({
-          handle: "bram",
-          kind: "fixBug",
-          record: 3,
-          territory: "@datekit/parse",
-          vouched: true,
-        }),
-        modules,
-        rule: "admit",
-      });
-
-      expect([
-        yield* opensAlone(3),
-        yield* opensAlone(1),
-        yield* admit,
-      ]).toStrictEqual([true, false, false]);
+      expect([yield* admit(3), yield* admit(1)]).toStrictEqual([true, false]);
     }).pipe(Effect.provide(bunEvaluator()))
   );
 });
@@ -663,9 +621,9 @@ describe("the /json adapter", () => {
 
       const called = yield* evaluator.call({
         at,
-        facts: decodeProposal({ ...fixBugProposal, record: 3 }),
+        facts: decodeClaimant({ ...fixBugClaimant, record: 3 }),
         modules: yield* folder("cm"),
-        rule: "opensAlone",
+        rule: "admit",
       });
 
       expect(called).toBeFalsy();

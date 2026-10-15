@@ -67,10 +67,7 @@ const platform = (
       noProjects,
       MemorySessions.layer({}),
       FrontPageMemory.layer({ credits: [], entries: [], projects: listed }),
-      Layer.succeed(
-        HostInfo,
-        HostInfo.of({ draftModel: "@cf/test/drafter", webUrl: web })
-      )
+      Layer.succeed(HostInfo, HostInfo.of({ webUrl: web }))
     )
   );
 
@@ -115,7 +112,6 @@ describe("the platform's /", () => {
         `${origin}/.well-known/oauth-authorization-server`,
         `${origin}/signup`,
         `${origin}/authorize`,
-        "@cf/test/drafter",
         `${origin}/health`,
         `<a href="${webUrl}">Open the web app</a>`,
       ]) {
@@ -257,10 +253,7 @@ describe("the platform's /", () => {
             FrontPageMemory.layer({ credits: [], entries: [], projects }),
             Layer.succeed(
               HostInfo,
-              HostInfo.of({
-                draftModel: "@cf/test/drafter",
-                webUrl: Option.some(webUrl),
-              })
+              HostInfo.of({ webUrl: Option.some(webUrl) })
             )
           )
         );

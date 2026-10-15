@@ -1,6 +1,6 @@
 /**
  * The facts the platform counts and times: landings, refusals, check lanes,
- * the wait before an answer's checks start, and draft rounds. A point names
+ * and the wait before an answer's checks start. A point names
  * public things only (a project, a refusal's tag and area, a stage, a lane)
  * and numbers: never a path, a layer, a held-back check, a command, a log or
  * a value. The project writes each one to its outbox in the same commit as
@@ -22,13 +22,6 @@ const Millis = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
 export const MetricPoint = Schema.TaggedUnion({
   /** How long an answer waited, from its submission, before its checks started. */
   ChecksWaited: { project: ProjectName, waitedMs: Millis },
-  /** A draft round, from its start to its settle. */
-  Drafted: {
-    attempts: Schema.Int,
-    latencyMs: Millis,
-    project: ProjectName,
-    ready: Schema.Boolean,
-  },
   /** A commit the platform landed on a project's main. */
   Landed: { project: ProjectName },
   /** One check lane's run on an answer's merged tree, as the Checker timed it. */

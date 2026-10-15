@@ -19,7 +19,6 @@ import type {
   LedgerRow,
   OutboxRow,
   ProjectRow,
-  ProposalRow,
   PushEventRow,
   RatchetRow,
 } from "./project-store/rows.ts";
@@ -43,7 +42,6 @@ export interface ProjectSnapshot {
   readonly ledger: readonly LedgerRow[];
   readonly outbox: readonly OutboxRow[];
   readonly project: Option.Option<ProjectRow>;
-  readonly proposals: readonly ProposalRow[];
   readonly queue: Schema.Json;
   readonly ratchets: readonly RatchetRow[];
 }
@@ -63,7 +61,6 @@ export interface ProjectWrites {
   readonly ledger?: readonly LedgerRow[];
   readonly outbox?: readonly OutboxRow[];
   readonly project?: ProjectRow;
-  readonly proposals?: readonly ProposalRow[];
   readonly pushEvents?: readonly PushEventRow[];
   readonly queue?: Schema.Json;
   readonly ratchets?: readonly RatchetRow[];

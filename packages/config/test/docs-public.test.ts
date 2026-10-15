@@ -63,6 +63,7 @@ const privateIn = (file: string, text: string) => [
 const TERMS = [
   "Claim fork",
   "Decision",
+  "Discussion",
   "Family",
   "Landed SHA",
   "Outcome",
@@ -70,7 +71,6 @@ const TERMS = [
   "Patch id",
   "Policy",
   "Project name",
-  "Proposal",
   "Source namespace",
   "Today",
   "Working fork",

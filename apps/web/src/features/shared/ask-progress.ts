@@ -101,8 +101,6 @@ const apply = (states: Map<AskId, AskProgress>, event: ProjectEvent): void => {
     },
     DiscussionPosted: constVoid,
     LedgerAppended: constVoid,
-    ProposalDrafted: constVoid,
-    ProposalOpened: constVoid,
     Pushed: ({ ask, at, head }) => {
       change(ask, (progress) => ({ ...progress, lastPush: { at, head } }));
     },

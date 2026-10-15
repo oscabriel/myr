@@ -170,24 +170,13 @@ describe("the why page's fallback", () => {
     expect(hrefsOf(band)).toContain(`/oscabriel/datekit/commit/${IMPORTED}`);
   });
 
-  it("offers why, one step back, and a proposal about each group's first line", () => {
+  it("offers why, one step back, on each group's first line", () => {
     const markup = markupOf(page);
-    const hrefs = hrefsOf(markup);
 
-    expect(hrefs).toContain(`/oscabriel/datekit/why/${IMPORTED}/src/format.ts`);
+    expect(hrefsOf(markup)).toContain(
+      `/oscabriel/datekit/why/${IMPORTED}/src/format.ts`
+    );
     expect(textOf(markup)).toContain("why, one step back");
-    expect(textOf(markup)).toContain("Propose an ask about this line");
-
-    const proposal = hrefs
-      .filter((href) => href.startsWith("/oscabriel/datekit/proposals/new?"))
-      .map((href) =>
-        Object.fromEntries(new URL(href, "https://x").searchParams)
-      );
-
-    expect(proposal).toStrictEqual([
-      { about: "src/format.ts", at: AT, line: "1" },
-      { about: "src/format.ts", at: AT, line: "4" },
-    ]);
   });
 
   it("puts each group's band above its first line, among the numbered lines, and leaves the drawing to the browser", () => {
