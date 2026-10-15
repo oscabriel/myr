@@ -33,7 +33,7 @@ const SUBJECT = `Add ${CONFIG}: the run block ${Brand.cli} ${COMMAND} found`;
 
 const PENDING = { origin: "<platform>", remote: "<remote>" } as const;
 
-const NEXT = `Next: write an ask in ${Brand.configDir}/asks/<ask>.ask.ts, with its failing test under ${ASKS_DIR}/, then ${Brand.cli} ask open <ask>; or ${Brand.cli} propose --want "<what should be true>" --draft.`;
+const NEXT = `Next: write an ask in ${Brand.configDir}/asks/<ask>.ask.ts, with its failing test under ${ASKS_DIR}/, then ${Brand.cli} ask open <ask>.`;
 
 /** The CLI knows the platform's address alone; the web shows the project at the same path. */
 const pageLine = (project: string, remote: string) =>

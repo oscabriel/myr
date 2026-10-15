@@ -12,8 +12,6 @@ import { Schema, Struct } from "effect";
 import { check } from "./check.ts";
 import type { CheckSpecInput } from "./check.ts";
 import { checked } from "./checked.ts";
-import { withFunctions } from "./functions.ts";
-import type { KindFunctions, OpensAlone, WithFunctions } from "./functions.ts";
 import type { TerritoryInput } from "./territory.ts";
 
 export type AskKindInput = typeof AskKind.Encoded;
@@ -22,7 +20,7 @@ type AskInputEncoded = typeof AskInput.Encoded;
 
 export type AskStated = Omit<AskInputEncoded, "askedBy" | "file" | "id">;
 
-export type AskDefinition = AskStated & WithFunctions<KindFunctions>;
+export type AskDefinition = AskStated;
 
 export type AskFields = typeof Brief.Encoded &
   Partial<Pick<AskInputEncoded, "blockedBy">> &
@@ -63,8 +61,6 @@ export interface KindDefinition<
   readonly name: string;
   /** Answers can't be undone by a later answer: judge changes, dependency changes. */
   readonly oneWay?: boolean;
-  /** Whether a proposal for an ask of this kind opens without a maintainer. */
-  readonly opensAlone?: OpensAlone;
   /** How many claims an ask takes at once; 1 is exclusive. */
   readonly race?: number;
   readonly requires?: readonly BriefField[];
@@ -73,7 +69,7 @@ export interface KindDefinition<
   readonly territory?: DeriveTerritory<Args>;
 }
 
-export interface DeclaredKind extends WithFunctions<KindFunctions> {
+export interface DeclaredKind {
   readonly askKind: AskKindInput;
 }
 
@@ -114,7 +110,6 @@ export const kind: KindBuilder = <
   definition: KindDefinition<Args, K>
 ): KindHandle<Args, TerritoryMode> => {
   const decodeArgs = Schema.decodeSync(Schema.Struct(definition.args));
-  const functions: KindFunctions = { opensAlone: definition.opensAlone };
 
   const ask = (input: AskArgs<Args, TerritoryMode>): AskDefinition => {
     const args = decodeArgs(input);
@@ -139,25 +134,22 @@ export const kind: KindBuilder = <
       ),
     };
 
-    return withFunctions(stated, functions);
+    return stated;
   };
 
-  return withFunctions(
-    {
-      ask,
-      askKind: askKindOf({
-        checkKind: definition.checkKind,
-        claimers: definition.claimers ?? "vouched",
-        finish: definition.finish ?? "optional",
-        name: definition.name,
-        oneWay: definition.oneWay ?? false,
-        race: definition.race ?? 1,
-        requires: definition.requires ?? ["want", "check", "territory"],
-        strength: definition.strength ?? "assertion",
-      }),
-    },
-    functions
-  );
+  return {
+    ask,
+    askKind: askKindOf({
+      checkKind: definition.checkKind,
+      claimers: definition.claimers ?? "vouched",
+      finish: definition.finish ?? "optional",
+      name: definition.name,
+      oneWay: definition.oneWay ?? false,
+      race: definition.race ?? 1,
+      requires: definition.requires ?? ["want", "check", "territory"],
+      strength: definition.strength ?? "assertion",
+    }),
+  };
 };
 
 export interface AskOrigin {

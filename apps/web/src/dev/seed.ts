@@ -4,10 +4,8 @@ import { LandingCommand } from "@repo/project/landing";
 import type { ProjectApi } from "@repo/project/project";
 import { Projects } from "@repo/project/projects";
 import type { HarnessAudit } from "@repo/protocol/audit";
-import { DecisionSubject } from "@repo/protocol/domain/decision";
-import type { Decision } from "@repo/protocol/domain/decision";
 import { AskId, Handle, keyOf, RepoName, RequestId } from "@repo/protocol/ids";
-import type { CommitSha, ProjectName, ProposalId } from "@repo/protocol/ids";
+import type { CommitSha, DiscussionId, ProjectName } from "@repo/protocol/ids";
 import { Anonymous, Person } from "@repo/protocol/principal";
 import { OutOfScope } from "@repo/protocol/refusal";
 import { Array, DateTime, Effect, Option } from "effect";
@@ -28,8 +26,7 @@ import type { Files } from "./git.ts";
 const mainRef = RefName.make("refs/heads/main");
 
 export const visitors = {
-  flagger: Handle.make("sefa"),
-  proposer: Handle.make("tove"),
+  asker: Handle.make("tove"),
   regular: Handle.make("wren"),
 } as const;
 
@@ -38,8 +35,7 @@ export const devPeople: readonly Handle[] = [
   datekitPeople.decider,
   datekitPeople.zones,
   datekitPeople.contributor,
-  visitors.proposer,
-  visitors.flagger,
+  visitors.asker,
   visitors.regular,
   burrowPeople.decider,
   burrowPeople.second,
@@ -138,18 +134,26 @@ const started = (
     ({ api }) => api
   );
 
+/** Each ask opened a minute apart; one named in `from` is opened from that discussion, which it marks asked. */
 export const opened = (
   api: ProjectApi,
   decider: Handle,
   asks: readonly (readonly [AskId, Opening])[],
-  minute: number
+  minute: number,
+  from: ReadonlyMap<AskId, DiscussionId> = new Map()
 ) =>
   Effect.forEach(
     asks,
     ([ask, files], index) =>
       Effect.andThen(
         at(minute + index),
-        api.openAsk(as(decider), { ask, files })
+        api.openAsk(
+          as(decider),
+          Option.match(Option.fromUndefinedOr(from.get(ask)), {
+            onNone: () => ({ ask, files }),
+            onSome: (discussion) => ({ ask, discussion, files }),
+          })
+        )
       ),
     { discard: true }
   );
@@ -291,28 +295,25 @@ const refusedRound = (api: ProjectApi) =>
     });
   });
 
-const decisionOn = (api: ProjectApi, decider: Handle, proposal: ProposalId) =>
-  Effect.flatMap(api.today(as(decider)), ({ decisions }) =>
-    Effect.fromOption(
-      Array.findFirst(
-        decisions,
-        ({ subject }: Decision) =>
-          DecisionSubject.guards.OpenProposal(subject) &&
-          subject.proposal === proposal
-      )
-    )
-  );
-
-const DECLINED = [
-  "parseISO accepts two-digit years.",
-  "datekit wraps the Temporal API.",
-];
-
 const seedDatekit = Effect.gen(function* () {
   const { contributor, decider } = datekitPeople;
   const api = yield* started(datekit.project, operator, datekit.files, 0);
 
-  yield* opened(api, decider, datekit.asks, 2);
+  // A visitor's question that a maintainer opens as an ask.
+  yield* at(1);
+
+  const asked = yield* api.postDiscussion(as(visitors.asker), {
+    body: "Could parseISO take week dates like 2026-W41-3 too?",
+    title: "ISO week dates",
+  });
+
+  yield* opened(
+    api,
+    decider,
+    datekit.asks,
+    2,
+    new Map([[AskId.make("parse-iso-week"), asked.discussion.id]])
+  );
 
   yield* at(6);
   yield* api.claim(as(contributor), datekit.answer.ask);
@@ -326,18 +327,7 @@ const seedDatekit = Effect.gen(function* () {
   yield* at(8);
   yield* api.claim(as(contributor), AskId.make("parse-iso-week"));
 
-  yield* at(9);
-  yield* api.proposeAsk(as(visitors.proposer), {
-    want: 'format(date, "Qo") prints the quarter as an ordinal.',
-  });
-
-  yield* at(10);
-  yield* api.flagAsk(as(visitors.flagger), {
-    ask: AskId.make("add-months-clamp"),
-    reason: "Its check pins a common year only; leap years need a case too.",
-  });
-
-  // Two discussions: one open, one a maintainer turned into a proposal.
+  // A discussion still open, with a maintainer's reply.
   yield* at(14);
 
   const talked = yield* api.postDiscussion(as(visitors.regular), {
@@ -349,42 +339,6 @@ const seedDatekit = Effect.gen(function* () {
     body: "ISO, always: a locale never changes what a date string means.",
     discussion: talked.discussion.id,
   });
-
-  yield* at(15);
-
-  const asked = yield* api.postDiscussion(as(visitors.proposer), {
-    body: "Could parseISO take week dates like 2026-W41-3 too?",
-    title: "ISO week dates",
-  });
-
-  yield* at(16);
-  yield* api.proposeAsk(as(decider), {
-    discussion: asked.discussion.id,
-    want: "parseISO reads an ISO week date to the day it names.",
-  });
-
-  yield* Effect.forEach(
-    DECLINED,
-    (want, index) =>
-      Effect.gen(function* () {
-        yield* at(17 + index * 2);
-
-        const { proposal } = yield* api.proposeAsk(as(visitors.regular), {
-          want,
-        });
-
-        yield* at(18 + index * 2);
-
-        const decision = yield* decisionOn(api, decider, proposal.id);
-
-        yield* api.decide(as(decider), {
-          choice: "decline",
-          decision: decision.id,
-          note: "Out of scope for a small library.",
-        });
-      }),
-    { discard: true }
-  );
 
   return api;
 });

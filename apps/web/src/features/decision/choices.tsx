@@ -1,11 +1,9 @@
 import type { Choice, Decision } from "@repo/protocol/domain/decision";
 import type { DateTime } from "effect";
-import { Option } from "effect";
 import { useId } from "react";
 import type { ReactNode } from "react";
 
 import { Button } from "../../components/ui/button.tsx";
-import { Spinner } from "../../components/ui/spinner.tsx";
 import { HandleLink } from "../shared/handle.tsx";
 import { StateMarkIcon } from "../shared/marks.tsx";
 import { When } from "../shared/time.tsx";
@@ -18,11 +16,6 @@ import {
   tookEffect,
 } from "./subject.ts";
 
-export interface Held {
-  readonly reason: string;
-  readonly waiting: boolean;
-}
-
 export type ChoicesLayout = "grid" | "stack";
 
 const LAYOUTS = {
@@ -33,13 +26,11 @@ const LAYOUTS = {
 export const Choices = ({
   busy,
   decision,
-  held = Option.none(),
   layout = "grid",
   onChoose,
 }: {
   readonly decision: Decision;
   readonly busy: boolean;
-  readonly held?: Option.Option<Held>;
   readonly layout?: ChoicesLayout;
   readonly onChoose: (choice: Choice) => void;
 }) => {
@@ -53,7 +44,6 @@ export const Choices = ({
       <div className={LAYOUTS[layout]}>
         {allowedChoices(decision.subject).map((choice) => {
           const isDefault = choice === decision.default;
-          const waits = Option.filter(held, () => choice === "accept");
           const consequence = consequenceOf(decision.subject, choice);
 
           return (
@@ -62,21 +52,14 @@ export const Choices = ({
                 aria-describedby={`${id}-${choice}`}
                 className="tablet:h-9 h-11 w-full px-4"
                 data-choice={choice}
-                disabled={busy || Option.isSome(waits)}
+                disabled={busy}
                 onClick={() => {
                   onChoose(choice);
                 }}
                 type="button"
                 variant={isDefault ? "outline" : "default"}
               >
-                {Option.isSome(waits) ? (
-                  <>
-                    {waits.value.waiting ? <Spinner /> : null}
-                    {waits.value.reason}
-                  </>
-                ) : (
-                  choiceWords[choice]
-                )}
+                {choiceWords[choice]}
                 {isDefault ? (
                   <span className="text-muted-foreground font-normal">
                     default

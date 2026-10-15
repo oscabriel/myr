@@ -1,5 +1,4 @@
 import { RefName, RepoHost, Revision } from "@repo/artifacts/repo-host";
-import { Brand } from "@repo/brand";
 import { CheckLane } from "@repo/checks/check-runner";
 import type { CheckRunner } from "@repo/checks/check-runner";
 import type { PushFacts } from "@repo/gate/facts";
@@ -9,7 +8,6 @@ import { formatLanding } from "@repo/git/trailers";
 import type { AnswerReceipt, LandReceipt } from "@repo/protocol/domain/answer";
 import type { Ask } from "@repo/protocol/domain/ask";
 import { RefNameText } from "@repo/protocol/domain/common";
-import type { ConfigFile, Evidence } from "@repo/protocol/domain/common";
 import type { AgentTrailer, Credit } from "@repo/protocol/domain/credit";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
 import type { Choice, Decision, Today } from "@repo/protocol/domain/decision";
@@ -22,18 +20,14 @@ import type { EnvSchemaView } from "@repo/protocol/domain/env";
 import type { LandingView } from "@repo/protocol/domain/landing";
 import { Outcome } from "@repo/protocol/domain/outcome";
 import type { Policy } from "@repo/protocol/domain/policy";
-import { DraftState } from "@repo/protocol/domain/proposal";
-import type { Proposal } from "@repo/protocol/domain/proposal";
 import type { CreditSummary } from "@repo/protocol/domain/record";
 import type { RunBlock } from "@repo/protocol/domain/run";
 import type { Ledger } from "@repo/protocol/domain/visibility";
 import {
-  AskId,
   CommitSha,
   DecisionId,
   DiscussionId,
   LandedSha,
-  ProposalId,
   RepoName,
   RepoPath,
   RequestId,
@@ -41,9 +35,8 @@ import {
   keyOf,
   sameHandle,
 } from "@repo/protocol/ids";
-import type { ProjectName, Handle, EnvKey } from "@repo/protocol/ids";
-import { Person } from "@repo/protocol/principal";
-import type { Principal } from "@repo/protocol/principal";
+import type { AskId, ProjectName, Handle, EnvKey } from "@repo/protocol/ids";
+import type { Person, Principal } from "@repo/protocol/principal";
 import {
   Denounced,
   NotDecider,
@@ -51,19 +44,15 @@ import {
   RepoBusy,
   StaleBase,
   TouchedJudge,
-  UnknownAsk,
   UnknownDiscussion,
-  UnknownProposal,
 } from "@repo/protocol/refusal";
 import type {
   CapReached,
   DecisionClosed,
   DiscussionClosed,
-  DraftInProgress,
   IncompleteBrief,
   NotRedFirst,
   NotSensitive,
-  ProposalClosed,
   Refusal,
   UnknownDecision,
   UnknownEnvItem,
@@ -95,22 +84,11 @@ import {
   openDecision,
 } from "./attention/decisions.ts";
 import type { Decided } from "./attention/decisions.ts";
-import { DiscussionCommand, post, promoted } from "./attention/discussions.ts";
+import { DiscussionCommand, post } from "./attention/discussions.ts";
 import { AttentionEffect, platformHandle } from "./attention/effects.ts";
-import {
-  draft,
-  DraftCommand,
-  draftFailedLabel,
-  expire as expireProposals,
-  propose,
-  ProposalCommand,
-} from "./attention/proposals.ts";
-import type { Proposed } from "./attention/proposals.ts";
-import { recordOf } from "./attention/record.ts";
 import { today } from "./attention/today.ts";
 import { capped, standing } from "./attention/vouch.ts";
 import { ClaimState } from "./claim.ts";
-import { DraftResult } from "./draft-runs.ts";
 import type { UnlandedRunEnv } from "./env-port.ts";
 import { ProjectEventInput } from "./events.ts";
 import { pushFacts } from "./facts.ts";
@@ -124,14 +102,7 @@ import {
   transition,
 } from "./landing.ts";
 import type { Request, Step } from "./landing.ts";
-import { MetricPoint, millisBetween } from "./metrics.ts";
-import {
-  draftRow,
-  measuredRow,
-  OutboxBody,
-  outboxRow,
-  startRow,
-} from "./outbox.ts";
+import { OutboxBody, outboxRow, startRow } from "./outbox.ts";
 import type {
   AnswerRow,
   ClaimRow,
@@ -173,13 +144,6 @@ export interface DeciderApi {
     AnswerReceipt,
     NotDecider | StaleBase | RepoBusy | TouchedJudge
   >;
-  readonly flagAsk: (
-    caller: Person,
-    input: { readonly ask: AskId; readonly reason: string }
-  ) => Effect.Effect<
-    { readonly proposal: Proposal },
-    UnknownAsk | Denounced | CapReached
-  >;
   readonly fork: (
     caller: Person
   ) => Effect.Effect<
@@ -210,25 +174,6 @@ export interface DeciderApi {
     { readonly discussion: Discussion },
     UnknownDiscussion | DiscussionClosed | Denounced | CapReached
   >;
-  readonly proposeAsk: (
-    caller: Person,
-    input: {
-      readonly discussion?: DiscussionId;
-      readonly draft?: true;
-      readonly files?: Array.NonEmptyReadonlyArray<ComposedFile>;
-      readonly sealed?: { readonly head: CommitSha };
-      readonly territory?: string;
-      readonly want: string;
-    }
-  ) => Effect.Effect<
-    { readonly proposal: Proposal },
-    | Denounced
-    | CapReached
-    | NotVouched
-    | NotDecider
-    | UnknownDiscussion
-    | DiscussionClosed
-  >;
   readonly setEnv: (
     caller: Person,
     input: {
@@ -244,24 +189,10 @@ export interface DeciderApi {
     },
     NotDecider | UnknownEnvItem | NotSensitive | ValueTooShort
   >;
-  readonly draftAsk: (
-    caller: Person,
-    input: { readonly note?: string; readonly proposal: ProposalId }
-  ) => Effect.Effect<
-    { readonly proposal: Proposal },
-    UnknownProposal | ProposalClosed | NotDecider | DraftInProgress | CapReached
-  >;
   readonly showDiscussion: (
     caller: Principal,
     discussion: DiscussionId
   ) => Effect.Effect<{ readonly discussion: Discussion }, UnknownDiscussion>;
-  readonly showProposal: (
-    caller: Principal,
-    proposal: ProposalId
-  ) => Effect.Effect<
-    { readonly files: readonly ConfigFile[]; readonly proposal: Proposal },
-    UnknownProposal
-  >;
   readonly today: (caller: Person) => Effect.Effect<Today, NotDecider>;
   readonly vouch: (
     caller: Person,
@@ -291,7 +222,6 @@ export interface DeciderState {
   readonly landings: readonly LandingView[];
   readonly policy: Option.Option<Policy>;
   readonly project: Option.Option<ProjectRow>;
-  readonly proposals: readonly Proposal[];
 }
 
 export interface DeciderWrites {
@@ -301,7 +231,6 @@ export interface DeciderWrites {
   readonly landings: LandingView[];
   readonly outbox: OutboxRow[];
   readonly project: Map<"row", ProjectRow>;
-  readonly proposals: Map<ProposalId, Proposal>;
 }
 
 export interface Opening {
@@ -323,10 +252,6 @@ export type OpenRefusal =
   | StaleBase;
 
 export type WaitRefusal = VerifierBlocked | StaleBase;
-
-type FinalOpenRefusal = Exclude<OpenRefusal, WaitRefusal>;
-
-const declines = (refusal: FinalOpenRefusal) => Effect.succeedSome(refusal);
 
 export type DeciderPorts = CheckRunner | Lander | RepoHost;
 
@@ -351,15 +276,6 @@ export interface DeciderKernel<
     }
   ) => Effect.Effect<AnswerReceipt>;
   readonly name: ProjectName;
-  readonly open: (
-    h: H,
-    writes: W,
-    now: DateTime.Utc,
-    opening: Opening
-  ) => Effect.Effect<
-    { readonly ask: Ask; readonly landed: LandedSha },
-    OpenRefusal
-  >;
   readonly policyAt: (
     row: ProjectRow,
     at: LandedSha,
@@ -382,8 +298,6 @@ export interface DeciderKernel<
 const mainRef = "refs/heads/main";
 
 const mainRefName = RefName.make(mainRef);
-
-const configFolder = `${Brand.configDir}/`;
 
 const landTurns = 16;
 
@@ -420,28 +334,6 @@ const minted = (prefix: string, taken: number) =>
 const workingFork = (project: ProjectName, handle: Handle) =>
   RepoName.make(`${keyOf(project)}--me--${handle.toLowerCase()}`);
 
-const moduleOf = (policy: Policy, territory: string) =>
-  Array.findFirst(
-    policy.modules,
-    (module) =>
-      module.module === territory ||
-      module.paths.some((glob) => glob === `${territory}/**`)
-  );
-
-export const pathsOf = (
-  policy: Policy,
-  files: readonly RepoPath[],
-  territory: Option.Option<string>
-): readonly RepoPath[] =>
-  Option.match(territory, {
-    onNone: () => files.filter((path) => !path.startsWith(configFolder)),
-    onSome: (named) =>
-      Option.match(moduleOf(policy, named), {
-        onNone: () => [RepoPath.make(named)],
-        onSome: ({ paths }) => paths.map((glob) => RepoPath.make(glob)),
-      }),
-  });
-
 export const decidersOn = (
   policy: Policy,
   paths: readonly RepoPath[],
@@ -455,92 +347,6 @@ export const decidersOn = (
 
   return Array.isReadonlyArrayNonEmpty(any) ? any : Array.of(initializer);
 };
-
-const proposedLabel = "want";
-
-const draftedByLabel = "drafted by";
-
-export const drafterOf = (model: string): AgentTrailer => ({
-  harness: `${Brand.cli}-drafter`,
-  model,
-  verified: true,
-});
-
-/** A round from its start to its settle: the proposal names its start while it drafts. */
-const draftedPoints = (
-  proposal: Proposal,
-  result: DraftResult,
-  now: DateTime.Utc
-): readonly MetricPoint[] =>
-  proposal.draft !== undefined && DraftState.guards.Drafting(proposal.draft)
-    ? [
-        MetricPoint.cases.Drafted.make({
-          attempts: result.attempts,
-          latencyMs: millisBetween(proposal.draft.startedAt, now),
-          project: proposal.project,
-          ready: DraftResult.guards.Red(result),
-        }),
-      ]
-    : [];
-
-const assistedBy = (evidence: readonly Evidence[]): readonly AgentTrailer[] =>
-  Option.toArray(
-    Option.map(
-      Array.findFirst(evidence, ({ label }) => label === draftedByLabel),
-      ({ value }) => drafterOf(value.split(", attempt ")[0] ?? value)
-    )
-  );
-
-const evidenceOf = (input: {
-  readonly files: readonly ComposedFile[];
-  readonly sealed: boolean;
-  readonly territory: Option.Option<string>;
-  readonly want: string;
-}): readonly Evidence[] => [
-  { label: proposedLabel, value: input.want },
-  ...Option.toArray(
-    Option.map(input.territory, (value): Evidence => ({
-      label: "territory",
-      value,
-    }))
-  ),
-  ...input.files.map(({ content, path }) => ({ label: path, value: content })),
-  ...(input.sealed
-    ? [
-        {
-          label: "sealed answer",
-          value:
-            "a commit in the proposer's working fork, judged first once the ask opens",
-        },
-      ]
-    : []),
-];
-
-const filesOf = (
-  proposal: Proposal,
-  evidence: readonly Evidence[]
-): readonly ComposedFile[] =>
-  proposal.files.flatMap((path) =>
-    Option.toArray(
-      Option.map(
-        Array.findFirst(evidence, ({ label }) => label === path),
-        ({ value }): ComposedFile => ({ content: value, path })
-      )
-    )
-  );
-
-const askFolder = `${configFolder}asks/`;
-
-const askSuffix = ".ask.ts";
-
-export const askIdOf = (files: readonly ComposedFile[]): Option.Option<AskId> =>
-  Array.findFirst(files, ({ path }) =>
-    path.startsWith(askFolder) && path.endsWith(askSuffix)
-      ? Schema.decodeOption(AskId)(
-          path.slice(askFolder.length, -askSuffix.length)
-        )
-      : Option.none()
-  );
 
 interface FirstClaim {
   readonly at: DateTime.Utc;
@@ -644,30 +450,13 @@ export const nextDecisionId = (
   written: ReadonlyMap<DecisionId, Decision>
 ) => DecisionId.make(minted("dec", overlaid(decisions, written).length));
 
-export const deciderDeadlines = (h: DeciderState): readonly DateTime.Utc[] => [
-  ...h.proposals.flatMap(({ expiresAt, state }) =>
-    state === "open" ? [expiresAt] : []
-  ),
-  ...h.decisions.flatMap(({ decided, expiresAt }) =>
+export const deciderDeadlines = (h: DeciderState): readonly DateTime.Utc[] =>
+  h.decisions.flatMap(({ decided, expiresAt }) =>
     decided === undefined ? [expiresAt] : []
-  ),
-];
+  );
 
 const unlanded = (handle: Handle, refused: NotDecider | StaleBase) =>
   Effect.logWarning(`the vouch for ${handle} did not land`, refused);
-
-const mayDraft = (
-  policy: Policy,
-  row: ProjectRow,
-  proposal: Proposal,
-  handle: Handle
-) =>
-  sameHandle(proposal.proposer, handle) ||
-  decidersOn(
-    policy,
-    pathsOf(policy, proposal.files, Option.fromUndefinedOr(proposal.territory)),
-    row.initializer
-  ).some((each) => sameHandle(each, handle));
 
 const emitted = (
   writes: DeciderWrites,
@@ -699,9 +488,6 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
       Option.fromUndefinedOr(writes.project.get("row")),
       () => h.project
     );
-
-  const proposalsNow = (h: H, writes: W) =>
-    overlaid(h.proposals, writes.proposals);
 
   const decisionsNow = (h: H, writes: W) =>
     overlaid(h.decisions, writes.decisions);
@@ -749,405 +535,6 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
         ),
         Effect.orElseSucceed(() => "")
       );
-
-  const putUp = (
-    h: H,
-    writes: W,
-    input: {
-      readonly evidence: readonly Evidence[];
-      readonly now: DateTime.Utc;
-      readonly paths: readonly RepoPath[];
-      readonly policy: Policy;
-      readonly proposed: Proposed;
-      readonly row: ProjectRow;
-    }
-  ) => {
-    const { now, policy, proposed } = input;
-
-    const decision = openDecision({
-      deciders: decidersOn(policy, input.paths, input.row.initializer),
-      evidence: input.evidence,
-      expireDays: policy.decisions.expireDays,
-      id: DecisionId.make(minted("dec", decisionsNow(h, writes).length)),
-      now,
-      project: name,
-      subject: DecisionSubject.cases.OpenProposal.make({
-        proposal: proposed.proposal.id,
-      }),
-    });
-
-    writes.proposals.set(proposed.proposal.id, proposed.proposal);
-    writes.decisions.set(decision.id, decision);
-    emitted(writes, proposed.effects);
-
-    return { proposal: proposed.proposal };
-  };
-
-  const startDraft = (
-    h: H,
-    writes: W,
-    now: DateTime.Utc,
-    input: {
-      readonly by: Handle;
-      readonly effects: readonly AttentionEffect[];
-      readonly note: Option.Option<string>;
-      readonly proposal: Proposal;
-    }
-  ) =>
-    Effect.gen(function* () {
-      const started = yield* Effect.fromResult(
-        draft(
-          input.proposal,
-          DraftCommand.DraftStarted({
-            by: input.by,
-            ...Option.match(input.note, {
-              onNone: () => ({}),
-              onSome: (note) => ({ note }),
-            }),
-          }),
-          now
-        )
-      );
-
-      const proposal = Option.getOrElse(
-        Option.map(started, (moved) => moved.proposal),
-        () => input.proposal
-      );
-
-      writes.proposals.set(proposal.id, proposal);
-      emitted(writes, input.effects);
-
-      if (
-        proposal.draft !== undefined &&
-        DraftState.guards.Drafting(proposal.draft)
-      ) {
-        writes.outbox.push(
-          yield* draftRow(
-            {
-              ...Option.match(input.note, {
-                onNone: () => ({}),
-                onSome: (note) => ({ note }),
-              }),
-              project: name,
-              proposal: proposal.id,
-              round: proposal.draft.round,
-            },
-            now
-          )
-        );
-      }
-
-      return { proposal };
-    });
-
-  const proposalNow = (h: H, writes: W, id: ProposalId) =>
-    Array.findFirst(proposalsNow(h, writes), (each) => each.id === id);
-
-  const decisionOf = (h: H, writes: W, proposal: ProposalId) =>
-    Array.findLast(
-      decisionsNow(h, writes),
-      ({ subject }) =>
-        DecisionSubject.guards.OpenProposal(subject) &&
-        subject.proposal === proposal
-    );
-
-  const draftBody =
-    (caller: Person, input: Parameters<DeciderApi["draftAsk"]>[1]) =>
-    (h: H, writes: W, now: DateTime.Utc) =>
-      Effect.gen(function* () {
-        const found = Option.all({
-          live: liveOf(h),
-          proposal: proposalNow(h, writes, input.proposal),
-        });
-
-        if (Option.isNone(found)) {
-          return yield* new UnknownProposal({ proposal: input.proposal });
-        }
-
-        const { live, proposal } = found.value;
-
-        if (!mayDraft(live.policy, live.row, proposal, caller.handle)) {
-          return yield* new NotDecider({});
-        }
-
-        return yield* startDraft(h, writes, now, {
-          by: caller.handle,
-          effects: [],
-          note: Option.fromUndefinedOr(input.note),
-          proposal,
-        });
-      });
-
-  const settledBody =
-    (input: {
-      readonly proposal: ProposalId;
-      readonly result: DraftResult;
-      readonly round: number;
-    }) =>
-    (h: H, writes: W, now: DateTime.Utc) =>
-      Effect.gen(function* () {
-        const found = Option.all({
-          live: liveOf(h),
-          proposal: proposalNow(h, writes, input.proposal),
-        });
-
-        if (Option.isNone(found)) {
-          return;
-        }
-
-        const { live, proposal } = found.value;
-
-        const moved = yield* Effect.fromResult(
-          draft(
-            proposal,
-            DraftCommand.DraftSettled({
-              result: input.result,
-              round: input.round,
-            }),
-            now
-          )
-        ).pipe(Effect.orDie);
-
-        if (Option.isNone(moved)) {
-          return;
-        }
-
-        const settled = moved.value.proposal;
-        const territory = Option.fromUndefinedOr(settled.territory);
-
-        const files = DraftResult.match(input.result, {
-          Failed: (): readonly ComposedFile[] => [],
-          Red: ({ files: drafted }) => drafted,
-        });
-
-        const open = Option.filter(
-          decisionOf(h, writes, settled.id),
-          ({ decided }) => decided === undefined
-        );
-
-        // A failed round that kept files keeps the decision that holds them.
-        const kept = Option.filter(
-          Option.map(open, ({ evidence: earlier }) =>
-            earlier.filter(({ label }) => label !== draftFailedLabel)
-          ),
-          () =>
-            DraftResult.guards.Failed(input.result) && settled.files.length > 0
-        );
-
-        const evidence = [
-          ...Option.getOrElse(kept, () =>
-            evidenceOf({
-              files,
-              sealed: false,
-              territory,
-              want: settled.want,
-            })
-          ),
-          ...moved.value.lines,
-        ];
-
-        writes.proposals.set(settled.id, settled);
-        emitted(writes, moved.value.effects);
-
-        // A settle moves only the round still drafting, so a replayed one counts nothing.
-        writes.outbox.push(
-          ...(yield* measuredRow(
-            `drafted:${settled.id}:r${input.round}`,
-            draftedPoints(proposal, input.result, now),
-            now
-          ))
-        );
-
-        // The drafted files may lie under other maintainers than the want did.
-        const decidedBy = decidersOn(
-          live.policy,
-          pathsOf(live.policy, settled.files, territory),
-          live.row.initializer
-        );
-
-        if (Option.isSome(open)) {
-          writes.decisions.set(open.value.id, {
-            ...open.value,
-            deciders: decidedBy,
-            evidence,
-          });
-
-          return;
-        }
-
-        const decision = openDecision({
-          deciders: decidedBy,
-          evidence,
-          expireDays: live.policy.decisions.expireDays,
-          id: DecisionId.make(minted("dec", decisionsNow(h, writes).length)),
-          now,
-          project: name,
-          subject: DecisionSubject.cases.OpenProposal.make({
-            proposal: settled.id,
-          }),
-        });
-
-        writes.decisions.set(decision.id, decision);
-      });
-
-  const proposalOf = (proposal: ProposalId) =>
-    Effect.gen(function* () {
-      const h = yield* kernel.read;
-
-      const found = Array.findFirst(h.proposals, ({ id }) => id === proposal);
-
-      if (Option.isNone(found)) {
-        return yield* new UnknownProposal({ proposal });
-      }
-
-      const evidence = Option.match(
-        Array.findLast(
-          h.decisions,
-          ({ subject }) =>
-            DecisionSubject.guards.OpenProposal(subject) &&
-            subject.proposal === proposal
-        ),
-        { onNone: () => [], onSome: (decision) => decision.evidence }
-      );
-
-      return {
-        files: filesOf(found.value, evidence),
-        proposal: found.value,
-      };
-    });
-
-  const openCountOf = (h: H, writes: W, handle: Handle) =>
-    proposalsNow(h, writes).filter(
-      ({ proposer, state }) => state === "open" && sameHandle(proposer, handle)
-    ).length;
-
-  const proposeBody =
-    (caller: Person, input: Parameters<DeciderApi["proposeAsk"]>[1]) =>
-    (h: H, writes: W, now: DateTime.Utc) =>
-      Effect.gen(function* () {
-        const live = liveOf(h);
-
-        // Nobody stands vouched before the project has a policy.
-        if (Option.isNone(live)) {
-          return yield* new NotVouched({});
-        }
-
-        const { policy, row } = live.value;
-        const who = standing(policy, [], caller.handle);
-        const files = input.files ?? [];
-        const territory = Option.fromUndefinedOr(input.territory);
-
-        const id = ProposalId.make(
-          minted("prop", proposalsNow(h, writes).length)
-        );
-
-        // Only a maintainer turns a thread into a proposal, and only an open one.
-        const fromThread = yield* Option.match(
-          Option.fromUndefinedOr(input.discussion),
-          {
-            onNone: () => Effect.succeedNone,
-            onSome: (named) =>
-              Effect.gen(function* () {
-                const thread = Array.findFirst(
-                  discussionsNow(h, writes),
-                  (each) => each.id === named
-                );
-
-                if (Option.isNone(thread)) {
-                  return yield* new UnknownDiscussion({ discussion: named });
-                }
-
-                if (!isDecider(policy, caller.handle)) {
-                  return yield* new NotDecider({});
-                }
-
-                return Option.some(
-                  yield* Effect.fromResult(promoted(thread.value, id))
-                );
-              }),
-          }
-        );
-
-        const area = Option.map(territory, (named) =>
-          Option.getOrElse(
-            Option.map(moduleOf(policy, named), ({ module }) => module),
-            () => named
-          )
-        );
-
-        const recordInArea = Option.match(area, {
-          onNone: () => 0,
-          onSome: (named) =>
-            recordOf({
-              asks: h.asks,
-              landings: h.landings,
-              now,
-              policy: policy.record,
-              reverted: new Set(),
-            })(caller.handle).filter((entry) => entry.area === named).length,
-        });
-
-        const proposed = yield* Effect.fromResult(
-          propose(
-            policy,
-            ProposalCommand.Propose({
-              capped: capped(who),
-              denounced: who === "denounced",
-              files: files.map(({ path }) => path),
-              id,
-              openCount: openCountOf(h, writes, caller.handle),
-              project: name,
-              recordInArea,
-              sealed: Option.map(
-                Option.fromUndefinedOr(input.sealed),
-                ({ head }) => ({
-                  fork: workingFork(name, caller.handle),
-                  head,
-                })
-              ),
-              territory,
-              vouched: who === "vouched",
-              want: input.want,
-              who: caller,
-            }),
-            now
-          )
-        );
-
-        if (Option.isSome(fromThread)) {
-          writes.discussions.set(fromThread.value.id, fromThread.value);
-        }
-
-        if (input.draft === true) {
-          // A proposal just opened drafts its first round: nothing refuses it.
-          return yield* Effect.orDie(
-            startDraft(h, writes, now, {
-              by: caller.handle,
-              effects: proposed.effects,
-              note: Option.none(),
-              proposal: proposed.proposal,
-            })
-          );
-        }
-
-        return putUp(h, writes, {
-          evidence: evidenceOf({
-            files,
-            sealed: input.sealed !== undefined,
-            territory,
-            want: input.want,
-          }),
-          now,
-          paths: pathsOf(
-            policy,
-            files.map(({ path }) => path),
-            territory
-          ),
-          policy,
-          proposed,
-          row,
-        });
-      });
 
   const openDiscussionsOf = (h: H, writes: W, handle: Handle) =>
     discussionsNow(h, writes).filter(
@@ -1238,55 +625,6 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
         }
       )
     );
-
-  const flagBody =
-    (caller: Person, input: Parameters<DeciderApi["flagAsk"]>[1]) =>
-    (h: H, writes: W, now: DateTime.Utc) =>
-      Effect.gen(function* () {
-        const live = liveOf(h);
-        const ask = Option.fromUndefinedOr(h.asks.get(input.ask));
-
-        if (Option.isNone(live) || Option.isNone(ask)) {
-          return yield* new UnknownAsk({ ask: input.ask });
-        }
-
-        const { policy, row } = live.value;
-
-        const proposed = yield* Effect.fromResult(
-          propose(
-            policy,
-            ProposalCommand.Flag({
-              ask: input.ask,
-              capped: capped(standing(policy, [], caller.handle)),
-              denounced: standing(policy, [], caller.handle) === "denounced",
-              id: ProposalId.make(
-                minted("prop", proposalsNow(h, writes).length)
-              ),
-              openCount: openCountOf(h, writes, caller.handle),
-              project: name,
-              reason: input.reason,
-              who: caller,
-            }),
-            now
-          )
-        ).pipe(
-          Effect.catchTag("NotVouched", () =>
-            Effect.die("a flag needs no vouch")
-          )
-        );
-
-        return putUp(h, writes, {
-          evidence: [
-            { label: "ask", value: input.ask },
-            { label: "reason", value: input.reason },
-          ],
-          now,
-          paths: ask.value.territory.paths.map((glob) => RepoPath.make(glob)),
-          policy,
-          proposed,
-          row,
-        });
-      });
 
   const landFiles = (
     h: H,
@@ -1637,81 +975,6 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
       }
     );
 
-  const accept = (
-    h: H,
-    writes: W,
-    now: DateTime.Utc,
-    input: {
-      readonly by: Handle;
-      readonly decision: Decision;
-      readonly proposal: ProposalId;
-    }
-  ) =>
-    Effect.gen(function* () {
-      const found = Array.findFirst(
-        proposalsNow(h, writes),
-        ({ id }) => id === input.proposal
-      );
-
-      if (Option.isNone(found) || found.value.state !== "open") {
-        return;
-      }
-
-      const proposal = found.value;
-      const files = filesOf(proposal, input.decision.evidence);
-
-      const held: Option.Option<Array.NonEmptyReadonlyArray<ComposedFile>> =
-        Array.isReadonlyArrayNonEmpty(files)
-          ? Option.some(files)
-          : Option.none();
-
-      const opening = Option.all({ ask: askIdOf(files), files: held });
-
-      const toOpen = Option.filter(opening, () => proposal.flags === undefined);
-
-      const refused: Option.Option<FinalOpenRefusal> = yield* Option.match(
-        toOpen,
-        {
-          onNone: () => Effect.succeedNone,
-          onSome: ({ ask, files: proposed }) =>
-            kernel
-              .open(h, writes, now, {
-                ask,
-                asker: proposal.proposer,
-                assisted: assistedBy(input.decision.evidence),
-                credits: [
-                  { handle: proposal.proposer, role: "Asked-by" },
-                  { handle: input.by, role: "Decided-by" },
-                ],
-                decider: Person.make({ handle: input.by }),
-                files: proposed,
-              })
-              .pipe(
-                Effect.as(Option.none<FinalOpenRefusal>()),
-                Effect.catchTags({
-                  IncompleteBrief: declines,
-                  NotDecider: declines,
-                  NotRedFirst: declines,
-                  TouchedJudge: declines,
-                  WeakCheck: declines,
-                })
-              ),
-        }
-      );
-
-      if (Option.isSome(refused)) {
-        yield* Effect.logWarning(
-          `proposal ${proposal.id} was accepted, and its ask could not open`,
-          refused.value
-        );
-      }
-
-      writes.proposals.set(proposal.id, {
-        ...proposal,
-        state: Option.isSome(refused) ? "declined" : "accepted",
-      });
-    });
-
   const goAhead = (
     h: H,
     writes: W,
@@ -1721,8 +984,6 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
     DecisionSubject.match(input.subject, {
       Finish: ({ ask, head }) =>
         finishAt(h, writes, now, { ask, by: input.by, head }),
-      // The proposal's `OpenAsk` effect opens it.
-      OpenProposal: () => Effect.void,
       // The answer waiting on it is told (`answerWaits`).
       PostureChange: () => Effect.void,
       // The env proxy and the value store are the visibility cartridge's.
@@ -1763,8 +1024,6 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
           AttentionEffect.$match(effect, {
             Emit: ({ event }) => Effect.sync(() => writes.events.push(event)),
             Land: ({ subject }) => goAhead(h, writes, now, { by, subject }),
-            OpenAsk: ({ proposal }) =>
-              accept(h, writes, now, { by, decision, proposal }),
             Revert: () =>
               DecisionSubject.guards.StrayPush(decision.subject)
                 ? revert(h, writes, now, { by, stray: decision.subject })
@@ -1774,23 +1033,6 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
           }),
         { discard: true }
       );
-
-      // A proposal a person declined closes; one that expired already has.
-      if (DecisionSubject.guards.OpenProposal(decision.subject)) {
-        const { proposal } = decision.subject;
-
-        const open = Array.findFirst(
-          proposalsNow(h, writes),
-          ({ id, state }) => id === proposal && state === "open"
-        );
-
-        if (
-          Option.isSome(open) &&
-          (choice === "decline" || choice === "revert")
-        ) {
-          writes.proposals.set(proposal, { ...open.value, state: "declined" });
-        }
-      }
 
       yield* answerWaits(h, writes, now, { by, choice, decision });
     });
@@ -1825,15 +1067,6 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
 
   const expire = (h: H, writes: W, now: DateTime.Utc) =>
     Effect.gen(function* () {
-      const proposals = proposalsNow(h, writes);
-      const expired = expireProposals(proposals, now).proposals;
-
-      for (const [index, proposal] of expired.entries()) {
-        if (proposal !== proposals[index]) {
-          writes.proposals.set(proposal.id, proposal);
-        }
-      }
-
       yield* Effect.forEach(
         decisionsNow(h, writes),
         (decision) => {
@@ -2300,30 +1533,12 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
       caller: Person,
       input: Parameters<DeciderApi["decide"]>[1]
     ) => kernel.write(queue, decideBody(caller, input)),
-    draftAsk: (
-      queue: AnswerQueue,
-      caller: Person,
-      input: Parameters<DeciderApi["draftAsk"]>[1]
-    ) => kernel.write(queue, draftBody(caller, input)),
-    draftSettled: (
-      queue: AnswerQueue,
-      input: {
-        readonly proposal: ProposalId;
-        readonly result: DraftResult;
-        readonly round: number;
-      }
-    ) => kernel.write(queue, settledBody(input)),
     expire,
     finish: (
       queue: AnswerQueue,
       caller: Person,
       input: Parameters<DeciderApi["finish"]>[1]
     ) => kernel.write(queue, finishBody(caller, input)),
-    flagAsk: (
-      queue: AnswerQueue,
-      caller: Person,
-      input: Parameters<DeciderApi["flagAsk"]>[1]
-    ) => kernel.write(queue, flagBody(caller, input)),
     fork: (queue: AnswerQueue, caller: Person) =>
       kernel.write(queue, forkBody(caller)),
     land: (
@@ -2337,13 +1552,7 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
       caller: Person,
       input: Parameters<DeciderApi["postDiscussion"]>[1]
     ) => kernel.write(queue, postBody(caller, input)),
-    proposeAsk: (
-      queue: AnswerQueue,
-      caller: Person,
-      input: Parameters<DeciderApi["proposeAsk"]>[1]
-    ) => kernel.write(queue, proposeBody(caller, input)),
     showDiscussion: discussionOf,
-    showProposal: proposalOf,
     today: todayOf,
     vouch: (
       queue: AnswerQueue,

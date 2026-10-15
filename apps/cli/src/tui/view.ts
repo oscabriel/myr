@@ -16,7 +16,6 @@ const refWords = (ref: string) => ref.replace(/^refs\/heads\//u, "");
 
 const about = DecisionSubject.match({
   Finish: ({ ask, head }) => `finish the answer to ${ask} at ${short(head)}`,
-  OpenProposal: ({ proposal }) => `open the ask ${proposal} proposes`,
   PostureChange: ({ from, to }) => `change the posture from ${from} to ${to}`,
   ProxyWidened: ({ hosts, item }) =>
     `let ${item} reach ${hosts.join(", ")} through the platform's proxy`,

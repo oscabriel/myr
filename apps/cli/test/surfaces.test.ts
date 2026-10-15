@@ -196,7 +196,6 @@ describe("the CLI's command tree", () => {
         "asks",
         "ask",
         "ask open",
-        "ask flag",
         "env shape",
         "env set",
         "init",
@@ -205,8 +204,8 @@ describe("the CLI's command tree", () => {
     );
   });
 
-  it("puts ask open, ask draft and ask flag under ask, and env shape beside env set", () => {
-    expect(subcommandsOf(top("ask"))).toStrictEqual(["draft", "flag", "open"]);
+  it("puts ask open under ask, and env shape beside env set", () => {
+    expect(subcommandsOf(top("ask"))).toStrictEqual(["open"]);
     expect(subcommandsOf(top("env"))).toStrictEqual(["shape", "set"]);
   });
 

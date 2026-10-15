@@ -83,9 +83,8 @@ const homeHtml = (input: {
   readonly origin: string;
   readonly projects: readonly ProjectListing[];
   readonly webUrl: Option.Option<string>;
-  readonly draftModel: string;
 }) => {
-  const { draftModel, origin, projects, webUrl } = input;
+  const { origin, projects, webUrl } = input;
 
   return page(
     "What this host serves",
@@ -122,10 +121,6 @@ const homeHtml = (input: {
           `Authorize a client: ${code(`${origin}/authorize`)}`,
         ])
       ),
-      section(
-        "Drafting",
-        `<p>A member can ask the platform's agent to draft a proposed ask (Workers AI, ${code(draftModel)}); a maintainer accepts it, and only people are credited.</p>`
-      ),
       section("Health", `<p>${link(`${origin}/health`)}</p>`),
     ].join("\n"),
     "document"
@@ -136,7 +131,7 @@ export const homeResponse = (
   request: Request
 ): Effect.Effect<Response, never, FrontPage | HostInfo | Projects> =>
   Effect.gen(function* () {
-    const { draftModel, webUrl } = yield* HostInfo;
+    const { webUrl } = yield* HostInfo;
 
     const projects = yield* FrontPage.use((frontPage) =>
       frontPage.projects()
@@ -165,7 +160,7 @@ export const homeResponse = (
       );
     }
 
-    return new Response(homeHtml({ draftModel, origin, projects, webUrl }), {
+    return new Response(homeHtml({ origin, projects, webUrl }), {
       headers: {
         "cache-control": BRIEFLY,
         "content-security-policy":

@@ -12,7 +12,6 @@ import {
   Handle,
   LandedSha,
   ProjectName,
-  ProposalId,
   RatchetName,
   RepoPath,
 } from "@repo/protocol/ids";
@@ -142,16 +141,17 @@ const vouch: Decision = {
   subject: DecisionSubject.cases.Vouch.make({ handle: Handle.make("lin-h") }),
 };
 
-const proposal: Decision = {
+const posture: Decision = {
   deciders: [okonkwo],
   default: "decline",
-  evidence: [{ label: "want", value: "Dates parse in every locale." }],
+  evidence: [{ label: "why", value: "The tokenizer's fixtures stay private." }],
   expiresAt: at("2026-10-10T09:00:00Z"),
   id: DecisionId.make("dec-000001"),
   openedAt: at("2026-10-05T09:00:00Z"),
   project: burrow,
-  subject: DecisionSubject.cases.OpenProposal.make({
-    proposal: ProposalId.make("prop-000004"),
+  subject: DecisionSubject.cases.PostureChange.make({
+    from: "open",
+    to: "openCore",
   }),
 };
 
@@ -172,7 +172,7 @@ const landing = (
 const today: Today = {
   decider: okonkwo,
   // Out of order on purpose: the page orders them.
-  decisions: [proposal, vouch, stray],
+  decisions: [posture, vouch, stray],
   expiringSoon: [stray.id],
   newcomers: [Handle.make("lin-h")],
   unattended: [
@@ -258,7 +258,10 @@ describe("the inbox, for the decisions waiting on a reader", () => {
         "oscabriel/datekit/dec-000003",
         "Vouch for lin-h, so they may claim asks",
       ],
-      ["oscabriel/burrow/dec-000001", "Open the ask proposed in prop-000004"],
+      [
+        "oscabriel/burrow/dec-000001",
+        "Change the project's posture from open to openCore",
+      ],
     ]);
   });
 
@@ -320,14 +323,16 @@ describe("the inbox, for the decisions waiting on a reader", () => {
     }
 
     expect(textOf(page)).toContain(
-      "Opens the ask: its file and check land on main, with you as Decided-by."
+      "The answer that changes it goes on through the gate, with you as Decided-by."
     );
-    expect(textOf(page)).toContain("The proposal closes; nothing lands.");
+    expect(textOf(page)).toContain(
+      "The answer that changes it is refused; the posture stays open."
+    );
   });
 
   it("keeps a decision taken in its row, reading what it did, and offers its choices no more", () => {
     const taken: Decision = {
-      ...proposal,
+      ...posture,
       decided: { at: now, by: okonkwo, choice: "accept" },
     };
 
@@ -351,7 +356,7 @@ describe("the inbox, for the decisions waiting on a reader", () => {
     ]);
     expect(textIn(last?.body ?? "")).toContain("Accepted");
     expect(textIn(last?.body ?? "")).toContain(
-      "Opens the ask: its file and check land on main, with you as Decided-by."
+      "The answer that changes it goes on through the gate, with you as Decided-by."
     );
     expect(last?.body).not.toContain("data-choice=");
     expect(textIn(markup)).toContain("Decisions: 2 waiting, 1 due today.");
@@ -423,7 +428,7 @@ describe(orderDecisions, () => {
 
     const merged = {
       ...today,
-      decisions: [proposal, other, vouch, stray],
+      decisions: [posture, other, vouch, stray],
       expiringSoon: [stray.id],
     };
 
@@ -443,7 +448,6 @@ const ask = AskId.make("parse-iso");
 const subjects = [
   stray.subject,
   vouch.subject,
-  proposal.subject,
   DecisionSubject.cases.Finish.make({ ask, head: sha("e") }),
   DecisionSubject.cases.RaiseRatchet.make({
     after: 3,
@@ -476,7 +480,6 @@ describe(allowedChoices, () => {
     ).toStrictEqual([
       ["StrayPush", ["adopt", "revert"]],
       ["Vouch", ["accept", "decline"]],
-      ["OpenProposal", ["accept", "decline"]],
       ["Finish", ["accept", "decline"]],
       ["RaiseRatchet", ["accept", "decline"]],
       ["Waiver", ["accept", "decline"]],
@@ -492,7 +495,6 @@ describe(describeSubject, () => {
     expect(subjects.map(describeSubject)).toStrictEqual([
       "main moved without a landing, from aaaaaaa to bbbbbbb",
       "Vouch for lin-h, so they may claim asks",
-      "Open the ask proposed in prop-000004",
       "Finish the passing answer to parse-iso, at eeeeeee",
       "Raise the no-explicit-any ratchet in packages/format from 2 to 3, for the answer to parse-iso",
       "Allow .skip( at src/parse.test.ts:12 in the answer to parse-iso: flaky on leap days",
@@ -519,10 +521,6 @@ describe(consequenceOf, () => {
       [
         "Lands lin-h in the vouch file, with you as Decided-by.",
         "Nothing lands; lin-h stays unvouched.",
-      ],
-      [
-        "Opens the ask: its file and check land on main, with you as Decided-by.",
-        "The proposal closes; nothing lands.",
       ],
       [
         "Lands the answer as it is, with you as Finished-by.",
@@ -582,12 +580,12 @@ describe("the inbox's decisions, read on the server with the reader's session", 
         const markup = pageFrom(yield* readInbox({ project: vellum }));
         const text = textIn(markup);
 
-        expect(text).toContain("Decisions: 6 waiting, 1 due today.");
+        expect(text).toContain("Decisions: 4 waiting, 1 due today.");
         expect(sectionsOf(markup).slice(0, 2)).toStrictEqual([
           "Due today",
           "Later",
         ]);
-        expect(rowsOf(markup)).toHaveLength(6);
+        expect(rowsOf(markup)).toHaveLength(4);
 
         for (const { body } of rowsOf(markup)) {
           expect(body).toContain("data-consequence=");

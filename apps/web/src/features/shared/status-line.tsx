@@ -6,8 +6,6 @@ import type { Ask } from "@repo/protocol/domain/ask";
 import type { Choice, Decision } from "@repo/protocol/domain/decision";
 import { Outcome } from "@repo/protocol/domain/outcome";
 import type { StageName } from "@repo/protocol/domain/outcome";
-import { DraftState } from "@repo/protocol/domain/proposal";
-import type { Proposal } from "@repo/protocol/domain/proposal";
 import type { Handle, ProjectName } from "@repo/protocol/ids";
 import { headline } from "@repo/protocol/render";
 import { DateTime, Match } from "effect";
@@ -95,8 +93,7 @@ export type StatusSubject =
       readonly decision: Decision;
       readonly now: DateTime.Utc;
       readonly viewerDecides: boolean;
-    }
-  | { readonly kind: "proposal"; readonly proposal: Proposal };
+    };
 
 export type StatusTone =
   | "checking"
@@ -468,68 +465,11 @@ const decisionReading = ({
   };
 };
 
-const proposalReading = (proposal: Proposal): Reading => {
-  if (proposal.state === "accepted") {
-    return { after: [], lead: "Accepted", mark: "landed", tone: "landed" };
-  }
-
-  if (proposal.state === "declined") {
-    return { after: [], lead: "Declined", mark: "notNeeded", tone: "ink" };
-  }
-
-  if (proposal.state === "expired") {
-    return { after: [], lead: "Expired", mark: "notNeeded", tone: "ink" };
-  }
-
-  const waiting: Reading = {
-    after: ["a maintainer's move"],
-    lead: "Waiting",
-    mark: "waiting",
-    rest: " for a maintainer to open it or decline it",
-    tone: "waiting",
-  };
-
-  return proposal.draft === undefined
-    ? waiting
-    : DraftState.match(proposal.draft, {
-        Drafting: ({ round }): Reading => ({
-          after: ["the platform's move"],
-          lead: "Drafting",
-          mark: "checking",
-          rest: round > 1 ? `, round ${round}` : undefined,
-          tone: "checking",
-        }),
-        Failed: ({ attempts, refusal }): Reading => ({
-          after: [],
-          lead: "The draft failed",
-          mark: "failed",
-          rest: (
-            <>
-              {" "}
-              after {attempts} {attempts === 1 ? "attempt" : "attempts"}:{" "}
-              <Code>{refusal}</Code>
-            </>
-          ),
-          tone: "ink",
-        }),
-        Ready: (): Reading => ({
-          after: ["a maintainer's move"],
-          lead: "Ready",
-          mark: "waiting",
-          rest: ", waits for a maintainer",
-          tone: "waiting",
-        }),
-      });
-};
-
 export const readStatus: (subject: StatusSubject) => Reading =
   Match.type<StatusSubject>().pipe(
     Match.discriminator("kind")("answer", answerReading),
     Match.discriminator("kind")("ask", askReading),
     Match.discriminator("kind")("decision", decisionReading),
-    Match.discriminator("kind")("proposal", ({ proposal }) =>
-      proposalReading(proposal)
-    ),
     Match.exhaustive
   );
 

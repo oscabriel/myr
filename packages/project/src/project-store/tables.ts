@@ -16,7 +16,6 @@ import {
   LedgerRow,
   OutboxRow,
   ProjectRow,
-  ProposalRow,
   PushEventRow,
   RatchetRow,
 } from "./rows.ts";
@@ -91,9 +90,6 @@ export const Tables = {
     seq: row.seq,
   })),
   outbox: tableOf("outbox", OutboxRow, ["id"], (row) => ({ id: row.id })),
-  proposals: tableOf("proposals", ProposalRow, ["id"], (row) => ({
-    id: row.id,
-  })),
   pushEvents: tableOf("push_events", PushEventRow, ["event_id"], (row) => ({
     event_id: row.eventId,
   })),
@@ -167,7 +163,6 @@ export const writeAll = <E, R>(
     yield* upsert(Tables.answers, writes.answers ?? []);
     yield* upsert(QueueTable, writes.queue === undefined ? [] : [writes.queue]);
     yield* upsert(Tables.landings, writes.landings ?? []);
-    yield* upsert(Tables.proposals, writes.proposals ?? []);
     yield* upsert(Tables.decisions, writes.decisions ?? []);
     yield* upsert(Tables.discussions, writes.discussions ?? []);
     yield* upsert(Tables.ratchets, writes.ratchets ?? []);

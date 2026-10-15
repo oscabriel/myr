@@ -2,7 +2,7 @@
  * Usage:
  *   bun scripts/smoke.ts --stage <stage> [--url <origin>] [--web-url <origin>]
  *     [--since <instant>]
- *   bun scripts/smoke.ts --stage <stage> --loop [--draft] [--as <handle>]
+ *   bun scripts/smoke.ts --stage <stage> --loop [--as <handle>]
  *
  * `--since` then reads the stage's Workers Logs since that instant, and fails
  * on any exception or error-level line: it needs infra's credentials, so the
@@ -33,15 +33,6 @@ import {
   subdomainFile,
 } from "../infra/stages.ts";
 import { PublicStageRefused, LoopFailed, smokeLoop } from "./lib/smoke/loop.ts";
-
-export class DraftNeedsLoop extends Schema.TaggedError<DraftNeedsLoop>()(
-  "DraftNeedsLoop",
-  { flag: Schema.Literal("--draft") }
-) {
-  override get message() {
-    return `${this.flag} drafts an ask on the loop's throwaway project: run it with --loop`;
-  }
-}
 
 export {
   BadSince,
@@ -150,7 +141,6 @@ const loopMain = (argv: readonly string[]) =>
 
     const report = yield* smokeLoop({
       ...tokens,
-      draft: argv.includes("--draft"),
       origin,
       run,
       stage,
@@ -161,24 +151,12 @@ const loopMain = (argv: readonly string[]) =>
     yield* Console.log(
       `smoke ${stage}: loop passed in ${total} ms: ${report.project} landed ${report.landed.slice(0, 12)} by ${report.author}, refused first with ${report.refusedWith.join(", ")}; trailers ${report.trailers.join("; ")}`
     );
-
-    if (report.draft !== undefined) {
-      const { attempts, model, ms, trailers } = report.draft;
-
-      yield* Console.log(
-        `smoke ${stage}: draft by ${model} went red first in ${attempts} of 3 attempts, ${ms} ms from proposal to draft; its ask opened with ${trailers.join("; ")}`
-      );
-    }
   });
 
 export const main = (argv: readonly string[]) =>
   Effect.gen(function* () {
     if (argv.includes("--loop")) {
       return yield* loopMain(argv);
-    }
-
-    if (argv.includes("--draft")) {
-      return yield* new DraftNeedsLoop({ flag: "--draft" });
     }
 
     return yield* probeMain(argv);

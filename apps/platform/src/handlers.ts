@@ -188,14 +188,6 @@ export const Handlers: Layer.Layer<
         Effect.flatMap(person, (who) =>
           on(project, (api) => api.decide(who, input))
         ),
-      draftAsk: ({ project, ...input }) =>
-        Effect.gen(function* () {
-          const who = yield* person;
-
-          yield* rateLimits.check("draft", who.handle);
-
-          return yield* on(project, (api) => api.draftAsk(who, input));
-        }),
       evidence: ({ project, ref }) =>
         Effect.flatMap(person, (who) =>
           on(project, (api) =>
@@ -212,14 +204,6 @@ export const Handlers: Layer.Layer<
         Effect.flatMap(person, (who) =>
           on(project, (api) => api.finish(who, input))
         ),
-      flagAsk: ({ project, ...input }) =>
-        Effect.gen(function* () {
-          const who = yield* person;
-
-          yield* rateLimits.check("proposal", who.handle);
-
-          return yield* on(project, (api) => api.flagAsk(who, input));
-        }),
       fork: ({ project }) =>
         Effect.gen(function* () {
           const who = yield* person;
@@ -303,19 +287,6 @@ export const Handlers: Layer.Layer<
           return yield* on(project, (api) => api.postDiscussion(who, input));
         }),
       projectPolicy: ({ project }) => on(project, (api) => api.policy()),
-      proposeAsk: ({ project, ...input }) =>
-        Effect.gen(function* () {
-          const who = yield* person;
-
-          // A draft spends the draft limit first, then the proposal limit.
-          if (input.draft === true) {
-            yield* rateLimits.check("draft", who.handle);
-          }
-
-          yield* rateLimits.check("proposal", who.handle);
-
-          return yield* on(project, (api) => api.proposeAsk(who, input));
-        }),
       readFile: ({ at, path, project }) =>
         code(project, (of) => fileOf(of, Option.fromUndefinedOr(at), path)),
       readTree: ({ at, path, project }) =>
@@ -342,10 +313,6 @@ export const Handlers: Layer.Layer<
       showDiscussion: ({ discussion, project }) =>
         Effect.flatMap(caller, (who) =>
           on(project, (api) => api.showDiscussion(who, discussion))
-        ),
-      showProposal: ({ project, proposal }) =>
-        Effect.flatMap(caller, (who) =>
-          on(project, (api) => api.showProposal(who, proposal))
         ),
       status: ({ project }) =>
         Effect.gen(function* () {

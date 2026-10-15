@@ -4,13 +4,7 @@ import { Ask } from "@repo/protocol/domain/ask";
 import { CheckSpec } from "@repo/protocol/domain/check";
 import { Command, SymbolName } from "@repo/protocol/domain/common";
 import { Policy } from "@repo/protocol/domain/policy";
-import {
-  CommitSha,
-  DecisionId,
-  ProposalId,
-  RepoPath,
-  RequestId,
-} from "@repo/protocol/ids";
+import { CommitSha, DecisionId, RepoPath, RequestId } from "@repo/protocol/ids";
 import { DateTime, Equal, Schema } from "effect";
 import { onTestFinished, vi } from "vitest";
 
@@ -307,17 +301,14 @@ describe("deterministic ids", () => {
     expect(aProject().landed).toBe("82d7409c24ead4d50f7614f6673ecdd72315be58");
   });
 
-  it("mints request, proposal and decision ids from counters", () => {
+  it("mints request and decision ids from counters", () => {
     const next = ids();
 
     expect([next.request(), next.request()]).toStrictEqual([
       "req-000001",
       "req-000002",
     ]);
-    expect([next.proposal(), next.decision()]).toStrictEqual([
-      "prop-000001",
-      "dec-000001",
-    ]);
+    expect(next.decision()).toBe("dec-000001");
     expect(ids().request()).toBe("req-000001");
   });
 
@@ -325,7 +316,6 @@ describe("deterministic ids", () => {
     const next = ids();
 
     expect(Schema.is(RequestId)(next.request())).toBeTruthy();
-    expect(Schema.is(ProposalId)(next.proposal())).toBeTruthy();
     expect(Schema.is(DecisionId)(next.decision())).toBeTruthy();
   });
 
@@ -349,7 +339,6 @@ describe("deterministic ids", () => {
     sixChildren();
     sha("main");
     next.request();
-    next.proposal();
     next.decision();
 
     expect(

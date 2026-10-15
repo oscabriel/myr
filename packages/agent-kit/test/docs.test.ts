@@ -191,8 +191,6 @@ describe("the reference", () => {
       "Landed",
       "Lapsed",
       "LedgerAppended",
-      "ProposalDrafted",
-      "ProposalOpened",
       "Pushed",
       "Released",
       "Warned",
@@ -220,7 +218,7 @@ describe("the reference", () => {
   it("names every limit and endpoint agent-kit gives, each with its value or what it is, and links each endpoint a reader can open", () => {
     const markdown = markdownOf("limits");
 
-    expect(agentLimits().length).toBeGreaterThan(4);
+    expect(agentLimits().length).toBeGreaterThan(3);
     expect(
       agentLimits()
         .filter(

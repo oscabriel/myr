@@ -5,7 +5,6 @@ import { Discussion } from "@repo/protocol/domain/discussion";
 import { ProjectEvent } from "@repo/protocol/domain/event";
 import { LandingView } from "@repo/protocol/domain/landing";
 import { ImportSource } from "@repo/protocol/domain/policy";
-import { Proposal } from "@repo/protocol/domain/proposal";
 import { LedgerEntry } from "@repo/protocol/domain/visibility";
 import {
   AreaName,
@@ -77,10 +76,6 @@ export type AnswerRow = typeof AnswerRow.Type;
 export const LandingRow = LandingView;
 
 export type LandingRow = typeof LandingRow.Type;
-
-export const ProposalRow = Proposal;
-
-export type ProposalRow = typeof ProposalRow.Type;
 
 export const DecisionRow = Decision;
 

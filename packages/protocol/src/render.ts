@@ -18,23 +18,17 @@ const counted = (count: number, noun: string) =>
 type CapLimit = NonNullable<CapReached["limit"]>;
 
 // A cap with no `retryAfter` is held: it lifts when a claim is released or
-// landed, a proposal decided; a proposal's draft rounds never lift.
+// landed, or a discussion closed.
 const held = {
   claims: (cap) =>
     `you already hold ${counted(cap, "claim")}, the most this project allows`,
   discussions: (cap) =>
     `you already have ${counted(cap, "open discussion")} here, the most this project allows`,
-  drafts: (cap) =>
-    `this proposal was already drafted ${cap === 1 ? "once" : `${cap} times`}, the most one proposal takes`,
-  proposals: (cap) =>
-    `you already have ${counted(cap, "open proposal")} here, the most this project allows`,
 } as const satisfies Record<CapLimit, (cap: number) => string>;
 
 const rated = {
   claims: { noun: "claim", verb: "made" },
   discussions: { noun: "post", verb: "made" },
-  drafts: { noun: "draft", verb: "started" },
-  proposals: { noun: "proposal", verb: "made" },
 } as const satisfies Record<CapLimit, { noun: string; verb: string }>;
 
 const capReason = ({
@@ -88,15 +82,13 @@ const reason = Match.typeTags<Refusal, string>()({
   DecisionClosed: ({ decision }) =>
     `${decision} was already decided, or expired to its default`,
   Denounced: () =>
-    "this project's vouch file denounces you, so it takes no claims, proposals or posts from you",
+    "this project's vouch file denounces you, so it takes no claims or posts from you",
   DirectPush: ({ ref }) =>
     ref.startsWith(BRANCH)
       ? `main moves only by a landing, so ${ref} takes no direct push; a contributor pushes the answer to the claim's fork, and a maintainer makes a working fork with ${Brand.cli} fork and lands it with ${Brand.cli} land`
       : `${ref} is written by the platform, not pushed; a fork takes branches only, so push your answer with git push ${Brand.slug} HEAD:main`,
   DiscussionClosed: ({ discussion }) =>
-    `${discussion} is closed, or became a proposal, so it takes no more posts`,
-  DraftInProgress: ({ proposal }) =>
-    `the platform is already drafting ${proposal}'s ask`,
+    `${discussion} is closed, or became an ask, so it takes no more posts`,
   Flake: ({ lane }) =>
     `the ${lane} checks failed, then passed on the same tree; the platform will run them again`,
   HeldBackFailed: ({ area, suite }) =>
@@ -120,14 +112,12 @@ const reason = Match.typeTags<Refusal, string>()({
   NotYourNamespace: ({ handle, project }) =>
     `${ownerOf(project)} is not yours to make projects in: you are ${handle}`,
   OutOfScope: ({ paths }) =>
-    `changes paths outside the ask's territory: ${list(paths)}; put those files back, or flag the ask if the want needs them`,
+    `changes paths outside the ask's territory: ${list(paths)}; put those files back, or say why the want needs them in a discussion`,
   PostureChange: ({ from, to }) =>
     `landing would change the posture from ${from} to ${to}, which takes a maintainer`,
   PrivatePathInPublicTree: ({ paths }) =>
     `would put held-back paths in a public tree: ${list(paths)}; those paths belong to a layer, so remove them from the answer`,
   ProjectExists: ({ project }) => `a project named ${project} already exists`,
-  ProposalClosed: ({ proposal }) =>
-    `${proposal} was already accepted, declined or expired`,
   ReachedInternals: ({ from, to }) =>
     `${from} reaches into ${to}, which its module does not export; import it through that module's public exports instead`,
   RepoBusy: () => "the repo was busy with another push",
@@ -144,7 +134,7 @@ const reason = Match.typeTags<Refusal, string>()({
   StaleLayer: ({ layer }) =>
     `the ${layer} layer moved since this answer was checked; it will be checked again`,
   TouchedJudge: ({ paths }) =>
-    `changes files that decide what the checks do: ${list(paths)}; the checks are fixed for this ask, so put them back, or flag the ask if a check is wrong`,
+    `changes files that decide what the checks do: ${list(paths)}; the checks are fixed for this ask, so put them back, or say why a check is wrong in a discussion`,
   UnknownAsk: ({ ask }) => `this project has no ask named ${ask}`,
   UnknownCommit: ({ sha }) => `this project has no commit ${sha}`,
   UnknownDecision: ({ decision }) => `this project has no decision ${decision}`,
@@ -154,7 +144,6 @@ const reason = Match.typeTags<Refusal, string>()({
   UnknownPath: ({ commit, path }) =>
     `${short(commit)} has no file or folder at ${path}`,
   UnknownProject: ({ project }) => `no project is named ${project}`,
-  UnknownProposal: ({ proposal }) => `this project has no proposal ${proposal}`,
   UnknownRevision: ({ rev }) =>
     `${rev} is neither main, a commit this project holds, nor one of its tags`,
   UnstatedRequirement: ({ area }) =>

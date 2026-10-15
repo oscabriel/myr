@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Projects } from "@repo/project/projects";
-import { AskId, Handle, ProposalId, RepoPath } from "@repo/protocol/ids";
+import { AskId, Handle, RepoPath } from "@repo/protocol/ids";
 import { Unauthenticated } from "@repo/protocol/principal";
 import { advanceTo } from "@repo/testkit/clock";
 import { aProject, withAsk, withVouches } from "@repo/testkit/scenarios";
@@ -34,7 +34,7 @@ const platform = Effect.gen(function* () {
   );
 });
 
-describe("the code, policy and drafting contracts over /rpc", () => {
+describe("the code, policy and discussion contracts over /rpc", () => {
   it.effect("give anyone a project's policy, without its layers", () =>
     Effect.gen(function* () {
       const { handler } = yield* platform;
@@ -91,17 +91,14 @@ describe("the code, policy and drafting contracts over /rpc", () => {
       })
   );
 
-  it.effect("refuse a draft to anyone not signed in", () =>
+  it.effect("refuse a post to anyone not signed in", () =>
     Effect.gen(function* () {
       const { handler } = yield* platform;
       const anyone = yield* rpcClient(handler);
 
       expect(
         yield* Effect.exit(
-          anyone.draftAsk({
-            project,
-            proposal: ProposalId.make("prop-000001"),
-          })
+          anyone.postDiscussion({ project, title: "ISO week dates" })
         )
       ).toStrictEqual(Exit.fail(new Unauthenticated()));
     })

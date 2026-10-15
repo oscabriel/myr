@@ -10,7 +10,6 @@ const selfNamed = new Set([
   "import",
   "key",
   "project",
-  "proposal",
   "sha",
   "value",
 ]);

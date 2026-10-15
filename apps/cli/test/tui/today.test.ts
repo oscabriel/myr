@@ -37,7 +37,7 @@ import { reduce, start } from "../../src/tui/today.ts";
 import type { DecideCall, TodayViewState } from "../../src/tui/today.ts";
 import { TodayView } from "../../src/tui/view.ts";
 import { runProgram } from "../remote-server.ts";
-import { datekit, okonkwo, proposal, stray, today, vouch } from "./fixture.ts";
+import { datekit, finish, okonkwo, stray, today, vouch } from "./fixture.ts";
 
 const press = (state: TodayViewState, keys: readonly string[]) => {
   const calls: DecideCall[] = [];
@@ -217,7 +217,7 @@ describe("Today as the terminal shows it", () => {
         );
 
         expect(rows.filter((row) => row.startsWith(">"))).toStrictEqual([
-          ">   oscabriel/datekit/dec-000001  open the ask prop-000001 proposes",
+          ">   oscabriel/datekit/dec-000001  finish the answer to week-start at ccccccc",
         ]);
         expect(rowsWith(rows, "above")).toStrictEqual([
           "2 decisions above; up to read them",
@@ -445,7 +445,7 @@ describe("Today full-screen, worked by a maintainer", () => {
         ]);
         expect([last?.notice, ids(last), last?.cursor]).toStrictEqual([
           ["Decided: decline on oscabriel/datekit/dec-000003"],
-          [proposal.id, stray.id],
+          [finish.id, stray.id],
           1,
         ]);
       })
@@ -457,8 +457,8 @@ describe("Today full-screen, worked by a maintainer", () => {
       Effect.gen(function* () {
         const { client, decided } = yield* platform(new Set());
 
-        // y accepts the vouch; the second a would accept the proposal that
-        // takes its place, at once, since accept is the proposal's default.
+        // y accepts the vouch; the second a would accept the finish that
+        // takes its place, at once, since accept is the finish's default.
         const { screen } = yield* scripted(["down", "a", "y", "a"]);
 
         yield* atTerminal(

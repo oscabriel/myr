@@ -29,7 +29,7 @@ export const startHere: DocSource = {
     "",
     "```",
     "$ git push",
-    "remote: OutOfScope: changes paths outside the ask's territory: README.md; put those files back, or flag the ask if the want needs them",
+    "remote: OutOfScope: changes paths outside the ask's territory: README.md; put those files back, or say why the want needs them in a discussion",
     `remote:   next: ${Brand.cli} check`,
     "remote:   retryable: no",
     "To https://<platform>/oscabriel/datekit--parse-iso--alice.git",

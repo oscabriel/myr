@@ -22,7 +22,6 @@ import {
   ListAsks,
   ListProjects,
   OpenAsk,
-  ProposeAsk,
   ShowAsk,
   SubmitAnswer,
 } from "../src/contracts.ts";
@@ -35,12 +34,7 @@ import {
   ProjectName,
   RequestId,
 } from "../src/ids.ts";
-import {
-  AskFull,
-  CapReached,
-  DecisionClosed,
-  StaleBase,
-} from "../src/refusal.ts";
+import { AskFull, DecisionClosed, StaleBase } from "../src/refusal.ts";
 import { asTester, unanswered } from "../src/testing.ts";
 import { ask, base, main, path } from "./examples.ts";
 
@@ -324,37 +318,6 @@ describe("a contract as a CLI command", () => {
       })
   );
 
-  it.effect(
-    "takes a switch as on when named, and leaves it out otherwise",
-    () =>
-      Effect.gen(function* () {
-        const proposed = yield* Ref.make<readonly unknown[]>([]);
-
-        const propose = (args: readonly string[]) =>
-          run(
-            Layer.mergeAll(
-              unanswered,
-              Contracts.toLayerHandler("proposeAsk", (payload) =>
-                Ref.update(proposed, (all) => [...all, payload]).pipe(
-                  Effect.andThen(Effect.fail(new CapReached({ cap: 2 })))
-                )
-              )
-            ),
-            (output) =>
-              toCommand(ProposeAsk, Effect.service(Client), { output }),
-            ["--project", project, "--want", "Parse ISO weeks.", ...args]
-          );
-
-        yield* propose(["--draft"]);
-        yield* propose([]);
-
-        expect(yield* Ref.get(proposed)).toStrictEqual([
-          { draft: true, project, want: "Parse ISO weeks." },
-          { project, want: "Parse ISO weeks." },
-        ]);
-      })
-  );
-
   it("takes the last word of a two-word name as its own", () => {
     const output = Effect.succeed<CommandOutput>({
       plan: () => Effect.void,
@@ -599,13 +562,9 @@ describe("the group as CLI commands", () => {
       "ledger",
       "env shape",
       "policy",
-      "proposal",
       "discussions",
       "discussion",
       "ask open",
-      "propose",
-      "ask draft",
-      "ask flag",
       "discussion post",
       "decide",
       "claim",

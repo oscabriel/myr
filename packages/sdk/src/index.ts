@@ -6,10 +6,7 @@ export {
   ClaimantFacts,
   Functions,
   functionsOf,
-  type KindFunctions,
-  type OpensAlone,
   type ProjectFunctions,
-  ProposalFacts,
   type WithFunctions,
 } from "./functions.ts";
 

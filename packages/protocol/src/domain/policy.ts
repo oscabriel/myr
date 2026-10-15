@@ -22,8 +22,6 @@ const defaultDecisions = { expireDays: 14 };
 /** Throttles on people nobody has vouched for; a vouched person and a maintainer are never held. */
 const Caps = Schema.Struct({
   claimsPerPerson: AtLeastOne,
-  /** `0` turns proposals off. */
-  proposalsPerPerson: NoneOrMore,
 });
 
 const Claims = Schema.Struct({
@@ -46,7 +44,6 @@ const Agents = Schema.Literals(["trailer", "none"]);
 
 const Functions = Schema.Struct({
   admit: Schema.Boolean,
-  opensAlone: Schema.Boolean,
 });
 
 const Weakening = Schema.Struct({
@@ -128,9 +125,7 @@ export const PolicyInput = Schema.Struct({
   agents: Agents.pipe(Schema.withDecodingDefaultKey(Effect.succeed("trailer"))),
   asks: Schema.Array(AskInput),
   caps: Caps.pipe(
-    Schema.withDecodingDefaultKey(
-      Effect.succeed({ claimsPerPerson: 20, proposalsPerPerson: 20 })
-    )
+    Schema.withDecodingDefaultKey(Effect.succeed({ claimsPerPerson: 20 }))
   ),
   claims: Claims.pipe(
     Schema.withDecodingDefaultKey(

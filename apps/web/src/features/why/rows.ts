@@ -93,16 +93,3 @@ export const priorHref = (
   Option.map(Option.fromUndefinedOr(commit.parents[0]), (parent) =>
     whyHref(project, pinnedRev(rev, parent), path)
   );
-
-export const proposeHref = (
-  project: ProjectName,
-  {
-    at,
-    line,
-    path,
-  }: { readonly at: string; readonly line: number; readonly path: string }
-) => {
-  const query = new URLSearchParams({ about: path, at, line: String(line) });
-
-  return `/${project}/proposals/new?${query.toString()}`;
-};

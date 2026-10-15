@@ -2,11 +2,11 @@ import { RefNameText } from "@repo/protocol/domain/common";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
 import type { Decision, Today } from "@repo/protocol/domain/decision";
 import {
+  AskId,
   CommitSha,
   DecisionId,
   Handle,
   ProjectName,
-  ProposalId,
 } from "@repo/protocol/ids";
 import { DateTime } from "effect";
 
@@ -18,8 +18,8 @@ export const okonkwo = Handle.make("okonkwo");
 
 export const datekit = ProjectName.make("oscabriel/datekit");
 
-/** An ask proposed for datekit, expiring tomorrow: last in expiry order. */
-export const proposal: Decision = {
+/** A passing answer to finish in datekit, expiring tomorrow: last in expiry order. */
+export const finish: Decision = {
   deciders: [okonkwo],
   default: "accept",
   evidence: [{ label: "territory", value: "src/week" }],
@@ -27,8 +27,9 @@ export const proposal: Decision = {
   id: DecisionId.make("dec-000001"),
   openedAt: at("2026-10-07T09:00:00Z"),
   project: datekit,
-  subject: DecisionSubject.cases.OpenProposal.make({
-    proposal: ProposalId.make("prop-000001"),
+  subject: DecisionSubject.cases.Finish.make({
+    ask: AskId.make("week-start"),
+    head: sha("c"),
   }),
 };
 
@@ -62,7 +63,7 @@ export const vouch: Decision = {
 
 export const today: Today = {
   decider: okonkwo,
-  decisions: [proposal, vouch, stray],
+  decisions: [finish, vouch, stray],
   expiringSoon: [stray.id],
   newcomers: [Handle.make("ada"), Handle.make("grace")],
   unattended: [],

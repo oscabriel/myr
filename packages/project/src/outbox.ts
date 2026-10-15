@@ -12,11 +12,10 @@ import {
   RequestId,
   TreeSha,
 } from "@repo/protocol/ids";
-import { Array, DateTime, Effect, Option, Order, Schema, Struct } from "effect";
+import { Array, DateTime, Effect, Option, Order, Schema } from "effect";
 
 import { AnswerRuns } from "./answer-runs.ts";
 import type { AnswerQueue } from "./answer-runs.ts";
-import { DraftParams, DraftRuns } from "./draft-runs.ts";
 import { noRunEnv } from "./env-port.ts";
 import { Lander, Rebuild } from "./lander.ts";
 import { backoff } from "./landing.ts";
@@ -48,7 +47,6 @@ export const OutboxBody = Schema.Union([
   Schema.TaggedStruct("StartAnswer", { requestId: RequestId }),
   Schema.TaggedStruct("Bookkeeping", { job: LandAgain }),
   Schema.TaggedStruct("Visibility", { effect: VisibilityEffect }),
-  Schema.TaggedStruct("StartDraft", DraftParams.fields),
   Schema.TaggedStruct("Measured", {
     points: Schema.NonEmptyArray(MetricPoint),
   }),
@@ -103,13 +101,6 @@ export const startRow = (requestId: RequestId, at: DateTime.Utc) =>
   outboxRow(
     `start:${requestId}:${DateTime.toEpochMillis(at)}`,
     OutboxBody.cases.StartAnswer.make({ requestId }),
-    at
-  );
-
-export const draftRow = (params: DraftParams, at: DateTime.Utc) =>
-  outboxRow(
-    `draft:${params.proposal}:r${params.round}`,
-    OutboxBody.cases.StartDraft.make(params),
     at
   );
 
@@ -270,15 +261,6 @@ export const runOutbox = (
       Effect.map(visibility.settle(body.effect), (ok) => ran(row, ok, now))
     );
 
-    const draftRuns = yield* DraftRuns;
-
-    const drafts = yield* Effect.forEach(of("StartDraft"), ({ body, row }) =>
-      Effect.as(
-        draftRuns.start(Struct.omit(body, ["_tag"])),
-        ran(row, true, now)
-      )
-    );
-
     const metrics = yield* Metrics;
 
     // A point is written at most once, and never retried: the dataset adds
@@ -331,7 +313,6 @@ export const runOutbox = (
       ...forks,
       ...kept,
       ...planned,
-      ...drafts,
       ...measured,
       ...warmed,
       ...runs,

@@ -46,8 +46,6 @@ const happening = (event: ProjectEvent) =>
       `${landing.ask ?? "main"} landed as ${short(landing.sha)}`,
     Lapsed: () => "",
     LedgerAppended: () => "",
-    ProposalDrafted: () => "",
-    ProposalOpened: () => "",
     Pushed: ({ ask, head }) => `${ask} pushed ${short(head)}`,
     Released: () => "",
     Warned: () => "",

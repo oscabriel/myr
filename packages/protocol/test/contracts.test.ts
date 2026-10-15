@@ -18,7 +18,6 @@ import {
 import {
   Contracts,
   partsOf,
-  ProposeAsk,
   SetEnv,
   surfaced,
   Watch,
@@ -214,14 +213,6 @@ const table = [
   },
   {
     audience: "public",
-    cli: "proposal <proposal>",
-    errors: ["UnknownProject", "UnknownProposal"],
-    flags: "RI",
-    on: "RMCW",
-    tag: "showProposal",
-  },
-  {
-    audience: "public",
     cli: "discussions",
     errors: ["UnknownProject"],
     flags: "RI",
@@ -256,49 +247,12 @@ const table = [
       "TouchedJudge",
       "VerifierBlocked",
       "StaleBase",
+      "UnknownDiscussion",
+      "DiscussionClosed",
     ],
     flags: "A",
     on: "RMC",
     tag: "openAsk",
-  },
-  {
-    audience: "signedIn",
-    cli: "propose",
-    errors: [
-      "UnknownProject",
-      "Denounced",
-      "CapReached",
-      "NotVouched",
-      "NotDecider",
-      "UnknownDiscussion",
-      "DiscussionClosed",
-    ],
-    flags: "",
-    on: "RMCW",
-    tag: "proposeAsk",
-  },
-  {
-    audience: "signedIn",
-    cli: "ask draft <proposal>",
-    errors: [
-      "UnknownProject",
-      "UnknownProposal",
-      "ProposalClosed",
-      "NotDecider",
-      "DraftInProgress",
-      "CapReached",
-    ],
-    flags: "",
-    on: "RMCW",
-    tag: "draftAsk",
-  },
-  {
-    audience: "signedIn",
-    cli: "ask flag <ask>",
-    errors: ["UnknownProject", "UnknownAsk", "Denounced", "CapReached"],
-    flags: "",
-    on: "RMC",
-    tag: "flagAsk",
   },
   {
     audience: "signedIn",
@@ -433,9 +387,6 @@ const table = [
     tag: "setEnv",
   },
 ] as const;
-
-const decodes = (payload: typeof Schema.Json.Type) =>
-  Schema.decodeUnknownOption(ProposeAsk.payloadSchema)(payload)._tag;
 
 type CodeRead =
   | "listPaths"
@@ -625,22 +576,6 @@ describe("the contracts group", () => {
     expect(encoded.value).toBe("not-a-real-value-0123456789abcdef");
     expect(JSON.stringify(decoded)).toContain('"value":"<redacted>"');
     expect(JSON.stringify(decoded)).not.toContain(encoded.value);
-  });
-
-  it("takes a drafted proposal with no files and no sealed answer", () => {
-    const want = { project: "datekit", want: "Parse ISO weeks." };
-
-    const files = [{ content: "x", path: "config/asks/a.ask.ts" }];
-
-    const sealed = { head: "3".repeat(40) };
-
-    expect([
-      decodes({ ...want, draft: true }),
-      decodes({ ...want, draft: true, files }),
-      decodes({ ...want, draft: true, sealed }),
-      decodes({ ...want, files }),
-      decodes({ ...want, draft: false }),
-    ]).toStrictEqual(["Some", "None", "None", "Some", "None"]);
   });
 
   it("streams a project's events from watch", () => {

@@ -15,22 +15,6 @@ const Module = Territory.fields.module;
 const LandingCount = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
 
 /** The rule sees these facts and nothing else: no clock, no network, no repo. */
-export const ProposalFacts = Schema.Struct({
-  kind: KindName,
-  proposer: Handle,
-  /** The proposer's landings in the territory that stayed unreverted. */
-  record: LandingCount,
-  territory: Module,
-});
-
-export type ProposalFacts = typeof ProposalFacts.Type;
-
-/**
- * Whether a proposal opens its ask on its own, without a maintainer. Write one
- * only when the kind's data can't say it: `(p) => p.record >= 3`.
- */
-export type OpensAlone = (proposal: ProposalFacts) => boolean;
-
 export const ClaimantFacts = Schema.Struct({
   handle: Handle,
   kind: KindName,
@@ -50,11 +34,6 @@ export type Admit = (claimant: ClaimantFacts) => boolean;
 
 export interface ProjectFunctions {
   readonly admit: Admit | undefined;
-  readonly opensAlone: OpensAlone | undefined;
-}
-
-export interface KindFunctions {
-  readonly opensAlone: OpensAlone | undefined;
 }
 
 /**
@@ -78,6 +57,6 @@ export const withFunctions = <A extends Readonly<Record<string, unknown>>, F>(
   return carried;
 };
 
-/** For the rules evaluator: `functionsOf(definition).opensAlone?.(facts)`. */
+/** For the rules evaluator: `functionsOf(definition).admit?.(facts)`. */
 export const functionsOf = <F>(definition: WithFunctions<F>): F =>
   definition[Functions];

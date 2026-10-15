@@ -9,7 +9,7 @@ import { useEffect, useState } from "react";
 import { importAtom, importMade } from "../../client/import.ts";
 import { hereOf } from "../auth/session-slot.tsx";
 import { whoAtom } from "../auth/who.ts";
-import { ProposalFailure } from "../proposal/failure.tsx";
+import { CallFailure } from "../shared/call-failure.tsx";
 import type { Importer } from "./import-form.tsx";
 
 export const afterImport = (made: ProjectName, at?: ProjectName) =>
@@ -54,7 +54,7 @@ export const useImporter = (at?: ProjectName): Importer => {
     },
     refusal: AsyncResult.isFailure(imported) ? (
       <div aria-live="polite">
-        <ProposalFailure cause={imported.cause} doing="import it" here={here} />
+        <CallFailure cause={imported.cause} doing="import it" here={here} />
       </div>
     ) : undefined,
   };

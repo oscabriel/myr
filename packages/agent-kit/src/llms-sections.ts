@@ -111,9 +111,6 @@ const eventLines = {
     "A landing reached `main`, a project's adoption (its first push or its import) among them.",
   Lapsed: "A claim lapsed: no push for too long.",
   LedgerAppended: "The project's public ledger gained an entry.",
-  ProposalDrafted:
-    "A proposal's draft settled: ready for a maintainer, or failed.",
-  ProposalOpened: "A proposal opened.",
   Pushed: "A claimant pushed to their fork.",
   Released: "A claim was released.",
   Warned: "A claim was warned that it lapses without a push.",

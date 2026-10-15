@@ -4,15 +4,11 @@ import type { Ask } from "@repo/protocol/domain/ask";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
 import type { Decision } from "@repo/protocol/domain/decision";
 import { Outcome } from "@repo/protocol/domain/outcome";
-import { DraftState } from "@repo/protocol/domain/proposal";
-import type { Proposal } from "@repo/protocol/domain/proposal";
 import {
   AskId,
   DecisionId,
   Handle,
   LandedSha,
-  LaneName,
-  ProposalId,
   RepoPath,
 } from "@repo/protocol/ids";
 import { OutOfScope, Weakened } from "@repo/protocol/refusal";
@@ -55,17 +51,6 @@ const decision: Decision = {
   openedAt: DateTime.subtract(now, { hours: 21 }),
   project,
   subject: DecisionSubject.cases.Vouch.make({ handle: tamsin }),
-};
-
-const proposal: Proposal = {
-  expiresAt: DateTime.add(now, { days: 6 }),
-  files: [],
-  id: ProposalId.make("prop-000001"),
-  openedAt: DateTime.subtract(now, { days: 1 }),
-  project,
-  proposer: tamsin,
-  state: "open",
-  want: "Format durations in words",
 };
 
 const rendered = (element: ReactElement) => {
@@ -274,34 +259,6 @@ describe(StatusLine, () => {
     expect(accepted.tone).toBe("landed");
     expect(declined.text).toContain("Declined by okonkwo");
     expect(declined.tone).toBe("ink");
-  });
-
-  it("says where a proposal's draft stands in the outcome's words", () => {
-    const drafting = line({
-      kind: "proposal",
-      proposal: {
-        ...proposal,
-        draft: DraftState.cases.Drafting.make({ round: 1, startedAt: now }),
-      },
-    });
-
-    const ready = line({
-      kind: "proposal",
-      proposal: {
-        ...proposal,
-        draft: DraftState.cases.Ready.make({
-          attempts: 1,
-          model: "a-model",
-          red: { lane: LaneName.make("unit"), signature: "expected 1" },
-          round: 1,
-        }),
-      },
-    });
-
-    expect(drafting.text).toContain("Drafting");
-    expect(drafting.tone).toBe("checking");
-    expect(ready.text).toContain("Ready, waits for a maintainer");
-    expect(ready.tone).toBe("waiting");
   });
 
   it("draws only the mark and the lead word in its compact form", () => {

@@ -4,7 +4,7 @@ import { Brand } from "@repo/brand";
 import { ApprovalNeeded } from "@repo/protocol/cli";
 import { Client, OpenAsk } from "@repo/protocol/contracts";
 import { ConfigFile } from "@repo/protocol/domain/common";
-import { AskId, ProjectName } from "@repo/protocol/ids";
+import { AskId, DiscussionId, ProjectName } from "@repo/protocol/ids";
 import { Effect, FileSystem, Option, Path, Schema } from "effect";
 import { Argument, Command, Flag } from "effect/cli";
 
@@ -82,6 +82,13 @@ export const askOpen = Command.make(
       Argument.withSchema(AskId),
       Argument.withDescription("The ask to open: its file is asks/<ask>.ask.ts")
     ),
+    discussion: Flag.String("discussion").pipe(
+      Flag.withSchema(DiscussionId),
+      Flag.optional,
+      Flag.withDescription(
+        "The discussion this ask comes from; opening it marks the thread asked"
+      )
+    ),
     dryRun: Flag.Boolean("dry-run").pipe(
       Flag.withDefault(false),
       Flag.withDescription("Print the payload it would send, and send nothing")
@@ -144,6 +151,10 @@ export const askOpen = Command.make(
         ask,
         files,
         project,
+        ...Option.match(flags.discussion, {
+          onNone: () => ({}),
+          onSome: (discussion) => ({ discussion }),
+        }),
       }).pipe(Effect.catch((error) => usage(String(error))));
 
       const output = yield* Output;
@@ -168,6 +179,6 @@ export const askOpen = Command.make(
     }).pipe(reportRefusals(COMMAND, flags.json))
 ).pipe(
   Command.withDescription(
-    `Open an ask by landing its file and its check, read from the ask's own file under ${Brand.configDir}/asks/ and the path it names unless --files gives them, once the check fails on main by an assertion, twice in the same way.`
+    `Open an ask by landing its file and its check, read from the ask's own file under ${Brand.configDir}/asks/ and the path it names unless --files gives them, once the check fails on main by an assertion, twice in the same way; --discussion names the thread it comes from, and marks it asked.`
   )
 );

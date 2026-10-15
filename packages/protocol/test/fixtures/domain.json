@@ -42,8 +42,7 @@
           "expireDays": 14
         },
         "caps": {
-          "claimsPerPerson": 3,
-          "proposalsPerPerson": 2
+          "claimsPerPerson": 3
         },
         "claims": {
           "lapseAfterMs": 86400000,
@@ -56,8 +55,7 @@
           }
         ],
         "functions": {
-          "admit": false,
-          "opensAlone": true
+          "admit": false
         },
         "judge": {
           "paths": ["config/**", ".env.schema"],
@@ -161,8 +159,7 @@
           "expireDays": 14
         },
         "caps": {
-          "claimsPerPerson": 3,
-          "proposalsPerPerson": 2
+          "claimsPerPerson": 3
         },
         "claims": {
           "lapseAfterMs": 86400000,
@@ -175,8 +172,7 @@
           }
         ],
         "functions": {
-          "admit": false,
-          "opensAlone": true
+          "admit": false
         },
         "judge": {
           "paths": ["config/**", ".env.schema"],
@@ -914,8 +910,8 @@
         "openedAt": "2026-10-07T12:00:00.000Z",
         "project": "oscabriel/datekit",
         "subject": {
-          "_tag": "OpenProposal",
-          "proposal": "prop-000001"
+          "_tag": "Vouch",
+          "handle": "dave"
         }
       },
       {
@@ -1465,8 +1461,7 @@
           "expireDays": 14
         },
         "caps": {
-          "claimsPerPerson": 3,
-          "proposalsPerPerson": 2
+          "claimsPerPerson": 3
         },
         "claims": {
           "lapseAfterMs": 86400000,
@@ -1479,8 +1474,7 @@
           }
         ],
         "functions": {
-          "admit": false,
-          "opensAlone": true
+          "admit": false
         },
         "judge": {
           "paths": ["config/**", ".env.schema"],
@@ -1586,8 +1580,7 @@
           "expireDays": 14
         },
         "caps": {
-          "claimsPerPerson": 3,
-          "proposalsPerPerson": 2
+          "claimsPerPerson": 3
         },
         "claims": {
           "lapseAfterMs": 86400000,
@@ -1600,8 +1593,7 @@
           }
         ],
         "functions": {
-          "admit": false,
-          "opensAlone": true
+          "admit": false
         },
         "kinds": [
           {
@@ -1674,8 +1666,7 @@
           "expireDays": 14
         },
         "caps": {
-          "claimsPerPerson": 3,
-          "proposalsPerPerson": 2
+          "claimsPerPerson": 3
         },
         "claims": {
           "lapseAfterMs": 86400000,
@@ -1688,8 +1679,7 @@
           }
         ],
         "functions": {
-          "admit": false,
-          "opensAlone": true
+          "admit": false
         },
         "kinds": [
           {
@@ -1902,12 +1892,6 @@
         "seq": 9
       },
       {
-        "_tag": "ProposalOpened",
-        "at": "2026-10-07T12:00:00.000Z",
-        "proposal": "prop-000001",
-        "seq": 10
-      },
-      {
         "_tag": "Decided",
         "at": "2026-10-07T12:00:00.000Z",
         "choice": "accept",
@@ -1938,41 +1922,6 @@
         "openAsks": 0,
         "posture": "open",
         "project": "oscabriel/burrow"
-      }
-    ],
-    "Proposal": [
-      {
-        "expiresAt": "2026-10-21T12:00:00.000Z",
-        "files": ["config/asks/iso-week.ask.ts"],
-        "flags": "drop-moment",
-        "id": "prop-000001",
-        "openedAt": "2026-10-07T12:00:00.000Z",
-        "project": "oscabriel/datekit",
-        "proposer": "dave",
-        "sealed": {
-          "fork": "datekit--me--dave",
-          "head": "3333333333333333333333333333333333333333"
-        },
-        "state": "open",
-        "territory": "@datekit/parse",
-        "want": "An ISO week date parses to the Monday of that week."
-      },
-      {
-        "draft": {
-          "_tag": "Drafting",
-          "note": "Name the week-53 case in the want.",
-          "round": 2,
-          "startedAt": "2026-10-07T13:00:00.000Z"
-        },
-        "expiresAt": "2026-10-21T12:00:00.000Z",
-        "files": ["config/asks/iso-week.ask.ts"],
-        "id": "prop-000001",
-        "openedAt": "2026-10-07T12:00:00.000Z",
-        "project": "oscabriel/datekit",
-        "proposer": "dave",
-        "state": "open",
-        "territory": "@datekit/parse",
-        "want": "An ISO week date parses to the Monday of that week."
       }
     ],
     "RatchetSpec": [
@@ -2036,8 +1985,8 @@
             "openedAt": "2026-10-07T12:00:00.000Z",
             "project": "oscabriel/datekit",
             "subject": {
-              "_tag": "OpenProposal",
-              "proposal": "prop-000001"
+              "_tag": "Vouch",
+              "handle": "dave"
             }
           }
         ],
@@ -2302,8 +2251,7 @@
       }
     ],
     "functions": {
-      "admit": false,
-      "opensAlone": true
+      "admit": false
     },
     "kinds": [
       {

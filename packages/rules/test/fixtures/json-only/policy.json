@@ -17,7 +17,7 @@
   ],
   "decisions": { "expireDays": 7 },
   "deciders": [{ "handles": "owners", "paths": "**" }],
-  "functions": { "admit": false, "opensAlone": false },
+  "functions": { "admit": false },
   "kinds": [
     {
       "checkKind": "redThenGreen",

@@ -2,7 +2,7 @@ import { NodeServices } from "@effect/platform-node";
 import { assert, describe, expect, it } from "@effect/vitest";
 import { Policy, PolicyInput } from "@repo/protocol/domain/policy";
 import { LandedSha } from "@repo/protocol/ids";
-import { ProposalFacts } from "@repo/sdk";
+import { ClaimantFacts } from "@repo/sdk";
 import { Effect, Layer, Path, Result, Schema } from "effect";
 import type { FileSystem } from "effect";
 import type { ChildProcessSpawner } from "effect/process";
@@ -66,16 +66,17 @@ const reasonOf = <A>(
   return result.failure.reason;
 };
 
-const decodeProposal = Schema.decodeUnknownSync(ProposalFacts);
+const decodeClaimant = Schema.decodeUnknownSync(ClaimantFacts);
 
-const proposal = (record: number): RuleCall => ({
-  facts: decodeProposal({
+const claimant = (record: number): RuleCall => ({
+  facts: decodeClaimant({
+    handle: "bram",
     kind: "fixBug",
-    proposer: "carol",
     record,
     territory: "@datekit/parse",
+    vouched: true,
   }),
-  rule: "opensAlone",
+  rule: "admit",
 });
 
 const baseEncoded = Schema.encodeSync(PolicyInput)({
@@ -274,7 +275,7 @@ describe("the /worker adapter", () => {
 
         yield* Effect.gen(function* () {
           yield* evaluated(bundle);
-          yield* called(bundle, proposal(3));
+          yield* called(bundle, claimant(3));
         }).pipe(Effect.provide(workerEvaluator(loader.binding)));
 
         // The warm evaluation worker froze the landing's clock, so the call
@@ -375,7 +376,7 @@ describe("the /worker adapter", () => {
         responds: '{"_tag":"Called","result":true}',
       });
 
-      const result = yield* called(bundle, proposal(3)).pipe(
+      const result = yield* called(bundle, claimant(3)).pipe(
         Effect.provide(workerEvaluator(loader.binding))
       );
 
@@ -384,12 +385,13 @@ describe("the /worker adapter", () => {
       expect(result).toStrictEqual(Result.succeed(true));
       expect(JSON.parse(loader.requests[0] ?? "")).toStrictEqual({
         facts: {
+          handle: "bram",
           kind: "fixBug",
-          proposer: "carol",
           record: 3,
           territory: "@datekit/parse",
+          vouched: true,
         },
-        rule: "opensAlone",
+        rule: "admit",
       });
 
       // A rule gets time only through its facts: the clock is the epoch.
@@ -410,7 +412,7 @@ describe("the /worker adapter", () => {
 
       const result = yield* called(
         bundleOf({ "asks/a.ask.ts": "export default {};\n" }),
-        proposal(3)
+        claimant(3)
       ).pipe(Effect.provide(workerEvaluator(loader.binding)));
 
       expect(result).toStrictEqual(Result.succeed(false));
@@ -424,7 +426,7 @@ describe("the /worker adapter", () => {
         responds: '{"_tag":"Called","result":"yes"}',
       });
 
-      const result = yield* called(bundle, proposal(3)).pipe(
+      const result = yield* called(bundle, claimant(3)).pipe(
         Effect.provide(workerEvaluator(loader.binding))
       );
 
@@ -558,7 +560,7 @@ describe("the /worker adapter's modules, run", () => {
       const worker = yield* running;
 
       const answers = yield* Effect.all(
-        [called(modules, proposal(3)), called(modules, proposal(2))],
+        [called(modules, claimant(3)), called(modules, claimant(2))],
         { concurrency: "unbounded" }
       ).pipe(Effect.provide(worker));
 

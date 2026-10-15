@@ -54,7 +54,8 @@ const open = Schema.decodeSync(Discussion)({
   title: "Which day starts a week?",
 });
 
-const proposed = Schema.decodeSync(Discussion)({
+const asked = Schema.decodeSync(Discussion)({
+  ask: "parse-iso-week",
   id: "disc-000002",
   openedAt: "2026-10-07T12:10:00.000Z",
   opener: "tove",
@@ -66,8 +67,7 @@ const proposed = Schema.decodeSync(Discussion)({
     },
   ],
   project: "oscabriel/datekit",
-  proposal: "prop-000001",
-  state: "proposed",
+  state: "asked",
   title: "ISO week dates",
 });
 
@@ -83,14 +83,14 @@ const listings = Schema.decodeSync(Schema.Array(DiscussionListing))([
     title: "Which day starts a week?",
   },
   {
+    ask: "parse-iso-week",
     id: "disc-000002",
     lastPostAt: "2026-10-07T12:10:00.000Z",
     openedAt: "2026-10-07T12:10:00.000Z",
     opener: "tove",
     posts: 1,
     project: "oscabriel/datekit",
-    proposal: "prop-000001",
-    state: "proposed",
+    state: "asked",
     title: "ISO week dates",
   },
 ]);
@@ -114,6 +114,7 @@ describe("a project's discussions page", () => {
     expect(markup).toMatch(/<h1\b[^>]*>Discussions<\/h1>/u);
     expect(rows).toContain('href="/oscabriel/datekit/discussions/disc-000001"');
     expect(rows).toContain('href="/oscabriel/datekit/discussions/disc-000002"');
+    expect(rows).toContain('href="/oscabriel/datekit/asks/parse-iso-week"');
     expect(
       inOrder(plainText(rows), [
         "Which day starts a week?",
@@ -124,7 +125,8 @@ describe("a project's discussions page", () => {
         "ISO week dates",
         "tove",
         "1 post",
-        "Became a proposal",
+        "Became an ask",
+        "parse-iso-week",
       ])
     ).toBeTruthy();
   });
@@ -201,15 +203,15 @@ describe("a discussion's page", () => {
     expect(markup).not.toMatch(/<form\b|<textarea\b/u);
   });
 
-  it("names the proposal a maintainer turned it into, linked, and offers no reply", () => {
-    const markup = markupOf(<DiscussionView discussion={proposed} now={now} />);
+  it("names the ask a maintainer opened from it, linked, and offers no reply", () => {
+    const markup = markupOf(<DiscussionView discussion={asked} now={now} />);
 
     const became = elementWith(mainOf(markup), "data-became");
 
     expect(became).toMatch(
-      /<a\b[^>]*href="\/oscabriel\/datekit\/proposals\/prop-000001"[^>]*>prop-000001<\/a>/u
+      /<a\b[^>]*href="\/oscabriel\/datekit\/asks\/parse-iso-week"[^>]*>parse-iso-week<\/a>/u
     );
-    expect(plainText(markup)).toContain("Became a proposal");
+    expect(plainText(markup)).toContain("Became an ask");
     expect(plainText(markup)).toContain("takes no more posts");
     expect(commandsOf(markup)).toStrictEqual([]);
   });

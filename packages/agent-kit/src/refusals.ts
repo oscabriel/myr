@@ -43,7 +43,7 @@ const repairs = {
     todo: "Wait until `resetsAt`: you used every attempt on that area's held-back checks for now.",
   },
   CapReached: {
-    todo: "Read `limit`: for claims, release or land a claim you hold; for proposals, wait for an open one to be decided; for drafts, the proposal has had every draft round it takes; with `retryAfter`, wait that many seconds and try again.",
+    todo: "Read `limit`: for claims, release or land a claim you hold; for discussions, wait for one of yours to close; with `retryAfter`, wait that many seconds and try again.",
   },
   ChecksFailed: {
     nextNames: "the command that reproduces the failure",
@@ -54,7 +54,7 @@ const repairs = {
     todo: "Your claim lapsed after a spell without a push: claim the ask again if it is still open.",
   },
   Denounced: {
-    todo: "The project's vouch file denounces you: it takes no claims, proposals or posts from you.",
+    todo: "The project's vouch file denounces you: it takes no claims or posts from you.",
   },
   DirectPush: {
     todo: "Main moves only by a landing. A contributor pushes the answer to the claim's fork; a maintainer makes a working fork with `next` and lands it with `land`.",
@@ -103,11 +103,7 @@ const elsewhere = {
     todo: "Nothing to decide: it was taken already, or expired to its default.",
   },
   DiscussionClosed: {
-    todo: "Nothing more is posted there: the discussion was closed, or a maintainer turned it into a proposal; `next` lists the open ones.",
-  },
-  DraftInProgress: {
-    next: cli("proposal", "<proposal>"),
-    todo: "Wait: the platform is drafting this proposal's ask already, and `next` shows when it settles.",
+    todo: "Nothing more is posted there: the discussion was closed, or a maintainer opened an ask from it; `next` lists the open ones.",
   },
   ImportFailed: { todo: "Read `reason`, then import again with `next`." },
   IncompleteBrief: {
@@ -132,9 +128,6 @@ const elsewhere = {
     todo: "A maintainer declined the posture change it names (`from`, `to`): take out what changes the posture; `next` lists the decisions.",
   },
   ProjectExists: { todo: "Pick another name: that one is taken." },
-  ProposalClosed: {
-    todo: "Nothing more is drafted for it: the proposal was accepted, declined or expired.",
-  },
   SecretInOutput: {
     todo: "Take the write-only value of `item` out of the output or the tree (`where`), then check again.",
   },
@@ -158,9 +151,6 @@ const elsewhere = {
   },
   UnknownProject: {
     todo: "Check the project's name: `next` lists every project.",
-  },
-  UnknownProposal: {
-    todo: "Check the proposal's id: `next` lists the proposals waiting on you.",
   },
   UnknownRevision: {
     todo: "Name `main`, a commit the project holds or one of its tags: `next`, the MCP tool, lists its refs.",

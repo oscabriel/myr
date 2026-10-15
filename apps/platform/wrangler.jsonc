@@ -67,8 +67,6 @@
     "STAGE": "local",
     // "container" (apps/sandbox) or "isogit" (in this Worker).
     "LANDER_ADAPTER": "container",
-    // The Workers AI model that drafts asks; swap it here, no code change.
-    "DRAFT_MODEL": "@cf/moonshotai/kimi-k2.7-code",
     // The web app, which `/` links to: `vite dev`'s URL locally.
     "PUBLIC_WEB_URL": "http://localhost:5173",
   },
@@ -121,9 +119,7 @@
   // each mail, code included, so no real mail leaves a local run.
   "send_email": [{ "name": "EMAIL" }],
   "worker_loaders": [{ "binding": "LOADER" }],
-  // Workers AI, for the drafter (no key: the account's own).
-  "ai": { "binding": "AI" },
-  // Domain metrics (landings, refusals, lanes, waits, drafts) in Workers
+  // Domain metrics (landings, refusals, lanes and waits) in Workers
   // Analytics Engine, one dataset per stage so no stage's counts mix with
   // another's. A dataset is made by its first write, so bootstrap makes none;
   // its name takes `_`, since SQL reads it as a table.
@@ -140,7 +136,7 @@
       "simple": { "limit": 10, "period": 60 },
     },
     {
-      "name": "PROPOSAL_LIMIT",
+      "name": "POST_LIMIT",
       "namespace_id": "1002",
       "simple": { "limit": 5, "period": 60 },
     },
@@ -150,12 +146,6 @@
       "name": "SIGN_IN_LIMIT",
       "namespace_id": "1003",
       "simple": { "limit": 5, "period": 60 },
-    },
-    // Drafts per person: each one is a model call and Checker runs.
-    {
-      "name": "DRAFT_LIMIT",
-      "namespace_id": "1004",
-      "simple": { "limit": 2, "period": 60 },
     },
   ],
   "triggers": {
@@ -173,7 +163,6 @@
         "OPERATOR_HANDLE": "oscabriel",
         "STAGE": "dev-oscabriel",
         "LANDER_ADAPTER": "container",
-        "DRAFT_MODEL": "@cf/moonshotai/kimi-k2.7-code",
         "PUBLIC_WEB_URL": "https://web-dev-oscabriel.oscargabriel.workers.dev",
       },
       "secrets": {
@@ -222,7 +211,6 @@
       ],
       "send_email": [{ "name": "EMAIL" }],
       "worker_loaders": [{ "binding": "LOADER" }],
-      "ai": { "binding": "AI" },
       "analytics_engine_datasets": [
         { "binding": "METRICS", "dataset": "metrics_dev_oscabriel" },
       ],
@@ -236,7 +224,7 @@
           "simple": { "limit": 10, "period": 60 },
         },
         {
-          "name": "PROPOSAL_LIMIT",
+          "name": "POST_LIMIT",
           "namespace_id": "1102",
           "simple": { "limit": 5, "period": 60 },
         },
@@ -244,11 +232,6 @@
           "name": "SIGN_IN_LIMIT",
           "namespace_id": "1103",
           "simple": { "limit": 5, "period": 60 },
-        },
-        {
-          "name": "DRAFT_LIMIT",
-          "namespace_id": "1104",
-          "simple": { "limit": 2, "period": 60 },
         },
       ],
       "triggers": {
@@ -273,7 +256,6 @@
         "OPERATOR_HANDLE": "oscabriel",
         "STAGE": "prod",
         "LANDER_ADAPTER": "container",
-        "DRAFT_MODEL": "@cf/moonshotai/kimi-k2.7-code",
         "PUBLIC_WEB_URL": "https://from-infra-deploy.invalid",
       },
       "secrets": {
@@ -318,7 +300,6 @@
       ],
       "send_email": [{ "name": "EMAIL" }],
       "worker_loaders": [{ "binding": "LOADER" }],
-      "ai": { "binding": "AI" },
       "analytics_engine_datasets": [
         { "binding": "METRICS", "dataset": "metrics_prod" },
       ],
@@ -330,7 +311,7 @@
           "simple": { "limit": 10, "period": 60 },
         },
         {
-          "name": "PROPOSAL_LIMIT",
+          "name": "POST_LIMIT",
           "namespace_id": "1302",
           "simple": { "limit": 5, "period": 60 },
         },
@@ -338,11 +319,6 @@
           "name": "SIGN_IN_LIMIT",
           "namespace_id": "1303",
           "simple": { "limit": 5, "period": 60 },
-        },
-        {
-          "name": "DRAFT_LIMIT",
-          "namespace_id": "1304",
-          "simple": { "limit": 2, "period": 60 },
         },
       ],
       "triggers": {

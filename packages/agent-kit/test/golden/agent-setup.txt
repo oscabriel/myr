@@ -113,10 +113,9 @@ npx skills add https://web-test.example.workers.dev
 | Limit | Value |
 | --- | --- |
 | Claims one person nobody has vouched for holds at once, in a project | 20 by default; a vouched person and a maintainer are never held |
-| Open proposals one person nobody has vouched for holds, in a project | 20 by default; 0 turns proposals off |
 | A claim without a push | Warned after 2 hours, lapses after 1 day, by default |
 | A decision nobody takes | 2 weeks by default, then it takes its default |
-| Claims, proposals and drafts across the platform, per person | A set number a minute; past it, CapReached says when to try again |
+| Claims and discussion posts across the platform, per person | A set number a minute; past it, CapReached says when to try again |
 
 ## Refusals
 
@@ -129,7 +128,7 @@ Every refusal the platform gives, by group. Each one's row in https://web-test.e
 - Never counted against the answerer: `Flake` and `VerifierBlocked`
 - At ask open: `NotRedFirst`, `WeakCheck` and `IncompleteBrief`
 - Maintainers only: `LayerContentInPublicTree`, `SecretInOutput` and `UnstatedRequirement`
-- Decision: `PostureChange`, `NotDecider`, `DecisionClosed`, `ProposalClosed`, `DraftInProgress` and `DiscussionClosed`
-- Lookup: `UnknownProject`, `UnknownAsk`, `UnknownCommit`, `UnknownDecision`, `UnknownPath`, `UnknownRevision`, `UnknownProposal` and `UnknownDiscussion`
+- Decision: `PostureChange`, `NotDecider`, `DecisionClosed` and `DiscussionClosed`
+- Lookup: `UnknownProject`, `UnknownAsk`, `UnknownCommit`, `UnknownDecision`, `UnknownPath`, `UnknownRevision` and `UnknownDiscussion`
 - Setup: `ProjectExists`, `NotYourNamespace` and `ImportFailed`
 - Env: `UnknownEnvItem`, `NotSensitive` and `ValueTooShort`

@@ -18,7 +18,6 @@ import {
   LaneName,
   PatchId,
   ProjectName,
-  ProposalId,
   RepoPath,
   TreeSha,
 } from "@repo/protocol/ids";
@@ -454,14 +453,14 @@ describe(patchOf, () => {
   });
 
   it("never gives a diff for another subject, whatever its evidence says", () => {
-    const proposal: Decision = {
+    const vouch: Decision = {
       ...withPatch,
-      subject: DecisionSubject.cases.OpenProposal.make({
-        proposal: ProposalId.make("prop-000001"),
+      subject: DecisionSubject.cases.Vouch.make({
+        handle: Handle.make("lin-h"),
       }),
     };
 
-    expect(patchOf(proposal)).toStrictEqual(Option.none());
+    expect(patchOf(vouch)).toStrictEqual(Option.none());
   });
 });
 

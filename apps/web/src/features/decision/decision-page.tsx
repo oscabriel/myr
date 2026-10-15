@@ -2,7 +2,6 @@ import { Brand } from "@repo/brand";
 import type { Ask } from "@repo/protocol/domain/ask";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
 import type { Decision } from "@repo/protocol/domain/decision";
-import type { Proposal } from "@repo/protocol/domain/proposal";
 import type { DecisionId, ProjectName } from "@repo/protocol/ids";
 import type { DateTime } from "effect";
 import { Hourglass, Shield } from "lucide-react";
@@ -107,23 +106,6 @@ const AskFacts = ({ ask }: { readonly ask: Ask }) => (
   </FactBlock>
 );
 
-const ProposalFacts = ({ proposal }: { readonly proposal: Proposal }) => (
-  <FactBlock label="The proposal">
-    <p className="text-ui" data-said="">
-      {proposal.want}
-    </p>
-    <p className="text-ui text-muted-foreground">
-      Proposed by <HandleLink handle={proposal.proposer} />
-    </p>
-    <AppLink
-      className={`text-ui ${LINK}`}
-      to={`/${proposal.project}/proposals/${proposal.id}`}
-    >
-      Read its draft
-    </AppLink>
-  </FactBlock>
-);
-
 export const WaiverDiff = ({
   decision,
   files,
@@ -176,7 +158,7 @@ const ForAnyone = ({
       safe default if nobody does.
     </p>
     <p className="text-ui">
-      <AppLink className={LINK} to={`/${project}/people`}>
+      <AppLink className={LINK} to={`/${project}/policy`}>
         Who decides in {project}
       </AppLink>
     </p>
@@ -229,9 +211,6 @@ const Found = ({
         <>
           <DecisionFacts decision={decision} now={now} soon={found.soon} />
           {found.ask === undefined ? null : <AskFacts ask={found.ask} />}
-          {found.proposal === undefined ? null : (
-            <ProposalFacts proposal={found.proposal} />
-          )}
           {found.posture === undefined ? null : (
             <PostureFacts
               label={found.posture.label}

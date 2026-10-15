@@ -43,11 +43,11 @@ const spanOf = (ms: number) => {
 };
 
 const vouchModes = {
-  all: "For everything: claiming an ask, offering a sealed answer and proposing an ask all need a vouch.",
+  all: "For everything, which today gates what for code does: claiming an ask needs a vouch; anyone not denounced may post in a discussion.",
   bansOnly:
-    "Bans only: nobody needs a vouch, but a denounced person still may not claim, push or propose.",
+    "Bans only: nobody needs a vouch, but a denounced person still may not claim, push or post.",
   forCode:
-    "For code: claiming an ask or offering a sealed answer needs a vouch; anyone not denounced may propose an ask.",
+    "For code: claiming an ask needs a vouch; anyone not denounced may post in a discussion.",
 } as const satisfies Record<PublicPolicy["vouch"]["mode"], string>;
 
 const Code = ({ children }: { readonly children: ReactNode }) => (
@@ -205,13 +205,6 @@ const Limits = ({ policy }: { readonly policy: PublicPolicy }) => {
       <Definitions label="Limits">
         <Definition term="Claims">
           <Num>{`${plural(caps.claimsPerPerson, "claim", "claims")} at once for a person nobody has vouched for; a vouched person and a maintainer are never held`}</Num>
-        </Definition>
-        <Definition term="Proposals">
-          <Num>
-            {caps.proposalsPerPerson === 0
-              ? "Proposals are off"
-              : `${plural(caps.proposalsPerPerson, "proposal", "proposals")} open at once for a person nobody has vouched for`}
-          </Num>
         </Definition>
         <Definition term="Decisions">
           <Num>{`an undecided one takes its default after ${plural(decisions.expireDays, "day", "days")}`}</Num>

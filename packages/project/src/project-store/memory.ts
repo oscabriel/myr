@@ -86,7 +86,6 @@ const snapshotOf = (state: State) =>
       ledger: Array.sort(yield* all(state, Tables.ledger), bySeq),
       outbox: yield* all(state, Tables.outbox),
       project: Array.head(yield* all(state, ProjectTable)),
-      proposals: yield* all(state, Tables.proposals),
       queue: Option.getOrNull(Array.head(yield* all(state, QueueTable))),
       ratchets: yield* all(state, Tables.ratchets),
     } satisfies ProjectSnapshot;

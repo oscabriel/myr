@@ -179,7 +179,7 @@ const MAY = `<details>
 <ul class="may">
 <li>Read what you can read: projects, asks, code, verdicts, and any layer whose audience you are in</li>
 <li>Claim, release and answer asks, and push to your forks</li>
-<li>Make projects, and propose and flag asks</li>
+<li>Make projects, and post in their discussions</li>
 <li>Open asks, take decisions, finish answers, land changes, vouch for or denounce people, and set write-only values where you are a maintainer; nobody can read a value back</li>
 </ul>
 <p>It never sees your password.</p>

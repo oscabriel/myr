@@ -1,14 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
-import type { RepoHost } from "@repo/artifacts/repo-host";
 import { Brand } from "@repo/brand";
 import { CheckAt } from "@repo/checks/check-runner";
-import { draftRunsInline } from "@repo/drafting/draft-runs/inline";
-import type { InlinePorts } from "@repo/drafting/draft-runs/inline";
-import type { DraftedAsk } from "@repo/drafting/drafted";
-import { DrafterMemory } from "@repo/drafting/drafter/memory";
-import { draftedFiles } from "@repo/drafting/render";
-import type { Projects } from "@repo/project/projects";
-import { DecisionSubject } from "@repo/protocol/domain/decision";
 import { Outcome } from "@repo/protocol/domain/outcome";
 import {
   AskId,
@@ -27,7 +19,7 @@ import {
   StaleBase,
 } from "@repo/protocol/refusal";
 import { explain } from "@repo/protocol/render";
-import { Array, Context, Deferred, Effect, Layer } from "effect";
+import { Array, Effect } from "effect";
 
 import { pushRequestId } from "../src/adapters/custody.ts";
 import { coreLoopWorld } from "./world.ts";
@@ -460,138 +452,6 @@ describe("the core loop, through the platform's fetch handler with real git", ()
             outcome: Outcome.cases.Checking.make({ stage: "merge" }),
             requestId: pushRequestId(claim.claimant, fix),
           },
-        });
-      }),
-    60_000
-  );
-
-  it.live(
-    "a want proposed with a draft runs in process, goes to the maintainer with its red-first evidence, and opens on accept with Assisted-by beside the people's credits",
-    () =>
-      Effect.gen(function* () {
-        const drafted: DraftedAsk = {
-          id: AskId.make("parse-day"),
-          kind: "fix",
-          rationale: "parse reads no day, so the test fails by its assertion",
-          territory: [RepoPath.make("src/parse.ts")],
-          test: {
-            path: RepoPath.make("test/parse-day.test.ts"),
-            source: [
-              'import { expect, it } from "bun:test";',
-              'import { parse } from "../src/parse.ts";',
-              "",
-              'it("parse reads the day of an ISO date", () => {',
-              '  expect(Reflect.get(parse("2026-10-07"), "day")).toBe(7);',
-              "});",
-              "",
-            ].join("\n"),
-          },
-          want: "parse reads the day of an ISO date",
-        };
-
-        const ready = yield* Deferred.make<Context.Context<InlinePorts>>();
-        const drafter = yield* Layer.build(DrafterMemory([drafted]));
-
-        const world = yield* coreLoopWorld({
-          plugIn: () => ({
-            project: draftRunsInline(Deferred.await(ready)),
-            worker: Layer.effectDiscard(
-              Effect.gen(function* () {
-                const ports = yield* Effect.context<Projects | RepoHost>();
-
-                yield* Deferred.succeed(ready, Context.merge(ports, drafter));
-              })
-            ),
-          }),
-        });
-
-        const dora = world.rpc("dora");
-        const alice = world.rpc("alice");
-        const doraGit = world.git("dora");
-
-        const made = yield* dora.initProject({ project });
-        const home = yield* doraGit.clone(made.remote);
-
-        yield* doraGit.commit(home, "Start datekit", start);
-        yield* doraGit.push(home);
-
-        yield* world.script(
-          CheckAt.cases.Commit.make({
-            commit: yield* world.composed(project, draftedFiles(drafted)),
-          }),
-          redThenGreen,
-          ["failed", "failed"]
-        );
-
-        const proposed = yield* alice.proposeAsk({
-          draft: true,
-          project,
-          want: drafted.want,
-        });
-
-        const { decisions } = yield* dora.today({ project });
-
-        const decision = yield* Effect.fromOption(
-          Array.findFirst(
-            decisions,
-            ({ subject }) =>
-              DecisionSubject.guards.OpenProposal(subject) &&
-              subject.proposal === proposed.proposal.id
-          )
-        );
-
-        const shown = yield* alice.showProposal({
-          project,
-          proposal: proposed.proposal.id,
-        });
-
-        yield* dora.decide({
-          choice: "accept",
-          decision: decision.id,
-          project,
-        });
-
-        const { asks } = yield* alice.listAsks({ project });
-
-        yield* doraGit.ok(home, "fetch", "--quiet", "origin");
-
-        expect({
-          asks: asks.map(({ ask, claimed }) => ({ ask, claimed })),
-          draft: shown.proposal.draft?._tag,
-          files: yield* doraGit.ok(
-            home,
-            "show",
-            "--format=",
-            "--name-only",
-            "origin/main"
-          ),
-          proposed: proposed.proposal.draft?._tag,
-          redFirst: decision.evidence.some(
-            ({ label, value }) =>
-              label === "red first" && value.startsWith(`${redThenGreen}: `)
-          ),
-          trailers: (yield* doraGit.ok(
-            home,
-            "log",
-            "-1",
-            "--format=%(trailers:only)",
-            "origin/main"
-          ))
-            .split("\n")
-            .filter((line) => /^[A-Za-z-]+-by: /u.test(line)),
-        }).toStrictEqual({
-          asks: [{ ask: drafted.id, claimed: false }],
-          draft: "Ready",
-          files: draftedFiles(drafted)
-            .map(({ path }) => path)
-            .join("\n"),
-          proposed: "Drafting",
-          redFirst: true,
-          trailers: [
-            `Asked-by: ${credited("alice")}`,
-            `Decided-by: ${credited("dora")}`,
-            `Assisted-by: ${Brand.cli}-drafter:memory (verified)`,
-          ],
         });
       }),
     60_000

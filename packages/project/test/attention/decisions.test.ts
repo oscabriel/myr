@@ -57,13 +57,10 @@ const main = RefNameText.make("refs/heads/main");
 
 const minted = ids();
 
-const proposal = minted.proposal();
-
-const { OpenProposal, StrayPush } = DecisionSubject.cases;
+const { StrayPush, Vouch } = DecisionSubject.cases;
 
 /** Every subject's default: doing nothing lets nothing in. */
 const defaults: readonly (readonly [DecisionSubject, Choice])[] = [
-  [OpenProposal.make({ proposal }), "decline"],
   [DecisionSubject.cases.Finish.make({ ask, head: sha("answer") }), "decline"],
   [
     DecisionSubject.cases.RaiseRatchet.make({
@@ -124,7 +121,7 @@ const open = (subject: DecisionSubject) =>
     subject,
   });
 
-const proposalDecision = open(OpenProposal.make({ proposal }));
+const vouchDecision = open(Vouch.make({ handle: bob }));
 
 const strayPush = open(StrayPush.make({ after, before, ref: main }));
 
@@ -157,25 +154,25 @@ describe("opening a decision", () => {
   });
 
   it("sets the default by subject and expires after the policy's days", () => {
-    expect(proposalDecision).toStrictEqual({
+    expect(vouchDecision).toStrictEqual({
       deciders: [alice, dana],
       default: "decline",
       evidence,
       expiresAt: at("2026-10-21T12:00:00Z"),
-      id: proposalDecision.id,
+      id: vouchDecision.id,
       openedAt: opened,
       project: scenario.project,
-      subject: OpenProposal.make({ proposal }),
+      subject: Vouch.make({ handle: bob }),
     });
   });
 });
 
 describe("deciding", () => {
-  it("records who chose what, and opens an accepted proposal's ask", () => {
-    const result = decide([strayPush, proposalDecision], {
+  it("records who chose what, and lands an accepted vouch", () => {
+    const result = decide([strayPush, vouchDecision], {
       by: dana,
       choice: "accept",
-      id: proposalDecision.id,
+      id: vouchDecision.id,
       note: Option.some("a good first ask"),
       now: later,
     });
@@ -183,7 +180,7 @@ describe("deciding", () => {
     expect(result).toStrictEqual(
       Result.succeed({
         decision: {
-          ...proposalDecision,
+          ...vouchDecision,
           decided: {
             at: later,
             by: dana,
@@ -192,12 +189,12 @@ describe("deciding", () => {
           },
         },
         effects: [
-          AttentionEffect.OpenAsk({ proposal }),
+          AttentionEffect.Land({ subject: vouchDecision.subject }),
           AttentionEffect.Emit({
             event: ProjectEventInput.Decided({
               at: later,
               choice: "accept",
-              decision: proposalDecision.id,
+              decision: vouchDecision.id,
             }),
           }),
         ],
@@ -205,16 +202,16 @@ describe("deciding", () => {
     );
   });
 
-  it("opens nothing for a declined proposal", () => {
+  it("lands nothing for a declined vouch", () => {
     expect(
-      Result.map(choose(proposalDecision, "decline"), ({ effects }) => effects)
+      Result.map(choose(vouchDecision, "decline"), ({ effects }) => effects)
     ).toStrictEqual(
       Result.succeed([
         AttentionEffect.Emit({
           event: ProjectEventInput.Decided({
             at: later,
             choice: "decline",
-            decision: proposalDecision.id,
+            decision: vouchDecision.id,
           }),
         }),
       ])
@@ -259,8 +256,8 @@ describe("deciding", () => {
     expect([
       words(strayPush, "accept"),
       words(strayPush, "decline"),
-      words(proposalDecision, "adopt"),
-      words(proposalDecision, "revert"),
+      words(vouchDecision, "adopt"),
+      words(vouchDecision, "revert"),
     ]).toStrictEqual([
       Result.succeed("adopt"),
       Result.succeed("revert"),
@@ -273,27 +270,27 @@ describe("deciding", () => {
   // the person GitHub signs in as `Alice`.
   it("takes a decision from its maintainer however sign-in cases the handle", () => {
     expect(
-      Result.isSuccess(choose(proposalDecision, "accept", Handle.make("Alice")))
+      Result.isSuccess(choose(vouchDecision, "accept", Handle.make("Alice")))
     ).toBeTruthy();
   });
 
   it("refuses a person who does not decide for it", () => {
-    expect(choose(proposalDecision, "accept", bob)).toStrictEqual(
+    expect(choose(vouchDecision, "accept", bob)).toStrictEqual(
       Result.fail(new NotDecider({}))
     );
   });
 
   it("refuses a person who does not decide for it before saying it is closed", () => {
-    const decided = Result.getOrThrow(choose(proposalDecision, "accept"));
+    const decided = Result.getOrThrow(choose(vouchDecision, "accept"));
 
     expect([
       choose(decided.decision, "decline", bob),
-      decide([proposalDecision], {
+      decide([vouchDecision], {
         by: bob,
         choice: "accept",
-        id: proposalDecision.id,
+        id: vouchDecision.id,
         note: Option.none(),
-        now: proposalDecision.expiresAt,
+        now: vouchDecision.expiresAt,
       }),
     ]).toStrictEqual([
       Result.fail(new NotDecider({})),
@@ -302,32 +299,32 @@ describe("deciding", () => {
   });
 
   it("refuses to decide twice", () => {
-    const decided = Result.getOrThrow(choose(proposalDecision, "accept"));
+    const decided = Result.getOrThrow(choose(vouchDecision, "accept"));
 
     expect(
       decide([decided.decision], {
         by: dana,
         choice: "decline",
-        id: proposalDecision.id,
+        id: vouchDecision.id,
         note: Option.none(),
         now: later,
       })
     ).toStrictEqual(
-      Result.fail(new DecisionClosed({ decision: proposalDecision.id }))
+      Result.fail(new DecisionClosed({ decision: vouchDecision.id }))
     );
   });
 
   it("refuses a decision that already reached its expiry", () => {
     expect(
-      decide([proposalDecision], {
+      decide([vouchDecision], {
         by: alice,
         choice: "accept",
-        id: proposalDecision.id,
+        id: vouchDecision.id,
         note: Option.none(),
-        now: proposalDecision.expiresAt,
+        now: vouchDecision.expiresAt,
       })
     ).toStrictEqual(
-      Result.fail(new DecisionClosed({ decision: proposalDecision.id }))
+      Result.fail(new DecisionClosed({ decision: vouchDecision.id }))
     );
   });
 
@@ -351,13 +348,13 @@ describe("a decision nobody took in time", () => {
 
   it("takes its default, decided by the platform's own handle", () => {
     const { decisions, effects } = expireDecisions(
-      [proposalDecision, strayPush],
+      [vouchDecision, strayPush],
       due
     );
 
     expect(decisions).toStrictEqual([
       {
-        ...proposalDecision,
+        ...vouchDecision,
         decided: { at: due, by: platformHandle, choice: "decline" },
       },
       {
@@ -371,7 +368,7 @@ describe("a decision nobody took in time", () => {
         event: ProjectEventInput.Decided({
           at: due,
           choice: "decline",
-          decision: proposalDecision.id,
+          decision: vouchDecision.id,
         }),
       }),
       AttentionEffect.Revert({ ref: main, to: before }),
@@ -390,7 +387,7 @@ describe("a decision nobody took in time", () => {
   });
 
   it("leaves decisions that are taken or not yet due as they are", () => {
-    const decided = Result.getOrThrow(choose(proposalDecision, "accept"));
+    const decided = Result.getOrThrow(choose(vouchDecision, "accept"));
     const notYet = DateTime.subtract(due, { minutes: 1 });
 
     expect(expireDecisions([decided.decision, strayPush], due)).toStrictEqual({

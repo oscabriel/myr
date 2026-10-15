@@ -132,9 +132,7 @@ const TABS = [
   "Code",
   "Asks",
   "Landings",
-  "Proposals",
   "Discussions",
-  "People",
   "Policy",
   "Visibility",
 ];
@@ -409,7 +407,7 @@ describe(ProjectView, () => {
         expect(text).toMatch(/src\/\*\*\s*·\s*ines-v, okonkwo/u);
         expect(
           missingFrom(about, [
-            'href="/oscabriel/datekit/people"',
+            'href="/oscabriel/datekit/policy"',
             'href="/oscabriel/datekit/visibility#ledger"',
             'href="/oscabriel/datekit/llms.txt"',
           ])
@@ -435,25 +433,6 @@ describe(ProjectView, () => {
 
         expect(text).toMatch(/every path\s*·\s*ines-v/u);
         expect(text).not.toMatch(/\*\*\s*·/u);
-      })
-  );
-
-  it.effect(
-    "offers a signed-out reader a sign-in that returns to proposing, and a signed-in one the propose link",
-    () =>
-      Effect.gen(function* () {
-        const signedOut = mainColumnOf(yield* page({ signedIn: false }));
-
-        expect(textIn(signedOut)).toContain("Sign in to propose one.");
-        expect(signedOut).toContain(
-          `href="/auth/signin?return=${encodeURIComponent("/oscabriel/datekit/proposals/new")}"`
-        );
-        expect(signedOut).not.toContain('data-propose=""');
-
-        const signedIn = mainColumnOf(yield* page({ signedIn: true }));
-
-        expect(signedIn).toContain('data-propose=""');
-        expect(textIn(signedIn)).not.toContain("Sign in to propose one.");
       })
   );
 
@@ -1065,33 +1044,26 @@ describe("a project's page in its frame", () => {
       })
   );
 
+  it("opens each tab on a page of its own, none on a region of Overview", () => {
+    expect(
+      projectSections("oscabriel/datekit").map(({ tab, to }) => [tab, to])
+    ).toStrictEqual([
+      ["overview", "/oscabriel/datekit"],
+      ["code", "/oscabriel/datekit/tree/main"],
+      ["asks", "/oscabriel/datekit/asks"],
+      ["landings", "/oscabriel/datekit/commits/main"],
+      ["discussions", "/oscabriel/datekit/discussions"],
+      ["policy", "/oscabriel/datekit/policy"],
+      ["visibility", "/oscabriel/datekit/visibility"],
+    ]);
+  });
+
   it.effect(
-    "opens each tab that stands for a region of Overview on that region, inside the frame",
+    "titles Overview with the project whichever region of it is open",
     () =>
       Effect.gen(function* () {
         const markup = yield* framed(
-          "/oscabriel/datekit",
-          headerFacts,
-          <ProjectView {...props()} />
-        );
-
-        const hashes = projectSections("oscabriel/datekit").flatMap(
-          ({ hash }) => (hash === undefined ? [] : [hash])
-        );
-
-        expect(hashes).toStrictEqual(["open-asks", "proposals", "who-decides"]);
-        expect(
-          hashes.filter((hash) => !markup.includes(`id="${hash}"`))
-        ).toStrictEqual([]);
-      })
-  );
-
-  it.effect(
-    "titles Overview with the project whichever region its tabs have opened",
-    () =>
-      Effect.gen(function* () {
-        const markup = yield* framed(
-          "/oscabriel/datekit#proposals",
+          "/oscabriel/datekit#open-asks",
           headerFacts,
           null
         );
@@ -1338,16 +1310,13 @@ const pagesUnderLayout = () =>
 
 describe("the project's layout route", () => {
   it.effect(
-    "reads the header for a tree page, and nothing on Overview, which reads its own, or on a new proposal, which draws none",
+    "reads the header for a tree page, and nothing on Overview, which reads its own",
     () =>
       Effect.gen(function* () {
         const seen = yield* Ref.make<readonly string[]>([]);
 
         const { made, quiet, tree } = yield* Effect.gen(function* () {
-          const skipped = yield* Effect.forEach(
-            [datekitAt(""), datekitAt("/proposals/new")],
-            layoutLoadAt
-          );
+          const skipped = yield* Effect.forEach([datekitAt("")], layoutLoadAt);
 
           const before = yield* Ref.get(seen);
 
@@ -1358,7 +1327,7 @@ describe("the project's layout route", () => {
           return { made: before, quiet: skipped, tree: read };
         }).pipe(Effect.provide(countingWorld(seen)));
 
-        expect(quiet).toStrictEqual([undefined, undefined]);
+        expect(quiet).toStrictEqual([undefined]);
         expect(made).toStrictEqual([]);
         expect(tree.project).toBe("oscabriel/datekit");
         expect(tree.open?.asks).toBeGreaterThan(0);
@@ -1380,9 +1349,7 @@ describe("the project's layout route", () => {
     ).toStrictEqual(
       pages.filter(({ shell }) => shell !== "project").map(({ path }) => path)
     );
-    expect(pages.map(({ path }) => path)).toContain(
-      datekitAt("/proposals/new")
-    );
+    expect(pages.map(({ path }) => path)).toContain(datekitAt("/asks"));
   });
 });
 

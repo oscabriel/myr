@@ -80,7 +80,6 @@ const yesOrNo: readonly ChoiceKey[] = [
 export const choicesFor = (decision: Decision): readonly ChoiceKey[] =>
   DecisionSubject.match(decision.subject, {
     Finish: () => yesOrNo,
-    OpenProposal: () => yesOrNo,
     PostureChange: () => yesOrNo,
     ProxyWidened: () => yesOrNo,
     RaiseRatchet: () => yesOrNo,
