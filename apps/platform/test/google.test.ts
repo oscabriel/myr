@@ -28,6 +28,7 @@ import { Identities, IdentityTaken } from "../src/auth/identities.ts";
 import { IdentitiesMemory } from "../src/auth/identities/memory.ts";
 import { hashPassword } from "../src/auth/password.ts";
 import { tokenReader } from "../src/auth/provider.ts";
+import { csrfCookieName } from "../src/auth/sign-in.ts";
 import { SignInFailed } from "../src/auth/state.ts";
 import { decodeEnv, InvalidEnv } from "../src/platform.ts";
 import worker from "../src/worker.ts";
@@ -859,7 +860,7 @@ describe("coming back from Google", () => {
             headers: {
               "cf-connecting-ip": "198.51.100.7",
               "content-type": "application/x-www-form-urlencoded",
-              cookie: `__Host-sign-in=${form.csrf}`,
+              cookie: `${csrfCookieName(form.csrf)}=${form.csrf}`,
             },
           }
         );
