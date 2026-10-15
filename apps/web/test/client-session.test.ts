@@ -14,7 +14,9 @@ describe("a browser's session, through the web", seededWorld, () => {
     () =>
       Effect.gen(function* () {
         const response = yield* Effect.promise(() =>
-          whoamiHandler((request) => serverClientOver(backend)(env, request))({
+          whoamiHandler(env, (request) =>
+            serverClientOver(backend)(env, request)
+          )({
             request: new Request(`${WEB_URL}/auth/whoami`, {
               headers: { cookie: `${SESSION_COOKIE}=${DECIDER}` },
             }),

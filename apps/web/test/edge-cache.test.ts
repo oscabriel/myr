@@ -265,7 +265,7 @@ describe("the Worker's entry", () => {
       })
   );
 
-  it("is Start's server entry behind the address redirects, wrapped by edgeEntry, and nothing else", () => {
+  it("is Start's server entry behind the address redirects and a navigation's session renewal, wrapped by edgeEntry, and nothing else", () => {
     const sources: Readonly<Record<string, string>> = import.meta.glob(
       "../src/server.ts",
       { eager: true, import: "default", query: "?raw" }
@@ -277,9 +277,11 @@ describe("the Worker's entry", () => {
 
     expect(code.split(/\n+/u)).toStrictEqual([
       'import handler from "@tanstack/react-start/server-entry";',
+      'import { env } from "cloudflare:workers";',
       'import { addressedEntry } from "./server/addresses.ts";',
       'import { edgeEntry } from "./server/edge-cache.ts";',
-      "export default edgeEntry(addressedEntry(handler));",
+      'import { renewingEntry } from "./server/session.ts";',
+      "export default edgeEntry(renewingEntry(env)(addressedEntry(handler)));",
     ]);
   });
 });
