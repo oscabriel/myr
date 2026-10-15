@@ -62,7 +62,9 @@ describe(planSeed, () => {
           ".env.schema",
           ".env.test",
           ".gitignore",
+          `${config}/package.json`,
           `${config}/project.ts`,
+          `${config}/tsconfig.json`,
           `${config}/visibility.ts`,
           `${config}/vouched.td`,
           "LICENSE",
@@ -149,11 +151,13 @@ describe(planSeed, () => {
 
         const paths = plan.initFiles.map(({ path }) => path);
 
-        expect(paths).toHaveLength(50);
+        expect(paths).toHaveLength(52);
 
         expect(paths).toStrictEqual(
           expect.arrayContaining([
+            `${config}/package.json`,
             `${config}/project.ts`,
+            `${config}/tsconfig.json`,
             "bun.lock",
             "packages/kit/src/legacy.ts",
             "scripts/count-callers.ts",
