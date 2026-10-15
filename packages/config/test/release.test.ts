@@ -66,6 +66,8 @@ describe("the npm package's manifest", () => {
     version: "0.1.0",
   });
 
+  // A bin path in npm's normal form, without `./`: npm rewrites any other
+  // and warns that it was "invalid and removed" though it keeps it.
   it("is the brand's CLI package, with both names as bins", () => {
     expect({
       bin: manifest.bin,
@@ -74,8 +76,8 @@ describe("the npm package's manifest", () => {
       version: manifest.version,
     }).toStrictEqual({
       bin: {
-        [Brand.cli]: "./dist/bin.js",
-        [Brand.gitCredentialHelper]: "./dist/bin.js",
+        [Brand.cli]: "dist/bin.js",
+        [Brand.gitCredentialHelper]: "dist/bin.js",
       },
       license: "MIT",
       name: Brand.cliPackage,

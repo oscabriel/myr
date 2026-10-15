@@ -94,7 +94,11 @@ export const pinnedDependencies = (input: {
       );
 };
 
+// `exports` takes the path with `./`; `bin` takes npm's normal form without
+// it, which `npm publish` would otherwise rewrite with a warning.
 const BIN = "./dist/bin.js";
+
+const BIN_TARGET = "dist/bin.js";
 
 interface LibraryEntry {
   readonly types: string;
@@ -141,7 +145,7 @@ export const publishManifest = (
     readonly dependencies: Readonly<Record<string, string>>;
   }
 ): PublishManifest => ({
-  bin: { [brand.cli]: BIN, [brand.gitCredentialHelper]: BIN },
+  bin: { [brand.cli]: BIN_TARGET, [brand.gitCredentialHelper]: BIN_TARGET },
   dependencies: input.dependencies,
   description: `The ${brand.name} command line: find an ask, claim it, check your answer, and read its verdict; also git's credential helper, and a pi package.`,
   exports: {
