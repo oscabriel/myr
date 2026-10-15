@@ -127,7 +127,7 @@ describe("the datekit example's config folder", () => {
         }).toStrictEqual({
           agents: "trailer",
           deciders: [
-            { handles: ["ines-v"], paths: "**" },
+            { handles: ["ines-v", "oscar"], paths: "**" },
             { handles: ["okonkwo"], paths: "src/tz.ts" },
           ],
           kinds: ["fix", "changeJudge"],

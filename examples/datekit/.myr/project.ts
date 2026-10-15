@@ -3,13 +3,13 @@ import { kinds, project } from "@myr/cli/rules";
 /**
  * How datekit takes changes. Each change we want is an ask in asks/, with a
  * test that fails on main; an answer lands when that test passes and the
- * rest of the suite stays green. ines-v decides for the whole library, and
- * okonkwo for time zones.
+ * rest of the suite stays green. ines-v and oscar decide for the whole
+ * library, and okonkwo for time zones.
  */
 export default project({
   agents: "trailer",
   deciders: {
-    "**": ["ines-v"],
+    "**": ["ines-v", "oscar"],
     "src/tz.ts": ["okonkwo"],
   },
   kinds: [kinds.fix, kinds.changeJudge],
