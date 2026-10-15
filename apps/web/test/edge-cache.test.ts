@@ -205,6 +205,11 @@ describe("an answer to a request with no cookie", () => {
       answer({ "cache-control": "public, max-age=31536000, immutable" }),
     ],
     ["an answer with no age", get("/x"), answer({ "cache-control": "public" })],
+    [
+      "the install script, which forbids serving it stale",
+      get("/install.sh"),
+      answer({ "cache-control": "public, max-age=300, must-revalidate" }),
+    ],
   ] as const)(
     "gives the edge no longer window for %s",
     (_, request, response) => {
