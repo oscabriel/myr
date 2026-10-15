@@ -42,7 +42,7 @@ export const URL_FROM_DEPLOY = "https://from-infra-deploy.invalid";
 export const customHosts = (stage: Stage): Option.Option<Hosts> =>
   stage === "prod"
     ? Option.some({
-        platform: `git.${Brand.domain}`,
+        platform: Brand.platformHost,
         web: Brand.domain,
         webAliases: [`www.${Brand.domain}`],
       })

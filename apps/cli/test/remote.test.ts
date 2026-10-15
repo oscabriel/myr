@@ -4,6 +4,7 @@ import { Contracts } from "@repo/protocol/contracts";
 import { AskId, Handle, KindName } from "@repo/protocol/ids";
 import { unanswered } from "@repo/protocol/testing";
 import { ConfigProvider, Effect, Layer, Option, Redacted } from "effect";
+import { FetchHttpClient } from "effect/http";
 
 import { Credentials } from "../src/credentials.ts";
 import type { Profile } from "../src/credentials.ts";
@@ -185,16 +186,32 @@ describe("the remote client", () => {
       }).pipe(Effect.scoped)
   );
 
-  it.live("with no profile and no url, is a usage error naming login", () =>
-    Effect.gen(function* () {
-      const run = yield* runProgram(["asks", "--project", "datekit"], {
-        client: remote(holding(Option.none())),
-        handlers,
-      });
+  it.live(
+    "with no profile and no url, calls the platform itself, as anyone",
+    () =>
+      Effect.gen(function* () {
+        const sent: (string | null)[] = [];
 
-      expect(run.code).toBe(2);
-      expect(run.err).toHaveLength(1);
-      expect(run.err[0]).toContain(`${Brand.cli} login`);
-    })
+        // The platform itself is never called from a test: the fetch notes
+        // where it was sent and answers 503.
+        const noted: typeof globalThis.fetch = (input, init) => {
+          sent.push(
+            new Request(input, init).url,
+            new Headers(init?.headers).get("authorization")
+          );
+
+          return Promise.resolve(new Response(null, { status: 503 }));
+        };
+
+        const run = yield* runProgram(["asks", "--project", "datekit"], {
+          client: remote(holding(Option.none())).pipe(
+            Layer.provide(Layer.succeed(FetchHttpClient.Fetch)(noted))
+          ),
+          handlers,
+        });
+
+        expect(run.code).toBe(69);
+        expect(sent).toStrictEqual([`${Brand.platformUrl}/rpc/`, null]);
+      })
   );
 });

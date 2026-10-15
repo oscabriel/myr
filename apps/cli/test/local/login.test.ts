@@ -434,7 +434,7 @@ describe(`${Brand.cli} login --token-stdin`, () => {
   );
 
   it.live(
-    "without --url, logs the current profile in again on its platform, but asks for --url for another profile",
+    "without --url, logs the current profile in again on its platform, and another profile in on the platform itself",
     () =>
       Effect.gen(function* () {
         const env = yield* home;
@@ -452,22 +452,21 @@ describe(`${Brand.cli} login --token-stdin`, () => {
 
         expect({
           again: Exit.isSuccess(again),
-          bob: yield* stored(env, "bob"),
+          bob: Option.map(yield* stored(env, "bob"), ({ url: at }) => at),
           checked: (yield* platform.connected).map(({ url: at }) => at),
           other: Exit.isSuccess(other),
         }).toStrictEqual({
           again: true,
-          bob: Option.none(),
-          checked: [url, url],
-          other: false,
+          bob: Option.some(Brand.platformUrl),
+          checked: [url, url, Brand.platformUrl],
+          other: true,
         });
-        expect((yield* printed).stderr.join("\n")).toContain("--url");
       }).pipe(Effect.scoped, Effect.provide(testServices)),
     30_000
   );
 
   it.live(
-    "with no --url and no stored profile, asks for --url, naming the platform's own host",
+    "with no --url, no variable and no stored profile, signs in to the platform itself",
     () =>
       Effect.gen(function* () {
         const env = yield* home;
@@ -479,10 +478,52 @@ describe(`${Brand.cli} login --token-stdin`, () => {
           stdin: `${given}\n`,
         });
 
-        expect(Exit.isFailure(exit)).toBeTruthy();
-        expect((yield* printed).stderr.join("\n")).toContain(
-          `${Brand.cli} login --url https://git.${Brand.domain}`
+        expect({
+          checked: (yield* platform.connected).map(({ url: at }) => at),
+          signedIn: Exit.isSuccess(exit),
+          stored: Option.map(
+            yield* stored(env, "default"),
+            ({ url: at }) => at
+          ),
+        }).toStrictEqual({
+          checked: [Brand.platformUrl],
+          signedIn: true,
+          stored: Option.some(Brand.platformUrl),
+        });
+      }).pipe(Effect.scoped, Effect.provide(testServices)),
+    30_000
+  );
+
+  it.live(
+    "takes the platform from --url, then the variable, then the stored profile, then the platform itself",
+    () =>
+      Effect.gen(function* () {
+        const env = yield* home;
+        const platform = yield* seams(signedInAs("alice"));
+        const fromVariable = "https://variable.test";
+        const fromFlag = "https://flag.test";
+
+        const run = (extra: Record<string, string>) => ({
+          env: { ...env, ...extra },
+          seams: platform.layer,
+          stdin: `${given}\n`,
+        });
+
+        yield* cli(["login", "--token-stdin"], run({}));
+        yield* cli(["login", "--url", url, "--token-stdin"], run({}));
+        yield* cli(["login", "--token-stdin"], run({}));
+        yield* cli(
+          ["login", "--token-stdin"],
+          run({ [`${SLUG}_URL`]: fromVariable })
         );
+        yield* cli(
+          ["login", "--url", fromFlag, "--token-stdin"],
+          run({ [`${SLUG}_URL`]: fromVariable })
+        );
+
+        expect(
+          (yield* platform.connected).map(({ url: at }) => at)
+        ).toStrictEqual([Brand.platformUrl, url, url, fromVariable, fromFlag]);
       }).pipe(Effect.scoped, Effect.provide(testServices)),
     30_000
   );

@@ -28,19 +28,7 @@ import { Credentials } from "./credentials.ts";
 
 const URL_VARIABLE = `${Brand.slug.toUpperCase()}_URL`;
 
-export class NoPlatform extends Schema.TaggedError<NoPlatform>()("NoPlatform", {
-  variable: Schema.String,
-}) {
-  override get message() {
-    return `no platform to call: run ${Brand.cli} login, or set ${this.variable} to call one as anyone`;
-  }
-}
-
 const isClientError = Schema.is(RpcClientError.RpcClientError);
-
-const isDefect = Schema.is(RpcClientError.RpcClientDefect);
-
-const isNoPlatformError = Schema.is(NoPlatform);
 
 const isHttpFailure = Schema.is(HttpClientError.HttpClientErrorSchema);
 
@@ -53,13 +41,6 @@ export const transportMessage = (failure: RpcClientError.RpcClientError) =>
   Predicate.isString(failure.reason.cause.message)
     ? failure.reason.cause.message
     : failure.message;
-
-export const noPlatformOf = (
-  failure: RpcClientError.RpcClientError
-): Option.Option<NoPlatform> =>
-  isDefect(failure.reason) && isNoPlatformError(failure.reason.cause)
-    ? Option.some(failure.reason.cause)
-    : Option.none();
 
 const isUnauthorized = (failure: RpcClientError.RpcClientError) =>
   Predicate.hasProperty(failure.reason, "cause") &&
@@ -109,36 +90,6 @@ const over = (origin: string, token: Option.Option<Redacted.Redacted>) =>
     Layer.provide([FetchHttpClient.layer, RpcSerialization.layerJson])
   );
 
-const noPlatform = new NoPlatform({ variable: URL_VARIABLE });
-
-const nowhere = Layer.effect(Client)(RpcClient.make(Contracts)).pipe(
-  Layer.provide(
-    Layer.effect(RpcClient.Protocol)(
-      Effect.flatMap(
-        Effect.service(RpcSerialization.RpcSerialization),
-        (serialization) =>
-          RpcClient.Protocol.make(() =>
-            Effect.succeed({
-              codecFor: serialization.codecFor,
-              send: () =>
-                Effect.fail(
-                  new RpcClientError.RpcClientError({
-                    reason: new RpcClientError.RpcClientDefect({
-                      cause: noPlatform,
-                      message: noPlatform.message,
-                    }),
-                  })
-                ),
-              supportsAck: false,
-              supportsTransferables: false,
-            })
-          )
-      )
-    )
-  ),
-  Layer.provide(RpcSerialization.layerJson)
-);
-
 export const RemoteClient: Layer.Layer<Client, never, Credentials> =
   Layer.unwrap(
     Effect.gen(function* () {
@@ -155,9 +106,10 @@ export const RemoteClient: Layer.Layer<Client, never, Credentials> =
         Config.NonEmptyString(URL_VARIABLE)
       ).pipe(Effect.orElseSucceed(() => Option.none()));
 
-      return Option.match(url, {
-        onNone: () => nowhere,
-        onSome: (origin) => over(origin, Option.none()),
-      });
+      // With nothing naming a platform, the platform itself, as anyone.
+      return over(
+        Option.getOrElse(url, () => Brand.platformUrl),
+        Option.none()
+      );
     })
   );

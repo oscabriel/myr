@@ -568,9 +568,9 @@ describe("the install script", () => {
     });
   });
 
-  it("ends by naming the next step, login on the brand's own platform host", () => {
-    expect(script).toContain(`platform='https://git.${Brand.domain}'`);
-    expect(script).toContain('echo "next: $name login --url $platform"');
+  it("ends by naming the next step, login, which signs in to the platform itself", () => {
+    expect(script).toContain('echo "next: $name login"');
+    expect(script).not.toContain("--url");
   });
 
   const install = (files: Readonly<Record<string, string>>) =>

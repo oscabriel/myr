@@ -38,7 +38,8 @@ export const localCommandDocs: readonly CommandDoc[] = [
     positional: [],
     readOnly: false,
     source: "local",
-    summary: "Sign in to a platform; git and this CLI then use its token.",
+    summary:
+      "Sign in (to the platform itself unless --url names another); git and this CLI then use its token.",
   },
   {
     flags: ["--profile", "--json"],

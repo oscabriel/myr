@@ -1,5 +1,6 @@
 import { commandDocs } from "@repo/agent-kit/command-doc";
 import { frontLlms, MCP_PROTOCOL } from "@repo/agent-kit/host-doc";
+import { loginCommand } from "@repo/agent-kit/install";
 import { Brand } from "@repo/brand";
 import { FrontPage } from "@repo/project/front-page";
 import type { Projects } from "@repo/project/projects";
@@ -102,7 +103,7 @@ const homeHtml = (input: {
         "CLI",
         pre(`curl -fsSL ${origin}/install.sh | sh`),
         `<p>Releases: ${link(`${origin}/releases/manifest.json`)}</p>`,
-        `<p>Then sign in: ${code(`${Brand.cli} login --url ${origin}`)}</p>`
+        `<p>Then sign in: ${code(loginCommand(origin))}</p>`
       ),
       section(
         "Agents",
