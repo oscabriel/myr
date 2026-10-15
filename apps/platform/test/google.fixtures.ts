@@ -347,8 +347,14 @@ const browserFor = (handler: (request: Request) => Promise<Response>) => {
         from === "same-site" || !kept.strict ? [`${name}=${kept.value}`] : []
       );
 
+      // A cookie the request names itself is kept beside the jar's.
+      const named = headers.get("cookie");
+
       if (cookies.length > 0) {
-        headers.set("cookie", cookies.join("; "));
+        headers.set(
+          "cookie",
+          [...(named === null ? [] : [named]), ...cookies].join("; ")
+        );
       }
 
       const response = yield* Effect.promise(() =>

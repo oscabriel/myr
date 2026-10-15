@@ -1,12 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { env } from "cloudflare:workers";
+import { Option } from "effect";
 
 import { signOutHandler } from "../../server/session.ts";
+
+// A development build serves the dev world, which has no platform to sign out of, as in `signin.ts`.
+const signOut = signOutHandler(
+  import.meta.env.DEV ? Option.none() : Option.some(env.PUBLIC_PLATFORM_URL)
+);
 
 export const Route = createFileRoute("/auth/signout")({
   server: {
     handlers: {
-      GET: signOutHandler,
-      POST: signOutHandler,
+      GET: signOut,
+      POST: signOut,
     },
   },
 });

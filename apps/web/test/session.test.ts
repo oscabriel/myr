@@ -652,40 +652,39 @@ describe("the callback", () => {
   );
 });
 
-describe("sign-out", () => {
-  it("goes home and expires the session and handle cookies, by POST or by a plain link", () => {
-    const answers = ["POST", "GET"].map((method) => {
-      const response = signOutHandler({
-        request: new Request(`${WEB_URL}/auth/signout`, {
-          headers: { cookie: `${SESSION_COOKIE}=tok123` },
-          method,
-        }),
-      });
-
-      return [
-        response.status,
-        response.headers.get("location"),
-        expiriesOf(response),
-      ];
+const signedOut = (platform: Option.Option<string>) =>
+  ["POST", "GET"].map((method) => {
+    const response = signOutHandler(platform)({
+      request: new Request(`${WEB_URL}/auth/signout`, {
+        headers: { cookie: `${SESSION_COOKIE}=tok123` },
+        method,
+      }),
     });
 
-    expect(answers).toStrictEqual([
-      [
-        302,
-        "/",
-        [
-          [SESSION_COOKIE, true],
-          [HANDLE_COOKIE, true],
-        ],
-      ],
-      [
-        302,
-        "/",
-        [
-          [SESSION_COOKIE, true],
-          [HANDLE_COOKIE, true],
-        ],
-      ],
+    return [
+      response.status,
+      response.headers.get("location"),
+      expiriesOf(response),
+    ];
+  });
+
+describe("sign-out", () => {
+  const expired = [
+    [SESSION_COOKIE, true],
+    [HANDLE_COOKIE, true],
+  ];
+
+  it("expires the session and handle cookies, then ends the platform's session too, by POST or by a plain link", () => {
+    expect(signedOut(Option.some(PLATFORM_URL))).toStrictEqual([
+      [302, `${PLATFORM_URL}/oauth/signout`, expired],
+      [302, `${PLATFORM_URL}/oauth/signout`, expired],
+    ]);
+  });
+
+  it("goes home at once where there is no platform to sign out of", () => {
+    expect(signedOut(Option.none())).toStrictEqual([
+      [302, "/", expired],
+      [302, "/", expired],
     ]);
   });
 });
