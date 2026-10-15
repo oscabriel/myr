@@ -3,15 +3,22 @@ import { Context, Effect, Layer, Option, Schema } from "effect";
 import { Tool } from "effect/ai";
 import { Rpc, RpcGroup } from "effect/rpc";
 
-import { Description, NeedsApproval } from "../src/annotations.ts";
+import {
+  Audience,
+  Description,
+  NeedsApproval,
+  ReadOnly,
+} from "../src/annotations.ts";
 import {
   Client,
   Contracts,
   ListAsks,
   SubmitAnswer,
   surfaced,
+  surfacedToAnyone,
   WhoAmI,
 } from "../src/contracts.ts";
+import type { Contract } from "../src/contracts.ts";
 import { PROJECT_DESCRIPTION_CAP } from "../src/domain/front-page.ts";
 import { RECENT_LANDINGS_CAP } from "../src/domain/recent-landing.ts";
 import { AskId, CommitSha, KindName, ProjectName } from "../src/ids.ts";
@@ -124,6 +131,28 @@ const receipt = {
   required: ["main"],
   type: "object",
 };
+
+const publicRead = (rpc: Contract) =>
+  Context.get(rpc.annotations, Audience) === "public" &&
+  Context.get(rpc.annotations, ReadOnly);
+
+describe("the MCP tools served to anyone", () => {
+  it("are exactly the MCP tools anyone may call that change nothing", () => {
+    const anyone = [...surfacedToAnyone("mcp").requests.keys()];
+
+    const expected = [...surfaced("mcp").requests.values()].flatMap((rpc) =>
+      publicRead(rpc) ? [rpc._tag] : []
+    );
+
+    expect(anyone).toStrictEqual(expected);
+    expect(anyone).toContain("listAsks");
+    expect(
+      ["claim", "status", "submitAnswer", "whoami"].filter((tag) =>
+        anyone.includes(tag)
+      )
+    ).toStrictEqual([]);
+  });
+});
 
 describe("the contracts as MCP tools", () => {
   it.effect(

@@ -1140,6 +1140,23 @@ export const surfaced = <S extends SurfaceName>(
     ...[...Contracts.requests.values()].filter(isServedOn(surface))
   );
 
+const anyoneMayCall = (rpc: Contract) =>
+  Context.get(rpc.annotations, Audience) === "public" &&
+  Context.get(rpc.annotations, ReadOnly);
+
+/**
+ * A surface's contracts that anyone may call and that change nothing: what it
+ * serves a caller who is not signed in, such as an agent that only reads.
+ */
+export const surfacedToAnyone = <S extends SurfaceName>(
+  surface: S
+): RpcGroup.RpcGroup<ContractOn<S>> =>
+  RpcGroup.make(
+    ...[...Contracts.requests.values()]
+      .filter(isServedOn(surface))
+      .filter(anyoneMayCall)
+  );
+
 export const partsOf = (rpc: Contract) =>
   RpcSchema.isStreamSchema(rpc.successSchema)
     ? {

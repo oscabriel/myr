@@ -9,7 +9,12 @@ import { FrontPage } from "@repo/project/front-page";
 import { Projects } from "@repo/project/projects";
 import { StandingPostures } from "@repo/project/standing-posture";
 import { authenticated, bearerToken } from "@repo/protocol/authenticate";
-import { Client, Contracts, surfaced } from "@repo/protocol/contracts";
+import {
+  Client,
+  Contracts,
+  surfaced,
+  surfacedToAnyone,
+} from "@repo/protocol/contracts";
 import { ProjectName } from "@repo/protocol/ids";
 import { toToolkit } from "@repo/protocol/mcp";
 import { briefResources, skillPrompt } from "@repo/protocol/mcp-extras";
@@ -76,6 +81,9 @@ const RELEASE_PATH =
 
 const SKILLS_PATH = /^\/\.well-known\/agent-skills\/.+$/u;
 
+// MCP for anyone: it reads what anyone may, so it takes no credential and refuses none.
+export const PUBLIC_MCP_PATH = "/mcp/public";
+
 // No credential is asked for or checked on these, so none answers 401: git's gateway
 // answers an unknown credential itself, and the rest may carry a stale token or an
 // OAuth client's own credential.
@@ -87,7 +95,8 @@ const isExempt = (path: string) =>
   DISCOVERY_PATH.test(path) ||
   SIGN_IN_PATH.test(path) ||
   RELEASE_PATH.test(path) ||
-  SKILLS_PATH.test(path);
+  SKILLS_PATH.test(path) ||
+  path === PUBLIC_MCP_PATH;
 
 const PROTECTED_RESOURCE_PATH = "/.well-known/oauth-protected-resource";
 
@@ -208,7 +217,18 @@ const forwardCredential = RpcMiddleware.layerClient(
     })
 );
 
+// A call from the MCP for anyone carries no credential, so it runs as anyone even when its client sent one.
+const forwardNoCredential = RpcMiddleware.layerClient(
+  Authenticated,
+  ({ next, request }) => next(request)
+);
+
 const projection = toToolkit(surfaced("mcp"), Effect.service(Client));
+
+const anyoneProjection = toToolkit(
+  surfacedToAnyone("mcp"),
+  Effect.service(Client)
+);
 
 // Made from the skill's parts, not its `SKILL.md`, whose hash is a promise the
 // router's build may not await.
@@ -233,6 +253,27 @@ const mcp = Layer.mergeAll(
       version: "0.0.0",
     }).pipe(Layer.provide(signedInOnly))
   )
+);
+
+// Its own server, toolkit and client, so nothing it is built from is shared with the signed-in one's.
+const mcpForAnyone = Layer.mergeAll(
+  McpServer.toolkit(anyoneProjection.toolkit).pipe(
+    Layer.provideMerge(anyoneProjection.layer)
+  ),
+  briefResources,
+  contribute
+).pipe(
+  Layer.provide(Layer.effect(Client, RpcTest.makeClient(Contracts))),
+  Layer.provide([asCaller, forwardNoCredential]),
+  Layer.provide(
+    McpServer.layerHttp({
+      name: Brand.name,
+      path: PUBLIC_MCP_PATH,
+      protocols: [McpProtocol.v2026_07_28],
+      version: "0.0.0",
+    })
+  ),
+  Layer.fresh
 );
 
 const rpcIn = (serialization: Layer.Layer<RpcSerialization.RpcSerialization>) =>
@@ -379,6 +420,7 @@ export const serve = <E, TE = never>(
       raw,
       git,
       mcp,
+      mcpForAnyone,
       rpc,
       releaseRoutes,
       agentSkillRoutes,

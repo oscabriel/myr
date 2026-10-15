@@ -4,7 +4,12 @@ import { readManaged } from "@repo/agent-kit/generated-file";
 import { platformSkill } from "@repo/agent-kit/platform";
 import { Brand } from "@repo/brand";
 import { CheckAt } from "@repo/checks/check-runner";
-import { Contracts, EnvSchemaOf, Surfaces } from "@repo/protocol/contracts";
+import {
+  Contracts,
+  EnvSchemaOf,
+  Surfaces,
+  surfacedToAnyone,
+} from "@repo/protocol/contracts";
 import type { Contract, ContractOn } from "@repo/protocol/contracts";
 import { Ask, AskListing } from "@repo/protocol/domain/ask";
 import { CheckSpec } from "@repo/protocol/domain/check";
@@ -155,7 +160,8 @@ const routedBy = new Map([
   ["tools/call", "name"],
 ]);
 
-const mcpRequest = (
+const mcpRequestAt = (
+  path: string,
   method: string,
   params: Readonly<Record<string, Schema.Json>>,
   token?: string
@@ -178,7 +184,7 @@ const mcpRequest = (
     headers.set("authorization", `Bearer ${token}`);
   }
 
-  return new Request(`${origin}/mcp`, {
+  return new Request(`${origin}${path}`, {
     body: JSON.stringify({
       id: 1,
       jsonrpc: "2.0",
@@ -189,6 +195,16 @@ const mcpRequest = (
     method: "POST",
   });
 };
+
+const mcpRequest = (
+  method: string,
+  params: Readonly<Record<string, Schema.Json>>,
+  token?: string
+) => mcpRequestAt("/mcp", method, params, token);
+
+const ToolNames = Schema.Struct({
+  tools: Schema.Array(Schema.Struct({ name: Schema.String })),
+});
 
 const Reply = Schema.fromJsonString(
   Schema.Struct({
@@ -682,6 +698,92 @@ layer(seeded, { excludeTestServices: true, timeout: "120 seconds" })(
           );
 
           expect(statuses).toStrictEqual([401, 401, 401]);
+        })
+    );
+
+    test.effect(
+      "serves anyone, with no credential, the MCP tools anyone may call, and none that writes",
+      () =>
+        Effect.gen(function* () {
+          const { fetch } = yield* Seeded;
+
+          const response = yield* fetch(
+            mcpRequestAt("/mcp/public", "tools/list", {})
+          );
+
+          const { tools } = yield* replyOf(response).pipe(
+            Effect.flatMap(({ result }) =>
+              Schema.decodeUnknownEffect(ToolNames)(result)
+            )
+          );
+
+          expect({
+            status: response.status,
+            tools: tools.map(({ name }) => name),
+          }).toStrictEqual({
+            status: 200,
+            tools: [...surfacedToAnyone("mcp").requests.keys()],
+          });
+          expect(tools.map(({ name }) => name)).not.toContain("claim");
+        })
+    );
+
+    test.effect(
+      "answers a read for anyone as anyone, even when its client sends a credential the platform does not know",
+      () =>
+        Effect.gen(function* () {
+          const { fetch } = yield* Seeded;
+
+          const asked = yield* Effect.forEach(
+            [undefined, "a-token-nobody-holds"],
+            (token) =>
+              Effect.gen(function* () {
+                const response = yield* fetch(
+                  mcpRequestAt(
+                    "/mcp/public",
+                    "tools/call",
+                    { arguments: { project }, name: "listAsks" },
+                    token
+                  )
+                );
+
+                const { result } = yield* replyOf(response);
+
+                const answered =
+                  yield* Schema.decodeUnknownEffect(Answered)(result);
+
+                return [response.status, answered.isError];
+              })
+          );
+
+          expect(asked).toStrictEqual([
+            [200, false],
+            [200, false],
+          ]);
+        })
+    );
+
+    test.effect(
+      "keeps a write from anyone: claim is no tool of the MCP for anyone",
+      () =>
+        Effect.gen(function* () {
+          const { fetch } = yield* Seeded;
+
+          const response = yield* fetch(
+            mcpRequestAt("/mcp/public", "tools/call", {
+              arguments: { ask: fixWeek, project },
+              name: "claim",
+            })
+          );
+
+          const { error, result } = yield* replyOf(response);
+
+          expect(
+            error !== undefined ||
+              Schema.is(Schema.Struct({ isError: Schema.Literal(true) }))(
+                result
+              )
+          ).toBeTruthy();
         })
     );
 
