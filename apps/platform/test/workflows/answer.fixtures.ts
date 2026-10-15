@@ -538,6 +538,61 @@ export const admitted = (files: Files = fixed) =>
     } satisfies Admitted;
   });
 
+export const ownMessage = "Split words on runs of spaces";
+
+/** Alice's own change, pushed to her working fork and sent to `land`, which queues it. */
+export const landedOwn = Effect.gen(function* () {
+  yield* advanceTo("2026-10-07T12:00:00Z");
+
+  const api = yield* Projects.use((each) => each.create(project)).pipe(
+    Effect.orDie
+  );
+
+  yield* api.initProject(alice, {}).pipe(Effect.orDie);
+
+  const first = yield* Pusher.use((each) =>
+    each.push(repo, Option.none(), start)
+  );
+
+  yield* api.recordFirstPush(alice, first).pipe(Effect.orDie);
+
+  const { fork } = yield* api.fork(alice).pipe(Effect.orDie);
+  const opened = LandedSha.make(first);
+
+  const head = yield* Pusher.use((each) =>
+    each.push(
+      fork,
+      Option.some(first),
+      changed(start, lexPath, "export const lex = (s) => s.split(/ +/);\n")
+    )
+  );
+
+  const merged = yield* LanderCalls.use((calls) =>
+    calls.preview({ base: first, fork, head, main: opened, repo })
+  );
+
+  const request = {
+    base: first,
+    head,
+    message: ownMessage,
+    requestId: RequestId.make("land-alice-01"),
+  };
+
+  const receipt = yield* api.land(alice, request).pipe(Effect.orDie);
+
+  return {
+    admitted: {
+      api,
+      head,
+      merged,
+      opened,
+      requestId: request.requestId,
+    } satisfies Admitted,
+    again: api.land(alice, request).pipe(Effect.orDie),
+    receipt,
+  };
+});
+
 export const mainMoved = (from: LandedSha, files: Files) =>
   Effect.map(
     Pusher.use((each) => each.push(repo, Option.some(from), files)),

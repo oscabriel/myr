@@ -6,6 +6,7 @@ import {
   Credits,
   Finish,
   FrontPage,
+  Land,
   LedgerOf,
   ListAsks,
   ListDiscussions,
@@ -629,6 +630,15 @@ const submitted = viewOf(SubmitAnswer.successSchema, receipt);
 
 const finished = viewOf(Finish.successSchema, receipt);
 
+// The checks run after `land` returns; the same request sent again reads where they stand.
+const landing = viewOf(Land.successSchema, ({ head, outcome, requestId }) =>
+  prose(
+    Outcome.guards.Checking(outcome)
+      ? `checking ${short(head)} (${outcome.stage}); follow with the same \`${Brand.cli} land\`, --requestId ${requestId} and all, which checks nothing twice`
+      : `${short(head)}: ${outcomeText(outcome)}`
+  )
+);
+
 const isReceipt = Schema.is(LandReceipt);
 
 /** `finish` and `land` refuse stages 0–1 inside a success's receipt; the command prints them as refusals and exits 1. */
@@ -644,6 +654,7 @@ export const views = {
   credits,
   finish: finished,
   frontPage: front,
+  land: landing,
   ledger,
   listAsks: asks,
   listDiscussions: discussions,
