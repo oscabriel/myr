@@ -234,7 +234,10 @@ const importedFrom = (
     return yield* Effect.promise((): Promise<Imported> => import(target));
   });
 
-const SDK_NAMES = [`"${Brand.cliPackage}/rules"`, '"@repo/sdk"'];
+const SDK_NAMES = [
+  ...Brand.sdkImports.map((name) => JSON.stringify(name)),
+  '"@repo/sdk"',
+];
 
 const pointedAtSdk = (source: string) => {
   let pointed = source;
@@ -701,6 +704,44 @@ describe("the Lander's git", () => {
             admits(projectModule, claimant(2)),
             admits(projectModule, claimant(1)),
           ]).toStrictEqual([true, false]);
+        }).pipe(Effect.scoped, Effect.provide(TestServices))
+    );
+
+    it.live(
+      "bundles a folder that imports the sdk by a name it had before, as a project made then still does",
+      () =>
+        Effect.gen(function* () {
+          const [current, former] = Brand.sdkImports;
+          const repos = yield* world;
+
+          const formerly = Object.fromEntries(
+            Object.entries(configFolder).map(([file, source]) => [
+              file,
+              source === null ? null : source.replaceAll(current, former),
+            ])
+          );
+
+          expect(formerly[config("project.ts")]).toContain(former);
+
+          const at = yield* startedWith(repos, formerly);
+
+          const bundled = yield* bundleRules(bundleWire(repos, at)).pipe(
+            Effect.provide(box(repos.work))
+          );
+
+          const projectModule = yield* importedFrom(
+            bundled.modules,
+            config("project.ts")
+          );
+
+          const projectAsCommitted = yield* importedFrom(
+            asCommitted(configFolder),
+            config("project.ts")
+          );
+
+          expect(dataOf(projectModule)).toStrictEqual(
+            dataOf(projectAsCommitted)
+          );
         }).pipe(Effect.scoped, Effect.provide(TestServices))
     );
 

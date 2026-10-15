@@ -1,4 +1,4 @@
-import { kinds, project } from "@myr/cli/rules";
+import { kinds, project } from "@myrtechnology/cli/rules";
 
 /**
  * How datekit takes changes. Each change we want is an ask in asks/, with a

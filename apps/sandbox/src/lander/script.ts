@@ -409,7 +409,9 @@ export const resolution = (sdk: string) =>
   `${JSON.stringify(
     {
       compilerOptions: {
-        paths: { [`${Brand.cliPackage}/rules`]: [sdk], "@repo/sdk": [sdk] },
+        paths: Object.fromEntries(
+          [...Brand.sdkImports, "@repo/sdk"].map((name) => [name, [sdk]])
+        ),
       },
     },
     null,

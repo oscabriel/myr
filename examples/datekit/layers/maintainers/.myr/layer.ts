@@ -1,5 +1,5 @@
-import { layerManifest } from "@myr/cli/rules";
-import type { AreaOf } from "@myr/cli/rules";
+import { layerManifest } from "@myrtechnology/cli/rules";
+import type { AreaOf } from "@myrtechnology/cli/rules";
 
 // The public config sits beside this file in a maintainer's work tree, where
 // the layer is overlaid on main at the same paths.
@@ -136,9 +136,9 @@ export default layerManifest<AreaOf<typeof policy>>({
   ],
   knownBad: [
     // known-bad/export: unescapes only the first pair of quotes.
-    "f7ba08a5de930667c6769382352b58574d6b5805",
+    "dbaee401dfda08e13c16ce9066727e2adb99ceca",
     // known-bad/parser: rounds the digits past the millisecond.
-    "ec27b34dcec611e099a0039e33bf003c48c4a8b5",
+    "af5d85ab3e43a2809ff19559f397028dbf3e86bf",
   ],
   layer: "maintainers",
 });

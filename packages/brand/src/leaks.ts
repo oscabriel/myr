@@ -31,8 +31,12 @@ const inExampleConfig = (path: string) => {
   );
 };
 
-// Letters on either side make it another word ("myriad"), not the name.
-const NAME = new RegExp(`(?<![a-z])${Brand.slug}(?![a-z])`, "iu");
+// Letters on either side make it another word ("myriad"), not the name; the
+// npm scope spells it with the domain's word joined on.
+const NAME = new RegExp(
+  `(?<![a-z])(?:${Brand.slug}|${Brand.npmScope.slice(1)})(?![a-z])`,
+  "iu"
+);
 
 const mayNameTheBrand = (path: string) =>
   path.startsWith(HOME) || PROSE.test(path) || inExampleConfig(path);

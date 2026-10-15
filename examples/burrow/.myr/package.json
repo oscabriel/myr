@@ -1,0 +1,7 @@
+{
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "@myrtechnology/cli": "0.2.2"
+  }
+}

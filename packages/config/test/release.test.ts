@@ -25,6 +25,7 @@ import {
   importedPackages,
   installScript,
   namedFiles,
+  NotServedAsLatest,
   pinnedDependencies,
   publishManifest,
   PublishNeedsAPerson,
@@ -32,6 +33,7 @@ import {
   releasePlan,
   releaseRun,
   releaseVersion,
+  servedAsLatest,
   targets,
   Unpinned,
   unreleased,
@@ -66,6 +68,8 @@ describe("the npm package's manifest", () => {
     version: "0.1.0",
   });
 
+  // A bin path in npm's normal form, without `./`: npm rewrites any other
+  // and warns that it was "invalid and removed" though it keeps it.
   it("is the brand's CLI package, with both names as bins", () => {
     expect({
       bin: manifest.bin,
@@ -74,8 +78,8 @@ describe("the npm package's manifest", () => {
       version: manifest.version,
     }).toStrictEqual({
       bin: {
-        [Brand.cli]: "./dist/bin.js",
-        [Brand.gitCredentialHelper]: "./dist/bin.js",
+        [Brand.cli]: "dist/bin.js",
+        [Brand.gitCredentialHelper]: "dist/bin.js",
       },
       license: "MIT",
       name: Brand.cliPackage,
@@ -260,12 +264,14 @@ describe("a release's plan", () => {
         build: false,
         env: { CLAUDECODE: "1" },
         publish: true,
+        stage: "dev-oscabriel",
         upload: false,
       }),
       person: releaseRun({
         build: false,
         env: {},
         publish: true,
+        stage: "dev-oscabriel",
         upload: false,
       }),
     }).toStrictEqual({
@@ -301,7 +307,13 @@ describe("a release's plan", () => {
   it("publishes last when a person runs it", () => {
     expect(
       Result.map(
-        releasePlan({ build: false, env: {}, publish: true, upload: false }),
+        releasePlan({
+          build: false,
+          env: {},
+          publish: true,
+          stage: "dev-oscabriel",
+          upload: false,
+        }),
         Arr.last
       )
     ).toStrictEqual(Result.succeed(Option.some("publish")));
@@ -379,13 +391,27 @@ describe("a release's plan", () => {
     });
   });
 
-  it("refuses an upload to a stage the repo doesn't declare, or to none", () => {
+  // A publish reads the stage's release manifest, so it names its stage, even
+  // when an agent hands it to a person.
+  it("refuses an upload or a publish to a stage the repo doesn't declare, or to none", () => {
     expect({
+      handedOver: releaseRun({
+        build: false,
+        env: { CLAUDECODE: "1" },
+        publish: true,
+        upload: false,
+      }),
       none: releasePlan({
         build: false,
         env: {},
         publish: false,
         upload: true,
+      }),
+      publish: releasePlan({
+        build: false,
+        env: {},
+        publish: true,
+        upload: false,
       }),
       unknown: releasePlan({
         build: false,
@@ -395,7 +421,9 @@ describe("a release's plan", () => {
         upload: true,
       }),
     }).toStrictEqual({
+      handedOver: Result.fail(new NoStage()),
       none: Result.fail(new NoStage()),
+      publish: Result.fail(new NoStage()),
       unknown: Result.fail(new UnknownStage({ stage: "staging" })),
     });
   });
@@ -509,6 +537,31 @@ describe("the release manifest", () => {
     ).toStrictEqual({
       latest: "0.1.0",
       versions: { "0.1.0": { assets: second } },
+    });
+  });
+
+  it("publishes to npm only the version the stage's install script serves as latest", () => {
+    expect({
+      ahead: servedAsLatest({ manifest: first, version: "0.2.0" }),
+      earlier: servedAsLatest({
+        manifest: releaseManifest({
+          assets: second,
+          previous: first,
+          version: "0.2.0",
+        }),
+        version: "0.1.0",
+      }),
+      latest: servedAsLatest({ manifest: first, version: "0.1.0" }),
+      unreleased: servedAsLatest({ manifest: undefined, version: "0.1.0" }),
+    }).toStrictEqual({
+      ahead: Result.fail(
+        new NotServedAsLatest({ latest: "0.1.0", version: "0.2.0" })
+      ),
+      earlier: Result.fail(
+        new NotServedAsLatest({ latest: "0.2.0", version: "0.1.0" })
+      ),
+      latest: Result.void,
+      unreleased: Result.fail(new NotServedAsLatest({ version: "0.1.0" })),
     });
   });
 

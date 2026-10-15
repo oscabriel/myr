@@ -94,7 +94,11 @@ export const pinnedDependencies = (input: {
       );
 };
 
+// `exports` takes the path with `./`; `bin` takes npm's normal form without
+// it, which `npm publish` would otherwise rewrite with a warning.
 const BIN = "./dist/bin.js";
+
+const BIN_TARGET = "dist/bin.js";
 
 interface LibraryEntry {
   readonly types: string;
@@ -141,7 +145,7 @@ export const publishManifest = (
     readonly dependencies: Readonly<Record<string, string>>;
   }
 ): PublishManifest => ({
-  bin: { [brand.cli]: BIN, [brand.gitCredentialHelper]: BIN },
+  bin: { [brand.cli]: BIN_TARGET, [brand.gitCredentialHelper]: BIN_TARGET },
   dependencies: input.dependencies,
   description: `The ${brand.name} command line: find an ask, claim it, check your answer, and read its verdict; also git's credential helper, and a pi package.`,
   exports: {
@@ -223,10 +227,13 @@ export interface ReleaseFlags {
   readonly env: Readonly<Record<string, string | undefined>>;
 }
 
+// A publish reads the stage's release manifest, so it names its stage even
+// when it is handed to a person: `runsPublish` is whether this run runs it.
 const stepsOf = (
-  flags: ReleaseFlags
+  flags: ReleaseFlags,
+  runsPublish = flags.publish
 ): Result.Result<readonly ReleaseStep[], NoStage | UnknownStage> => {
-  if (flags.stage === undefined && flags.upload) {
+  if (flags.stage === undefined && (flags.upload || flags.publish)) {
     return Result.fail(new NoStage());
   }
 
@@ -238,7 +245,7 @@ const stepsOf = (
     ...(flags.build ? BUILD : []),
     ...(flags.build || flags.upload ? RELEASE_FILES : []),
     ...(flags.upload ? (["upload"] as const) : []),
-    ...(flags.publish ? (["publish"] as const) : []),
+    ...(runsPublish ? (["publish"] as const) : []),
   ]);
 };
 
@@ -270,7 +277,7 @@ export const releaseRun = (
   const handOver = flags.publish ? agentMarkers(flags.env) : [];
 
   return Result.map(
-    stepsOf({ ...flags, publish: flags.publish && handOver.length === 0 }),
+    stepsOf(flags, flags.publish && handOver.length === 0),
     (steps) => ({ handOver, steps })
   );
 };
@@ -360,6 +367,37 @@ export const unreleased = (input: {
   return released === undefined || sameAssets(released.assets, input.assets)
     ? Result.void
     : Result.fail(new VersionReleased({ version: input.version }));
+};
+
+export class NotServedAsLatest extends Schema.TaggedError<NotServedAsLatest>()(
+  "NotServedAsLatest",
+  { latest: Schema.optionalKey(Schema.String), version: Schema.String }
+) {
+  override get message() {
+    const serves =
+      this.latest === undefined ? "serves no release" : `serves ${this.latest}`;
+
+    return `npm gets only the version the stage's install script serves as latest, and it ${serves}, not ${this.version}: upload --version ${this.version} to the stage first, or in the same run`;
+  }
+}
+
+/** npm and the install script give one version: the stage's latest. */
+export const servedAsLatest = (input: {
+  readonly version: string;
+  readonly manifest: ReleaseManifest | undefined;
+}): Result.Result<void, NotServedAsLatest> => {
+  if (input.manifest === undefined) {
+    return Result.fail(new NotServedAsLatest({ version: input.version }));
+  }
+
+  return input.manifest.latest === input.version
+    ? Result.void
+    : Result.fail(
+        new NotServedAsLatest({
+          latest: input.manifest.latest,
+          version: input.version,
+        })
+      );
 };
 
 export const MANIFEST_KEY = "releases/manifest.json";

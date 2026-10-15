@@ -1,4 +1,4 @@
-import { check, kinds, project, territory } from "@myr/cli/rules";
+import { check, kinds, project, territory } from "@myrtechnology/cli/rules";
 
 // The run block `myr init` found in this repo's own files, each command with
 // where it was found; deciders, kinds and the ratchet added since.

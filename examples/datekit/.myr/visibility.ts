@@ -1,4 +1,4 @@
-import { flows, layer, sealedChecks, visibility } from "@myr/cli/rules";
+import { flows, layer, sealedChecks, visibility } from "@myrtechnology/cli/rules";
 
 /**
  * What datekit keeps out of its public tree, and why. The maintainers hold
