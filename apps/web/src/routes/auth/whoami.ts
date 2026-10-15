@@ -7,7 +7,7 @@ import { whoamiHandler } from "../../server/session.ts";
 export const Route = createFileRoute("/auth/whoami")({
   server: {
     handlers: {
-      GET: whoamiHandler((request) => serverClient(env, request)),
+      GET: whoamiHandler(env, (request) => serverClient(env, request)),
     },
   },
 });

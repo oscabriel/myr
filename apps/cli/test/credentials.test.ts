@@ -19,6 +19,7 @@ import {
   gitHelperConfig,
 } from "../src/credentials.ts";
 import type { Profile } from "../src/credentials.ts";
+import { oauthServer, refreshTokenOf, renewedTokenOf } from "./oauth-server.ts";
 
 const SLUG = Brand.slug.toUpperCase();
 
@@ -153,8 +154,8 @@ describe("stored credentials", () => {
 
       yield* credentials.put("default", defaultProfile);
 
-      expect(yield* credentials.remove("default")).toBeTruthy();
-      expect(yield* credentials.remove("default")).toBeFalsy();
+      expect(Option.isSome(yield* credentials.remove("default"))).toBeTruthy();
+      expect(yield* credentials.remove("default")).toStrictEqual(Option.none());
       expect(yield* credentials.current).toStrictEqual(Option.none());
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
   );
@@ -198,6 +199,148 @@ describe("stored credentials", () => {
         expect(put).toStrictEqual(new CredentialsUnwritable({ path: file }));
         expect(yield* fs.readFileString(file)).toBe("not json");
         expect(yield* credentials.current).toStrictEqual(Option.none());
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
+  );
+});
+
+const kept = (profile: Option.Option<Profile>) =>
+  Option.map(profile, ({ refreshToken, token: secret }) => ({
+    refreshToken:
+      refreshToken === undefined ? undefined : Redacted.value(refreshToken),
+    token: Redacted.value(secret),
+  }));
+
+describe("a stored browser sign-in, near its token's lapse", () => {
+  const signedIn = "tok-signed-in-0123456789abcdefghijklmnopqrstuvwxyz";
+
+  const given = "refresh-given";
+
+  // A profile as `login` keeps it, its token lapsing `in` milliseconds from now.
+  const browserProfile = (url: string, lapsesIn: number) =>
+    Effect.map(
+      Effect.clockWith((clock) => clock.currentTimeMillis),
+      (now): Profile => ({
+        expiresAt: now + lapsesIn,
+        handle: Handle.make("oscar"),
+        refreshToken: Redacted.make(given),
+        token: Redacted.make(signedIn),
+        url,
+      })
+    );
+
+  it.live(
+    "is renewed by its refresh token when read, and the renewal is written back",
+    () =>
+      Effect.gen(function* () {
+        const server = yield* oauthServer({ given, token: signedIn });
+        const { env } = yield* configHome;
+        const credentials = yield* credentialsIn(env);
+
+        yield* credentials.put(
+          "default",
+          yield* browserProfile(server.origin, 30_000)
+        );
+
+        const read = yield* credentials.current;
+        const again = yield* (yield* credentialsIn(env)).current;
+
+        const renewed = {
+          refreshToken: refreshTokenOf(1),
+          token: renewedTokenOf(signedIn, 0),
+        };
+
+        expect({
+          again: kept(again),
+          asked: (yield* server.renewals).map((form) => ({ ...form })),
+          read: kept(read),
+        }).toStrictEqual({
+          again: Option.some(renewed),
+          asked: [
+            {
+              client_id: `${server.origin}/oauth/cli`,
+              grant_type: "refresh_token",
+              refresh_token: given,
+            },
+          ],
+          read: Option.some(renewed),
+        });
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
+  );
+
+  it.live("is renewed when git's helper finds it by host, too", () =>
+    Effect.gen(function* () {
+      const server = yield* oauthServer({ given, token: signedIn });
+      const { env } = yield* configHome;
+      const credentials = yield* credentialsIn(env);
+
+      yield* credentials.put("alice", yield* browserProfile(server.origin, 0));
+
+      expect(
+        kept(yield* credentials.forHost(new URL(server.origin).host))
+      ).toStrictEqual(
+        Option.some({
+          refreshToken: refreshTokenOf(1),
+          token: renewedTokenOf(signedIn, 0),
+        })
+      );
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
+  );
+
+  it.live("is left alone while its token has more than a minute to live", () =>
+    Effect.gen(function* () {
+      const server = yield* oauthServer({ given, token: signedIn });
+      const { env } = yield* configHome;
+      const credentials = yield* credentialsIn(env);
+
+      yield* credentials.put(
+        "default",
+        yield* browserProfile(server.origin, 10 * 60_000)
+      );
+
+      expect(kept(yield* credentials.current)).toStrictEqual(
+        Option.some({ refreshToken: given, token: signedIn })
+      );
+      expect(yield* server.renewals).toStrictEqual([]);
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
+  );
+
+  it.live(
+    "keeps its token when the platform refuses the renewal, so the call it carries is refused as signed out",
+    () =>
+      Effect.gen(function* () {
+        const server = yield* oauthServer({
+          given,
+          refuseRenewals: true,
+          token: signedIn,
+        });
+
+        const { env } = yield* configHome;
+        const credentials = yield* credentialsIn(env);
+
+        yield* credentials.put(
+          "default",
+          yield* browserProfile(server.origin, 0)
+        );
+
+        expect(kept(yield* credentials.current)).toStrictEqual(
+          Option.some({ refreshToken: given, token: signedIn })
+        );
+        expect(yield* server.renewals).toHaveLength(1);
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
+  );
+
+  it.live(
+    "never renews a token given by hand, which has no refresh token",
+    () =>
+      Effect.gen(function* () {
+        const { env } = yield* configHome;
+        const credentials = yield* credentialsIn(env);
+
+        yield* credentials.put("default", defaultProfile);
+
+        expect(seen(yield* credentials.current)).toStrictEqual(
+          seen(Option.some(defaultProfile))
+        );
       }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
   );
 });

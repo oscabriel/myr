@@ -29,7 +29,11 @@ import {
 } from "./accounts.ts";
 import type { Account } from "./accounts.ts";
 import { SignInAttempts } from "./attempts.ts";
-import { CLI_CLIENT_PATH, cliClientMetadata } from "./cli-client.ts";
+import {
+  CLI_CLIENT_PATH,
+  CLI_CODE_PATH,
+  cliClientMetadata,
+} from "./cli-client.ts";
 import { codeMatches, codeTag, deadTag, freshCode } from "./codes.ts";
 import type { CodePurpose } from "./codes.ts";
 import { firstPartyOf } from "./first-party.ts";
@@ -38,6 +42,7 @@ import { OAuthStore } from "./oauth-store.ts";
 import {
   ACCOUNT_PATHS,
   addEmailPage,
+  cliCodePage,
   codePage,
   continuePage,
   problemPage,
@@ -117,6 +122,7 @@ export const SIGN_IN_PATHS = [
   "/authorize",
   "/signup",
   CLI_CLIENT_PATH,
+  CLI_CODE_PATH,
   ...Object.values(ACCOUNT_PATHS),
   ...Object.values(SESSION_PATHS),
 ] as const;
@@ -176,7 +182,19 @@ const STAND_IN_HASH = PasswordHash.make(
   `pbkdf2-sha256$${PasswordPolicy.iterations}$${"A".repeat(22)}$${"A".repeat(43)}`
 );
 
-export const CSRF_COOKIE = "__Host-sign-in";
+/**
+ * One cookie per sign-in in progress, named by the head of its own token: a
+ * second sign-in in the same browser (the CLI's and an agent's, each in its
+ * own tab) never replaces the first's, so neither is told it expired. Each
+ * lapses with its form, and a finished one is cleared.
+ */
+export const csrfCookieName = (csrf: string) =>
+  `__Host-sign-in-${csrf.slice(0, 16)}`;
+
+export const csrfOf = (
+  request: HttpServerRequest.HttpServerRequest,
+  csrf: string
+): string | undefined => request.cookies[csrfCookieName(csrf)];
 
 export const csrfCookie = {
   httpOnly: true,
@@ -184,9 +202,6 @@ export const csrfCookie = {
   sameSite: "strict",
   secure: true,
 } as const;
-
-const BASE_CSP =
-  "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'";
 
 // CSP's host grammar cannot name an IPv6 literal host, so only its scheme.
 const redirectSource = (redirectUri: string) =>
@@ -197,18 +212,28 @@ const redirectSource = (redirectUri: string) =>
     )
   );
 
-// Browsers hold a form post's redirect to `form-action` too, so the client's redirect URI is allowed.
+// Browsers hold a form post's redirect to `form-action` too, so the client's
+// redirect URI is allowed there. Built by directive, so a source meant for
+// `form-action` never lands in the directive written after it.
 const contentSecurityPolicy = (
   redirectUri?: string,
   formActions: readonly string[] = []
 ) =>
   [
-    BASE_CSP,
-    ...Option.toArray(
-      Option.flatMap(Option.fromUndefinedOr(redirectUri), redirectSource)
-    ),
-    ...formActions,
-  ].join(" ");
+    ["default-src", "'none'"],
+    ["style-src", "'unsafe-inline'"],
+    [
+      "form-action",
+      "'self'",
+      ...Option.toArray(
+        Option.flatMap(Option.fromUndefinedOr(redirectUri), redirectSource)
+      ),
+      ...formActions,
+    ],
+    ["frame-ancestors", "'none'"],
+  ]
+    .map((directive) => directive.join(" "))
+    .join("; ");
 
 export const htmlPage = (
   body: string,
@@ -364,7 +389,7 @@ const passwordFits = (password: string) =>
 const withCsrfCookie =
   (csrf: string) => (response: HttpServerResponse.HttpServerResponse) =>
     response.pipe(
-      HttpServerResponse.setCookie(CSRF_COOKIE, csrf, {
+      HttpServerResponse.setCookie(csrfCookieName(csrf), csrf, {
         ...csrfCookie,
         maxAge: SIGN_IN_LIFETIME,
       }),
@@ -377,9 +402,23 @@ const sameCsrf = (
   posted: string,
   sealed: string
 ) =>
-  sealed === posted && request.cookies[CSRF_COOKIE] === posted
+  sealed === posted && csrfOf(request, posted) === posted
     ? Effect.void
     : Effect.fail(startAgain);
+
+// The form a request posted, if it posted one: its CSRF token names the cookie to clear.
+const postedCsrf = Effect.gen(function* () {
+  const request = yield* HttpServerRequest.HttpServerRequest;
+
+  return request.method === "POST"
+    ? yield* HttpServerRequest.schemaBodyUrlParams(
+        Schema.Struct({ csrf: Schema.String })
+      ).pipe(
+        Effect.map(({ csrf }) => Option.some(csrf)),
+        Effect.orElseSucceed(() => Option.none<string>())
+      )
+    : Option.none<string>();
+});
 
 // The grant's user is the handle's key, so a grant is one account's in any case.
 // Every account it is given for has a proven email, or the person just proved
@@ -391,37 +430,49 @@ export const completed = (handle: Handle, request: AuthRequest) =>
   Effect.gen(function* () {
     const api = yield* oauthApi;
     const { cookieKey } = yield* SignInKeys;
+    const { origin } = yield* Authorization;
+    const { webUrl } = yield* SignInHome;
     const account = yield* (yield* Accounts).find(handle);
+    const csrf = yield* postedCsrf;
 
     const { redirectTo } = yield* provider(() =>
       api.completeAuthorization({
         metadata: {},
         props: { handle },
         request: forProvider(request),
+        // A grant to the web replaces none: each browser a person signs in on keeps its own.
+        revokeExistingGrants:
+          firstPartyOf(request.clientId, origin, webUrl) !== "web",
         scope: [...request.scope],
         userId: handleKey(handle),
       })
     );
 
-    return yield* HttpServerResponse.redirect(redirectTo, {
+    const redirected = HttpServerResponse.redirect(redirectTo, {
       headers: {
         "cache-control": "no-store",
         "referrer-policy": "no-referrer",
       },
       status: 302,
-    }).pipe(
-      HttpServerResponse.setCookie(CSRF_COOKIE, "", {
-        ...csrfCookie,
-        maxAge: 0,
-      }),
-      Effect.orDie,
-      Effect.flatMap((response) =>
-        Option.match(account, {
-          onNone: () => Effect.succeed(response),
-          onSome: (found) => withSession(cookieKey, found)(response),
-        })
-      )
-    );
+    });
+
+    // Only this sign-in's cookie: another in progress in this browser keeps its own.
+    const cleared = yield* Option.match(csrf, {
+      onNone: () => Effect.succeed(redirected),
+      onSome: (finished) =>
+        redirected.pipe(
+          HttpServerResponse.setCookie(csrfCookieName(finished), "", {
+            ...csrfCookie,
+            maxAge: 0,
+          }),
+          Effect.orDie
+        ),
+    });
+
+    return yield* Option.match(account, {
+      onNone: () => Effect.succeed(cleared),
+      onSome: (found) => withSession(cookieKey, found)(cleared),
+    });
   });
 
 const offeredSignIn = (
@@ -1422,6 +1473,23 @@ const cliClient = Effect.gen(function* () {
   });
 });
 
+// The code is shown, never kept: it is worth nothing without the CLI's verifier.
+const cliCode = Effect.gen(function* () {
+  const { webUrl } = yield* SignInHome;
+
+  const { code } = yield* HttpServerRequest.schemaSearchParams(
+    Schema.Struct({ code: Schema.optionalKey(Schema.NonEmptyString) })
+  ).pipe(Effect.orElseSucceed(() => ({ code: undefined })));
+
+  return htmlPage(
+    cliCodePage(
+      code,
+      Option.getOrElse(webUrl, () => "/")
+    ),
+    code === undefined ? 400 : 200
+  );
+});
+
 const authorizationServer = (request: HttpServerRequest.HttpServerRequest) =>
   Effect.gen(function* () {
     const { context, server } = yield* Authorization;
@@ -1504,6 +1572,7 @@ export const signInRoutes = HttpRouter.use((router) =>
     yield* add("POST", ACCOUNT_PATHS.reset, reset);
     yield* add("POST", ACCOUNT_PATHS.resetVerify, resetVerified);
     yield* add("GET", CLI_CLIENT_PATH, () => cliClient);
+    yield* add("GET", CLI_CODE_PATH, () => cliCode);
 
     for (const path of AUTHORIZATION_SERVER_PATHS) {
       yield* add("*", path, authorizationServer);

@@ -131,7 +131,7 @@ const signedIn = (url: string) => {
     current: Effect.succeedSome(profile),
     forHost: () => Effect.succeedSome(profile),
     put: () => Effect.void,
-    remove: () => Effect.succeed(false),
+    remove: () => Effect.succeedNone,
   });
 };
 

@@ -13,7 +13,7 @@ import type { Account } from "../src/auth/accounts.ts";
 import { AccountsMemory } from "../src/auth/accounts/memory.ts";
 import { SignInAttempts } from "../src/auth/attempts.ts";
 import { SignInAttemptsMemory } from "../src/auth/attempts/memory.ts";
-import { cliClientMetadata } from "../src/auth/cli-client.ts";
+import { CLI_CODE_PATH, cliClientMetadata } from "../src/auth/cli-client.ts";
 import { codeMatches, codeTag, deadTag, freshCode } from "../src/auth/codes.ts";
 import type { CodePurpose } from "../src/auth/codes.ts";
 import { ACCOUNT_PATHS, SESSION_PATHS } from "../src/auth/pages.ts";
@@ -25,6 +25,7 @@ import {
 } from "../src/auth/password.ts";
 import { sessionAccount, withSession } from "../src/auth/platform-session.ts";
 import { tokenReader } from "../src/auth/provider.ts";
+import { csrfCookieName } from "../src/auth/sign-in.ts";
 import { openState, sealState, SignInFailed } from "../src/auth/state.ts";
 import type { PendingSignIn } from "../src/auth/state.ts";
 import worker from "../src/worker.ts";
@@ -37,13 +38,17 @@ import {
   authorizeUrl,
   cliClient,
   codeOf,
+  cspOf,
   formOf,
   namedPerson,
   origin,
   port,
   post,
   signInWorld,
+  redirectUri,
   tokenRequest,
+  webCallback,
+  webClient,
 } from "./oauth.fixtures.ts";
 import type { World } from "./oauth.fixtures.ts";
 
@@ -197,12 +202,16 @@ describe("a sign-in in progress, sealed into the form", () => {
 });
 
 describe("the CLI's OAuth client", () => {
-  it("is public, signs in with PKCE only, and comes back to a loopback port", () => {
+  it("is public, signs in with PKCE only, and comes back to a loopback port or the platform's own code page", () => {
     expect(cliClientMetadata("https://platform.test")).toStrictEqual({
       client_id: "https://platform.test/oauth/cli",
       client_name: `${Brand.name} CLI`,
       grant_types: ["authorization_code", "refresh_token"],
-      redirect_uris: ["http://127.0.0.1/callback", "http://[::1]/callback"],
+      redirect_uris: [
+        "http://127.0.0.1/callback",
+        "http://[::1]/callback",
+        "https://platform.test/oauth/cli/code",
+      ],
       response_types: ["code"],
       token_endpoint_auth_method: "none",
     });
@@ -466,8 +475,13 @@ const accessTokenFor = (world: World, handle: string, secret: string) =>
 
 const alicePassword = "correct horse battery";
 
-const CSP =
-  "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'";
+// The page loads nothing, cannot be framed, and posts its forms only here and to where the code goes back.
+const lockedDown = (formAction: readonly string[]) => ({
+  "default-src": ["'none'"],
+  "form-action": ["'self'", ...formAction],
+  "frame-ancestors": ["'none'"],
+  "style-src": ["'unsafe-inline'"],
+});
 
 describe("the platform as its own OAuth authorization server", () => {
   it.live("publishes where to authorize and where to get a token", () =>
@@ -528,12 +542,12 @@ describe("the platform as its own OAuth authorization server", () => {
         expect([
           page.response.status,
           page.response.headers.get("content-type"),
-          page.response.headers.get("content-security-policy"),
+          cspOf(page.response),
           page.response.headers.get("x-frame-options"),
         ]).toStrictEqual([
           200,
           "text/html; charset=utf-8",
-          `${CSP} http://127.0.0.1:${port}`,
+          lockedDown([`http://127.0.0.1:${port}`]),
           "DENY",
         ]);
         expect(page.html).toContain(
@@ -592,10 +606,10 @@ describe("the platform as its own OAuth authorization server", () => {
           )
           .pipe(Effect.flatMap(read));
 
-        expect([
-          page.response.status,
-          page.response.headers.get("content-security-policy"),
-        ]).toStrictEqual([200, `${CSP} http:`]);
+        expect([page.response.status, cspOf(page.response)]).toStrictEqual([
+          200,
+          lockedDown(["http:"]),
+        ]);
       })
   );
 });
@@ -1593,7 +1607,7 @@ const continueFrom = (
           { csrf: csrf ?? form.csrf, request: form.request },
           form.cookie
         ),
-        { "__Host-sign-in": form.cookie, [SESSION]: session }
+        { [csrfCookieName(form.cookie)]: form.cookie, [SESSION]: session }
       )
     );
   });
@@ -1621,6 +1635,265 @@ const asksToContinue = (page: Page) => ({
   continues: page.html.includes("Continue as @alice"),
   password: page.html.includes('name="password"'),
   status: page.response.status,
+});
+
+// A code given back to `redirect`, wherever that is.
+const codeAt = (response: Response, redirect: string) =>
+  Effect.fromOption(
+    Option.fromNullishOr(response.headers.get("location")).pipe(
+      Option.flatMap((location) => Option.fromNullishOr(URL.parse(location))),
+      Option.filter((url) => `${url.origin}${url.pathname}` === redirect),
+      Option.flatMap((url) =>
+        Option.fromNullishOr(url.searchParams.get("code"))
+      )
+    )
+  ).pipe(Effect.orDie);
+
+const tokenAt = (
+  world: World,
+  code: string,
+  client = cliClient,
+  redirect = redirectUri
+) =>
+  Effect.gen(function* () {
+    const response = yield* world.fetch(
+      tokenRequest(code, undefined, client, redirect)
+    );
+
+    return yield* Effect.promise(() => response.json()).pipe(
+      Effect.flatMap(Schema.decodeUnknownEffect(TokenResponse)),
+      Effect.map(({ access_token }) => access_token),
+      Effect.orDie
+    );
+  });
+
+// A password sign-in for `client`, from a page opened in a browser that holds `jar` as well.
+const signInWithJar = (
+  world: World,
+  form: {
+    readonly cookie: string;
+    readonly csrf: string;
+    readonly request: string;
+  },
+  jar: readonly string[]
+) =>
+  world.fetch(
+    withCookies(
+      post(
+        "/authorize",
+        {
+          csrf: form.csrf,
+          login: "alice",
+          password: alicePassword,
+          request: form.request,
+        },
+        form.cookie
+      ),
+      Object.fromEntries(jar.map((value) => [csrfCookieName(value), value]))
+    )
+  );
+
+// The sign-in cookies an answer clears, by name.
+const cleared = (response: Response) =>
+  response.headers
+    .getSetCookie()
+    .filter(
+      (line) =>
+        line.startsWith("__Host-sign-in-") &&
+        line.toLowerCase().includes("max-age=0")
+    )
+    .map((line) => line.slice(0, line.indexOf("=")));
+
+describe("a CLI sign-in by pasted code", () => {
+  const codePage = `${origin}${CLI_CODE_PATH}`;
+
+  it.live(
+    "ends on the platform's code page, which shows the code to paste, and the code trades for a token with the CLI's verifier",
+    () =>
+      Effect.gen(function* () {
+        const world = yield* signInWorld();
+
+        yield* signUp(world, "alice", alicePassword);
+
+        const page = yield* world
+          .fetch(new Request(authorizeUrl("state-1", codePage)))
+          .pipe(Effect.flatMap(read));
+
+        const form = yield* formIn(page);
+
+        const signedIn = yield* signInWithJar(world, form, [form.cookie]);
+
+        const code = yield* codeAt(signedIn, codePage);
+
+        const shown = yield* world
+          .fetch(new Request(signedIn.headers.get("location") ?? ""))
+          .pipe(Effect.flatMap(read));
+
+        const token = yield* tokenAt(world, code, cliClient, codePage);
+
+        expect({
+          asks: page.html.includes(
+            "login --paste</code>: the next page shows a code"
+          ),
+          cached: shown.response.headers.get("cache-control"),
+          shows: shown.html.includes(
+            `<code class="paste">${code.replaceAll("&", "&amp;")}</code>`
+          ),
+          status: shown.response.status,
+          verified: Option.isSome(
+            yield* OAuthSessions(tokenReader(world.store)).verify(token)
+          ),
+        }).toStrictEqual({
+          asks: true,
+          cached: "no-store",
+          shows: true,
+          status: 200,
+          verified: true,
+        });
+      })
+  );
+
+  it.live("gives no token for a shown code without the CLI's verifier", () =>
+    Effect.gen(function* () {
+      const world = yield* signInWorld();
+
+      yield* signUp(world, "alice", alicePassword);
+
+      const form = yield* formIn(
+        yield* world
+          .fetch(new Request(authorizeUrl("state-1", codePage)))
+          .pipe(Effect.flatMap(read))
+      );
+
+      const code = yield* signInWithJar(world, form, [form.cookie]).pipe(
+        Effect.flatMap((response) => codeAt(response, codePage))
+      );
+
+      const response = yield* world.fetch(
+        tokenRequest(
+          code,
+          "another-verifier-0123456789abcdefghijklmnopqrstu",
+          cliClient,
+          codePage
+        )
+      );
+
+      expect(response.status).toBe(400);
+    })
+  );
+
+  it.live("says there is no code when the sign-in did not finish", () =>
+    Effect.gen(function* () {
+      const world = yield* signInWorld();
+
+      const shown = yield* world
+        .fetch(new Request(`${codePage}?error=access_denied&state=state-1`))
+        .pipe(Effect.flatMap(read));
+
+      expect([
+        shown.response.status,
+        shown.html.includes("No code to paste"),
+      ]).toStrictEqual([400, true]);
+    })
+  );
+});
+
+describe("two sign-ins in progress in one browser", () => {
+  it.live(
+    "both finish, whichever page was opened last, and each clears only its own cookie",
+    () =>
+      Effect.gen(function* () {
+        const world = yield* signInWorld();
+
+        yield* signUp(world, "alice", alicePassword);
+
+        const first = yield* formIn(yield* openSignIn(world, "state-1"));
+        const second = yield* formIn(yield* openSignIn(world, "state-2"));
+        const jar = [first.cookie, second.cookie];
+
+        const done = yield* signInWithJar(world, first, jar);
+        const after = yield* signInWithJar(world, second, jar);
+
+        expect({
+          after: Option.isSome(codeOf(after)),
+          cleared: cleared(done),
+          distinct:
+            csrfCookieName(first.cookie) !== csrfCookieName(second.cookie),
+          done: Option.isSome(codeOf(done)),
+        }).toStrictEqual({
+          after: true,
+          cleared: [csrfCookieName(first.cookie)],
+          distinct: true,
+          done: true,
+        });
+      })
+  );
+});
+
+describe("grants to one person's clients", () => {
+  it.live(
+    "keeps each browser's grant to the web: signing in on a second ends none on the first",
+    () =>
+      Effect.gen(function* () {
+        const world = yield* signInWorld({ web: true });
+
+        yield* signUp(world, "alice", alicePassword);
+
+        const tokens = yield* Effect.forEach(["state-1", "state-2"], (state) =>
+          Effect.gen(function* () {
+            const page = yield* world
+              .fetch(new Request(authorizeUrl(state, webCallback, webClient)))
+              .pipe(Effect.flatMap(read));
+
+            const form = yield* formIn(page);
+
+            const code = yield* signInWithJar(world, form, [form.cookie]).pipe(
+              Effect.flatMap((response) => codeAt(response, webCallback))
+            );
+
+            return yield* tokenAt(world, code, webClient, webCallback);
+          })
+        );
+
+        const sessions = OAuthSessions(tokenReader(world.store));
+
+        expect(
+          yield* Effect.forEach(tokens, (token) =>
+            Effect.map(sessions.verify(token), Option.isSome)
+          )
+        ).toStrictEqual([true, true]);
+      })
+  );
+
+  it.live(
+    "still replaces another client's grant to the same redirect, so an app signed in again holds one",
+    () =>
+      Effect.gen(function* () {
+        const world = yield* signInWorld();
+
+        yield* signUp(world, "alice", alicePassword);
+
+        const tokens = yield* Effect.forEach(["state-1", "state-2"], (state) =>
+          Effect.gen(function* () {
+            const form = yield* formIn(yield* openSignIn(world, state));
+
+            const code = yield* signInWithJar(world, form, [form.cookie]).pipe(
+              Effect.flatMap(codeIn)
+            );
+
+            return yield* tokenAt(world, code);
+          })
+        );
+
+        const sessions = OAuthSessions(tokenReader(world.store));
+
+        expect(
+          yield* Effect.forEach(tokens, (token) =>
+            Effect.map(sessions.verify(token), Option.isSome)
+          )
+        ).toStrictEqual([false, true]);
+      })
+  );
 });
 
 describe("the platform's own session", () => {

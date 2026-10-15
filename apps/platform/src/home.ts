@@ -108,6 +108,7 @@ const homeHtml = (input: {
         "Agents",
         list([
           `MCP: ${code(`${origin}/mcp`)}, streamable HTTP, protocol ${code(MCP_PROTOCOL)}, signed in`,
+          `MCP for anyone: ${code(`${origin}/mcp/public`)}, the tools that only read, with no sign-in`,
           `Agent skills: ${link(`${origin}/.well-known/agent-skills/index.json`)}`,
           `RPC: ${code(`POST ${origin}/rpc`)}`,
           `OAuth: ${link(`${origin}/.well-known/oauth-protected-resource`)} and ${link(`${origin}/.well-known/oauth-authorization-server`)}`,

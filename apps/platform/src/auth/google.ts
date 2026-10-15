@@ -37,7 +37,8 @@ import {
   chosenDisplayName,
   chosenHandle,
   completed,
-  CSRF_COOKIE,
+  csrfCookieName,
+  csrfOf,
   csrfCookie,
   failedPage,
   freshCsrf,
@@ -527,7 +528,7 @@ const start =
 
       const pending = yield* openState(cookieKey, sealed);
 
-      if (request.cookies[CSRF_COOKIE] !== pending.csrf) {
+      if (csrfOf(request, pending.csrf) !== pending.csrf) {
         return yield* startAgain;
       }
 
@@ -566,7 +567,7 @@ const pickHandle = (
       status,
       pending.request.redirectUri
     ).pipe(
-      HttpServerResponse.setCookie(CSRF_COOKIE, csrf, {
+      HttpServerResponse.setCookie(csrfCookieName(csrf), csrf, {
         ...csrfCookie,
         maxAge: SIGN_IN_LIFETIME,
       }),
@@ -760,7 +761,7 @@ const handleChosen = (request: HttpServerRequest.HttpServerRequest) =>
 
     if (
       pending.csrf !== form.csrf ||
-      request.cookies[CSRF_COOKIE] !== form.csrf
+      csrfOf(request, form.csrf) !== form.csrf
     ) {
       return yield* startAgain;
     }

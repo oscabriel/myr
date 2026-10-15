@@ -57,7 +57,12 @@ const SignedIn = RpcMiddleware.layerClient(Authenticated, ({ next, request }) =>
   )
 );
 
-const over = (origin: string, token: Option.Option<Redacted.Redacted>) =>
+// The token is read for each request, not once: `mcp` serves for hours, and
+// the stored token is renewed under it as it nears its lapse.
+const over = (
+  origin: string,
+  token: Effect.Effect<Option.Option<Redacted.Redacted>>
+) =>
   Layer.effect(Client)(RpcClient.make(Contracts)).pipe(
     Layer.provide(SignedIn),
     Layer.provide(
@@ -70,15 +75,17 @@ const over = (origin: string, token: Option.Option<Redacted.Redacted>) =>
                   `${origin.replace(/\/+$/u, "")}/rpc`
                 )
               ),
-              HttpClient.mapRequest((request) =>
-                Option.match(token, {
-                  onNone: () => request,
-                  onSome: (bearer) =>
-                    HttpClientRequest.bearerToken(
-                      request,
-                      Redacted.value(bearer)
-                    ),
-                })
+              HttpClient.mapRequestEffect((request) =>
+                Effect.map(token, (bearer) =>
+                  Option.match(bearer, {
+                    onNone: () => request,
+                    onSome: (value) =>
+                      HttpClientRequest.bearerToken(
+                        request,
+                        Redacted.value(value)
+                      ),
+                  })
+                )
               ),
               // Any status but 2xx fails as itself, so a 401 is told apart.
               HttpClient.filterStatusOk
@@ -93,13 +100,22 @@ const over = (origin: string, token: Option.Option<Redacted.Redacted>) =>
 export const RemoteClient: Layer.Layer<Client, never, Credentials> =
   Layer.unwrap(
     Effect.gen(function* () {
-      const profile = yield* Effect.flatMap(
-        Effect.service(Credentials),
-        (credentials) => credentials.current
-      );
+      const credentials = yield* Credentials;
+
+      const profile = yield* credentials.current;
 
       if (Option.isSome(profile)) {
-        return over(profile.value.url, Option.some(profile.value.token));
+        const { url } = profile.value;
+
+        return over(
+          url,
+          Effect.map(credentials.current, (now) =>
+            Option.map(
+              Option.filter(now, (kept) => kept.url === url),
+              ({ token }) => token
+            )
+          )
+        );
       }
 
       const url = yield* Config.option(
@@ -109,7 +125,7 @@ export const RemoteClient: Layer.Layer<Client, never, Credentials> =
       // With nothing naming a platform, the platform itself, as anyone.
       return over(
         Option.getOrElse(url, () => Brand.platformUrl),
-        Option.none()
+        Effect.succeedNone
       );
     })
   );

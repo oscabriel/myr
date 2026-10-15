@@ -3,7 +3,7 @@ import { Brand } from "@repo/brand";
 import { Contracts } from "@repo/protocol/contracts";
 import { AskId, Handle, KindName } from "@repo/protocol/ids";
 import { unanswered } from "@repo/protocol/testing";
-import { ConfigProvider, Effect, Layer, Option, Redacted } from "effect";
+import { ConfigProvider, Effect, Layer, Option, Redacted, Ref } from "effect";
 import { FetchHttpClient } from "effect/http";
 
 import { Credentials } from "../src/credentials.ts";
@@ -46,7 +46,7 @@ const holding = (profile: Option.Option<Profile>) =>
     current: Effect.succeed(profile),
     forHost: () => Effect.succeed(profile),
     put: () => Effect.void,
-    remove: () => Effect.succeed(false),
+    remove: () => Effect.succeedNone,
   });
 
 const profileOn = (url: string, token: string): Profile => ({
@@ -84,6 +84,40 @@ describe("the remote client", () => {
       expect(run.code).toBe(0);
       expect(yield* platform.seen).toStrictEqual([`Bearer ${knownToken}`]);
     }).pipe(Effect.scoped)
+  );
+
+  it.live(
+    "reads the stored token for each request, so a token renewed while it serves is the one sent",
+    () =>
+      Effect.gen(function* () {
+        const platform = yield* httpPlatform(handlers);
+        const reads = yield* Ref.make(0);
+
+        // The first read, as the client is built, finds the token that has since been renewed.
+        const renewing = Layer.succeed(Credentials)({
+          current: Effect.map(
+            Ref.getAndUpdate(reads, (n) => n + 1),
+            (n) =>
+              Option.some(
+                profileOn(
+                  platform.origin,
+                  n === 0 ? "lapsed-token" : knownToken
+                )
+              )
+          ),
+          forHost: () => Effect.succeedNone,
+          put: () => Effect.void,
+          remove: () => Effect.succeedNone,
+        });
+
+        const run = yield* runProgram(["status", "--json"], {
+          client: remote(renewing),
+          handlers,
+        });
+
+        expect(run.code).toBe(0);
+        expect(yield* platform.seen).toStrictEqual([`Bearer ${knownToken}`]);
+      }).pipe(Effect.scoped)
   );
 
   it.live("status says whom the platform takes the caller for", () =>

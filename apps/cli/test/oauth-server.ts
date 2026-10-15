@@ -5,6 +5,10 @@ import { HttpServer, HttpServerRequest, HttpServerResponse } from "effect/http";
 export interface OAuthServerOptions {
   readonly token: string;
   readonly state?: "same" | "other";
+  // Refuse every renewal, as a platform does once the grant has ended.
+  readonly refuseRenewals?: boolean;
+  // A refresh token it gave out before the test began.
+  readonly given?: string;
 }
 
 interface Grant {
@@ -13,13 +17,7 @@ interface Grant {
   readonly redirectUri: string;
 }
 
-const TokenForm = Schema.Struct({
-  client_id: Schema.String,
-  code: Schema.String,
-  code_verifier: Schema.String,
-  grant_type: Schema.String,
-  redirect_uri: Schema.String,
-});
+const TokenForm = Schema.Record(Schema.String, Schema.String);
 
 /** Base64url without padding, as RFC 7636 §4.2 spells the S256 challenge. */
 const base64url = (bytes: Uint8Array) =>
@@ -39,11 +37,47 @@ const s256 = (verifier: string) =>
 const refused = (error: string) =>
   HttpServerResponse.jsonUnsafe({ error }, { status: 400 });
 
+export const refreshTokenOf = (count: number) => `refresh-${count}`;
+
+export const renewedTokenOf = (token: string, count: number) =>
+  `${token}-renewed-${count}`;
+
+/**
+ * An authorization server as the platform's behaves for the CLI: PKCE codes,
+ * then refresh tokens that rotate on each renewal, the one just replaced still
+ * taken once, and revocation of a whole grant by any of its refresh tokens.
+ */
 export const oauthServer = (options: OAuthServerOptions) =>
   Effect.gen(function* () {
     const grants = yield* Ref.make<ReadonlyMap<string, Grant>>(new Map());
     const authorizations = yield* Ref.make<readonly URLSearchParams[]>([]);
+    const renewals = yield* Ref.make<readonly Record<string, string>[]>([]);
+    const revocations = yield* Ref.make<readonly Record<string, string>[]>([]);
     const issued = yield* Ref.make(0);
+    const refreshes = yield* Ref.make(0);
+
+    // The refresh tokens still taken: the current one and the one before it.
+    const live = yield* Ref.make<readonly string[]>(
+      options.given === undefined ? [] : [options.given]
+    );
+
+    // Seconds each token lives, as the platform's default says.
+    const lifetime = 3600;
+
+    const tokens = (accessToken: string) =>
+      Effect.gen(function* () {
+        const count = yield* Ref.updateAndGet(refreshes, (n) => n + 1);
+        const refreshToken = refreshTokenOf(count);
+
+        yield* Ref.update(live, (all) => [...all.slice(-1), refreshToken]);
+
+        return HttpServerResponse.jsonUnsafe({
+          access_token: accessToken,
+          expires_in: lifetime,
+          refresh_token: refreshToken,
+          token_type: "bearer",
+        });
+      });
 
     const authorize = (query: URLSearchParams) =>
       Effect.gen(function* () {
@@ -83,32 +117,74 @@ export const oauthServer = (options: OAuthServerOptions) =>
         return HttpServerResponse.redirect(back.href, { status: 302 });
       });
 
+    const traded = (form: Readonly<Record<string, string>>) =>
+      Effect.gen(function* () {
+        const code = form.code ?? "";
+        const grant = (yield* Ref.get(grants)).get(code);
+
+        yield* Ref.update(grants, (all) => {
+          const left = new Map(all);
+
+          left.delete(code);
+
+          return left;
+        });
+
+        if (
+          grant === undefined ||
+          grant.clientId !== form.client_id ||
+          grant.redirectUri !== form.redirect_uri ||
+          (yield* s256(form.code_verifier ?? "")) !== grant.challenge
+        ) {
+          return refused("invalid_grant");
+        }
+
+        return yield* tokens(options.token);
+      });
+
+    const renewed = (form: Readonly<Record<string, string>>) =>
+      Effect.gen(function* () {
+        yield* Ref.update(renewals, (all) => [...all, form]);
+
+        const presented = form.refresh_token ?? "";
+
+        if (
+          options.refuseRenewals === true ||
+          !(yield* Ref.get(live)).includes(presented)
+        ) {
+          return refused("invalid_grant");
+        }
+
+        return yield* tokens(
+          renewedTokenOf(options.token, yield* Ref.get(refreshes))
+        );
+      });
+
+    const revoked = (form: Readonly<Record<string, string>>) =>
+      Effect.gen(function* () {
+        yield* Ref.update(revocations, (all) => [...all, form]);
+
+        if ((yield* Ref.get(live)).includes(form.token ?? "")) {
+          yield* Ref.set(live, []);
+        }
+
+        return HttpServerResponse.empty({ status: 200 });
+      });
+
     const token = Effect.gen(function* () {
       const form = yield* HttpServerRequest.schemaBodyUrlParams(TokenForm);
-      const grant = (yield* Ref.get(grants)).get(form.code);
 
-      yield* Ref.update(grants, (all) => {
-        const left = new Map(all);
-
-        left.delete(form.code);
-
-        return left;
-      });
-
-      if (
-        form.grant_type !== "authorization_code" ||
-        grant === undefined ||
-        grant.clientId !== form.client_id ||
-        grant.redirectUri !== form.redirect_uri ||
-        (yield* s256(form.code_verifier)) !== grant.challenge
-      ) {
-        return refused("invalid_grant");
+      if (form.grant_type === "authorization_code") {
+        return yield* traded(form);
       }
 
-      return HttpServerResponse.jsonUnsafe({
-        access_token: options.token,
-        token_type: "bearer",
-      });
+      if (form.grant_type === "refresh_token") {
+        return yield* renewed(form);
+      }
+
+      return form.grant_type === undefined && form.token !== undefined
+        ? yield* revoked(form)
+        : refused("unsupported_grant_type");
     }).pipe(Effect.orElseSucceed(() => refused("invalid_request")));
 
     const app = Effect.gen(function* () {
@@ -137,5 +213,12 @@ export const oauthServer = (options: OAuthServerOptions) =>
         ? `http://127.0.0.1:${address.port}`
         : yield* Effect.die("the test server listens on a socket, not a port");
 
-    return { authorizations: Ref.get(authorizations), origin };
+    return {
+      authorizations: Ref.get(authorizations),
+      // The refresh tokens it still takes.
+      live: Ref.get(live),
+      origin,
+      renewals: Ref.get(renewals),
+      revocations: Ref.get(revocations),
+    };
   });

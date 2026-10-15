@@ -1,17 +1,27 @@
 // The access token lives only in an HttpOnly cookie: no URL, log line or response body carries it, and the web
 // holds no secret (PKCE, and a Client ID Metadata Document it serves itself). The handle cookie beside it only
 // shapes what a page shows; every call carries the token, and the platform decides who the caller is.
+// The refresh token lives in an HttpOnly cookie of its own, read only where a session is renewed: a page's
+// navigation and `/auth/whoami`, one request each, so two renewals seldom race over one rotating refresh token.
 import { Brand } from "@repo/brand";
 import { Client } from "@repo/protocol/contracts";
 import { Handle as HandleSchema } from "@repo/protocol/ids";
 import type { Handle } from "@repo/protocol/ids";
-import { Data, Effect, Option, Redacted, Schema } from "effect";
+import { Clock, Data, Effect, Option, Redacted, Result, Schema } from "effect";
 import type { Layer } from "effect";
 
 // `__Host-` keeps it to this exact origin over HTTPS, so no sibling host on the same `workers.dev` subdomain can set or shadow it.
 export const SESSION_COOKIE = "__Host-session";
 
 export const HANDLE_COOKIE = "__Host-handle";
+
+export const RENEW_COOKIE = "__Host-renew";
+
+// As long as the platform's refresh token lasts by default; the platform ends it sooner if it must.
+const RENEW_SECONDS = 30 * 24 * 60 * 60;
+
+// A session is renewed this long before its token lapses, so a page drawn now still has its token when it calls.
+const RENEW_MARGIN_SECONDS = 5 * 60;
 
 const SIGN_IN_COOKIE = "__Host-sign-in";
 
@@ -84,9 +94,16 @@ export const sessionCookie = (token: string, maxAgeSeconds: number) =>
 
 export const clearedCookie = () => lockedCookie(SESSION_COOKIE, "", 0);
 
+// A session the platform no longer takes: its refresh token stays, for the next navigation to renew it with.
 export const clearedCookies = () => [
   clearedCookie(),
   lockedCookie(HANDLE_COOKIE, "", 0),
+];
+
+// A session ended: signed out, or its refresh token refused.
+const endedCookies = () => [
+  ...clearedCookies(),
+  lockedCookie(RENEW_COOKIE, "", 0),
 ];
 
 const clearedSignIn = () => lockedCookie(SIGN_IN_COOKIE, "", 0);
@@ -292,34 +309,24 @@ const unreachablePlatform = new SignInStopped({
 const TokenAnswer = Schema.Struct({
   access_token: Schema.RedactedFromValue(Token),
   expires_in: Schema.Int.check(Schema.isGreaterThan(0)),
+  refresh_token: Schema.optionalKey(Schema.RedactedFromValue(Token)),
   token_type: Schema.String,
 });
+
+type TokenAnswer = typeof TokenAnswer.Type;
 
 const decodeTokenAnswer = Schema.decodeEffect(
   Schema.fromJsonString(TokenAnswer)
 );
 
-const exchange = (
-  env: Env,
-  input: {
-    readonly code: string;
-    readonly origin: string;
-    readonly verifier: string;
-  }
-) =>
+const tokenCall = (env: Env, fields: Readonly<Record<string, string>>) =>
   Effect.gen(function* () {
     const response = yield* Effect.tryPromise({
       catch: () => unreachablePlatform,
       try: () =>
         env.PLATFORM.fetch(
           new Request(new URL("/token", env.PUBLIC_PLATFORM_URL), {
-            body: new URLSearchParams({
-              client_id: clientIdOf(input.origin),
-              code: input.code,
-              code_verifier: input.verifier,
-              grant_type: "authorization_code",
-              redirect_uri: redirectUriOf(input.origin),
-            }),
+            body: new URLSearchParams(fields),
             headers: {
               accept: "application/json",
               "content-type": "application/x-www-form-urlencoded",
@@ -347,6 +354,189 @@ const exchange = (
     }
 
     return answer;
+  });
+
+const exchange = (
+  env: Env,
+  input: {
+    readonly code: string;
+    readonly origin: string;
+    readonly verifier: string;
+  }
+) =>
+  tokenCall(env, {
+    client_id: clientIdOf(input.origin),
+    code: input.code,
+    code_verifier: input.verifier,
+    grant_type: "authorization_code",
+    redirect_uri: redirectUriOf(input.origin),
+  });
+
+// `<lapse>.<refresh token>`: the token's lapse in epoch seconds, then the token that renews it.
+const Renewal = Schema.Struct({ lapse: Schema.Int, refreshToken: Token });
+
+type Renewal = typeof Renewal.Type;
+
+const decodeRenewal = Schema.decodeUnknownOption(Renewal);
+
+const renewalFrom = (request: Request) =>
+  Option.flatMap(cookieValue(request, RENEW_COOKIE), (value) => {
+    const at = value.indexOf(".");
+
+    return at > 0
+      ? decodeRenewal({
+          lapse: Number(value.slice(0, at)),
+          refreshToken: value.slice(at + 1),
+        })
+      : Option.none();
+  });
+
+/** The cookies an answer from `/token` sets: the session, and the refresh token beside it with its lapse. */
+const sessionCookies = (answer: TokenAnswer) =>
+  Effect.map(Clock.currentTimeMillis, (now) => {
+    const lapse = Math.floor(now / 1000) + answer.expires_in;
+
+    return [
+      sessionCookie(
+        Redacted.value(answer.access_token),
+        answer.expires_in - SESSION_MARGIN_SECONDS
+      ),
+      ...Option.toArray(
+        Option.map(Option.fromUndefinedOr(answer.refresh_token), (refresh) =>
+          lockedCookie(
+            RENEW_COOKIE,
+            `${lapse}.${Redacted.value(refresh)}`,
+            RENEW_SECONDS
+          )
+        )
+      ),
+    ];
+  });
+
+export interface Renewed {
+  // The session's token from here on: the request it renewed for carries it.
+  readonly token: Option.Option<string>;
+  readonly cookies: readonly string[];
+}
+
+/**
+ * A session near its token's lapse, or past it, renewed by the refresh token
+ * beside it. Nothing to renew, or a platform out of reach, is none: the
+ * session stands as it is. A refresh token the platform refuses ends the
+ * session, so the browser is signed out rather than left half in.
+ */
+export const renewedSession = (env: Env, request: Request) =>
+  Effect.gen(function* () {
+    const renewal = renewalFrom(request);
+
+    if (Option.isNone(renewal)) {
+      return Option.none<Renewed>();
+    }
+
+    const now = Math.floor((yield* Clock.currentTimeMillis) / 1000);
+
+    if (
+      Option.isSome(credentialFrom(request)) &&
+      renewal.value.lapse - RENEW_MARGIN_SECONDS > now
+    ) {
+      return Option.none<Renewed>();
+    }
+
+    const answer = yield* tokenCall(env, {
+      client_id: clientIdOf(new URL(request.url).origin),
+      grant_type: "refresh_token",
+      refresh_token: renewal.value.refreshToken,
+    }).pipe(Effect.result);
+
+    if (Result.isSuccess(answer)) {
+      return Option.some<Renewed>({
+        cookies: yield* sessionCookies(answer.success),
+        token: Option.some(Redacted.value(answer.success.access_token)),
+      });
+    }
+
+    return answer.failure.status === 502
+      ? Option.none<Renewed>()
+      : Option.some<Renewed>({
+          cookies: endedCookies(),
+          token: Option.none(),
+        });
+  });
+
+/** The request as it goes on after a renewal: its session cookie holds the renewed token, or none. */
+export const withRenewedSession = (request: Request, renewed: Renewed) => {
+  const headers = new Headers(request.headers);
+
+  const others = (headers.get("cookie") ?? "")
+    .split(";")
+    .map((part) => part.trim())
+    .filter(
+      (part) =>
+        part !== "" &&
+        ![SESSION_COOKIE, HANDLE_COOKIE, RENEW_COOKIE].some((name) =>
+          part.startsWith(`${name}=`)
+        )
+    );
+
+  const session = Option.map(
+    renewed.token,
+    (token) => `${SESSION_COOKIE}=${encodeURIComponent(token)}`
+  );
+
+  headers.set("cookie", [...others, ...Option.toArray(session)].join("; "));
+
+  return new Request(request, { headers });
+};
+
+export const withCookies = (response: Response, cookies: readonly string[]) =>
+  new Response(response.body, {
+    headers: settingCookies(response.headers, cookies),
+    status: response.status,
+    statusText: response.statusText,
+  });
+
+/**
+ * A page's navigation renews its session before the page is drawn, so the
+ * page is drawn for the person still signed in. Only a navigation: a page's
+ * own calls never renew, so they never race it.
+ */
+export const renewingEntry =
+  (env: Env) =>
+  <Rest extends readonly unknown[]>(entry: {
+    readonly fetch: (
+      request: Request,
+      ...rest: Rest
+    ) => Promise<Response> | Response;
+  }) => ({
+    fetch: (request: Request, ...rest: Rest): Promise<Response> =>
+      Effect.runPromise(
+        Effect.gen(function* () {
+          const navigates =
+            request.method === "GET" &&
+            request.headers.get("sec-fetch-mode") === "navigate" &&
+            !new URL(request.url).pathname.startsWith("/auth/");
+
+          const renewed = navigates
+            ? yield* renewedSession(env, request)
+            : Option.none<Renewed>();
+
+          return yield* Option.match(renewed, {
+            onNone: () =>
+              Effect.promise(() =>
+                Promise.resolve(entry.fetch(request, ...rest))
+              ),
+            onSome: (fresh) =>
+              Effect.map(
+                Effect.promise(() =>
+                  Promise.resolve(
+                    entry.fetch(withRenewedSession(request, fresh), ...rest)
+                  )
+                ),
+                (response) => withCookies(response, fresh.cookies)
+              ),
+          });
+        })
+      ),
   });
 
 export const callbackHandler =
@@ -387,7 +577,7 @@ export const callbackHandler =
         );
 
         return redirect(returnPath(here.origin, pending.return), [
-          sessionCookie(token, lives),
+          ...(yield* sessionCookies(answer)),
           ...Option.toArray(handle),
           clearedSignIn(),
         ]);
@@ -400,18 +590,37 @@ export const callbackHandler =
 
 /**
  * Ends the web's session, then the platform's, which comes home again: signed
- * out of one is signed out of both, so the next sign-in asks who you are. With
- * no platform (the dev world) it goes home at once.
+ * out of one is signed out of both, so the next sign-in asks who you are. The
+ * refresh token's grant is ended on the platform too, so the token in it is
+ * worth nothing should a copy of the cookie outlive this. With no platform
+ * (the dev world) it goes home at once.
  */
 export const signOutHandler =
-  (platformUrl: Option.Option<string>) =>
-  (_handled: Handled): Response =>
-    redirect(
-      Option.match(platformUrl, {
-        onNone: () => "/",
-        onSome: (platform) => new URL(PLATFORM_SIGN_OUT, platform).href,
-      }),
-      clearedCookies()
+  (platform: Option.Option<Env>) =>
+  ({ request }: Handled): Promise<Response> =>
+    Effect.runPromise(
+      Effect.gen(function* () {
+        if (Option.isNone(platform)) {
+          return redirect("/", endedCookies());
+        }
+
+        const env = platform.value;
+
+        yield* Option.match(renewalFrom(request), {
+          onNone: () => Effect.void,
+          onSome: ({ refreshToken }) =>
+            tokenCall(env, {
+              client_id: clientIdOf(new URL(request.url).origin),
+              token: refreshToken,
+              token_type_hint: "refresh_token",
+            }).pipe(Effect.ignore),
+        });
+
+        return redirect(
+          new URL(PLATFORM_SIGN_OUT, env.PUBLIC_PLATFORM_URL).href,
+          endedCookies()
+        );
+      })
     );
 
 const whoAnswer = (
@@ -422,47 +631,63 @@ const whoAnswer = (
     headers: settingCookies({ "cache-control": "no-store" }, cookies),
   });
 
+const whoFor = (
+  clientFor: (request: Request) => Layer.Layer<Client>,
+  request: Request
+) =>
+  Option.match(credentialFrom(request), {
+    onNone: () =>
+      Effect.succeed(
+        whoAnswer(
+          {},
+          Option.isSome(cookieValue(request, HANDLE_COOKIE))
+            ? [lockedCookie(HANDLE_COOKIE, "", 0)]
+            : []
+        )
+      ),
+    onSome: (token) =>
+      Effect.flatMap(keptHandle(request, token), (kept) =>
+        Option.match(kept, {
+          onNone: () =>
+            handleOf(clientFor, new URL(request.url).origin, token).pipe(
+              Effect.flatMap((handle) =>
+                Effect.map(
+                  handleCookie(token, handle, HANDLE_LEARNED_SECONDS),
+                  (cookie) => whoAnswer({ handle }, [cookie])
+                )
+              ),
+              Effect.catchTag("Unauthenticated", () =>
+                Effect.succeed(whoAnswer({}, clearedCookies()))
+              ),
+              Effect.orElseSucceed(() => whoAnswer({}))
+            ),
+          onSome: (handle) => Effect.succeed(whoAnswer({ handle })),
+        })
+      ),
+  });
+
+// The page asks this once as it starts, so it is where a session past its token's lapse is renewed for a page already drawn.
 export const whoamiHandler =
-  (clientFor: (request: Request) => Layer.Layer<Client>) =>
+  (env: Env, clientFor: (request: Request) => Layer.Layer<Client>) =>
   ({ request }: Handled): Promise<Response> =>
     Effect.runPromise(
-      Option.match(credentialFrom(request), {
-        onNone: () =>
-          Effect.succeed(
-            whoAnswer(
-              {},
-              Option.isSome(cookieValue(request, HANDLE_COOKIE))
-                ? [lockedCookie(HANDLE_COOKIE, "", 0)]
-                : []
-            )
-          ),
-        onSome: (token) =>
-          Effect.flatMap(keptHandle(request, token), (kept) =>
-            Option.match(kept, {
-              onNone: () =>
-                handleOf(clientFor, new URL(request.url).origin, token).pipe(
-                  Effect.flatMap((handle) =>
-                    Effect.map(
-                      handleCookie(token, handle, HANDLE_LEARNED_SECONDS),
-                      (cookie) => whoAnswer({ handle }, [cookie])
-                    )
-                  ),
-                  Effect.catchTag("Unauthenticated", () =>
-                    Effect.succeed(whoAnswer({}, clearedCookies()))
-                  ),
-                  Effect.orElseSucceed(() => whoAnswer({}))
-                ),
-              onSome: (handle) => Effect.succeed(whoAnswer({ handle })),
-            })
-          ),
-      })
+      Effect.flatMap(renewedSession(env, request), (renewed) =>
+        Option.match(renewed, {
+          onNone: () => whoFor(clientFor, request),
+          onSome: (fresh) =>
+            Effect.map(
+              whoFor(clientFor, withRenewedSession(request, fresh)),
+              (answer) => withCookies(answer, fresh.cookies)
+            ),
+        })
+      )
     );
 
 export const webClientMetadata = (origin: string) => ({
   client_id: clientIdOf(origin),
   client_name: `${Brand.name} web`,
   client_uri: origin,
-  grant_types: ["authorization_code"],
+  grant_types: ["authorization_code", "refresh_token"],
   redirect_uris: [redirectUriOf(origin)],
   response_types: ["code"],
   token_endpoint_auth_method: "none",

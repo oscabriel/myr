@@ -28,6 +28,7 @@ import { Identities, IdentityTaken } from "../src/auth/identities.ts";
 import { IdentitiesMemory } from "../src/auth/identities/memory.ts";
 import { hashPassword } from "../src/auth/password.ts";
 import { tokenReader } from "../src/auth/provider.ts";
+import { csrfCookieName } from "../src/auth/sign-in.ts";
 import { SignInFailed } from "../src/auth/state.ts";
 import { decodeEnv, InvalidEnv } from "../src/platform.ts";
 import worker from "../src/worker.ts";
@@ -51,8 +52,10 @@ import type {
 import {
   authorizeUrl,
   codeOf,
+  cspOf,
   formOf,
   origin,
+  port,
   tokenRequest,
 } from "./oauth.fixtures.ts";
 
@@ -559,9 +562,10 @@ describe("Google sign-in, without a Google OAuth client", () => {
       expect(page.response.status).toBe(200);
       expect(Option.isSome(formOf(page.response, page.html))).toBeTruthy();
       expect(page.html).not.toContain("Google");
-      expect(
-        page.response.headers.get("content-security-policy")
-      ).not.toContain("accounts.google.com");
+      expect(cspOf(page.response)["form-action"]).toStrictEqual([
+        "'self'",
+        `http://127.0.0.1:${port}`,
+      ]);
     })
   );
 
@@ -612,9 +616,12 @@ describe("Google sign-in, with a Google OAuth client", () => {
         expect(Option.isSome(googleLinkIn(page))).toBeTruthy();
         expect(page.html).toContain("Continue with Google");
         expect(page.html).toContain('formaction="/oauth/google/link"');
-        expect(page.response.headers.get("content-security-policy")).toContain(
+        expect(cspOf(page.response)["form-action"]).toContain(
           "https://accounts.google.com"
         );
+        expect(cspOf(page.response)["frame-ancestors"]).toStrictEqual([
+          "'none'",
+        ]);
       })
   );
 
@@ -853,7 +860,7 @@ describe("coming back from Google", () => {
             headers: {
               "cf-connecting-ip": "198.51.100.7",
               "content-type": "application/x-www-form-urlencoded",
-              cookie: `__Host-sign-in=${form.csrf}`,
+              cookie: `${csrfCookieName(form.csrf)}=${form.csrf}`,
             },
           }
         );

@@ -1,9 +1,9 @@
 import { NodeServices } from "@effect/platform-node";
-import { describe, expect, it } from "@effect/vitest";
+import { expect, layer } from "@effect/vitest";
 import { CheckSpec } from "@repo/protocol/domain/check";
 import { Policy } from "@repo/protocol/domain/policy";
 import { RepoPath } from "@repo/protocol/ids";
-import { Effect, Exit, FileSystem, Path, Schema } from "effect";
+import { Context, Effect, Exit, FileSystem, Layer, Path, Schema } from "effect";
 
 import { EvaluationFacts, RulesEvaluator } from "../src/rules-evaluator.ts";
 import type { ConfigBundle } from "../src/rules-evaluator.ts";
@@ -81,6 +81,19 @@ const evaluated = Effect.gen(function* () {
   return { folder, policy: yield* Schema.encodeEffect(Policy)(policy) };
 });
 
+// Evaluated once for the file: each evaluation starts a Bun process, and a
+// test that started its own timed out while every workspace's tests ran.
+class Evaluated extends Context.Service<
+  Evaluated,
+  Effect.Success<typeof evaluated>
+>()("test/Evaluated") {}
+
+const evaluatedOnce = Layer.effect(Evaluated, evaluated).pipe(
+  // Its time limit is evaluate.test.ts's to test; here it only must not fire while every workspace's tests share the machine.
+  Layer.provide(bunEvaluator({ timeout: "60 seconds" })),
+  Layer.provideMerge(NodeServices.layer)
+);
+
 const askOf = (
   folder: string,
   id: string,
@@ -101,154 +114,169 @@ const askOf = (
   territory: { module: ".", paths: territory },
 });
 
-describe("the datekit example's config folder", () => {
-  it.live("is the example's one dot-folder with a project file", () =>
-    Effect.gen(function* () {
-      const { folders } = yield* configFolders;
-
-      expect(folders).toHaveLength(1);
-    }).pipe(Effect.provide(NodeServices.layer))
-  );
-
-  it.live(
-    "evaluates under /bun to a policy with its run block, its maintainers and its kinds",
-    () =>
+layer(evaluatedOnce, { excludeTestServices: true, timeout: "60 seconds" })(
+  "the datekit example's config folder",
+  (it) => {
+    it.effect("is the example's one dot-folder with a project file", () =>
       Effect.gen(function* () {
-        const { folder, policy } = yield* evaluated;
+        const { folders } = yield* configFolders;
 
-        expect(Exit.isSuccess(Schema.decodeExit(Policy)(policy))).toBeTruthy();
-        expect({
-          agents: policy.agents,
-          deciders: policy.deciders,
-          kinds: policy.kinds.map(({ name }) => name),
-          run: policy.run,
-          source: policy.source,
-          vouch: policy.vouch,
-        }).toStrictEqual({
-          agents: "trailer",
-          deciders: [
-            { handles: ["ines-v", "oscar"], paths: "**" },
-            { handles: ["okonkwo"], paths: "src/tz.ts" },
-          ],
-          kinds: ["fix", "changeJudge"],
-          run: {
-            checks: { unit: "bun test --path-ignore-patterns='test/asks/**'" },
-            test: "bun test {path}",
-          },
-          source: "config",
-          vouch: { file: `${folder}/vouched.td`, mode: "forCode" },
-        });
-      }).pipe(Effect.provide(bunEvaluator()))
-  );
+        expect(folders).toHaveLength(1);
+      })
+    );
 
-  it.live(
-    "holds its three asks, each checked by its own red-then-green test",
-    () =>
-      Effect.gen(function* () {
-        const { folder, policy } = yield* evaluated;
+    it.effect(
+      "evaluates under /bun to a policy with its run block, its maintainers and its kinds",
+      () =>
+        Effect.gen(function* () {
+          const { folder, policy } = yield* Evaluated;
 
-        expect(
-          policy.asks.map(({ brief: _brief, ...ask }) => ask)
-        ).toStrictEqual([
-          askOf(folder, "add-months-clamp", ["src/add.ts", "test/add.test.ts"]),
-          {
-            ...askOf(folder, "format-ordinal", [
-              "src/format.ts",
-              "test/format.test.ts",
-            ]),
-            mentor: "okonkwo",
-            reserve: "newcomers",
-          },
-          askOf(folder, "parse-iso-week", [
-            "src/parse.ts",
-            "test/parse.test.ts",
-          ]),
-        ]);
-      }).pipe(Effect.provide(bunEvaluator()))
-  );
-
-  it.live(
-    "states each ask's want without a path or a line, what happens today, and what is out of scope",
-    () =>
-      Effect.gen(function* () {
-        const { policy } = yield* evaluated;
-
-        expect(
-          policy.asks.map(({ brief, id }) => ({
-            current: brief.current !== undefined,
-            id,
-            outOfScope: (brief.outOfScope ?? []).length > 0,
-            wantNamesCode: /\.ts\b|:\d+|\bline \d/u.test(brief.want),
-          }))
-        ).toStrictEqual(
-          ["add-months-clamp", "format-ordinal", "parse-iso-week"].map(
-            (id) => ({
-              current: true,
-              id,
-              outOfScope: true,
-              wantNamesCode: false,
-            })
-          )
-        );
-      }).pipe(Effect.provide(bunEvaluator()))
-  );
-
-  it.live(
-    "evaluates its visibility.ts into the policy: a sealed maintainers layer of checks for export and parser",
-    () =>
-      Effect.gen(function* () {
-        const { policy } = yield* evaluated;
-        const { visibility } = policy;
-
-        expect({
-          areas: visibility?.checks?.areas,
-          layers: visibility?.layers.map(
-            ({ audience, disclose, holds, name, readers, writers }) => ({
-              audience,
-              disclose,
-              holds,
-              name,
-              readers,
-              writers,
-            })
-          ),
-          suite: {
-            admit: visibility?.checks?.admit,
-            canary: visibility?.checks?.canary,
-            layer: visibility?.checks?.layer,
-          },
-        }).toStrictEqual({
-          areas: { export: "src/format.ts", parser: "src/parse.ts" },
-          layers: [
-            {
-              audience: "maintainers",
-              disclose: "sealed",
-              holds: ["checks", "notes"],
-              name: "maintainers",
-              readers: "deciders",
-              writers: "deciders",
+          expect(
+            Exit.isSuccess(Schema.decodeExit(Policy)(policy))
+          ).toBeTruthy();
+          expect({
+            agents: policy.agents,
+            deciders: policy.deciders,
+            kinds: policy.kinds.map(({ name }) => name),
+            run: policy.run,
+            source: policy.source,
+            vouch: policy.vouch,
+          }).toStrictEqual({
+            agents: "trailer",
+            deciders: [
+              { handles: ["ines-v", "oscar"], paths: "**" },
+              { handles: ["okonkwo"], paths: "src/tz.ts" },
+            ],
+            kinds: ["fix", "changeJudge"],
+            run: {
+              checks: {
+                unit: "bun test --path-ignore-patterns='test/asks/**'",
+              },
+              test: "bun test {path}",
             },
-          ],
-          suite: {
-            admit: { greenOnMainRuns: 3, redOnKnownBadAtLeast: 1 },
-            canary: true,
-            layer: "maintainers",
-          },
-        });
-      }).pipe(Effect.provide(bunEvaluator()))
-  );
+            source: "config",
+            vouch: { file: `${folder}/vouched.td`, mode: "forCode" },
+          });
+        })
+    );
 
-  it.live("reads its vouch file: the two maintainers and one contributor", () =>
-    Effect.gen(function* () {
-      const { policy } = yield* evaluated;
+    it.effect(
+      "holds its three asks, each checked by its own red-then-green test",
+      () =>
+        Effect.gen(function* () {
+          const { folder, policy } = yield* Evaluated;
 
-      expect(
-        policy.vouches.map(({ denounced, handle }) => ({ denounced, handle }))
-      ).toStrictEqual([
-        { denounced: false, handle: "bram" },
-        { denounced: false, handle: "ines-v" },
-        { denounced: false, handle: "okonkwo" },
-      ]);
-    }).pipe(Effect.provide(bunEvaluator()))
-  );
-});
+          expect(
+            policy.asks.map(({ brief: _brief, ...ask }) => ask)
+          ).toStrictEqual([
+            askOf(folder, "add-months-clamp", [
+              "src/add.ts",
+              "test/add.test.ts",
+            ]),
+            {
+              ...askOf(folder, "format-ordinal", [
+                "src/format.ts",
+                "test/format.test.ts",
+              ]),
+              mentor: "okonkwo",
+              reserve: "newcomers",
+            },
+            askOf(folder, "parse-iso-week", [
+              "src/parse.ts",
+              "test/parse.test.ts",
+            ]),
+          ]);
+        })
+    );
+
+    it.effect(
+      "states each ask's want without a path or a line, what happens today, and what is out of scope",
+      () =>
+        Effect.gen(function* () {
+          const { policy } = yield* Evaluated;
+
+          expect(
+            policy.asks.map(({ brief, id }) => ({
+              current: brief.current !== undefined,
+              id,
+              outOfScope: (brief.outOfScope ?? []).length > 0,
+              wantNamesCode: /\.ts\b|:\d+|\bline \d/u.test(brief.want),
+            }))
+          ).toStrictEqual(
+            ["add-months-clamp", "format-ordinal", "parse-iso-week"].map(
+              (id) => ({
+                current: true,
+                id,
+                outOfScope: true,
+                wantNamesCode: false,
+              })
+            )
+          );
+        })
+    );
+
+    it.effect(
+      "evaluates its visibility.ts into the policy: a sealed maintainers layer of checks for export and parser",
+      () =>
+        Effect.gen(function* () {
+          const { policy } = yield* Evaluated;
+          const { visibility } = policy;
+
+          expect({
+            areas: visibility?.checks?.areas,
+            layers: visibility?.layers.map(
+              ({ audience, disclose, holds, name, readers, writers }) => ({
+                audience,
+                disclose,
+                holds,
+                name,
+                readers,
+                writers,
+              })
+            ),
+            suite: {
+              admit: visibility?.checks?.admit,
+              canary: visibility?.checks?.canary,
+              layer: visibility?.checks?.layer,
+            },
+          }).toStrictEqual({
+            areas: { export: "src/format.ts", parser: "src/parse.ts" },
+            layers: [
+              {
+                audience: "maintainers",
+                disclose: "sealed",
+                holds: ["checks", "notes"],
+                name: "maintainers",
+                readers: "deciders",
+                writers: "deciders",
+              },
+            ],
+            suite: {
+              admit: { greenOnMainRuns: 3, redOnKnownBadAtLeast: 1 },
+              canary: true,
+              layer: "maintainers",
+            },
+          });
+        })
+    );
+
+    it.effect(
+      "reads its vouch file: the two maintainers and one contributor",
+      () =>
+        Effect.gen(function* () {
+          const { policy } = yield* Evaluated;
+
+          expect(
+            policy.vouches.map(({ denounced, handle }) => ({
+              denounced,
+              handle,
+            }))
+          ).toStrictEqual([
+            { denounced: false, handle: "bram" },
+            { denounced: false, handle: "ines-v" },
+            { denounced: false, handle: "okonkwo" },
+          ]);
+        })
+    );
+  }
+);

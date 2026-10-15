@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Handle } from "@repo/protocol/ids";
 import { untouchable } from "@repo/testkit/untouchable";
-import { Effect, Option, Schema } from "effect";
+import { Clock, Effect, Option, Schema } from "effect";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
@@ -18,6 +18,8 @@ import {
   credentialFrom,
   HANDLE_COOKIE,
   pkce,
+  RENEW_COOKIE,
+  renewingEntry,
   SESSION_COOKIE,
   sessionCookie,
   signInHandler,
@@ -547,7 +549,7 @@ describe("the callback", () => {
   );
 
   it.effect(
-    "answers with no token or refresh token in its body or its URL",
+    "answers with no token or refresh token in its body or its URL, and the refresh token only in the renewal cookie",
     () =>
       Effect.gen(function* () {
         const { response } = yield* signInAndBack("/auth/signin", "c0de");
@@ -556,9 +558,44 @@ describe("the callback", () => {
 
         expect(shown).not.toContain("tok-from-platform");
         expect(shown).not.toContain("refresh-secret");
-        expect(response.headers.getSetCookie().join("\n")).not.toContain(
-          "refresh-secret"
+        expect(
+          cookiesOf(response)
+            .filter(({ value }) => value.includes("refresh-secret"))
+            .map(({ name }) => name)
+        ).toStrictEqual([RENEW_COOKIE]);
+      })
+  );
+
+  it.live(
+    "keeps the refresh token beside the session, locked down, with the token's lapse, for as long as the platform keeps it",
+    () =>
+      Effect.gen(function* () {
+        const before = Math.floor((yield* Clock.currentTimeMillis) / 1000);
+        const { response } = yield* signInAndBack("/auth/signin", "c0de");
+
+        const renewal = cookiesOf(response).find(
+          ({ name }) => name === RENEW_COOKIE
         );
+
+        const [lapse = "", token] = decodeURIComponent(
+          renewal?.value ?? ""
+        ).split(".");
+
+        expect({
+          host: RENEW_COOKIE.startsWith("__Host-"),
+          lapses:
+            Number(lapse) >= before + TOKEN_ANSWER.expires_in &&
+            Number(lapse) <= before + TOKEN_ANSWER.expires_in + 60,
+          lives: maxAgeOf(renewal?.attributes ?? []),
+          lockedDown: lockedDown(renewal?.attributes),
+          token,
+        }).toStrictEqual({
+          host: true,
+          lapses: true,
+          lives: 30 * 24 * 60 * 60,
+          lockedDown: true,
+          token: TOKEN_ANSWER.refresh_token,
+        });
       })
   );
 
@@ -652,46 +689,93 @@ describe("the callback", () => {
   );
 });
 
-const signedOut = (platform: Option.Option<string>) =>
-  ["POST", "GET"].map((method) => {
-    const response = signOutHandler(platform)({
-      request: new Request(`${WEB_URL}/auth/signout`, {
-        headers: { cookie: `${SESSION_COOKIE}=tok123` },
-        method,
-      }),
-    });
-
-    return [
-      response.status,
-      response.headers.get("location"),
-      expiriesOf(response),
-    ];
-  });
+const signedOut = (
+  platform: Option.Option<Env>,
+  cookie = `${SESSION_COOKIE}=tok123`
+) =>
+  Effect.forEach(["POST", "GET"], (method) =>
+    Effect.map(
+      Effect.promise(() =>
+        signOutHandler(platform)({
+          request: new Request(`${WEB_URL}/auth/signout`, {
+            headers: { cookie },
+            method,
+          }),
+        })
+      ),
+      (response) => [
+        response.status,
+        response.headers.get("location"),
+        expiriesOf(response),
+      ]
+    )
+  );
 
 describe("sign-out", () => {
   const expired = [
     [SESSION_COOKIE, true],
     [HANDLE_COOKIE, true],
+    [RENEW_COOKIE, true],
   ];
 
-  it("expires the session and handle cookies, then ends the platform's session too, by POST or by a plain link", () => {
-    expect(signedOut(Option.some(PLATFORM_URL))).toStrictEqual([
-      [302, `${PLATFORM_URL}/oauth/signout`, expired],
-      [302, `${PLATFORM_URL}/oauth/signout`, expired],
-    ]);
-  });
+  it.effect(
+    "expires the session, handle and renewal cookies, then ends the platform's session too, by POST or by a plain link",
+    () =>
+      Effect.gen(function* () {
+        expect(yield* signedOut(Option.some(unreachable))).toStrictEqual([
+          [302, `${PLATFORM_URL}/oauth/signout`, expired],
+          [302, `${PLATFORM_URL}/oauth/signout`, expired],
+        ]);
+      })
+  );
 
-  it("goes home at once where there is no platform to sign out of", () => {
-    expect(signedOut(Option.none())).toStrictEqual([
-      [302, "/", expired],
-      [302, "/", expired],
-    ]);
-  });
+  it.effect(
+    "ends the refresh token's grant on the platform, as the web's client",
+    () =>
+      Effect.gen(function* () {
+        const platform = recorder(() => new Response(null, { status: 200 }));
+
+        const [one] = yield* signedOut(
+          Option.some(envWith(platform.fetch)),
+          `${SESSION_COOKIE}=tok123; ${RENEW_COOKIE}=1700000000.alice:grant1:refresh-secret`
+        );
+
+        expect(one).toStrictEqual([
+          302,
+          `${PLATFORM_URL}/oauth/signout`,
+          expired,
+        ]);
+        expect(
+          (yield* platform.seen).map(({ body, method, url }) => ({
+            form: Object.fromEntries(new URLSearchParams(body)),
+            method,
+            url,
+          }))
+        ).toContainEqual({
+          form: {
+            client_id: `${WEB_URL}/auth/client`,
+            token: "alice:grant1:refresh-secret",
+            token_type_hint: "refresh_token",
+          },
+          method: "POST",
+          url: `${PLATFORM_URL}/token`,
+        });
+      })
+  );
+
+  it.effect("goes home at once where there is no platform to sign out of", () =>
+    Effect.gen(function* () {
+      expect(yield* signedOut(Option.none())).toStrictEqual([
+        [302, "/", expired],
+        [302, "/", expired],
+      ]);
+    })
+  );
 });
 
 const whoami = (env: Env, headers: Readonly<Record<string, string>> = {}) =>
   Effect.promise(() =>
-    whoamiHandler((request) => serverClientOver(backend)(env, request))({
+    whoamiHandler(env, (request) => serverClientOver(backend)(env, request))({
       request: get("/auth/whoami", headers),
     })
   );
@@ -759,7 +843,7 @@ describe("whoami", () => {
   );
 
   it.effect(
-    "answers {} and expires both cookies when the platform no longer knows the session",
+    "answers {} and expires both cookies when the platform no longer knows the session, keeping the refresh token for a renewal",
     () =>
       Effect.gen(function* () {
         const platform = recorder((request) =>
@@ -838,7 +922,7 @@ describe("the handle kept beside the session", () => {
           cookiesOf(response)
             .map(({ name }) => name)
             .filter((name) => name !== "__Host-sign-in")
-        ).toStrictEqual([SESSION_COOKIE]);
+        ).toStrictEqual([SESSION_COOKIE, RENEW_COOKIE]);
       })
   );
 
@@ -883,6 +967,228 @@ const decodeDocument = Schema.decodeUnknownEffect(
   Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknown))
 );
 
+const RENEWED = {
+  access_token: "alice:grant1:tok-renewed",
+  expires_in: 3600,
+  refresh_token: "alice:grant1:refresh-renewed",
+  scope: "",
+  token_type: "bearer",
+};
+
+// A renewal cookie whose token lapses `in` seconds from now.
+const renewalCookie = (lapsesIn: number) =>
+  Effect.map(
+    Clock.currentTimeMillis,
+    (now) =>
+      `${RENEW_COOKIE}=${Math.floor(now / 1000) + lapsesIn}.alice:grant1:refresh-secret`
+  );
+
+const renewingPlatform = (token: () => Response) =>
+  recorder((request) =>
+    new URL(request.url).pathname === "/token"
+      ? token()
+      : whoamiReply(INES)(request)
+  );
+
+const asked = (
+  seen: readonly { readonly body: string; readonly url: string }[]
+) =>
+  seen.map(({ body, url }) =>
+    new URL(url).pathname === "/token"
+      ? Object.fromEntries(new URLSearchParams(body))
+      : new URL(url).pathname.replace(/\/$/u, "")
+  );
+
+const renewedForm = {
+  client_id: `${WEB_URL}/auth/client`,
+  grant_type: "refresh_token",
+  refresh_token: "alice:grant1:refresh-secret",
+};
+
+const navigation = (
+  path: string,
+  cookie: string,
+  mode: "navigate" | "cors" = "navigate"
+) =>
+  new Request(`${WEB_URL}${path}`, {
+    headers: { cookie, "sec-fetch-mode": mode },
+  });
+
+const drawn = (env: Env, request: Request) =>
+  Effect.gen(function* () {
+    const reached: (string | null)[] = [];
+
+    const entry = renewingEntry(env)({
+      fetch: (handed: Request) => {
+        reached.push(handed.headers.get("cookie"));
+
+        return new Response("page", {
+          headers: { "content-type": "text/html" },
+        });
+      },
+    });
+
+    const response = yield* Effect.promise(() => entry.fetch(request));
+
+    return { reached, response };
+  });
+
+describe("renewing a session", () => {
+  it.live(
+    "whoami renews a session past its token's lapse by its refresh token, sets the new cookies and names the person",
+    () =>
+      Effect.gen(function* () {
+        const platform = renewingPlatform(() => Response.json(RENEWED));
+
+        const response = yield* whoami(envWith(platform.fetch), {
+          cookie: yield* renewalCookie(-10),
+        });
+
+        const set = cookiesOf(response).filter(
+          ({ attributes }) => !attributes.includes("max-age=0")
+        );
+
+        const seen = yield* platform.seen;
+
+        expect({
+          answer: yield* textOf(response),
+          asked: asked(seen),
+          bearer: seen
+            .filter(({ url }) => new URL(url).pathname.startsWith("/rpc"))
+            .map(({ authorization }) => authorization),
+          set: set
+            .filter(({ name }) => name !== HANDLE_COOKIE)
+            .map(({ name, value }) => [
+              name,
+              decodeURIComponent(value).replace(/^\d+\./u, ""),
+            ]),
+        }).toStrictEqual({
+          answer: '{"handle":"ines-v"}',
+          asked: [renewedForm, "/rpc"],
+          bearer: [`Bearer ${RENEWED.access_token}`],
+          set: [
+            [SESSION_COOKIE, RENEWED.access_token],
+            [RENEW_COOKIE, RENEWED.refresh_token],
+          ],
+        });
+      })
+  );
+
+  it.live("renews a session whose token lapses within five minutes", () =>
+    Effect.gen(function* () {
+      const platform = renewingPlatform(() => Response.json(RENEWED));
+
+      yield* whoami(envWith(platform.fetch), {
+        cookie: `${SESSION_COOKIE}=alice:grant1:tok-old; ${yield* renewalCookie(120)}`,
+      });
+
+      expect(asked(yield* platform.seen)[0]).toStrictEqual(renewedForm);
+    })
+  );
+
+  it.live(
+    "leaves a session alone while its token has more than five minutes to live",
+    () =>
+      Effect.gen(function* () {
+        const platform = renewingPlatform(() => Response.json(RENEWED));
+
+        const response = yield* whoami(envWith(platform.fetch), {
+          cookie: `${SESSION_COOKIE}=alice:grant1:tok-old; ${yield* renewalCookie(1800)}`,
+        });
+
+        expect(asked(yield* platform.seen)).toStrictEqual(["/rpc"]);
+        expect(cookiesOf(response).map(({ name }) => name)).not.toContain(
+          RENEW_COOKIE
+        );
+      })
+  );
+
+  it.live(
+    "ends the session, every cookie of it, when the platform refuses the refresh token",
+    () =>
+      Effect.gen(function* () {
+        const platform = renewingPlatform(
+          () => new Response('{"error":"invalid_grant"}', { status: 400 })
+        );
+
+        const response = yield* whoami(envWith(platform.fetch), {
+          cookie: yield* renewalCookie(-10),
+        });
+
+        expect(yield* textOf(response)).toBe("{}");
+        expect(expiriesOf(response)).toStrictEqual([
+          [SESSION_COOKIE, true],
+          [HANDLE_COOKIE, true],
+          [RENEW_COOKIE, true],
+        ]);
+      })
+  );
+
+  it.live(
+    "keeps the refresh token when the platform cannot be reached, for the next try",
+    () =>
+      Effect.gen(function* () {
+        const response = yield* whoami(
+          envWith(() => Promise.reject(new Error("down"))),
+          { cookie: yield* renewalCookie(-10) }
+        );
+
+        expect(yield* textOf(response)).toBe("{}");
+        expect(cookiesOf(response).map(({ name }) => name)).not.toContain(
+          RENEW_COOKIE
+        );
+      })
+  );
+
+  it.live(
+    "renews a page's session before the page is drawn, so it is drawn for the person, and sets the new cookies",
+    () =>
+      Effect.gen(function* () {
+        const platform = renewingPlatform(() => Response.json(RENEWED));
+
+        const { reached, response } = yield* drawn(
+          envWith(platform.fetch),
+          navigation("/inbox", `theme=dark; ${yield* renewalCookie(-10)}`)
+        );
+
+        expect({
+          reached,
+          set: cookiesOf(response).map(({ name }) => name),
+        }).toStrictEqual({
+          reached: [
+            `theme=dark; ${SESSION_COOKIE}=${encodeURIComponent(RENEWED.access_token)}`,
+          ],
+          set: [SESSION_COOKIE, RENEW_COOKIE],
+        });
+      })
+  );
+
+  it.live(
+    "never renews for a page's own calls, nor on the sign-in paths, so none races a navigation",
+    () =>
+      Effect.gen(function* () {
+        const renewal = yield* renewalCookie(-10);
+
+        for (const request of [
+          navigation("/inbox", renewal, "cors"),
+          navigation("/auth/callback?code=x&state=y", renewal),
+          new Request(`${WEB_URL}/rpc`, {
+            body: LIST_ASKS,
+            headers: { cookie: renewal, "sec-fetch-mode": "navigate" },
+            method: "POST",
+          }),
+        ]) {
+          const { reached, response } = yield* drawn(unreachable, request);
+
+          expect([reached, response.headers.getSetCookie()]).toStrictEqual([
+            [renewal],
+            [],
+          ]);
+        }
+      })
+  );
+});
+
 describe("the web's OAuth client", () => {
   it.effect(
     "is a public Client ID Metadata Document at its own URL, redirecting only to the callback",
@@ -900,7 +1206,7 @@ describe("the web's OAuth client", () => {
         expect(document).toStrictEqual(
           expect.objectContaining({
             client_id: `${WEB_URL}/auth/client`,
-            grant_types: ["authorization_code"],
+            grant_types: ["authorization_code", "refresh_token"],
             redirect_uris: [`${WEB_URL}/auth/callback`],
             response_types: ["code"],
             token_endpoint_auth_method: "none",

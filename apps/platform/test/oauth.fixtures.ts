@@ -12,6 +12,7 @@ import { MailerMemory } from "../src/auth/mailer/memory.ts";
 import { OAuthStore } from "../src/auth/oauth-store.ts";
 import { OAuthStoreMemory } from "../src/auth/oauth-store/memory.ts";
 import { oauthProvider, signInSettings } from "../src/auth/provider.ts";
+import { csrfCookieName } from "../src/auth/sign-in.ts";
 import { decodeEnv } from "../src/platform.ts";
 import { fakeEnv } from "./fake-env.ts";
 
@@ -29,12 +30,33 @@ export const redirectUri = `http://127.0.0.1:${port}/callback`;
 
 export const namedPerson = "carol";
 
-const worldEnv = () => ({
-  ...fakeEnv(),
-  SESSION_TOKENS: JSON.stringify({
-    "carol-token-0123456789abcdef01234567": namedPerson,
-  }),
-});
+// Where a world that names a web serves the web's client metadata document.
+export const webOrigin = "https://web.test";
+
+export const webClient = `${webOrigin}/auth/client`;
+
+export const webCallback = `${webOrigin}/auth/callback`;
+
+const worldEnv = (web: boolean) => {
+  const env = {
+    ...fakeEnv(),
+    SESSION_TOKENS: JSON.stringify({
+      "carol-token-0123456789abcdef01234567": namedPerson,
+    }),
+  };
+
+  return web ? { ...env, PUBLIC_WEB_URL: webOrigin } : env;
+};
+
+const webMetadata = () =>
+  Response.json({
+    client_id: webClient,
+    client_name: "web",
+    grant_types: ["authorization_code", "refresh_token"],
+    redirect_uris: [webCallback],
+    response_types: ["code"],
+    token_endpoint_auth_method: "none",
+  });
 
 const context = untouchable<ExecutionContext>("ExecutionContext");
 
@@ -47,9 +69,13 @@ const decodeTokenRecord = Schema.decodeUnknownEffect(
   Schema.Record(Schema.String, Schema.Unknown)
 );
 
-export const signInWorld = (options: { readonly mailFails?: boolean } = {}) =>
+export const signInWorld = (
+  options: { readonly mailFails?: boolean; readonly web?: boolean } = {}
+) =>
   Effect.gen(function* () {
-    const config = yield* decodeEnv(worldEnv()).pipe(Effect.orDie);
+    const config = yield* decodeEnv(worldEnv(options.web === true)).pipe(
+      Effect.orDie
+    );
 
     const accounts = yield* Effect.provide(
       Effect.service(Accounts),
@@ -82,9 +108,13 @@ export const signInWorld = (options: { readonly mailFails?: boolean } = {}) =>
         vi.stubGlobal("Cloudflare", {
           compatibilityFlags: { global_fetch_strictly_public: true },
         });
-        vi.stubGlobal("fetch", (input: RequestInfo | URL) =>
-          send(new Request(input))
-        );
+        vi.stubGlobal("fetch", (input: RequestInfo | URL) => {
+          const request = new Request(input);
+
+          return options.web === true && request.url === webClient
+            ? Promise.resolve(webMetadata())
+            : send(request);
+        });
       }),
       () =>
         Effect.promise(dispose).pipe(
@@ -141,7 +171,7 @@ export const formOf = (
   Option.all({
     cookie: Option.orElse(
       Option.fromNullishOr(
-        /__Host-sign-in=(?<value>[^;]+)/u.exec(
+        /__Host-sign-in-[\w-]+=(?<value>[^;]+)/u.exec(
           response.headers.get("set-cookie") ?? ""
         )?.groups?.value
       ),
@@ -151,6 +181,16 @@ export const formOf = (
     request: field(html, "request"),
   });
 
+// Each directive's sources, by name: a source counts only under the directive it was written in.
+export const cspOf = (response: Response) =>
+  Object.fromEntries(
+    (response.headers.get("content-security-policy") ?? "")
+      .split(";")
+      .map((directive) => directive.trim().split(/\s+/u))
+      .filter(([name]) => name !== undefined && name !== "")
+      .map(([name = "", ...sources]) => [name, sources])
+  );
+
 export const codeOf = (response: Response) =>
   Option.fromNullishOr(response.headers.get("location")).pipe(
     Option.flatMap((location) => Option.fromNullishOr(URL.parse(location))),
@@ -158,11 +198,15 @@ export const codeOf = (response: Response) =>
     Option.flatMap((url) => Option.fromNullishOr(url.searchParams.get("code")))
   );
 
-export const authorizeUrl = (state = "state-1", redirect = redirectUri) => {
+export const authorizeUrl = (
+  state = "state-1",
+  redirect = redirectUri,
+  client = cliClient
+) => {
   const url = new URL("/authorize", origin);
 
   for (const [name, value] of Object.entries({
-    client_id: cliClient,
+    client_id: client,
     code_challenge: challenge,
     code_challenge_method: "S256",
     redirect_uri: redirect,
@@ -186,20 +230,25 @@ export const post = (
     headers: {
       "cf-connecting-ip": address,
       "content-type": "application/x-www-form-urlencoded",
-      cookie: `__Host-sign-in=${cookie}`,
+      cookie: `${csrfCookieName(cookie)}=${cookie}`,
     },
     method: "POST",
     redirect: "manual",
   });
 
-export const tokenRequest = (code: string, codeVerifier = verifier) =>
+export const tokenRequest = (
+  code: string,
+  codeVerifier = verifier,
+  client = cliClient,
+  redirect = redirectUri
+) =>
   new Request(new URL("/token", origin), {
     body: new URLSearchParams({
-      client_id: cliClient,
+      client_id: client,
       code,
       code_verifier: codeVerifier,
       grant_type: "authorization_code",
-      redirect_uri: redirectUri,
+      redirect_uri: redirect,
     }),
     headers: { "content-type": "application/x-www-form-urlencoded" },
     method: "POST",
