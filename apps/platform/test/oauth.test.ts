@@ -466,7 +466,8 @@ const accessTokenFor = (world: World, handle: string, secret: string) =>
 
 const alicePassword = "correct horse battery";
 
-const CSP = "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'";
+const CSP =
+  "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'";
 
 describe("the platform as its own OAuth authorization server", () => {
   it.live("publishes where to authorize and where to get a token", () =>

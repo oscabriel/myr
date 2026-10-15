@@ -186,7 +186,7 @@ export const csrfCookie = {
 } as const;
 
 const BASE_CSP =
-  "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'";
+  "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'";
 
 // CSP's host grammar cannot name an IPv6 literal host, so only its scheme.
 const redirectSource = (redirectUri: string) =>
