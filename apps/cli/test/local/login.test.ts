@@ -15,6 +15,7 @@ import {
   Clock,
   ConfigProvider,
   Context,
+  Deferred,
   Effect,
   Exit,
   Fiber,
@@ -187,6 +188,8 @@ interface Run {
   readonly env: Record<string, string>;
   readonly seams: Layer.Layer<never>;
   readonly stdin?: string;
+  // Read in place of `stdin`, for a test that types into it later.
+  readonly typed?: Stream.Stream<Uint8Array>;
   readonly terminal?: boolean;
 }
 
@@ -205,7 +208,9 @@ const cli = (argv: readonly string[], run: Run) =>
             run.seams
           ).pipe(Layer.provideMerge(NodeServices.layer)),
           Stdio.layerTest({
-            stdin: Stream.make(new TextEncoder().encode(run.stdin ?? "")),
+            stdin:
+              run.typed ??
+              Stream.make(new TextEncoder().encode(run.stdin ?? "")),
             stdoutIsTerminal: Effect.succeed(run.terminal ?? false),
           }),
           noTerminal
@@ -836,6 +841,91 @@ describe(`${Brand.cli} login's grant`, () => {
 
         expect(Exit.isSuccess(yield* cli(["logout"], run))).toBeTruthy();
         expect(yield* server.revocations).toStrictEqual([]);
+      }).pipe(Effect.scoped, Effect.provide(testServices)),
+    30_000
+  );
+});
+
+// Where the platform's code page would show the code: the sign-in's last redirect, not followed.
+const shownCode = (at: string) =>
+  Effect.gen(function* () {
+    const client = yield* HttpClient.HttpClient;
+    const response = yield* client.get(at);
+
+    return new URL(response.headers.location ?? "").searchParams.get("code");
+  }).pipe(
+    Effect.provide(
+      FetchHttpClient.layer.pipe(
+        Layer.provide(
+          Layer.succeed(FetchHttpClient.RequestInit, { redirect: "manual" })
+        )
+      )
+    )
+  );
+
+describe(`${Brand.cli} login --paste`, () => {
+  it.live(
+    "ends the sign-in on the platform's code page, reads the pasted code, and keeps the token it trades for",
+    () =>
+      Effect.gen(function* () {
+        const env = yield* home;
+        const server = yield* oauthServer({ token: issued });
+        const platform = yield* seams(signedInAs("alice"));
+        const pasted = yield* Deferred.make<Uint8Array>();
+
+        const fiber = yield* Effect.forkChild(
+          cli(["login", "--url", server.origin, "--paste"], {
+            env,
+            seams: platform.layer,
+            typed: Stream.fromEffect(Deferred.await(pasted)),
+          })
+        );
+
+        const shown = yield* signInUrl(server.origin);
+        const code = yield* shownCode(shown);
+
+        yield* Deferred.succeed(
+          pasted,
+          new TextEncoder().encode(`  ${code ?? ""}  \n`)
+        );
+
+        expect(Exit.isSuccess(yield* Fiber.join(fiber))).toBeTruthy();
+
+        const [query] = yield* server.authorizations;
+
+        expect({
+          kept: yield* stored(env, "default"),
+          listened: yield* platform.listened,
+          redirect: query?.get("redirect_uri"),
+        }).toStrictEqual({
+          kept: Option.some({
+            handle: "alice",
+            token: issued,
+            url: server.origin,
+          }),
+          listened: [],
+          redirect: `${server.origin}/oauth/cli/code`,
+        });
+      }).pipe(Effect.scoped, Effect.provide(testServices)),
+    30_000
+  );
+
+  it.live(
+    "refuses --paste beside --token-stdin, which both read stdin",
+    () =>
+      Effect.gen(function* () {
+        const env = yield* home;
+        const platform = yield* seams(signedInAs("alice"));
+
+        const exit = yield* cli(["login", "--paste", "--token-stdin"], {
+          env,
+          seams: platform.layer,
+          stdin: `${given}\n`,
+        });
+
+        expect(Exit.isFailure(exit)).toBeTruthy();
+        expect((yield* printed).stderr.join("\n")).toContain("choose one");
+        expect(yield* platform.connected).toStrictEqual([]);
       }).pipe(Effect.scoped, Effect.provide(testServices)),
     30_000
   );

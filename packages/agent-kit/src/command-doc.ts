@@ -29,6 +29,7 @@ export const localCommandDocs: readonly CommandDoc[] = [
       "--url",
       "--profile",
       "--token-stdin",
+      "--paste",
       "--no-browser",
       "--no-git-config",
       "--json",

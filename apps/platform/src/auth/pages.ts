@@ -122,6 +122,7 @@ button.link:hover{color:var(--ink);opacity:1;text-decoration:underline}
 .aside{margin:24px 0 0;text-align:center}
 pre{margin:8px 0 12px;padding:8px 12px;overflow-x:auto;background-color:var(--surface);border:1px solid var(--rule)}
 code{font-family:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-size:.8125rem;overflow-wrap:anywhere}
+code.paste{display:block;padding:12px;border:1px solid var(--rule);border-radius:2px;user-select:all}
 ul{margin:0;padding-left:1.25rem}
 li{margin:0 0 8px}
 `;
@@ -197,7 +198,9 @@ const askerParagraphs = (asker: Asker, says: Says = "who") => {
   }
 
   if (asker.firstParty === "cli") {
-    return `<p class="lead small muted">This finishes signing in the CLI on this computer. Continue only if you just ran <code>${escapeHtml(Brand.cli)} login</code>.</p>`;
+    return asker.redirectIsLoopback
+      ? `<p class="lead small muted">This finishes signing in the CLI on this computer. Continue only if you just ran <code>${escapeHtml(Brand.cli)} login</code>.</p>`
+      : `<p class="lead small muted">This signs in the CLI where you ran <code>${escapeHtml(Brand.cli)} login --paste</code>: the next page shows a code to paste there. Continue only if you just ran it.</p>`;
   }
 
   const name = `<strong>${escapeHtml(asker.clientName)}</strong>`;
@@ -480,6 +483,28 @@ ${hiddenFields(form)}
       after: `Remembered it? <a href="${escapeHtml(signInHref)}">Sign in</a>`,
     }
   );
+
+/**
+ * The end of a `login --paste` sign-in: the code, to paste into the terminal
+ * that asked for it. Or, when the sign-in did not finish, what to do instead.
+ */
+export const cliCodePage = (code: string | undefined, home = "/") =>
+  code === undefined
+    ? page(
+        "Sign-in code",
+        `<h1>No code to paste</h1>
+<p role="alert">The sign-in did not finish, so there is no code. Run <code>${escapeHtml(Brand.cli)} login --paste</code> again.</p>`,
+        "form",
+        { home }
+      )
+    : page(
+        "Sign-in code",
+        `<h1>Paste this code</h1>
+<p class="lead small muted">Paste it where <code>${escapeHtml(Brand.cli)} login --paste</code> is waiting. It works once, within ten minutes, and only for the CLI that asked for it.</p>
+<p><code class="paste">${escapeHtml(code)}</code></p>`,
+        "form",
+        { home }
+      );
 
 export const problemPage = (message: string, home = "/") =>
   page(

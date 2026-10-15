@@ -29,7 +29,11 @@ import {
 } from "./accounts.ts";
 import type { Account } from "./accounts.ts";
 import { SignInAttempts } from "./attempts.ts";
-import { CLI_CLIENT_PATH, cliClientMetadata } from "./cli-client.ts";
+import {
+  CLI_CLIENT_PATH,
+  CLI_CODE_PATH,
+  cliClientMetadata,
+} from "./cli-client.ts";
 import { codeMatches, codeTag, deadTag, freshCode } from "./codes.ts";
 import type { CodePurpose } from "./codes.ts";
 import { firstPartyOf } from "./first-party.ts";
@@ -38,6 +42,7 @@ import { OAuthStore } from "./oauth-store.ts";
 import {
   ACCOUNT_PATHS,
   addEmailPage,
+  cliCodePage,
   codePage,
   continuePage,
   problemPage,
@@ -117,6 +122,7 @@ export const SIGN_IN_PATHS = [
   "/authorize",
   "/signup",
   CLI_CLIENT_PATH,
+  CLI_CODE_PATH,
   ...Object.values(ACCOUNT_PATHS),
   ...Object.values(SESSION_PATHS),
 ] as const;
@@ -1467,6 +1473,23 @@ const cliClient = Effect.gen(function* () {
   });
 });
 
+// The code is shown, never kept: it is worth nothing without the CLI's verifier.
+const cliCode = Effect.gen(function* () {
+  const { webUrl } = yield* SignInHome;
+
+  const { code } = yield* HttpServerRequest.schemaSearchParams(
+    Schema.Struct({ code: Schema.optionalKey(Schema.NonEmptyString) })
+  ).pipe(Effect.orElseSucceed(() => ({ code: undefined })));
+
+  return htmlPage(
+    cliCodePage(
+      code,
+      Option.getOrElse(webUrl, () => "/")
+    ),
+    code === undefined ? 400 : 200
+  );
+});
+
 const authorizationServer = (request: HttpServerRequest.HttpServerRequest) =>
   Effect.gen(function* () {
     const { context, server } = yield* Authorization;
@@ -1549,6 +1572,7 @@ export const signInRoutes = HttpRouter.use((router) =>
     yield* add("POST", ACCOUNT_PATHS.reset, reset);
     yield* add("POST", ACCOUNT_PATHS.resetVerify, resetVerified);
     yield* add("GET", CLI_CLIENT_PATH, () => cliClient);
+    yield* add("GET", CLI_CODE_PATH, () => cliCode);
 
     for (const path of AUTHORIZATION_SERVER_PATHS) {
       yield* add("*", path, authorizationServer);

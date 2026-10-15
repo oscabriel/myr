@@ -31,7 +31,12 @@ import { RpcClient, RpcSerialization } from "effect/rpc";
 import { currentEnv } from "../credential-helper.ts";
 import { Credentials, gitHelperConfig } from "../credentials.ts";
 import type { Profile } from "../credentials.ts";
-import { cliClientIdOf, revoke, tradeCode } from "../oauth-token.ts";
+import {
+  CLI_CODE_PATH,
+  cliClientIdOf,
+  revoke,
+  tradeCode,
+} from "../oauth-token.ts";
 import type { Issued } from "../oauth-token.ts";
 import { Output } from "../output.ts";
 
@@ -249,7 +254,7 @@ const platformOf = (
     );
   });
 
-const tokenFromStdin = Effect.gen(function* () {
+const firstLine = Effect.gen(function* () {
   const { stdin } = yield* Stdio.Stdio;
 
   const [line = ""] = yield* stdin.pipe(
@@ -260,7 +265,11 @@ const tokenFromStdin = Effect.gen(function* () {
     Effect.orElseSucceed((): readonly string[] => [])
   );
 
-  const token = line.trim();
+  return line.trim();
+});
+
+const tokenFromStdin = Effect.gen(function* () {
+  const token = yield* firstLine;
 
   if (token === "") {
     return yield* new LoginUsage({
@@ -367,6 +376,26 @@ const exchange = (input: {
   readonly verifier: string;
 }) => tradeCode(input).pipe(Effect.mapError(() => refusedTrade(input.url)));
 
+const authorizeAt = (input: {
+  readonly challenge: string;
+  readonly redirectUri: string;
+  readonly state: string;
+  readonly url: string;
+}) => {
+  const authorize = new URL("/authorize", input.url);
+
+  authorize.search = new URLSearchParams({
+    client_id: cliClientIdOf(input.url),
+    code_challenge: input.challenge,
+    code_challenge_method: "S256",
+    redirect_uri: input.redirectUri,
+    response_type: "code",
+    state: input.state,
+  }).toString();
+
+  return authorize;
+};
+
 const tokenFromBrowser = (url: string, opens: boolean) =>
   Effect.scoped(
     Effect.gen(function* () {
@@ -375,22 +404,18 @@ const tokenFromBrowser = (url: string, opens: boolean) =>
       const state = yield* randomText(32);
       const { redirectUri, returned } = yield* loopback;
 
-      const authorize = new URL("/authorize", url);
-
-      authorize.search = new URLSearchParams({
-        client_id: cliClientIdOf(url),
-        code_challenge: yield* challengeOf(verifier),
-        code_challenge_method: "S256",
-        redirect_uri: redirectUri,
-        response_type: "code",
+      const authorize = authorizeAt({
+        challenge: yield* challengeOf(verifier),
+        redirectUri,
         state,
-      }).toString();
+        url,
+      });
 
       const query = yield* Effect.gen(function* () {
         yield* output.note(
           opens
             ? `Opening a browser to sign in to ${url}. If it does not open, visit:\n  ${authorize.href}`
-            : `To sign in to ${url}, open this in a browser:\n  ${authorize.href}`
+            : `To sign in to ${url}, open this in a browser:\n  ${authorize.href}\nIf the browser is on another machine, run ${Brand.cli} login --paste instead.`
         );
 
         if (opens) {
@@ -427,6 +452,85 @@ const tokenFromBrowser = (url: string, opens: boolean) =>
       return yield* exchange({ code, redirectUri, url, verifier });
     })
   );
+
+/**
+ * For a browser that cannot reach this machine (over SSH, in a container): the
+ * sign-in ends on the platform's page, which shows a code to paste here. The
+ * code trades for a token only with the verifier this process holds, so a
+ * code read off that page is worth nothing to anyone else.
+ */
+const tokenFromPaste = (url: string, opens: boolean) =>
+  Effect.gen(function* () {
+    const output = yield* Output;
+    const verifier = yield* randomText(32);
+    const redirectUri = `${url}${CLI_CODE_PATH}`;
+
+    const authorize = authorizeAt({
+      challenge: yield* challengeOf(verifier),
+      redirectUri,
+      state: yield* randomText(32),
+      url,
+    });
+
+    yield* output.note(
+      `To sign in to ${url}, open this in a browser on any machine:\n  ${authorize.href}\nThen paste the code it shows here, and press Enter:`
+    );
+
+    if (opens) {
+      yield* (yield* Browser).open(authorize.href);
+    }
+
+    const code = yield* firstLine.pipe(
+      Effect.timeoutOrElse({
+        duration: SIGN_IN_WAIT,
+        orElse: () =>
+          Effect.fail(
+            new LoginUsage({
+              reason: `no code was pasted within ${SIGN_IN_WAIT}: run ${Brand.cli} login --paste again`,
+            })
+          ),
+      })
+    );
+
+    if (code === "") {
+      return yield* new LoginUsage({
+        reason: `--paste read no code: paste the code the sign-in page shows, then press Enter`,
+      });
+    }
+
+    return yield* exchange({ code, redirectUri, url, verifier });
+  });
+
+// A token given by hand, a pasted code's, or the loopback's: one way per sign-in.
+const issuedFor = (
+  url: string,
+  way: {
+    readonly opens: boolean;
+    readonly paste: boolean;
+    readonly tokenStdin: boolean;
+  }
+) =>
+  Effect.gen(function* () {
+    if (way.paste && way.tokenStdin) {
+      return yield* new LoginUsage({
+        reason: `--paste and --token-stdin both read stdin: choose one`,
+      });
+    }
+
+    if (way.tokenStdin) {
+      const given: Issued = {
+        expiresAt: Option.none(),
+        refreshToken: Option.none(),
+        token: yield* tokenFromStdin,
+      };
+
+      return given;
+    }
+
+    return way.paste
+      ? yield* tokenFromPaste(url, way.opens)
+      : yield* tokenFromBrowser(url, way.opens);
+  });
 
 const verify = (url: string, token: Redacted.Redacted) =>
   Effect.scoped(
@@ -493,6 +597,12 @@ export const login = Command.make(
         "Leave git's config alone; print the lines to set instead"
       )
     ),
+    paste: Flag.Boolean("paste").pipe(
+      Flag.withDefault(false),
+      Flag.withDescription(
+        "Sign in from a browser on another machine: it shows a code to paste here"
+      )
+    ),
     tokenStdin: Flag.Boolean("token-stdin").pipe(
       Flag.withDefault(false),
       Flag.withDescription(
@@ -514,16 +624,11 @@ export const login = Command.make(
       const name = profileName(given.profile, env);
       const url = yield* platformOf(given.url, given.profile, env);
 
-      const issued: Issued = given.tokenStdin
-        ? {
-            expiresAt: Option.none(),
-            refreshToken: Option.none(),
-            token: yield* tokenFromStdin,
-          }
-        : yield* tokenFromBrowser(
-            url,
-            !given.noBrowser && (yield* mayOpenBrowser(env))
-          );
+      const issued = yield* issuedFor(url, {
+        opens: !given.noBrowser && (yield* mayOpenBrowser(env)),
+        paste: given.paste,
+        tokenStdin: given.tokenStdin,
+      });
 
       const handle = yield* verify(url, issued.token);
 
