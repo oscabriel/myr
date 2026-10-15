@@ -337,7 +337,7 @@ const table = [
       "TouchedJudge",
     ],
     flags: "IA",
-    on: "RMCW",
+    on: "RMC",
     tag: "finish",
   },
   {

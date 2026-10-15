@@ -277,7 +277,7 @@ Rejected on purpose: the dashboard look (stat tiles, big numbers over small labe
 - Four shells (site, project, docs, focus), each named by its route, with no global rail and no generic right rail. The site, the docs and a focused page are ruled (the rails); a project is full-bleed.
 - A project has one header and eight tabs, and opens on Overview.
 - State is a mark, then a word, then a colour; red belongs to refusals, violet to sealed things, green to what is on main, olive to waiting, blue to checking. In a row the colour is the mark's; the word is ink, except Refused and Landed.
-- A page names no CLI command. What a person does on the web is a control: a maintainer's choices, claiming and releasing an ask, posting in a discussion, reading a failed lane's log, finishing an answer, importing a repo, the theme preference, and signing in or out. A command box shows only the install line and `git clone` (`apps/web/test/no-cli-commands.test.ts`).
+- A page names no CLI command. What a person does on the web is a control: a maintainer's choices, claiming and releasing an ask, posting in a discussion, reading a failed lane's log, importing a repo, the theme preference, and signing in or out. A command box shows only the install line and `git clone` (`apps/web/test/no-cli-commands.test.ts`).
 - Light and dark follow the system setting, or its opposite by the reader's choice on `/settings` (ADR 0042).
 - Motion carries state, never decoration: transitions of 120 to 200 ms, the landing's stamp, and the landing's music box, whose every move is a step of an answer through the gate.
 
@@ -518,7 +518,7 @@ The platform's own label, never rewritten, through the state badge: a lock and t
 
 - **Inbox** (`/inbox`, once Home and Today, which redirect to it with their query kept): the reader's handle and record, how many decisions wait as one sentence for a decider, then sections under sticky headers: the decisions (Due today, Later), every open one, each decided in its row; Your claims, each answer's stage strip under its row; Asks you may take; and what happened lately in the projects the reader decides for (Newcomers to welcome, Landed without a decision). `?project=` narrows it to one project. A personal page: never kept at the edge.
 - **Choices:** one tap each, no confirm. Primary buttons, the default the outline button with "default" beside its name; 36 px in a row from 640 px, 44 px in a two-column grid on a phone. Under each, a 13 px muted consequence line written from what the platform does. After a choice the record replaces the buttons, landed green only for a choice that took effect.
-- **Finish:** the changed files in the tree column with status letters, `+n −m` and a local read mark; the diff with sticky file headers and "Mark read"; the want, verdict, choices, and Finish it: the answer fork's head, read in the browser, and a button that finishes with the commits on top of the answer.
+- **Finish:** the changed files in the tree column with status letters, `+n −m` and a local read mark; the diff with sticky file headers and "Mark read"; the want, verdict and choices. A maintainer who finishes it with commits of their own does so from the CLI; the page has no control for it.
 
 ### Code browser (the Code tab)
 

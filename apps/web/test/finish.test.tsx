@@ -21,32 +21,24 @@ import {
   RepoPath,
   TreeSha,
 } from "@repo/protocol/ids";
-import { StaleBase, Weakened } from "@repo/protocol/refusal";
-import { Cause, DateTime, Option } from "effect";
+import { Weakened } from "@repo/protocol/refusal";
+import { DateTime, Option } from "effect";
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import type { PlacedRefusal } from "../src/features/finish/annotation.tsx";
 import { patchFiles } from "../src/features/finish/files.ts";
-import {
-  finishInput,
-  FinishView,
-} from "../src/features/finish/finish-view.tsx";
+import { FinishView } from "../src/features/finish/finish-view.tsx";
 import type {
   FinishDecision,
   FinishViewProps,
 } from "../src/features/finish/finish-view.tsx";
-import {
-  answererOf,
-  changedFiles,
-  patchOf,
-} from "../src/features/finish/patch.ts";
+import { changedFiles, patchOf } from "../src/features/finish/patch.ts";
 import {
   marksKey,
   readMarks,
   writeMark,
 } from "../src/features/finish/read-marks.ts";
-import { CallFailure } from "../src/features/shared/call-failure.tsx";
 
 const ENTITIES: ReadonlyMap<string, string> = new Map([
   ["&#x27;", "'"],
@@ -285,11 +277,12 @@ describe(FinishView, () => {
     );
   });
 
-  it("gives no command lines to finish it from a clone", () => {
+  it("gives no command lines and no control to finish it: a maintainer finishes from the CLI", () => {
     const markup = markupOf(pageOf(withPatch, { verdict }));
     const text = textOf(pageOf(withPatch, { verdict }));
 
     expect(markup).not.toContain("data-finish-lines");
+    expect(markup).not.toContain('data-action="finish"');
     expect(text).not.toContain("git fetch");
     expect(text).not.toContain(`${Brand.cli} finish`);
   });
@@ -319,81 +312,6 @@ describe(FinishView, () => {
     );
     expect(text).toContain(
       "Nothing lands; the answer keeps waiting for a finish."
-    );
-  });
-});
-
-const finishButtonOf = (markup: string) =>
-  /<button\b[^>]*data-action="finish"[^>]*>/u.exec(markup)?.[0] ?? "";
-
-const onTop = CommitSha.make("f".repeat(40));
-
-describe("finishing it from the page", () => {
-  it("offers no Finish while the fork's head is still the answer's own", () => {
-    const element = pageOf(withPatch, {
-      forkHead: Option.some(head),
-      onFinish: () => {},
-      verdict,
-    });
-
-    expect(finishButtonOf(markupOf(element))).toContain('disabled=""');
-    expect(textOf(element)).toContain("Nothing is on top of the answer yet");
-  });
-
-  it("offers Finish once commits sit on top, and finishes from the verdict's base at the fork's head", () => {
-    const markup = markupOf(
-      pageOf(withPatch, {
-        forkHead: Option.some(onTop),
-        onFinish: () => {},
-        verdict,
-      })
-    );
-
-    expect(finishButtonOf(markup)).not.toBe("");
-    expect(finishButtonOf(markup)).not.toContain('disabled=""');
-    expect(finishInput(withPatch, verdict, Option.some(onTop))).toStrictEqual(
-      Option.some({
-        ask: parseIso,
-        base,
-        head: onTop,
-        project: datekit,
-        requestId: `finish-${onTop}`,
-      })
-    );
-  });
-
-  it("finishes nothing with no verdict to take the base from, or no fork head", () => {
-    expect(finishInput(withPatch, undefined, Option.some(onTop))).toStrictEqual(
-      Option.none()
-    );
-    expect(finishInput(withPatch, verdict, Option.none())).toStrictEqual(
-      Option.none()
-    );
-  });
-
-  it("shows a refused finish as the refusal", () => {
-    const markup = markupOf(
-      pageOf(withPatch, {
-        finishFailure: (
-          <CallFailure
-            cause={Cause.fail(
-              new StaleBase({ base, conflicts: [], main: onTop })
-            )}
-            doing="finish it"
-            here="/oscabriel/datekit/decisions/dec-000007"
-          />
-        ),
-        forkHead: Option.some(onTop),
-        verdict,
-      })
-    );
-
-    expect(markup).toContain('data-refusal="StaleBase"');
-  });
-
-  it("reads the answerer from the decision's answer evidence, to find their fork", () => {
-    expect(answererOf(withPatch)).toStrictEqual(
-      Option.some(Handle.make("ines-v"))
     );
   });
 });
