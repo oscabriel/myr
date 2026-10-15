@@ -31,6 +31,7 @@ import {
   publishManifest,
   ReleaseManifest,
   releaseManifest,
+  servedAsLatest,
   targets,
   unreleased,
   uploads,
@@ -341,7 +342,12 @@ const wranglerOf = (layout: Layout, path: Path.Path) =>
   );
 
 // Wrangler's own login, never the read-mostly infra token.
-const wrangler = (layout: Layout, cwd: string, args: readonly string[]) =>
+const wrangler = (
+  step: ReleaseStep,
+  layout: Layout,
+  cwd: string,
+  args: readonly string[]
+) =>
   Effect.gen(function* () {
     const path = yield* Path.Path;
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
@@ -366,19 +372,24 @@ const wrangler = (layout: Layout, cwd: string, args: readonly string[]) =>
   }).pipe(
     Effect.scoped,
     Effect.mapError(({ message }) =>
-      failed("upload", `wrangler didn't run: ${message}`)
+      failed(step, `wrangler didn't run: ${message}`)
     )
   );
 
 const NO_SUCH_KEY = "The specified key does not exist";
 
-const previousManifest = (layout: Layout, bucket: string, scratch: string) =>
+const bucketManifest = (
+  step: ReleaseStep,
+  layout: Layout,
+  bucket: string,
+  scratch: string
+) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     const file = path.join(scratch, "previous.json");
 
-    const got = yield* wrangler(layout, scratch, [
+    const got = yield* wrangler(step, layout, scratch, [
       "r2",
       "object",
       "get",
@@ -392,7 +403,7 @@ const previousManifest = (layout: Layout, bucket: string, scratch: string) =>
       return got.output.includes(NO_SUCH_KEY)
         ? Option.none()
         : yield* failed(
-            "upload",
+            step,
             `wrangler r2 object get ${bucket}/${MANIFEST_KEY} failed:\n${got.output.trim()}`
           );
     }
@@ -405,7 +416,7 @@ const previousManifest = (layout: Layout, bucket: string, scratch: string) =>
       ).pipe(
         Effect.mapError(({ message }) =>
           failed(
-            "upload",
+            step,
             `${bucket}/${MANIFEST_KEY} doesn't decode, so the platform answers 503 until it is fixed by hand: ${message}`
           )
         )
@@ -428,7 +439,7 @@ const upload = (layout: Layout, release: Release) =>
       prefix: "release-715-",
     });
 
-    const previous = yield* previousManifest(layout, bucket, scratch);
+    const previous = yield* bucketManifest("upload", layout, bucket, scratch);
     const assets = yield* assetsIn(layout);
 
     yield* Effect.fromResult(
@@ -456,7 +467,7 @@ const upload = (layout: Layout, release: Release) =>
       files: Object.keys(assets),
       version: release.version,
     })) {
-      yield* wrangler(layout, scratch, [
+      yield* wrangler("upload", layout, scratch, [
         "r2",
         "object",
         "put",
@@ -517,7 +528,29 @@ export const publishable = (layout: Layout, release: Release) =>
           failed("publish", `the staged package lacks ${missing.join(", ")}`)
       )
     );
-  });
+
+    const stage = yield* Effect.fromOption(release.stage).pipe(
+      Effect.mapError(() => failed("publish", "a publish names its --stage"))
+    );
+
+    const scratch = yield* FileSystem.FileSystem.pipe(
+      Effect.flatMap((fs) => fs.makeTempDirectoryScoped({ prefix: "release-" }))
+    );
+
+    const manifest = yield* bucketManifest(
+      "publish",
+      layout,
+      resources(stage).releases,
+      scratch
+    );
+
+    yield* Effect.fromResult(
+      servedAsLatest({
+        manifest: Option.getOrUndefined(manifest),
+        version: release.version,
+      })
+    ).pipe(Effect.mapError(({ message }) => failed("publish", message)));
+  }).pipe(Effect.scoped);
 
 const publish = (layout: Layout, release: Release) =>
   Effect.andThen(

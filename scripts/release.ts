@@ -40,7 +40,7 @@ const FLAGS = new Set([
 ]);
 
 const USAGE =
-  "bun run release -- [--build] [--upload --stage <dev-…|prod>] [--publish] [--version <semver>] [--origin <url>]";
+  "bun run release -- [--build] [--upload] [--publish] [--stage <dev-…|prod>] [--version <semver>] [--origin <url>]";
 
 // Already said in one line, so the runtime exits 1 without printing it again.
 class Reported extends Schema.TaggedError<Reported>()("Reported", {}) {
