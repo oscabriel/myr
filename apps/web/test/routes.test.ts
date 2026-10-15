@@ -81,6 +81,7 @@ describe("the web's own paths", () => {
       "install.sh",
       "llms-full.txt",
       "llms.txt",
+      "og.png",
       "people",
       "privacy",
       "releases",

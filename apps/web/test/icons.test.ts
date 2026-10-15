@@ -58,5 +58,6 @@ describe("the site's icon", () => {
     expect(pngSize("../public/icons/icon-192.png")).toStrictEqual([192, 192]);
     expect(pngSize("../public/icons/icon-512.png")).toStrictEqual([512, 512]);
     expect(icoSizes("../public/favicon.ico")).toStrictEqual([16, 32, 48]);
+    expect(pngSize("../public/og.png")).toStrictEqual([1200, 630]);
   });
 });

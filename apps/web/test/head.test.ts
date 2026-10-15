@@ -3,7 +3,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 
 import { pageHead } from "../src/features/shared/head.ts";
-import { rootHead } from "../src/routes/__root.tsx";
+import { OG_IMAGE_URL, rootHead } from "../src/routes/__root.tsx";
 
 const keyOf = (meta: Readonly<Record<string, string>>) =>
   meta.name ?? meta.property ?? (meta.title === undefined ? "" : "title");
@@ -53,5 +53,13 @@ describe("the root's head", () => {
     expect(metas["og:description"]).toBe(metas.description);
     expect(metas["og:title"]).toBe(Brand.name);
     expect(metas["og:type"]).toBe("website");
+  });
+
+  it("gives every page the card as a large image, at its absolute URL", () => {
+    const metas = metasOf(rootHead());
+
+    expect(metas["og:image"]).toBe(OG_IMAGE_URL);
+    expect(new URL(OG_IMAGE_URL).pathname).toBe("/og.png");
+    expect(metas["twitter:card"]).toBe("summary_large_image");
   });
 });
