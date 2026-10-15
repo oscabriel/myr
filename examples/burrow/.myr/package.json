@@ -2,6 +2,6 @@
   "private": true,
   "type": "module",
   "devDependencies": {
-    "@myr/cli": "0.1.2"
+    "@myr/cli": "0.2.1"
   }
 }

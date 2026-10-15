@@ -136,9 +136,9 @@ export default layerManifest<AreaOf<typeof policy>>({
   ],
   knownBad: [
     // known-bad/export: unescapes only the first pair of quotes.
-    "5dfd99059d7808e07b50bfd0beb7bb292f64a79e",
+    "038860d9115139e3d23ce9c7a5814a5f67ef8416",
     // known-bad/parser: rounds the digits past the millisecond.
-    "b14491948ba8f512dd9c0418f19041b798401a05",
+    "bee4f59771f2c1297bb4896dc495ee669be7d2f7",
   ],
   layer: "maintainers",
 });
