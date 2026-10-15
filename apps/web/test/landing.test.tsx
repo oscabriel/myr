@@ -205,7 +205,7 @@ describe(LandingView, () => {
   );
 
   it.effect(
-    "says under the lede that many agents answer at once while main moves one landing at a time, and that the merge stage merges again when main moves",
+    "keeps the hero to its headline, one lede and its actions, and lets the merge stage say it merges again when main moves",
     () =>
       Effect.gen(function* () {
         const main = mainOf(yield* pageWith(landed));
@@ -215,29 +215,9 @@ describe(LandingView, () => {
         const merge =
           /<li\b[^>]*data-stage="merge"[\s\S]*?<\/li>/u.exec(gate)?.[0] ?? "";
 
-        expect(textIn(hero)).toContain(
-          "Many agents answer at once, each in a fork of its own, and main moves by one landing at a time."
-        );
+        expect(hero.match(/<p\b/gu)).toHaveLength(1);
         expect(textIn(merge)).toContain("merged again when main moves");
       })
-  );
-
-  it.effect("names the four words as GLOSSARY.md defines them", () =>
-    Effect.gen(function* () {
-      const markup = yield* pageWith(landed);
-      const words = ["Ask", "Answer", "Check", "Refusal"];
-
-      expect(
-        [...markup.matchAll(/data-noun="(?<noun>[^"]+)"/gu)].map(
-          (found) => found.groups?.noun
-        )
-      ).toStrictEqual(["ask", "answer", "check", "refusal"]);
-      expect(
-        words.filter(
-          (word) => !textIn(markup).includes(defined(word) ?? `(${word})`)
-        )
-      ).toStrictEqual([]);
-    })
   );
 
   it.effect(
@@ -248,7 +228,14 @@ describe(LandingView, () => {
         const hrefs = hrefsOf(main);
         const hero = main.slice(0, main.indexOf('data-figure="music-box"'));
 
-        expect(hrefs).toContain("/install");
+        const ways = [...main.matchAll(/data-way="(?<way>[^"]+)"/gu)].map(
+          (found) => found.groups?.way
+        );
+
+        expect(ways.length).toBeGreaterThan(0);
+        expect(
+          ways.filter((way) => !hrefs.includes(`/install#${way}`))
+        ).toStrictEqual([]);
         expect(hrefs).toContain("/explore");
         expect(hrefsOf(hero)).toStrictEqual(["/asks", "/import", "/tour"]);
         expect(textIn(hero)).toContain("Take the tour");

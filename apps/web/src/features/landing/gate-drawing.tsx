@@ -108,9 +108,8 @@ export const GateDrawing = ({
     <figure className="flex flex-col gap-4">
       <Stages />
       <figcaption className="text-ui text-muted-foreground max-w-(--measure)">
-        The seven bridges of Fig 1, in order, cheapest first. The first stage
-        that fails refuses the answer, with every reason that stage found; an
-        answer that passes them all lands on main.
+        Cheapest first: the first stage that fails refuses the answer with every
+        reason it found, and one that passes all seven lands on main.
       </figcaption>
     </figure>
     <div className="columns:grid-cols-2 grid gap-5">
