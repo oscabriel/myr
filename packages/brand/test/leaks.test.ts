@@ -76,6 +76,21 @@ describe(findLeaks, () => {
     expect(findLeaks([{ content, path }])).toStrictEqual([]);
   });
 
+  it("allows this repo's own config folder, at its root alone", () => {
+    const content = `import { project } from "${Brand.cliPackage}/rules";`;
+
+    expect(
+      findLeaks([
+        { content, path: `${Brand.configDir}/project.ts` },
+        { content, path: `${Brand.configDir}/asks/a.ask.ts` },
+        { content, path: `apps/cli/${Brand.configDir}/project.ts` },
+      ]).map((leak) => [leak.path, leak.line])
+    ).toStrictEqual([
+      [`apps/cli/${Brand.configDir}/project.ts`, 0],
+      [`apps/cli/${Brand.configDir}/project.ts`, 1],
+    ]);
+  });
+
   it("allows the config folder of an example's layer, at the layer repo's root", () => {
     const content = `import { layerManifest } from "${Brand.npmScope}/cli/rules";`;
 

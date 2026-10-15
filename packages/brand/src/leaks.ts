@@ -38,8 +38,15 @@ const NAME = new RegExp(
   "iu"
 );
 
+// This repo is a project too: its own config folder sits at the root, with the
+// same name and the same import as an example's.
+const inOwnConfig = (path: string) => path.split("/")[0] === Brand.configDir;
+
 const mayNameTheBrand = (path: string) =>
-  path.startsWith(HOME) || PROSE.test(path) || inExampleConfig(path);
+  path.startsWith(HOME) ||
+  PROSE.test(path) ||
+  inExampleConfig(path) ||
+  inOwnConfig(path);
 
 const leaksIn = (file: SourceFile): readonly BrandLeak[] => {
   if (mayNameTheBrand(file.path)) {

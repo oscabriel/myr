@@ -1,3 +1,4 @@
+import { Brand } from "@repo/brand";
 import { defineConfig } from "oxlint";
 import core from "ultracite/oxlint/core";
 import react from "ultracite/oxlint/react";
@@ -16,6 +17,8 @@ export default defineConfig({
     "tools/oxlint/anti-slop/**",
     "**/worker-configuration.d.ts",
     "examples/**",
+    // Imports the published rules package, which this repo never installs; the platform checks it.
+    `${Brand.configDir}/**`,
     "apps/web/src/components/ui/**",
     "apps/web/src/routeTree.gen.ts",
   ],
