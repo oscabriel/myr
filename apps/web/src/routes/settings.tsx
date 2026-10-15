@@ -10,7 +10,7 @@ import { branchPage } from "../server/cache-headers.ts";
 
 // Reads nothing on the server: the preference lives in the reader's browser, so the page is the same for everyone and the edge may keep it.
 export const Route = createFileRoute("/settings")({
-  staticData: { shell: "project" },
+  staticData: { shell: "site" },
   component: SettingsView,
   headers: () => branchPage,
   head: () => pageHead({ description: SETTINGS_LEDE, title: SETTINGS_TITLE }),

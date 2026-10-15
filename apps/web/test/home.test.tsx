@@ -492,8 +492,8 @@ describe("the inbox, read on the server with the reader's session", () => {
     });
   });
 
-  it("is drawn in the project shell", () => {
-    expect(Route.options.staticData?.shell).toBe("project");
+  it("is drawn in the site shell, ruled as Explore and Asks are", () => {
+    expect(Route.options.staticData?.shell).toBe("site");
   });
 });
 

@@ -397,8 +397,8 @@ Every route names exactly one shell in its `staticData` (`shell: "site" | "proje
 
 | Shell | Routes | Container | Header | Side columns |
 | --- | --- | --- | --- | --- |
-| `site` | `/`, `/explore`, `/asks`, `/install`, `/privacy`, `/terms` | centred, ruled, `--container-site` (1760 px), `--gutter-site` (32 px) | framed top bar | only the filters on `/asks` (`--column-filters`, 240 px), left of the list |
-| `project` | `/:owner/:project/**`, `/inbox`, `/settings`, `/people/:handle` | fluid to `--container-project` (1600 px), `--gutter-project` (28 px) | full-bleed top bar, then the page header | only the about column on Overview (`--column-about`, 340 px) and the file tree on Code (`--column-tree`, 280 px) |
+| `site` | `/`, `/explore`, `/asks`, `/inbox`, `/settings`, `/people/:handle`, `/install`, `/privacy`, `/terms` | centred, ruled, `--container-site` (1760 px), `--gutter-site` (32 px) | framed top bar | only the filters on `/asks` (`--column-filters`, 240 px), left of the list |
+| `project` | `/:owner/:project/**` | fluid to `--container-project` (1600 px), `--gutter-project` (28 px) | full-bleed top bar, then the page header | only the about column on Overview (`--column-about`, 340 px) and the file tree on Code (`--column-tree`, 280 px) |
 | `docs` | `/docs/**` | centred, ruled, `--container-site` (1760 px) | the site's top bar | nav tree `--column-docs-nav` (240 px), parted from the article by a rule its full height; the article at `--measure` (72ch) with "on this page" (`--column-docs-toc`, 220 px) beside it, hugging it, the rest of the frame paper |
 | `focus` | sign-in, MCP consent, new project | a centred, ruled card, `--container-focus` (400 px) | the wordmark only, in the framed bar | none |
 
