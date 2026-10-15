@@ -371,7 +371,7 @@ export const MusicBox = () => {
           </span>
         </div>
       </div>
-      <figcaption className="flex flex-col gap-3">
+      <figcaption>
         <dl className="tablet:grid-cols-2 columns:grid-cols-3 grid gap-x-8 gap-y-2.5">
           {KEYS.map((key) => (
             <div className="text-ui" data-key={key.word} key={key.word}>
@@ -383,9 +383,6 @@ export const MusicBox = () => {
             </div>
           ))}
         </dl>
-        <p className="text-ui text-muted-foreground max-w-(--measure)">
-          {FIGURE.caption}
-        </p>
       </figcaption>
     </figure>
   );

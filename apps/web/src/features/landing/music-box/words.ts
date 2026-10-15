@@ -1,8 +1,6 @@
 /** The music box's card and legend: what each part stands for, in GLOSSARY.md's words. */
 
 export const FIGURE = {
-  caption:
-    "Everything on main is public, under glass. A project states each change it wants as a tooth that plays sour; anyone can claim it and push an answer. The gate checks every answer, cheapest stage first: a refused answer drops into that stage's tray with its reason, and one that passes every stage is pinned by the press, which alone writes the cylinder.",
   fig: "Fig 1",
   hint: "Click or press Space for the next step",
   label:

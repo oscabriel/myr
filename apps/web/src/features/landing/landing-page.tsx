@@ -2,14 +2,13 @@ import { installCommand } from "@repo/agent-kit/install";
 import type { ReactNode } from "react";
 
 import { buttonVariants } from "../../components/ui/button.tsx";
-import { ID, LINK } from "../shared/classes.ts";
+import { LINK } from "../shared/classes.ts";
 import { CommandLine } from "../shared/command.tsx";
 import { AppLink } from "../shared/link.tsx";
 import {
   ASKS_PATH,
   EXPLORE_PATH,
   IMPORT_PATH,
-  INSTALL_PATH,
   LANDING_NOW_ANCHOR,
   TOUR_PATH,
 } from "../shared/paths.ts";
@@ -19,7 +18,7 @@ import { LandingNowList } from "./landing-now-list.tsx";
 import type { LandingNow } from "./landing-now.ts";
 import { MusicBox } from "./music-box/music-box.tsx";
 import { WaysIn } from "./ways-in.tsx";
-import { CONCURRENCY, HEADLINE, HERO_LEDE, RUN_A_PROJECT } from "./words.ts";
+import { HEADLINE, HERO_LEDE, RUN_A_PROJECT } from "./words.ts";
 
 /** The page's main action, a size up from a toolbar's button. */
 const PRIMARY = buttonVariants({
@@ -33,10 +32,6 @@ const SECONDARY = buttonVariants({
   size: "lg",
   variant: "outline",
 });
-
-const Code = ({ children }: { readonly children: ReactNode }) => (
-  <code className={ID}>{children}</code>
-);
 
 const MAIN = "main";
 
@@ -106,54 +101,6 @@ const More = ({
   </AppLink>
 );
 
-interface Noun {
-  readonly noun: string;
-  readonly means: ReactNode;
-}
-
-/** GLOSSARY.md's definitions, word for word. */
-const NOUNS: readonly Noun[] = [
-  {
-    means: (
-      <>
-        A file on <Code>main</Code> in which a project states one change it
-        wants: a behavioural want, a territory, and a check that fails on{" "}
-        <Code>main</Code>.
-      </>
-    ),
-    noun: "Ask",
-  },
-  {
-    means: "A commit in a claimant's fork offered to satisfy one ask.",
-    noun: "Answer",
-  },
-  {
-    means:
-      "The predicate that judges an answer: the ask's own check plus the project's checks, run by the platform on the exact merged tree.",
-    noun: "Check",
-  },
-  {
-    means:
-      "One or more members of the closed, typed union the platform returns instead of landing, all from the cheapest failing stage, each with a reason, a reproducing command, a next step, and whether retrying can help.",
-    noun: "Refusal",
-  },
-];
-
-const Nouns = () => (
-  <dl className="tablet:grid-cols-2 columns:grid-cols-4 grid gap-x-8 gap-y-6">
-    {NOUNS.map(({ means, noun }) => (
-      <div
-        className="border-rule flex flex-col gap-1.5 border-t pt-4"
-        data-noun={noun.toLowerCase()}
-        key={noun}
-      >
-        <dt className="text-title">{noun}</dt>
-        <dd className="text-ui text-muted-foreground">{means}</dd>
-      </div>
-    ))}
-  </dl>
-);
-
 export const LandingView = ({
   landings,
   platformUrl,
@@ -168,7 +115,7 @@ export const LandingView = ({
     id="main"
     tabIndex={-1}
   >
-    {/* The hero: the headline and its lede centred between the rails, the two ways in under them, then Fig 1 across the frame. */}
+    {/* The hero: the headline and its one lede centred between the rails, the two ways in under them, then Fig 1 across the frame. */}
     <div
       className={`tablet:pt-20 flex flex-col items-center gap-12 pt-12 pb-16 ${GUTTER}`}
       data-hero=""
@@ -179,12 +126,6 @@ export const LandingView = ({
         </h1>
         <p className="text-lede text-muted-foreground max-w-(--measure-lede) text-pretty">
           <WithMain text={HERO_LEDE} />
-        </p>
-        <p
-          className="text-ui text-muted-foreground max-w-(--measure-lede) text-pretty"
-          data-concurrency=""
-        >
-          <WithMain text={CONCURRENCY} />
         </p>
       </div>
       <div className="flex max-w-full flex-col items-center gap-4">
@@ -212,10 +153,6 @@ export const LandingView = ({
       <GateDrawing platformUrl={platformUrl} />
     </Part>
 
-    <Part id="nouns" title="Four words">
-      <Nouns />
-    </Part>
-
     <Part
       aside={<More to={EXPLORE_PATH}>Explore projects</More>}
       id={LANDING_NOW_ANCHOR}
@@ -224,11 +161,7 @@ export const LandingView = ({
       <LandingNowList landings={landings} />
     </Part>
 
-    <Part
-      aside={<More to={INSTALL_PATH}>All the ways in</More>}
-      id="ways-in"
-      title="Every way in"
-    >
+    <Part id="ways-in" title="Every way in">
       <WaysIn platformUrl={platformUrl} webUrl={webUrl} />
     </Part>
   </main>
