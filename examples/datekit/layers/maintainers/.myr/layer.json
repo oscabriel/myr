@@ -112,8 +112,8 @@
     }
   ],
   "knownBad": [
-    "038860d9115139e3d23ce9c7a5814a5f67ef8416",
-    "bee4f59771f2c1297bb4896dc495ee669be7d2f7"
+    "dbaee401dfda08e13c16ce9066727e2adb99ceca",
+    "af5d85ab3e43a2809ff19559f397028dbf3e86bf"
   ],
   "layer": "maintainers"
 }

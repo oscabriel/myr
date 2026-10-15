@@ -1,4 +1,4 @@
-import { kinds, territory } from "@myr/cli/rules";
+import { kinds, territory } from "@myrtechnology/cli/rules";
 
 export default kinds.fix.ask({
   current: "The 11th, 12th and 13th of a month print as 11st, 12nd and 13rd.",

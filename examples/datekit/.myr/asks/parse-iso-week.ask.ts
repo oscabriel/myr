@@ -1,4 +1,4 @@
-import { kinds, territory } from "@myr/cli/rules";
+import { kinds, territory } from "@myrtechnology/cli/rules";
 
 export default kinds.fix.ask({
   current:
