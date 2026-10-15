@@ -29,6 +29,9 @@ const AUTH_PATHS = {
   signIn: "/auth/signin",
 } as const;
 
+// The platform ends its own session here and sends the browser to the web's home.
+export const PLATFORM_SIGN_OUT = "/oauth/signout";
+
 export interface Handled {
   readonly request: Request;
 }
@@ -395,8 +398,21 @@ export const callbackHandler =
       )
     );
 
-export const signOutHandler = (_handled: Handled): Response =>
-  redirect("/", clearedCookies());
+/**
+ * Ends the web's session, then the platform's, which comes home again: signed
+ * out of one is signed out of both, so the next sign-in asks who you are. With
+ * no platform (the dev world) it goes home at once.
+ */
+export const signOutHandler =
+  (platformUrl: Option.Option<string>) =>
+  (_handled: Handled): Response =>
+    redirect(
+      Option.match(platformUrl, {
+        onNone: () => "/",
+        onSome: (platform) => new URL(PLATFORM_SIGN_OUT, platform).href,
+      }),
+      clearedCookies()
+    );
 
 const whoAnswer = (
   who: { readonly handle?: Handle },

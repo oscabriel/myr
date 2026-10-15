@@ -10,9 +10,11 @@ import {
   ACCOUNT_PATHS,
   addEmailPage,
   codePage,
+  continuePage,
   problemPage,
   profilePage,
   resetPage,
+  SESSION_PATHS,
   signInPage,
   signUpPage,
 } from "../src/auth/pages.ts";
@@ -105,6 +107,10 @@ const PAGES = {
     "alice@mail.example",
     "Another account already uses that email. Add a different one."
   ),
+  "continuing as someone signed in": continuePage(claude, form, {
+    displayName: "Alice Example",
+    handle: "alice",
+  }),
   "entering a code": codePage(
     claude,
     form,
@@ -751,5 +757,61 @@ describe("the sign-in page's ways out", () => {
     expect(
       signUpPage(local, form, { google: false }, "/authorize", {})
     ).not.toContain("Continue with Google");
+  });
+});
+
+describe("the page that asks only to continue", () => {
+  const alice = { displayName: "Alice Example", handle: "alice" };
+
+  it("names who is signed in and offers one button, asking for no password", () => {
+    const html = continuePage(ourWeb, form, alice);
+
+    expect({
+      button: html.includes(">Continue as @alice</button>"),
+      consent: html.includes('class="consent"'),
+      named: html.includes("Alice Example"),
+      password: html.includes('name="password"'),
+      posts: html.includes(`action="${SESSION_PATHS.continue}"`),
+      switches: html.includes(
+        `href="${SESSION_PATHS.switch}?request=sealed-request">Use another account</a>`
+      ),
+    }).toStrictEqual({
+      button: true,
+      consent: false,
+      named: true,
+      password: false,
+      posts: true,
+      switches: true,
+    });
+  });
+
+  it("gives the CLI its one line, and a client that is not ours its consent first", () => {
+    const cli = continuePage(ourCli, form, alice);
+    const other = continuePage(claude, form, alice);
+
+    expect([
+      cli.includes("This finishes signing in the CLI"),
+      cli.includes("What it can do"),
+      other.includes("wants to act as you"),
+      other.includes("<summary>What it can do</summary>"),
+      other.indexOf("wants to act as you") < other.indexOf("Continue as"),
+    ]).toStrictEqual([true, false, true, true, true]);
+  });
+
+  it("escapes the handle, the name and every value a client supplies", () => {
+    const html = continuePage(
+      {
+        clientDomain: `"><img src=x>`,
+        clientName: `<script>alert("x")</script>`,
+        redirectHost: "evil.example<b>",
+        redirectIsLoopback: false,
+      },
+      { csrf: `"><script>`, request: `a"b` },
+      { displayName: `<i>Alice</i>`, handle: `<u>alice</u>` }
+    );
+
+    expect(html).not.toMatch(/<script|<img|<b>|<i>|<u>/u);
+    expect(html).toContain("&lt;i&gt;Alice&lt;/i&gt;");
+    expect(html).toContain("@&lt;u&gt;alice&lt;/u&gt;");
   });
 });

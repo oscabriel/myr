@@ -32,6 +32,13 @@ export const ACCOUNT_PATHS = {
   signUpVerify: "/oauth/signup/verify",
 } as const;
 
+// The platform's own session: continue as the person it names, switch away from them, or end it.
+export const SESSION_PATHS = {
+  continue: "/authorize/continue",
+  signOut: "/oauth/signout",
+  switch: "/oauth/switch",
+} as const;
+
 export const GOOGLE_PATHS = {
   callback: "/oauth/google/callback",
   handle: "/oauth/google/handle",
@@ -107,6 +114,9 @@ button:hover{opacity:.9}
 button.link{display:block;width:auto;min-height:0;margin:16px auto 0;padding:2px 4px;color:var(--muted);background-color:transparent;border:0;font-size:.875rem;line-height:1.3rem;font-weight:400;text-decoration:none;text-underline-offset:.2em}
 button.link:hover{color:var(--ink);opacity:1;text-decoration:underline}
 .submit{margin-top:24px}
+.who{display:flex;align-items:center;gap:12px;padding:12px;border:1px solid var(--rule);border-radius:2px;overflow-wrap:anywhere}
+.who .mark{flex:none;display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;background-color:var(--surface);font-weight:600;text-transform:uppercase}
+.who .name{display:block;font-weight:600}
 .or{display:flex;align-items:center;gap:12px;margin:20px 0}
 .or .line{flex:1;height:1px;background-color:var(--rule)}
 .aside{margin:24px 0 0;text-align:center}
@@ -267,6 +277,54 @@ ${offers.google ? `<button type="submit" class="link" formaction="${GOOGLE_PATHS
       after: `New here? <a href="${withRequest("/signup", form)}">Create an account</a>`,
     }
   );
+
+// A name's first letter as a reader sees it, an accent or an emoji whole.
+const graphemes = new Intl.Segmenter("en", { granularity: "grapheme" });
+
+export interface SignedInAs {
+  readonly displayName?: string | undefined;
+  readonly handle: string;
+}
+
+/**
+ * Someone already signed in here: one click gives this client its grant, and a
+ * client that is not ours still says who asks and what it may do first.
+ */
+export const continuePage = (
+  asker: Asker,
+  form: PendingForm,
+  who: SignedInAs,
+  message?: string
+) => {
+  const handle = `@${escapeHtml(who.handle)}`;
+
+  const named =
+    who.displayName === undefined
+      ? `<span class="name">${handle}</span>`
+      : `<span class="name">${escapeHtml(who.displayName)}</span><span class="small muted">${handle}</span>`;
+
+  const [first] = Array.from(
+    graphemes.segment(who.displayName ?? who.handle),
+    ({ segment }) => segment
+  );
+
+  return page(
+    "Sign in",
+    `<h1>Sign in to ${escapeHtml(Brand.name)}</h1>
+${askerParagraphs(asker, "who and what")}
+${messageParagraph(message)}
+<section class="who" aria-label="Signed in as"><span class="mark" aria-hidden="true">${escapeHtml(first ?? "")}</span><div>${named}</div></section>
+<form method="post" action="${SESSION_PATHS.continue}">
+${hiddenFields(form)}
+<div class="submit"><button type="submit">Continue as ${handle}</button></div>
+</form>`,
+    "form",
+    {
+      ...homeOf(asker),
+      after: `Not you? <a href="${withRequest(SESSION_PATHS.switch, form)}">Use another account</a>`,
+    }
+  );
+};
 
 export interface ProfileValues {
   readonly displayName?: string;

@@ -809,6 +809,9 @@ describe("coming back from Google", () => {
 
         yield* chooseHandle(world, first, "Carol");
 
+        // Signed out, or the platform's session would only ask to continue.
+        yield* visit(world, "/oauth/signout");
+
         const again = yield* backFromGoogle(
           world,
           yield* continueWithGoogle(world),
@@ -1220,6 +1223,8 @@ describe("linking Google to an account signed in by password", () => {
           Option.some(Handle.make("alice")),
           Option.some(googleEmailOf("5150")),
         ]);
+
+        yield* visit(world, "/oauth/signout");
 
         const later = yield* backFromGoogle(
           world,

@@ -55,7 +55,11 @@ const hmacKey = (key: Redacted.Redacted) =>
   );
 
 // The signature covers `purpose` too: a schema ignores extra keys, so a value sealed for another purpose must not open.
-export const sealing = <A, I>(purpose: string, schema: Schema.Codec<A, I>) => {
+export const sealing = <A, I>(
+  purpose: string,
+  schema: Schema.Codec<A, I>,
+  lifetime: Duration.Duration = SIGN_IN_LIFETIME
+) => {
   const signed = (payload: string) => utf8(`${purpose}.${payload}`);
 
   const Payload = Schema.StringFromBase64Url.pipe(
@@ -75,7 +79,7 @@ export const sealing = <A, I>(purpose: string, schema: Schema.Codec<A, I>) => {
       const now = yield* Clock.currentTimeMillis;
 
       const payload = yield* encodePayload({
-        expiresAt: now + Duration.toMillis(SIGN_IN_LIFETIME),
+        expiresAt: now + Duration.toMillis(lifetime),
         value,
       }).pipe(Effect.orDie);
 

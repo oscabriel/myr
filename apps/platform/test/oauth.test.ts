@@ -4,22 +4,26 @@ import { Handle } from "@repo/protocol/ids";
 import { Person } from "@repo/protocol/principal";
 import { untouchable } from "@repo/testkit/untouchable";
 import { Effect, Option, Redacted, Schema } from "effect";
+import { HttpServerRequest, HttpServerResponse } from "effect/http";
 import { TestClock } from "effect/testing";
 
 import { OAuthSessions } from "../src/adapters/sessions-oauth.ts";
-import { Email } from "../src/auth/accounts.ts";
+import { Accounts, Email } from "../src/auth/accounts.ts";
+import type { Account } from "../src/auth/accounts.ts";
+import { AccountsMemory } from "../src/auth/accounts/memory.ts";
 import { SignInAttempts } from "../src/auth/attempts.ts";
 import { SignInAttemptsMemory } from "../src/auth/attempts/memory.ts";
 import { cliClientMetadata } from "../src/auth/cli-client.ts";
 import { codeMatches, codeTag, deadTag, freshCode } from "../src/auth/codes.ts";
 import type { CodePurpose } from "../src/auth/codes.ts";
-import { ACCOUNT_PATHS } from "../src/auth/pages.ts";
+import { ACCOUNT_PATHS, SESSION_PATHS } from "../src/auth/pages.ts";
 import {
   hashPassword,
   hashPasswordWith,
   PasswordHash,
   verifyPassword,
 } from "../src/auth/password.ts";
+import { sessionAccount, withSession } from "../src/auth/platform-session.ts";
 import { tokenReader } from "../src/auth/provider.ts";
 import { openState, sealState, SignInFailed } from "../src/auth/state.ts";
 import type { PendingSignIn } from "../src/auth/state.ts";
@@ -1516,5 +1520,516 @@ describe("a mailed code", () => {
         yield* codeMatches(cookieKey, "reset", email, tag, "123456")
       ).toBeFalsy();
     })
+  );
+});
+
+const SESSION = "__Host-platform-session";
+
+const webHome = fakeEnv().PUBLIC_WEB_URL;
+
+const sessionLine = (response: Response) =>
+  Option.fromNullishOr(
+    response.headers
+      .getSetCookie()
+      .find((line) => line.startsWith(`${SESSION}=`))
+  );
+
+const sessionIn = (response: Response) =>
+  Effect.fromOption(
+    sessionLine(response).pipe(
+      Option.flatMap((line) =>
+        Option.fromNullishOr(
+          /^[^=]+=(?<value>[^;]*)/u.exec(line)?.groups?.value
+        )
+      ),
+      Option.filter((value) => value !== "")
+    )
+  ).pipe(Effect.orDie);
+
+// A line that ends the session: an empty value, kept for no time at all.
+const endsSession = (response: Response) =>
+  Option.exists(
+    sessionLine(response),
+    (line) =>
+      line.startsWith(`${SESSION}=;`) &&
+      line.toLowerCase().includes("max-age=0")
+  );
+
+const withCookies = (
+  request: Request,
+  cookies: Readonly<Record<string, string>>
+) => {
+  const headers = new Headers(request.headers);
+
+  headers.set(
+    "cookie",
+    Object.entries(cookies)
+      .map(([name, value]) => `${name}=${value}`)
+      .join("; ")
+  );
+
+  return new Request(request, { headers });
+};
+
+const openSignedIn = (world: World, session: string, url = authorizeUrl()) =>
+  world
+    .fetch(withCookies(new Request(url), { [SESSION]: session }))
+    .pipe(Effect.flatMap(read));
+
+const continueFrom = (
+  world: World,
+  page: Page,
+  session: string,
+  csrf?: string
+) =>
+  Effect.gen(function* () {
+    const form = yield* formIn(page);
+
+    return yield* world.fetch(
+      withCookies(
+        post(
+          SESSION_PATHS.continue,
+          { csrf: csrf ?? form.csrf, request: form.request },
+          form.cookie
+        ),
+        { "__Host-sign-in": form.cookie, [SESSION]: session }
+      )
+    );
+  });
+
+const signedInSession = (world: World) =>
+  Effect.gen(function* () {
+    yield* signUp(world, "alice", alicePassword);
+
+    return yield* signIn(world, "alice", alicePassword).pipe(
+      Effect.flatMap(sessionIn)
+    );
+  });
+
+// A session sealed as the platform would, for an account a test names.
+const sessionFor = (account: Account) =>
+  withSession(
+    cookieKey,
+    account
+  )(HttpServerResponse.empty()).pipe(
+    Effect.map(HttpServerResponse.toWeb),
+    Effect.flatMap(sessionIn)
+  );
+
+const asksToContinue = (page: Page) => ({
+  continues: page.html.includes("Continue as @alice"),
+  password: page.html.includes('name="password"'),
+  status: page.response.status,
+});
+
+describe("the platform's own session", () => {
+  it.live(
+    "keeps the person signed in here for thirty days after a grant, out of reach of scripts and other sites' posts",
+    () =>
+      Effect.gen(function* () {
+        const world = yield* signInWorld();
+
+        yield* signUp(world, "alice", alicePassword);
+
+        const signedIn = yield* signIn(world, "alice", alicePassword);
+
+        const attributes = Option.map(sessionLine(signedIn), (line) =>
+          line
+            .split(";")
+            .slice(1)
+            .map((part) => part.trim().toLowerCase())
+            .toSorted()
+        );
+
+        expect(Option.isSome(codeOf(signedIn))).toBeTruthy();
+        expect(attributes).toStrictEqual(
+          Option.some([
+            "httponly",
+            "max-age=2592000",
+            "path=/",
+            "samesite=lax",
+            "secure",
+          ])
+        );
+      })
+  );
+
+  it.live(
+    "asks only to continue on the next sign-in, and gives the code to the same person",
+    () =>
+      Effect.gen(function* () {
+        const world = yield* signInWorld();
+
+        const session = yield* signedInSession(world);
+
+        const page = yield* openSignedIn(
+          world,
+          session,
+          authorizeUrl("state-2")
+        );
+
+        const code = yield* continueFrom(world, page, session).pipe(
+          Effect.flatMap(codeIn)
+        );
+
+        const response = yield* world.fetch(tokenRequest(code));
+
+        const { access_token } = yield* Effect.promise(() =>
+          response.json()
+        ).pipe(
+          Effect.flatMap(Schema.decodeUnknownEffect(TokenResponse)),
+          Effect.orDie
+        );
+
+        expect(asksToContinue(page)).toStrictEqual({
+          continues: true,
+          password: false,
+          status: 200,
+        });
+        expect(
+          yield* OAuthSessions(tokenReader(world.store)).verify(access_token)
+        ).toStrictEqual(
+          Option.some(Person.make({ handle: Handle.make("alice") }))
+        );
+      })
+  );
+
+  it.live(
+    "shows a client that is not ours who asks and what it may do, then the button",
+    () =>
+      Effect.gen(function* () {
+        const world = yield* signInWorld();
+
+        const session = yield* signedInSession(world);
+
+        const url = authorizeUrl();
+
+        url.searchParams.set("client_id", "https://other.test/oauth/cli");
+
+        const page = yield* openSignedIn(world, session, url);
+
+        expect({
+          ...asksToContinue(page),
+          asks: page.html.includes("wants to act as you."),
+          host: page.html.includes("Access goes to <strong>127.0.0.1"),
+          lists: page.html.includes("<summary>What it can do</summary>"),
+        }).toStrictEqual({
+          asks: true,
+          continues: true,
+          host: true,
+          lists: true,
+          password: false,
+          status: 200,
+        });
+      })
+  );
+
+  it.live(
+    "reads a changed session as none, the same page as no session, and drops it",
+    () =>
+      Effect.gen(function* () {
+        const world = yield* signInWorld();
+
+        const session = yield* signedInSession(world);
+
+        const page = yield* openSignedIn(world, tampered(session));
+
+        expect({
+          ...asksToContinue(page),
+          dropped: endsSession(page.response),
+        }).toStrictEqual({
+          continues: false,
+          dropped: true,
+          password: true,
+          status: 200,
+        });
+      })
+  );
+
+  it.live(
+    "ends with a reset of the password, wherever it was kept, and a new one starts",
+    () =>
+      Effect.gen(function* () {
+        const world = yield* signInWorld();
+
+        const session = yield* signedInSession(world);
+
+        const started = yield* startReset(world, emailOf("alice"));
+
+        const code = yield* Effect.fromOption(
+          yield* codeMailedTo(world, emailOf("alice"))
+        ).pipe(Effect.orDie);
+
+        const reset = yield* enterCode(
+          world,
+          started,
+          ACCOUNT_PATHS.resetVerify,
+          code,
+          { password: "a brand new password" }
+        );
+
+        const old = yield* openSignedIn(world, session);
+
+        const fresh = yield* openSignedIn(world, yield* sessionIn(reset));
+
+        expect([
+          asksToContinue(old),
+          endsSession(old.response),
+          asksToContinue(fresh).continues,
+        ]).toStrictEqual([
+          { continues: false, password: true, status: 200 },
+          true,
+          true,
+        ]);
+      })
+  );
+
+  it.live(
+    "names nobody for an account that is not there, though its session is genuine",
+    () =>
+      Effect.gen(function* () {
+        const world = yield* signInWorld();
+
+        const session = yield* sessionFor({
+          email: Email.make("ghost@mail.example"),
+          handle: Handle.make("ghost"),
+          hash: yield* hashPassword(pepper, password),
+        });
+
+        const page = yield* openSignedIn(world, session);
+
+        expect({
+          ...asksToContinue(page),
+          dropped: endsSession(page.response),
+        }).toStrictEqual({
+          continues: false,
+          dropped: true,
+          password: true,
+          status: 200,
+        });
+      })
+  );
+
+  it.live("refuses a continue with another form's CSRF token, or none", () =>
+    Effect.gen(function* () {
+      const world = yield* signInWorld();
+
+      const session = yield* signedInSession(world);
+
+      const page = yield* openSignedIn(world, session);
+
+      const wrong = yield* continueFrom(world, page, session, "another-token");
+
+      const form = yield* formIn(page);
+
+      const without = yield* world.fetch(
+        withCookies(
+          post(
+            SESSION_PATHS.continue,
+            { csrf: form.csrf, request: form.request },
+            form.cookie
+          ),
+          { [SESSION]: session }
+        )
+      );
+
+      expect([
+        wrong.status,
+        Option.isNone(codeOf(wrong)),
+        without.status,
+        Option.isNone(codeOf(without)),
+      ]).toStrictEqual([400, true, 400, true]);
+    })
+  );
+
+  it.live(
+    "asks to sign in again when the session ended between the page and the click",
+    () =>
+      Effect.gen(function* () {
+        const world = yield* signInWorld();
+
+        const session = yield* signedInSession(world);
+
+        const page = yield* openSignedIn(world, session);
+
+        const clicked = yield* continueFrom(
+          world,
+          page,
+          tampered(session)
+        ).pipe(Effect.flatMap(read));
+
+        expect({
+          ...asksToContinue(clicked),
+          code: Option.isSome(codeOf(clicked.response)),
+          dropped: endsSession(clicked.response),
+          says: clicked.html.includes("You were signed out here."),
+        }).toStrictEqual({
+          code: false,
+          continues: false,
+          dropped: true,
+          password: true,
+          says: true,
+          status: 200,
+        });
+      })
+  );
+
+  it.live(
+    "lets the person use another account: the session is dropped and the same request asks to sign in",
+    () =>
+      Effect.gen(function* () {
+        const world = yield* signInWorld();
+
+        const session = yield* signedInSession(world);
+
+        const page = yield* openSignedIn(
+          world,
+          session,
+          authorizeUrl("state-9")
+        );
+
+        const form = yield* formIn(page);
+
+        const switched = yield* world
+          .fetch(
+            withCookies(
+              new Request(
+                new URL(
+                  `${SESSION_PATHS.switch}?request=${encodeURIComponent(form.request)}`,
+                  origin
+                )
+              ),
+              { [SESSION]: session }
+            )
+          )
+          .pipe(Effect.flatMap(read));
+
+        const again = yield* formIn(switched);
+
+        const signedIn = yield* world.fetch(
+          post(
+            "/authorize",
+            {
+              csrf: again.csrf,
+              login: "alice",
+              password: alicePassword,
+              request: again.request,
+            },
+            again.cookie
+          )
+        );
+
+        expect({
+          ...asksToContinue(switched),
+          dropped: endsSession(switched.response),
+          state: Option.map(
+            Option.fromNullishOr(signedIn.headers.get("location")),
+            (location) => new URL(location).searchParams.get("state")
+          ),
+        }).toStrictEqual({
+          continues: false,
+          dropped: true,
+          password: true,
+          state: Option.some("state-9"),
+          status: 200,
+        });
+      })
+  );
+
+  it.live(
+    "signs out to the web's home alone, whatever address the request names",
+    () =>
+      Effect.gen(function* () {
+        const world = yield* signInWorld();
+
+        const session = yield* signedInSession(world);
+
+        const answers = yield* Effect.forEach(["GET", "POST"], (method) =>
+          world.fetch(
+            withCookies(
+              new Request(
+                new URL(
+                  `${SESSION_PATHS.signOut}?return=https://elsewhere.example/&redirect_uri=https://elsewhere.example/`,
+                  origin
+                ),
+                { method, redirect: "manual" }
+              ),
+              { [SESSION]: session }
+            )
+          )
+        );
+
+        expect(
+          answers.map((response) => [
+            response.status,
+            response.headers.get("location"),
+            endsSession(response),
+          ])
+        ).toStrictEqual([
+          [302, webHome, true],
+          [302, webHome, true],
+        ]);
+      })
+  );
+
+  it.live(
+    "asks an account with no email for one before it continues, and gives no code",
+    () =>
+      Effect.gen(function* () {
+        const world = yield* signInWorld();
+
+        yield* legacyAccount(world);
+
+        const account = yield* Effect.fromOption(
+          yield* world.accounts.find(Handle.make("alice"))
+        ).pipe(Effect.orDie);
+
+        const session = yield* sessionFor(account);
+
+        const page = yield* openSignedIn(world, session);
+
+        const clicked = yield* continueFrom(world, page, session).pipe(
+          Effect.flatMap(read)
+        );
+
+        expect([
+          asksToContinue(page).continues,
+          clicked.html.includes("Add your email"),
+          Option.isNone(codeOf(clicked.response)),
+        ]).toStrictEqual([true, true, true]);
+      })
+  );
+});
+
+describe("a session's lifetime", () => {
+  it.effect("names its account for thirty days, and nobody after", () =>
+    Effect.gen(function* () {
+      const accounts = yield* Accounts;
+
+      const account = {
+        email: Email.make("alice@mail.example"),
+        handle: Handle.make("alice"),
+        hash: yield* hashPasswordWith(1000)(pepper, password),
+      };
+
+      yield* accounts.create(account);
+
+      const session = yield* sessionFor(account);
+
+      const request = HttpServerRequest.fromWeb(
+        new Request(origin, { headers: { cookie: `${SESSION}=${session}` } })
+      );
+
+      const opened = () =>
+        Effect.map(sessionAccount(cookieKey, request), Option.isSome);
+
+      yield* TestClock.adjust("29 days");
+
+      const before = yield* opened();
+
+      yield* TestClock.adjust("1 day");
+
+      expect([before, yield* opened()]).toStrictEqual([true, false]);
+    }).pipe(Effect.provide(AccountsMemory.layer))
   );
 });

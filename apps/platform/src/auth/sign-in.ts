@@ -39,8 +39,10 @@ import {
   ACCOUNT_PATHS,
   addEmailPage,
   codePage,
+  continuePage,
   problemPage,
   resetPage,
+  SESSION_PATHS,
   signInPage,
   signUpPage,
 } from "./pages.ts";
@@ -51,6 +53,12 @@ import {
   PasswordPolicy,
   verifyPassword,
 } from "./password.ts";
+import {
+  hasSessionCookie,
+  sessionAccount,
+  withoutSession,
+  withSession,
+} from "./platform-session.ts";
 import {
   AuthRequest,
   openState,
@@ -110,6 +118,7 @@ export const SIGN_IN_PATHS = [
   "/signup",
   CLI_CLIENT_PATH,
   ...Object.values(ACCOUNT_PATHS),
+  ...Object.values(SESSION_PATHS),
 ] as const;
 
 // A handle is an owner, the first segment of a project's address, so it may not be a word the web serves pages at.
@@ -149,6 +158,7 @@ export const Says = {
     "Someone took that handle while you confirmed your email. Choose another.",
   mailFailed: "We could not send the mail just now. Try again in a minute.",
   passwordLength: "A password is 12 to 256 characters.",
+  signedOut: "You were signed out here. Sign in again.",
   tooManyCodes:
     "Too many codes tried for that address. Wait a minute, then try again.",
   tooManyMails:
@@ -373,10 +383,15 @@ const sameCsrf = (
 
 // The grant's user is the handle's key, so a grant is one account's in any case.
 // Every account it is given for has a proven email, or the person just proved
-// who they are to Google, whose address is then the account's.
+// who they are to Google, whose address is then the account's. Each grant
+// keeps the person signed in here, under the password the account has now
+// (read again, since a reset has just changed it), so the next asks only to
+// continue.
 export const completed = (handle: Handle, request: AuthRequest) =>
   Effect.gen(function* () {
     const api = yield* oauthApi;
+    const { cookieKey } = yield* SignInKeys;
+    const account = yield* (yield* Accounts).find(handle);
 
     const { redirectTo } = yield* provider(() =>
       api.completeAuthorization({
@@ -399,7 +414,13 @@ export const completed = (handle: Handle, request: AuthRequest) =>
         ...csrfCookie,
         maxAge: 0,
       }),
-      Effect.orDie
+      Effect.orDie,
+      Effect.flatMap((response) =>
+        Option.match(account, {
+          onNone: () => Effect.succeed(response),
+          onSome: (found) => withSession(cookieKey, found)(response),
+        })
+      )
     );
   });
 
@@ -444,15 +465,57 @@ export const signInPageFor = (
     return yield* withCsrfCookie(csrf)(page);
   });
 
+const continuePageFor = (request: AuthRequest, account: Account) =>
+  Effect.gen(function* () {
+    const { cookieKey } = yield* SignInKeys;
+
+    const csrf = yield* freshCsrf;
+
+    const sealed = yield* sealState(cookieKey, { csrf, request });
+
+    const asker = yield* askerOf(request);
+
+    return yield* withCsrfCookie(csrf)(
+      htmlPage(
+        continuePage(
+          asker,
+          { csrf, request: sealed },
+          { displayName: account.displayName, handle: account.handle }
+        ),
+        200,
+        request.redirectUri
+      )
+    );
+  });
+
+// A session that no longer fits is dropped as the page that replaces it is shown.
+const signInOrDropped = (
+  request: HttpServerRequest.HttpServerRequest,
+  pending: AuthRequest,
+  message?: string
+) =>
+  Effect.gen(function* () {
+    const page = yield* signInPageFor(pending, 200, message);
+
+    return hasSessionCookie(request) ? yield* withoutSession(page) : page;
+  });
+
+// Someone signed in here already is asked only to continue; anyone else, to sign in.
 const showSignIn = (request: HttpServerRequest.HttpServerRequest) =>
   Effect.gen(function* () {
     const api = yield* oauthApi;
+    const { cookieKey } = yield* SignInKeys;
 
     const web = yield* HttpServerRequest.toWeb(request).pipe(Effect.orDie);
 
     const parsed = yield* provider(() => api.parseAuthRequest(web));
 
-    return yield* signInPageFor(parsed, 200);
+    const account = yield* sessionAccount(cookieKey, request);
+
+    return yield* Option.match(account, {
+      onNone: () => signInOrDropped(request, parsed),
+      onSome: (signedIn) => continuePageFor(parsed, signedIn),
+    });
   });
 
 // Mailing
@@ -690,14 +753,69 @@ export const addEmailPageFor = (
 
 // A signed-in account with no email adds one before its grant.
 export const signedInWithEmail = (account: Account, request: AuthRequest) =>
-  account.email === undefined
-    ? addEmailPageFor(account.handle, request, 200)
-    : completed(account.handle, request);
+  Effect.gen(function* () {
+    return account.email === undefined
+      ? yield* addEmailPageFor(account.handle, request, 200)
+      : yield* completed(account.handle, request);
+  });
 
 const signIn = (request: HttpServerRequest.HttpServerRequest) =>
   byPassword(request, (account, pending) =>
     signedInWithEmail(account, pending.request)
   );
+
+const PostedContinue = Schema.Struct({
+  csrf: Schema.String,
+  request: Schema.String,
+});
+
+// No password is asked, so the session is read again at the click: it must still fit, and the email rule still holds.
+const continueAs = (request: HttpServerRequest.HttpServerRequest) =>
+  Effect.gen(function* () {
+    const { cookieKey } = yield* SignInKeys;
+
+    const form = yield* HttpServerRequest.schemaBodyUrlParams(
+      PostedContinue
+    ).pipe(Effect.mapError(() => startAgain));
+
+    const pending = yield* openState(cookieKey, form.request);
+
+    yield* sameCsrf(request, form.csrf, pending.csrf);
+
+    const account = yield* sessionAccount(cookieKey, request);
+
+    return yield* Option.match(account, {
+      onNone: () => signInOrDropped(request, pending.request, Says.signedOut),
+      onSome: (signedIn) => signedInWithEmail(signedIn, pending.request),
+    });
+  });
+
+// Leaves the session and signs in afresh for the same client.
+const switchAccount = Effect.gen(function* () {
+  const { cookieKey } = yield* SignInKeys;
+
+  const { request: sealed } = yield* HttpServerRequest.schemaSearchParams(
+    Schema.Struct({ request: Schema.String })
+  ).pipe(Effect.mapError(() => startAgain));
+
+  const pending = yield* openState(cookieKey, sealed);
+
+  return yield* signInPageFor(pending.request, 200).pipe(
+    Effect.flatMap(withoutSession)
+  );
+});
+
+// Always to the web's home, never to an address the request names.
+const signOut = Effect.gen(function* () {
+  const { webUrl } = yield* SignInHome;
+
+  return yield* withoutSession(
+    HttpServerResponse.redirect(
+      Option.getOrElse(webUrl, () => "/"),
+      { headers: { "cache-control": "no-store" }, status: 302 }
+    )
+  );
+});
 
 const addEmailCode = (request: AuthRequest, email: Email): CodeForm => ({
   action: ACCOUNT_PATHS.addEmailVerify,
@@ -1373,6 +1491,10 @@ export const signInRoutes = HttpRouter.use((router) =>
 
     yield* add("GET", "/authorize", showSignIn);
     yield* add("POST", "/authorize", signIn);
+    yield* add("POST", SESSION_PATHS.continue, continueAs);
+    yield* add("GET", SESSION_PATHS.switch, () => switchAccount);
+    yield* add("GET", SESSION_PATHS.signOut, () => signOut);
+    yield* add("POST", SESSION_PATHS.signOut, () => signOut);
     yield* add("GET", "/signup", () => showSignUp);
     yield* add("POST", "/signup", signUp);
     yield* add("POST", ACCOUNT_PATHS.signUpVerify, signUpVerified);
