@@ -31,6 +31,8 @@ import { RpcClient, RpcSerialization } from "effect/rpc";
 import { currentEnv } from "../credential-helper.ts";
 import { Credentials, gitHelperConfig } from "../credentials.ts";
 import type { Profile } from "../credentials.ts";
+import { cliClientIdOf, revoke, tradeCode } from "../oauth-token.ts";
+import type { Issued } from "../oauth-token.ts";
 import { Output } from "../output.ts";
 
 const SLUG = Brand.slug.toUpperCase();
@@ -38,8 +40,6 @@ const SLUG = Brand.slug.toUpperCase();
 const LOOPBACK = "127.0.0.1";
 
 const SIGN_IN_WAIT = "5 minutes";
-
-const clientIdOf = (origin: string) => `${origin}/oauth/cli`;
 
 export const Loopback = Context.Reference<{
   readonly listen: (address: {
@@ -355,55 +355,17 @@ const loopback = Effect.gen(function* () {
   };
 });
 
-const TokenResponse = Schema.Struct({
-  access_token: Schema.RedactedFromValue(Schema.NonEmptyString),
-  token_type: Schema.String,
-});
-
-const decodeTokenResponse = Schema.decodeUnknownEffect(TokenResponse);
+const refusedTrade = (url: string) =>
+  new LoginRefused({
+    reason: `${url}/token would not trade the sign-in for a token: run ${Brand.cli} login again`,
+  });
 
 const exchange = (input: {
   readonly code: string;
   readonly redirectUri: string;
   readonly url: string;
   readonly verifier: string;
-}) => {
-  const refused = new LoginRefused({
-    reason: `${input.url}/token would not trade the sign-in for a token: run ${Brand.cli} login again`,
-  });
-
-  return Effect.gen(function* () {
-    const client = yield* HttpClient.HttpClient;
-
-    const response = yield* client.execute(
-      HttpClientRequest.post(`${input.url}/token`).pipe(
-        HttpClientRequest.acceptJson,
-        HttpClientRequest.bodyUrlParams({
-          client_id: clientIdOf(input.url),
-          code: input.code,
-          code_verifier: input.verifier,
-          grant_type: "authorization_code",
-          redirect_uri: input.redirectUri,
-        })
-      )
-    );
-
-    if (response.status !== 200) {
-      return yield* refused;
-    }
-
-    const body = yield* decodeTokenResponse(yield* response.json);
-
-    if (body.token_type.toLowerCase() !== "bearer") {
-      return yield* refused;
-    }
-
-    return body.access_token;
-  }).pipe(
-    Effect.provide(FetchHttpClient.layer),
-    Effect.mapError(() => refused)
-  );
-};
+}) => tradeCode(input).pipe(Effect.mapError(() => refusedTrade(input.url)));
 
 const tokenFromBrowser = (url: string, opens: boolean) =>
   Effect.scoped(
@@ -416,7 +378,7 @@ const tokenFromBrowser = (url: string, opens: boolean) =>
       const authorize = new URL("/authorize", url);
 
       authorize.search = new URLSearchParams({
-        client_id: clientIdOf(url),
+        client_id: cliClientIdOf(url),
         code_challenge: yield* challengeOf(verifier),
         code_challenge_method: "S256",
         redirect_uri: redirectUri,
@@ -552,16 +514,32 @@ export const login = Command.make(
       const name = profileName(given.profile, env);
       const url = yield* platformOf(given.url, given.profile, env);
 
-      const token = given.tokenStdin
-        ? yield* tokenFromStdin
+      const issued: Issued = given.tokenStdin
+        ? {
+            expiresAt: Option.none(),
+            refreshToken: Option.none(),
+            token: yield* tokenFromStdin,
+          }
         : yield* tokenFromBrowser(
             url,
             !given.noBrowser && (yield* mayOpenBrowser(env))
           );
 
-      const handle = yield* verify(url, token);
+      const handle = yield* verify(url, issued.token);
 
-      yield* credentials.put(name, { handle, token, url });
+      yield* credentials.put(name, {
+        ...Option.match(issued.expiresAt, {
+          onNone: () => ({}),
+          onSome: (expiresAt) => ({ expiresAt }),
+        }),
+        handle,
+        ...Option.match(issued.refreshToken, {
+          onNone: () => ({}),
+          onSome: (refreshToken) => ({ refreshToken }),
+        }),
+        token: issued.token,
+        url,
+      });
 
       const commands = gitHelperConfig(url);
 
@@ -642,7 +620,25 @@ export const logout = Command.make("logout", flags, (given) =>
     const credentials = yield* Credentials;
     const env = yield* currentEnv;
     const name = profileName(given.profile, env);
-    const removed = yield* credentials.remove(name);
+    const kept = yield* credentials.remove(name);
+    const removed = Option.isSome(kept);
+
+    // A browser sign-in's grant ends at the platform too, so a copy of its token lives no longer than this file's did.
+    const revoked = yield* Option.match(
+      Option.flatMap(kept, (profile) =>
+        Option.map(Option.fromUndefinedOr(profile.refreshToken), (token) => ({
+          token,
+          url: profile.url,
+        }))
+      ),
+      {
+        onNone: () => Effect.succeed(false),
+        onSome: ({ token, url }) =>
+          revoke(url, token, "refresh_token").pipe(
+            Effect.orElseSucceed(() => false)
+          ),
+      }
+    );
 
     // git keeps asking the helper for a platform another profile is still on.
     const unused: string[] = [];
@@ -666,10 +662,10 @@ export const logout = Command.make("logout", flags, (given) =>
 
     yield* output.success({
       command: "logout",
-      data: { gitConfig: commands, profile: name, removed },
+      data: { gitConfig: commands, profile: name, removed, revoked },
       json: given.json,
       view: viewOf(
-        `${removed ? `Logged out: profile ${name} removed.` : `No profile ${name} to remove.`}${
+        `${removed ? `Logged out: profile ${name} removed${revoked ? ", and its sign-in ended on the platform" : ""}.` : `No profile ${name} to remove.`}${
           commands.length === 0
             ? ""
             : ` git no longer asks ${Brand.cli} for ${unused.join(", ")}; its global config lost:`

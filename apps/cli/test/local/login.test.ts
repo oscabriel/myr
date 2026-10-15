@@ -755,6 +755,92 @@ describe(`${Brand.cli} login in the browser (PKCE)`, () => {
   );
 });
 
+const renewalOf = (env: Record<string, string>, name: string) =>
+  Effect.provide(
+    Effect.flatMap(Effect.service(Credentials), ({ current }) => current),
+    credentialsIn({ ...env, [`${SLUG}_PROFILE`]: name })
+  ).pipe(
+    Effect.map(
+      Option.map(({ expiresAt, refreshToken }) => ({
+        expiresAt,
+        refreshToken:
+          refreshToken === undefined ? undefined : Redacted.value(refreshToken),
+      }))
+    )
+  );
+
+describe(`${Brand.cli} login's grant`, () => {
+  it.live(
+    "keeps the refresh token and when the token lapses, and logout ends the grant on the platform",
+    () =>
+      Effect.gen(function* () {
+        const env = yield* home;
+        const server = yield* oauthServer({ token: issued });
+        const platform = yield* seams(signedInAs("alice"));
+        const run = { env, seams: platform.layer };
+        const before = yield* Clock.currentTimeMillis;
+
+        const fiber = yield* Effect.forkChild(
+          cli(["login", "--url", server.origin, "--no-browser"], run)
+        );
+
+        yield* visit(yield* signInUrl(server.origin));
+
+        expect(Exit.isSuccess(yield* Fiber.join(fiber))).toBeTruthy();
+
+        const renewal = yield* renewalOf(env, "default");
+
+        expect(
+          Option.map(renewal, ({ expiresAt, refreshToken }) => ({
+            lapses:
+              expiresAt !== undefined &&
+              expiresAt >= before + 3_600_000 &&
+              expiresAt <= before + 3_600_000 + 60_000,
+            refreshToken,
+          }))
+        ).toStrictEqual(
+          Option.some({ lapses: true, refreshToken: "refresh-1" })
+        );
+
+        expect(Exit.isSuccess(yield* cli(["logout"], run))).toBeTruthy();
+        expect({
+          live: yield* server.live,
+          revoked: (yield* server.revocations).map((form) => ({ ...form })),
+        }).toStrictEqual({
+          live: [],
+          revoked: [
+            {
+              client_id: `${server.origin}/oauth/cli`,
+              token: "refresh-1",
+              token_type_hint: "refresh_token",
+            },
+          ],
+        });
+        expect((yield* printed).stdout.join("\n")).toContain(
+          "its sign-in ended on the platform"
+        );
+      }).pipe(Effect.scoped, Effect.provide(testServices)),
+    30_000
+  );
+
+  it.live(
+    "asks the platform to end no grant for a token given by hand",
+    () =>
+      Effect.gen(function* () {
+        const env = yield* home;
+        const server = yield* oauthServer({ token: issued });
+        const platform = yield* seams(signedInAs("alice"));
+        const run = { env, seams: platform.layer, stdin: `${given}\n` };
+
+        yield* cli(["login", "--url", server.origin, "--token-stdin"], run);
+
+        expect(Exit.isSuccess(yield* cli(["logout"], run))).toBeTruthy();
+        expect(yield* server.revocations).toStrictEqual([]);
+      }).pipe(Effect.scoped, Effect.provide(testServices)),
+    30_000
+  );
+});
+
 describe(`${Brand.cli} logout`, () => {
   it.live(
     "removes the profile and the git config that names the helper for its platform",

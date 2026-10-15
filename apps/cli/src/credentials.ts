@@ -2,19 +2,31 @@ import { Brand } from "@repo/brand";
 import { Handle } from "@repo/protocol/ids";
 import {
   Array,
+  Clock,
   Config,
   Context,
+  Duration,
   Effect,
   FileSystem,
   Layer,
   Option,
   Order,
   Path,
+  Redacted,
   Schema,
 } from "effect";
 
+import { renew } from "./oauth-token.ts";
+
+// A browser sign-in keeps the token's lapse, in epoch milliseconds, and the
+// refresh token that renews it; a token given by hand keeps neither, and lasts
+// as long as the platform lets it.
 export const Profile = Schema.Struct({
+  expiresAt: Schema.optionalKey(Schema.Int),
   handle: Schema.optionalKey(Handle),
+  refreshToken: Schema.optionalKey(
+    Schema.RedactedFromValue(Schema.NonEmptyString)
+  ),
   token: Schema.RedactedFromValue(Schema.NonEmptyString),
   url: Schema.NonEmptyString,
 });
@@ -39,9 +51,10 @@ export class Credentials extends Context.Service<
       name: string,
       profile: Profile
     ) => Effect.Effect<void, CredentialsUnwritable>;
+    // The profile it removed, if there was one.
     readonly remove: (
       name: string
-    ) => Effect.Effect<boolean, CredentialsUnwritable>;
+    ) => Effect.Effect<Option.Option<Profile>, CredentialsUnwritable>;
   }
 >()("cli/Credentials") {}
 
@@ -71,6 +84,12 @@ const hostOf = Option.liftThrowable((url: string) =>
 const FILE_MODE = 0o600;
 
 const DIR_MODE = 0o700;
+
+/** Renewed this long before it lapses, so no call carries a token that dies on the way. */
+export const RENEW_MARGIN = Duration.minutes(1);
+
+const sameToken = (one: Redacted.Redacted, other: Redacted.Redacted) =>
+  Redacted.value(one) === Redacted.value(other);
 
 /** Replaced whole on every write so no reader sees half of one. */
 export const CredentialsFile = Layer.effect(Credentials)(
@@ -140,10 +159,73 @@ export const CredentialsFile = Layer.effect(Credentials)(
         )
       );
 
+    /**
+     * A stored profile whose token is about to lapse, renewed and written back.
+     * When the platform refuses the renewal, another process (git's helper, a
+     * second command) may have renewed it first, so the file is read again; if
+     * it holds no newer token, the old one is handed back, and the call it
+     * carries is refused as signed out.
+     */
+    const fresh = (name: string, profile: Profile) =>
+      Effect.gen(function* () {
+        const now = yield* Clock.currentTimeMillis;
+
+        if (
+          profile.refreshToken === undefined ||
+          profile.expiresAt === undefined ||
+          profile.expiresAt - Duration.toMillis(RENEW_MARGIN) > now
+        ) {
+          return profile;
+        }
+
+        const { refreshToken } = profile;
+
+        const issued = yield* renew(profile.url, refreshToken).pipe(
+          Effect.option
+        );
+
+        if (Option.isNone(issued)) {
+          const latest = Option.fromNullishOr((yield* readable)[name]);
+
+          return Option.match(
+            Option.filter(
+              latest,
+              (kept) =>
+                kept.url === profile.url &&
+                !sameToken(kept.token, profile.token)
+            ),
+            { onNone: () => profile, onSome: (kept) => kept }
+          );
+        }
+
+        const renewed: Profile = {
+          ...profile,
+          ...Option.match(issued.value.expiresAt, {
+            onNone: () => ({}),
+            onSome: (expiresAt) => ({ expiresAt }),
+          }),
+          refreshToken: Option.getOrElse(
+            issued.value.refreshToken,
+            () => refreshToken
+          ),
+          token: issued.value.token,
+        };
+
+        // The renewal stands even if the file cannot take it: this call carries it.
+        yield* Effect.flatMap(load, (profiles) =>
+          save({ ...profiles, [name]: renewed })
+        ).pipe(Effect.ignore);
+
+        return renewed;
+      });
+
     const current = Option.match(fromEnv, {
       onNone: () =>
-        Effect.map(readable, (profiles) =>
-          Option.fromNullishOr(profiles[named])
+        Effect.flatMap(readable, (profiles) =>
+          Option.match(Option.fromNullishOr(profiles[named]), {
+            onNone: () => Effect.succeedNone,
+            onSome: (profile) => Effect.asSome(fresh(named, profile)),
+          })
         ),
       onSome: (profile) => Effect.succeedSome(profile),
     });
@@ -151,20 +233,42 @@ export const CredentialsFile = Layer.effect(Credentials)(
     return {
       current,
       forHost: (host) =>
-        Effect.map(readable, (profiles) => {
+        Effect.flatMap(readable, (profiles) => {
           const stored = Array.sort(Object.keys(profiles), Order.String)
             .toSorted(
               (one, other) => Number(other === named) - Number(one === named)
             )
             .flatMap((name) =>
-              Option.toArray(Option.fromNullishOr(profiles[name]))
+              Option.toArray(
+                Option.map(
+                  Option.fromNullishOr(profiles[name]),
+                  (profile) => [Option.some(name), profile] as const
+                )
+              )
             );
 
-          return Array.findFirst(
-            [...Option.toArray(fromEnv), ...stored],
-            (profile) =>
+          const found = Array.findFirst(
+            [
+              ...Option.toArray(
+                Option.map(
+                  fromEnv,
+                  (profile) => [Option.none<string>(), profile] as const
+                )
+              ),
+              ...stored,
+            ],
+            ([, profile]) =>
               Option.contains(hostOf(profile.url), host.toLowerCase())
           );
+
+          return Option.match(found, {
+            onNone: () => Effect.succeedNone,
+            onSome: ([name, profile]) =>
+              Option.match(name, {
+                onNone: () => Effect.succeedSome(profile),
+                onSome: (at) => Effect.asSome(fresh(at, profile)),
+              }),
+          });
         }),
       put: (name, profile) =>
         Effect.flatMap(load, (profiles) =>
@@ -172,13 +276,11 @@ export const CredentialsFile = Layer.effect(Credentials)(
         ),
       remove: (name) =>
         Effect.flatMap(load, (profiles) => {
-          if (!Object.hasOwn(profiles, name)) {
-            return Effect.succeed(false);
-          }
+          const { [name]: removed, ...rest } = profiles;
 
-          const { [name]: _removed, ...rest } = profiles;
-
-          return Effect.as(save(rest), true);
+          return removed === undefined
+            ? Effect.succeedNone
+            : Effect.as(save(rest), Option.some(removed));
         }),
     };
   })
