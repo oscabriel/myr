@@ -55,11 +55,13 @@ import {
   DoCalls,
   finishRequired,
   LanderCalls,
+  landedOwn,
   lexPath,
   logged,
   mainMoved,
   mainTip,
   openedFiles,
+  ownMessage,
   parseIso,
   parsePath,
   policy,
@@ -1044,5 +1046,38 @@ describe(Answer, () => {
         expect(Exit.isFailure(exit)).toBeTruthy();
         expect(engine.ran).toStrictEqual(["load"]);
       })
+  );
+});
+
+describe("a maintainer's own landing", () => {
+  it.effect(
+    "is queued by land, then merged, checked and landed by the same run an answer has, with the message it was given",
+    () =>
+      Effect.gen(function* () {
+        const own = yield* landedOwn;
+
+        yield* scriptProjectLanes(own.admitted.merged, { result: "passed" });
+
+        const outcome = yield* run(own.admitted, yield* freshSteps());
+        const tip = yield* mainTip;
+        const host = yield* RepoHost;
+        const commit = yield* host.readCommit(repo, tip).pipe(Effect.orDie);
+
+        expect(own.receipt.outcome).toStrictEqual(
+          Outcome.cases.Checking.make({ stage: "merge" })
+        );
+        expect(yield* Started.use(({ ids }) => ids)).toContain(
+          own.admitted.requestId
+        );
+        // The same request sent again reads the landing the run made.
+        expect([outcome, (yield* own.again).outcome]).toStrictEqual([
+          landedAt(tip),
+          landedAt(tip),
+        ]);
+        expect(
+          Option.map(commit, ({ message }) => message.split("\n", 1)[0])
+        ).toStrictEqual(Option.some(ownMessage));
+        expect(yield* parentsOf(tip)).toStrictEqual([own.admitted.opened]);
+      }).pipe(Effect.provide(world))
   );
 });

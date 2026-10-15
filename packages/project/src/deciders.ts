@@ -1,5 +1,4 @@
 import { RefName, RepoHost, Revision } from "@repo/artifacts/repo-host";
-import { CheckLane } from "@repo/checks/check-runner";
 import type { CheckRunner } from "@repo/checks/check-runner";
 import type { PushFacts } from "@repo/gate/facts";
 import { pushStages, runGate } from "@repo/gate/gate";
@@ -21,7 +20,6 @@ import type { LandingView } from "@repo/protocol/domain/landing";
 import { Outcome } from "@repo/protocol/domain/outcome";
 import type { Policy } from "@repo/protocol/domain/policy";
 import type { CreditSummary } from "@repo/protocol/domain/record";
-import type { RunBlock } from "@repo/protocol/domain/run";
 import type { Ledger } from "@repo/protocol/domain/visibility";
 import {
   CommitSha,
@@ -41,7 +39,6 @@ import {
   Denounced,
   NotDecider,
   NotVouched,
-  RepoBusy,
   StaleBase,
   TouchedJudge,
   UnknownDiscussion,
@@ -60,22 +57,13 @@ import type {
   ValueTooShort,
   VerifierBlocked,
   WeakCheck,
+  RepoBusy,
 } from "@repo/protocol/refusal";
 import { parseVouchFile } from "@repo/rules/vouch";
-import {
-  Array,
-  DateTime,
-  Effect,
-  Match,
-  Option,
-  Order,
-  Record,
-  Schema,
-} from "effect";
+import { Array, DateTime, Effect, Match, Option, Order, Schema } from "effect";
 import type { Redacted } from "effect";
 
-import type { Advanced, AnswerQueue, AnswerRun } from "./answer-runs.ts";
-import { isStep, runStep } from "./answer-runs/steps.ts";
+import type { Advanced, AnswerQueue } from "./answer-runs.ts";
 import { creditsByArea } from "./attention/credits.ts";
 import {
   decide,
@@ -89,7 +77,6 @@ import { AttentionEffect, platformHandle } from "./attention/effects.ts";
 import { today } from "./attention/today.ts";
 import { capped, standing } from "./attention/vouch.ts";
 import { ClaimState } from "./claim.ts";
-import type { UnlandedRunEnv } from "./env-port.ts";
 import { ProjectEventInput } from "./events.ts";
 import { pushFacts } from "./facts.ts";
 import { Lander, Rebuild } from "./lander.ts";
@@ -99,9 +86,8 @@ import {
   LandingCommand,
   LandingState,
   outcomeOf,
-  transition,
 } from "./landing.ts";
-import type { Request, Step } from "./landing.ts";
+import type { Request } from "./landing.ts";
 import { OutboxBody, outboxRow, startRow } from "./outbox.ts";
 import type {
   AnswerRow,
@@ -208,7 +194,6 @@ export interface DeciderState {
   readonly answers: readonly {
     readonly record: {
       readonly landing: LandingState;
-      readonly receipt: AnswerReceipt;
     };
     readonly row: AnswerRow;
   }[];
@@ -275,6 +260,15 @@ export interface DeciderKernel<
       readonly now: DateTime.Utc;
     }
   ) => Effect.Effect<AnswerReceipt>;
+  readonly enqueueLand: (
+    writes: W,
+    request: Request,
+    input: {
+      readonly main: LandedSha;
+      readonly message: string;
+      readonly now: DateTime.Utc;
+    }
+  ) => Effect.Effect<LandReceipt>;
   readonly name: ProjectName;
   readonly policyAt: (
     row: ProjectRow,
@@ -282,7 +276,6 @@ export interface DeciderKernel<
     now: DateTime.Utc
   ) => Effect.Effect<ProjectRow>;
   readonly read: Effect.Effect<H>;
-  readonly runEnv: Effect.Effect<UnlandedRunEnv>;
   readonly withLayers: (facts: PushFacts) => Effect.Effect<PushFacts>;
   readonly remote: (fork: RepoName) => Effect.Effect<string>;
   readonly repo: RepoName;
@@ -298,8 +291,6 @@ export interface DeciderKernel<
 const mainRef = "refs/heads/main";
 
 const mainRefName = RefName.make(mainRef);
-
-const landTurns = 16;
 
 export const isDecider = (policy: Policy, handle: Handle) =>
   policy.deciders.some(({ handles }) =>
@@ -370,12 +361,6 @@ const isTouchedJudge = (refusal: Refusal) =>
   Match.value(refusal).pipe(
     Match.tag("TouchedJudge", () => true),
     Match.orElse(() => false)
-  );
-
-const staleOf = (refusal: Refusal): Option.Option<StaleBase> =>
-  Match.value(refusal).pipe(
-    Match.tag("StaleBase", (stale) => Option.some(stale)),
-    Match.orElse(() => Option.none())
   );
 
 const answerDecisionOf = (subject: DecisionSubject) =>
@@ -1226,49 +1211,6 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
         );
       });
 
-  const carry = (
-    input: {
-      readonly env: UnlandedRunEnv;
-      readonly lanes: readonly CheckLane[];
-      readonly landings: AnswerQueue["landings"];
-      readonly message: string;
-      readonly now: DateTime.Utc;
-      readonly run: RunBlock;
-    },
-    step: Step,
-    turns: number
-  ): Effect.Effect<LandingState, never, DeciderPorts> =>
-    Effect.gen(function* () {
-      const next = step.effects.find(isStep);
-
-      if (next === undefined || turns === 0) {
-        return step.state;
-      }
-
-      const run: AnswerRun = {
-        admitted: true,
-        env: input.env,
-        finish: "optional",
-        lanes: input.lanes,
-        message: input.message,
-        repo,
-        run: input.run,
-        state: step.state,
-      };
-
-      const reported = yield* runStep(run, next, input.landings);
-
-      if (Option.isNone(reported)) {
-        return step.state;
-      }
-
-      return yield* carry(
-        input,
-        transition(step.state, reported.value.command, input.now),
-        turns - 1
-      );
-    });
-
   const landBody =
     (
       queue: AnswerQueue,
@@ -1296,7 +1238,7 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
           requestId: input.requestId,
         });
 
-        // The same request again: the landing it made.
+        // The same request again: the landing it made, or its run as it stands.
         const earlier = Array.findFirst(
           h.landings,
           ({ author, requestId }) =>
@@ -1307,6 +1249,21 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
           return receiptOf(
             Outcome.cases.Landed.make({ sha: earlier.value.sha })
           );
+        }
+
+        const queued = Array.findFirst(
+          h.answers,
+          ({ row }) => row.requestId === input.requestId
+        );
+
+        if (Option.isSome(queued)) {
+          const { record, row } = queued.value;
+
+          // An answer's request id, or another maintainer's, is not this landing's to read.
+          return row.ask === undefined &&
+            sameHandle(row.answerer, caller.handle)
+            ? receiptOf(outcomeOf(record.landing))
+            : yield* new NotDecider({});
         }
 
         const fork = workingFork(name, caller.handle);
@@ -1363,75 +1320,33 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
           { handle: caller.handle, role: "Signed-off-by" },
         ];
 
-        const request: Request = {
-          answerer: caller.handle,
-          ask: Option.none(),
-          assisted: [],
-          base: input.base,
-          credits,
-          fork,
-          head: input.head,
-          project: name,
-          requestId: input.requestId,
-        };
-
-        const env = yield* kernel.runEnv;
-
-        const state = yield* kernel.withPorts(
-          carry(
-            {
-              env,
-              landings: queue.landings,
-              lanes: Record.toEntries(policy.run.checks).map(
-                ([lane, command]) => CheckLane.make({ command, lane })
-              ),
-              message: formatLanding({
-                assisted: [],
-                credits,
-                requestId: input.requestId,
-                ...messageParts(input.message),
-              }),
-              now,
-              run: policy.run,
-            },
-            transition(
-              LandingState.cases.Queued.make({ request }),
-              LandingCommand.Start({ main }),
-              now
-            ),
-            landTurns
-          )
-        );
-
-        if (LandingState.guards.Landed(state)) {
-          yield* recordLanding(
-            h,
-            writes,
-            {
+        // The checks run after this call returns, as an answer's do: a send
+        // of the same request reads where they stand, and the landing's own
+        // receipt once it lands.
+        return yield* kernel.enqueueLand(
+          writes,
+          {
+            answerer: caller.handle,
+            ask: Option.none(),
+            assisted: [],
+            base: input.base,
+            credits,
+            fork,
+            head: input.head,
+            project: name,
+            requestId: input.requestId,
+          },
+          {
+            main,
+            message: formatLanding({
               assisted: [],
-              author: caller.handle,
               credits,
-              landedAt: now,
-              parent: main,
-              project: name,
               requestId: input.requestId,
-              sha: state.sha,
-            },
-            now
-          );
-
-          return receiptOf(outcomeOf(state));
-        }
-
-        if (LandingState.guards.Refused(state)) {
-          const stuck = Array.findFirst(state.refusals, staleOf);
-
-          return Option.isSome(stuck)
-            ? yield* stuck.value
-            : receiptOf(outcomeOf(state));
-        }
-
-        return yield* new RepoBusy({});
+              ...messageParts(input.message),
+            }),
+            now,
+          }
+        );
       });
 
   const forkBody = (caller: Person) => (h: H, writes: W, now: DateTime.Utc) =>

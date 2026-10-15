@@ -160,7 +160,13 @@ const commitOf = (sha: CommitSha) =>
     const read = yield* host.readCommit(repo, sha).pipe(Effect.orDie);
     const { author, committer, message, parents } = Option.getOrThrow(read);
 
-    return { author, committer, parents, trailers: parseTrailers(message) };
+    return {
+      author,
+      committer,
+      parents,
+      subject: message.split("\n", 1)[0],
+      trailers: parseTrailers(message),
+    };
   });
 
 const stored = ProjectStore.use((store) => store.load());
@@ -591,6 +597,41 @@ const landingOwn = (api: ProjectApi) =>
     };
   });
 
+// A land sent under an answer's request id reads nothing of it and replaces nothing.
+const landingUnderAnAnswersId = (api: ProjectApi) =>
+  Effect.gen(function* () {
+    yield* openRed(api, "parse-iso");
+
+    const answer = yield* answered(api, {
+      change: [
+        "packages/parser/src/parse.ts",
+        "export const parse = (s) => new Date(s);\n",
+      ],
+      files: withAskFiles(start, "parse-iso"),
+      id: "parse-iso",
+      who: bob,
+    });
+
+    const tip = yield* mainTip;
+
+    yield* api.fork(alice);
+
+    const refused = yield* api
+      .land(alice, {
+        base: tip,
+        head: tip,
+        message: "Take the answer's id",
+        requestId: answer.receipt.requestId,
+      })
+      .pipe(Effect.flip);
+
+    return {
+      after: (yield* api.status(bob)).answers.map(({ requestId }) => requestId),
+      refused,
+      requestId: answer.receipt.requestId,
+    };
+  });
+
 describe("a maintainer's own change", () => {
   const seen = Effect.flatMap(begun, landingOwn).pipe(
     Effect.provide(worldOf(scenario, "memory"))
@@ -612,19 +653,22 @@ describe("a maintainer's own change", () => {
   );
 
   it.effect(
-    "passes the same stages and checks, and lands once as a platform commit its maintainer authors",
+    "passes the same stages and checks after its receipt, and lands once as a platform commit its maintainer authors",
     () =>
       Effect.map(seen, (run) => {
+        const receipt = (outcome: Outcome) => ({
+          base: run.base,
+          head: run.receipt.head,
+          outcome,
+          project,
+          requestId: RequestId.make("land-alice-01"),
+        });
+
         expect(run.bobLands).toStrictEqual(new NotDecider({}));
+        // The checks run after the call returns; the same request sent again reads the landing.
         expect([run.receipt, run.replay]).toStrictEqual([
-          {
-            base: run.base,
-            head: run.receipt.head,
-            outcome: Outcome.cases.Landed.make({ sha: run.landed }),
-            project,
-            requestId: RequestId.make("land-alice-01"),
-          },
-          run.receipt,
+          receipt(Outcome.cases.Checking.make({ stage: "merge" })),
+          receipt(Outcome.cases.Landed.make({ sha: run.landed })),
         ]);
         expect({
           author: run.commit.author,
@@ -633,11 +677,13 @@ describe("a maintainer's own change", () => {
           signed: run.commit.trailers.filter(
             ({ key }) => key === "Signed-off-by"
           ),
+          subject: run.commit.subject,
         }).toStrictEqual({
           author: authorLine(alice.handle),
           committer: committerLine,
           parents: [run.base],
           signed: [{ key: "Signed-off-by", value: userOf("alice") }],
+          subject: "Split words on runs of spaces",
         });
         expect(run.view).toMatchObject({
           author: alice.handle,
@@ -658,6 +704,20 @@ describe("a maintainer's own change", () => {
             .map((job) => job.repo)
         ).toStrictEqual([run.forked.fork]);
       })
+  );
+
+  it.effect(
+    "under an answer's request id is refused, and the answer stays",
+    () =>
+      Effect.map(
+        Effect.flatMap(begun, landingUnderAnAnswersId).pipe(
+          Effect.provide(worldOf(scenario, "memory"))
+        ),
+        (run) => {
+          expect(run.refused).toStrictEqual(new NotDecider({}));
+          expect(run.after).toStrictEqual([run.requestId]);
+        }
+      )
   );
 
   it.effect(

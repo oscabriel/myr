@@ -102,10 +102,10 @@ export const runAProject: DocSource = {
       `git remote add fork <remote>`,
       `git push fork HEAD:main`,
       `git fetch ${Brand.slug}`,
-      `${Brand.cli} land --project <owner>/<name> --base $(git rev-parse ${Brand.slug}/main) --head $(git rev-parse HEAD) --message "<what it does>" --requestId <id>`
+      `${Brand.cli} land --project <owner>/<name> --base $(git rev-parse ${Brand.slug}/main) --head $(git rev-parse HEAD) --message "<what it does>" --requestId <id> --yes`
     ),
     "",
-    `${code("--base")} is \`main\` as the platform last landed it: ${code(`git rev-parse ${Brand.slug}/main`)} after ${code(`git fetch ${Brand.slug}`)}, where ${code(Brand.slug)} is the remote ${cli("init")} added for the project. ${code("--head")} is the commit you pushed to the fork. ${code("--requestId")} is any 8 to 64 letters, digits, \`-\` or \`_\` you choose: sending the same one again returns the same receipt, and checks nothing twice. ${cli("finish")} takes the same three. If \`main\` moves past your base before the change lands, the platform merges it onto the new \`main\` itself, and refuses with \`StaleBase\` only when that merge conflicts.`,
+    `${code("--base")} is \`main\` as the platform last landed it: ${code(`git rev-parse ${Brand.slug}/main`)} after ${code(`git fetch ${Brand.slug}`)}, where ${code(Brand.slug)} is the remote ${cli("init")} added for the project. ${code("--head")} is the commit you pushed to the fork. ${code("--requestId")} is any 8 to 64 letters, digits, \`-\` or \`_\` you choose: sending the same one again returns its receipt as it stands, and checks nothing twice. ${cli("finish")} takes the same three. ${cli("land")} answers as soon as the stages a push hears pass, with an outcome of \`Checking\`: the checks run on the platform after it returns, as an answer's do, and the same command again, with the same ${code("--requestId")}, says where they stand, then names the landing. If \`main\` moves past your base before the change lands, the platform merges it onto the new \`main\` itself, and refuses with \`StaleBase\` only when that merge conflicts.`,
     "",
     "## Vouch",
     "",

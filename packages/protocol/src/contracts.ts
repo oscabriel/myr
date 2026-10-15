@@ -949,7 +949,7 @@ export class Land extends Rpc.make("land", {
 })
   .annotate(
     Description,
-    "Land a maintainer's own change from their working fork, after the same checks an answer passes."
+    "Land a maintainer's own change from their working fork, after the same checks an answer passes. The checks run after it returns: the same request sent again says where they stand, and names the landing once it lands."
   )
   .annotate(Audience, "decider")
   .annotate(Visibility, "public")

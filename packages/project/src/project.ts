@@ -75,6 +75,7 @@ import {
 import {
   AnswerReceipt,
   HeldBackResult,
+  LandReceipt,
   Verdict,
 } from "@repo/protocol/domain/answer";
 import type { AnswerView, LaneResult } from "@repo/protocol/domain/answer";
@@ -766,9 +767,12 @@ export const AnswerRecord = Schema.Struct({
   heldBack: Schema.optionalKey(HeldBackJudged),
   landing: LandingState,
   measured: Schema.optionalKey(Measured),
+  /** A maintainer's own landing's message, as `land` was given it; an answer's comes from its verdict. */
+  message: Schema.optionalKey(Schema.NonEmptyString),
   /** When the answer was queued: absent from an answer queued before it was kept. */
   queuedAt: Schema.optionalKey(Schema.DateTimeUtcFromString),
-  receipt: AnswerReceipt,
+  /** A maintainer's own landing answers no ask, so its receipt names none. */
+  receipt: Schema.Union([AnswerReceipt, LandReceipt]),
   verdict: Schema.optionalKey(Verdict),
   waived: Schema.optionalKey(Schema.Array(DecisionSubject.cases.Waiver)),
 });
@@ -788,6 +792,8 @@ const encodeClaim = Schema.encodeEffect(ClaimJson);
 const decodeAnswer = Schema.decodeUnknownEffect(AnswerJson);
 
 const encodeAnswer = Schema.encodeEffect(AnswerJson);
+
+const isAnswerReceipt = Schema.is(AnswerReceipt);
 
 const decodePolicy = Schema.decodeUnknownEffect(PolicyJson);
 
@@ -2678,6 +2684,12 @@ export const projectService = (
         verdict: each,
       }));
 
+      // A maintainer's own landing has no verdict; it lands with the message it was given.
+      const ownRun = Option.map(
+        Option.fromUndefinedOr(found.record.message),
+        (message) => ({ message })
+      );
+
       return {
         admitted: holdsSlot(h.queue, request.requestId),
         finish,
@@ -2707,7 +2719,10 @@ export const projectService = (
           "run",
           Option.map(h.policy, ({ run }) => run)
         ),
-        ...Option.getOrElse(judgedRun, () => ({})),
+        ...Option.getOrElse(
+          Option.orElse(judgedRun, () => ownRun),
+          () => ({})
+        ),
       };
     };
 
@@ -4525,16 +4540,26 @@ export const projectService = (
         )
       );
 
-      return Effect.succeed(Option.map(given, ({ record }) => record.receipt));
+      const { ask } = input;
+
+      // A maintainer's own landing under the same request id is not this answer's.
+      return Option.match(given, {
+        onNone: () => Effect.succeedNone,
+        onSome: ({ record }) =>
+          isAnswerReceipt(record.receipt)
+            ? Effect.succeedSome(record.receipt)
+            : Effect.fail(NotClaimed.of(ask)),
+      });
     };
 
-    const queueAnswer = (
+    const queueRun = <R extends AnswerReceipt | LandReceipt>(
       writes: Writes,
       request: Request,
       input: {
-        readonly ask: AskId;
         readonly main: LandedSha;
+        readonly message: Option.Option<string>;
         readonly now: DateTime.Utc;
+        readonly receiptOf: (outcome: Outcome) => R;
       }
     ) =>
       Effect.gen(function* () {
@@ -4544,14 +4569,7 @@ export const projectService = (
           input.now
         );
 
-        const receipt: AnswerReceipt = {
-          ask: input.ask,
-          base: request.base,
-          head: request.head,
-          outcome: outcomeOf(started.state),
-          project: name,
-          requestId: request.requestId,
-        };
+        const receipt = input.receiptOf(outcomeOf(started.state));
 
         writes.answers.set(request.requestId, {
           answerer: request.answerer,
@@ -4562,6 +4580,7 @@ export const projectService = (
               landing: started.state,
               queuedAt: input.now,
               receipt,
+              ...field("message", input.message),
             })
           ),
           updatedAt: input.now,
@@ -4570,6 +4589,52 @@ export const projectService = (
         writes.outbox.push(yield* startRow(request.requestId, input.now));
 
         return receipt;
+      });
+
+    const queueAnswer = (
+      writes: Writes,
+      request: Request,
+      input: {
+        readonly ask: AskId;
+        readonly main: LandedSha;
+        readonly now: DateTime.Utc;
+      }
+    ) =>
+      queueRun(writes, request, {
+        main: input.main,
+        message: Option.none(),
+        now: input.now,
+        receiptOf: (outcome): AnswerReceipt => ({
+          ask: input.ask,
+          base: request.base,
+          head: request.head,
+          outcome,
+          project: name,
+          requestId: request.requestId,
+        }),
+      });
+
+    // A maintainer's own landing runs as an answer does, with the message it was given.
+    const queueLand = (
+      writes: Writes,
+      request: Request,
+      input: {
+        readonly main: LandedSha;
+        readonly message: string;
+        readonly now: DateTime.Utc;
+      }
+    ) =>
+      queueRun(writes, request, {
+        main: input.main,
+        message: Option.some(input.message),
+        now: input.now,
+        receiptOf: (outcome): LandReceipt => ({
+          base: request.base,
+          head: request.head,
+          outcome,
+          project: name,
+          requestId: request.requestId,
+        }),
       });
 
     const submitBody =
@@ -4814,10 +4879,6 @@ export const projectService = (
         return { lane, ...tailOf(kept.value) };
       });
 
-    const unlandedEnv = Effect.flatMap(hydrate, (h) =>
-      envPort.runEnv({ landed: false }, h.snapshot)
-    );
-
     const pinnedClaimOf = (h: Hydrated, record: AnswerRecord) => {
       const { request } = record.landing;
 
@@ -4979,6 +5040,7 @@ export const projectService = (
       advance: (h, writes, now, requestId, command) =>
         advanceBody(requestId, command)(h, writes, now),
       enqueue: queueAnswer,
+      enqueueLand: queueLand,
       name,
       policyAt: withPolicyAt,
       read: hydrate,
@@ -4987,7 +5049,6 @@ export const projectService = (
           return `${yield* GatewayUrl}/${Option.getOrElse(addressOfRepo(fork), () => fork)}.git`;
         }),
       repo,
-      runEnv: unlandedEnv,
       withLayers: (facts) =>
         Effect.flatMap(hydrate, (h) => layered(h.snapshot, facts)),
       withPorts,
