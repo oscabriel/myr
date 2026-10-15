@@ -602,7 +602,7 @@ describe("Google sign-in, without a Google OAuth client", () => {
 
 describe("Google sign-in, with a Google OAuth client", () => {
   it.live(
-    'offers "Continue with Google" and "Sign in and link Google" on the sign-in page',
+    'offers "Continue with Google" and "Sign in and link your Google account" on the sign-in page',
     () =>
       Effect.gen(function* () {
         const world = yield* googleWorld();

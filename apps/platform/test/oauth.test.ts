@@ -531,9 +531,45 @@ describe("the platform as its own OAuth authorization server", () => {
           `${CSP} http://127.0.0.1:${port}`,
           "DENY",
         ]);
-        expect(page.html).toContain(`${Brand.name} CLI`);
+        expect(page.html).toContain(
+          "This finishes signing in the CLI on this computer."
+        );
+        expect(page.html).not.toContain("What it can do");
         expect(page.html).not.toMatch(/<script|<link|<img|src=|url\(|@import/u);
         expect(Option.isSome(formOf(page.response, page.html))).toBeTruthy();
+      })
+  );
+
+  it.live(
+    "asks a client from another address for consent, though it names itself as the platform's CLI",
+    () =>
+      Effect.gen(function* () {
+        const world = yield* signInWorld();
+        const url = authorizeUrl();
+
+        // The same metadata document, served at another origin: its name is ours, its id is not.
+        url.searchParams.set("client_id", "https://other.test/oauth/cli");
+
+        const page = yield* world
+          .fetch(new Request(url))
+          .pipe(Effect.flatMap(read));
+
+        expect({
+          asks: new RegExp(
+            `<strong>${Brand.name} CLI</strong>[^<]* wants to act as you\\.`,
+            "u"
+          ).test(page.html),
+          lists: page.html.includes("<summary>What it can do</summary>"),
+          ours: page.html.includes("This finishes signing in the CLI"),
+          status: page.response.status,
+          warns: page.html.includes("Warning</strong>"),
+        }).toStrictEqual({
+          asks: true,
+          lists: true,
+          ours: false,
+          status: 200,
+          warns: true,
+        });
       })
   );
 

@@ -33,6 +33,21 @@ const local: Asker = {
   redirectIsLoopback: true,
 };
 
+const ourWeb: Asker = {
+  clientName: `${Brand.name} web`,
+  firstParty: "web",
+  home: "https://web.example",
+  redirectHost: "web.example",
+  redirectIsLoopback: false,
+};
+
+const ourCli: Asker = {
+  clientName: `${Brand.name} CLI`,
+  firstParty: "cli",
+  redirectHost: "127.0.0.1:53682",
+  redirectIsLoopback: true,
+};
+
 const form: PendingForm = { csrf: "csrf-token", request: "sealed-request" };
 
 const home = Effect.gen(function* () {
@@ -122,6 +137,7 @@ const PAGES = {
   "sign-up": signUpPage(
     local,
     form,
+    { google: true },
     "/authorize?x=1",
     { displayName: "Alice", email: "alice@mail.example", handle: "alice" },
     "A password is 12 to 256 characters."
@@ -420,8 +436,11 @@ const SIGN_IN_PAGES = Object.entries(PAGES).map(([name, html]) => ({
 const EDGES = /^(?:border-(?:top|right|bottom|left)|box-shadow|outline)/u;
 
 describe.each(SIGN_IN_PAGES)("$name, in the focus look", ({ html }) => {
-  it("shows the wordmark as text, then one card, and no navigation", () => {
-    const wordmark = html.indexOf(`<p class="wordmark">${Brand.name}</p>`);
+  it("shows the wordmark as a link home, then one card, and no navigation", () => {
+    const wordmark = html.indexOf(
+      `<a class="wordmark" href="/">${Brand.name}</a>`
+    );
+
     const card = html.indexOf('class="card"');
 
     expect(wordmark).toBeGreaterThan(html.indexOf("<body"));
@@ -497,13 +516,19 @@ describe("the sign-in page, as an MCP client's consent", () => {
     const consent = consentOf(PAGES["sign-in"]);
 
     expect(consent).toContain(
-      "<strong>Claude</strong> (published by claude.ai)"
+      "<strong>Claude</strong> (claude.ai) wants to act as you."
     );
     expect(consent.match(/<li>/gu)).toHaveLength(4);
     expect(consent).toContain("<li>Claim, release and answer asks");
     expect(consent).toContain("It never sees your password.");
     expect(consent).toContain(
       "finish answers, land changes, vouch for or denounce people"
+    );
+  });
+
+  it("keeps what the client may do behind a disclosure, the who and where in view", () => {
+    expect(consentOf(PAGES["sign-in"])).toMatch(
+      /wants to act as you\.<\/p>\s*<p>Access goes to <strong>claude\.ai<\/strong>\.<\/p>[\s\S]*<details>\s*<summary>What it can do<\/summary>\s*<ul class="may">/u
     );
   });
 
@@ -532,7 +557,7 @@ describe("the sign-in page, as an MCP client's consent", () => {
     };
 
     const named = [
-      signUpPage(hostile, form, "/authorize", {}),
+      signUpPage(hostile, form, { google: true }, "/authorize", {}),
       profilePage(hostile, form, "/authorize", {}),
       addEmailPage(hostile, form, "/authorize"),
       resetPage(hostile, form, "/authorize"),
@@ -554,7 +579,7 @@ describe("the sign-in page, as an MCP client's consent", () => {
 
   it("says who asks and where access goes before Google and the form", () => {
     const html = PAGES["sign-in"];
-    const asks = html.indexOf("asks to act as you");
+    const asks = html.indexOf("wants to act as you");
     const goes = html.indexOf("Access goes to");
     const google = html.indexOf("Continue with Google");
     const formAt = html.indexOf("<form");
@@ -604,7 +629,54 @@ describe("the sign-in page, as an MCP client's consent", () => {
       /<p class="error" role="alert">The email, handle or password is wrong\.<\/p>/u
     );
     expect(PAGES["the problem page"]).not.toContain('class="error"');
-    expect(PAGES["the problem page"]).toMatch(/<a href="\/">/u);
+    expect(PAGES["the problem page"]).toMatch(
+      new RegExp(`<a href="/">Back to ${Brand.name}</a>`, "u")
+    );
+  });
+});
+
+describe("the sign-in page, for one of the platform's own clients", () => {
+  it("asks the web's reader nothing about consent", () => {
+    const html = signInPage(ourWeb, form, { google: true });
+
+    expect(consentOf(html)).toBe("");
+    expect(html).not.toContain("What it can do");
+    expect(html).not.toContain("act as you");
+    expect(html).toContain(`<h1>Sign in to ${Brand.name}</h1>`);
+  });
+
+  it("tells the CLI's reader in one line what finishing does, with no warning or list", () => {
+    const html = signInPage(ourCli, form, { google: true });
+
+    expect(consentOf(html)).toBe("");
+    expect(html).toContain(
+      `This finishes signing in the CLI on this computer. Continue only if you just ran <code>${Brand.cli} login</code>.`
+    );
+    expect(html).not.toContain("Warning");
+    expect(html).not.toContain("What it can do");
+  });
+
+  it("links the wordmark and the problem page to the web's home when it is known", () => {
+    expect(signInPage(ourWeb, form, { google: false })).toContain(
+      `<a class="wordmark" href="https://web.example">${Brand.name}</a>`
+    );
+    expect(problemPage("Expired.", "https://web.example")).toContain(
+      `<a href="https://web.example">Back to ${Brand.name}</a>`
+    );
+  });
+
+  it("treats every page's asker the same way", () => {
+    const pages = [
+      signUpPage(ourWeb, form, { google: false }, "/authorize", {}),
+      profilePage(ourWeb, form, "/authorize", {}),
+      addEmailPage(ourWeb, form, "/authorize"),
+      resetPage(ourWeb, form, "/authorize"),
+    ];
+
+    for (const html of pages) {
+      expect(consentOf(html)).toBe("");
+      expect(html).not.toContain("act as you");
+    }
   });
 });
 
@@ -613,7 +685,7 @@ describe("a sign-in form shown again", () => {
     const typed = `"><script>alert(1)</script>`;
 
     const pages = [
-      signUpPage(local, form, "/authorize", {
+      signUpPage(local, form, { google: false }, "/authorize", {
         displayName: typed,
         email: typed,
         handle: typed,
@@ -636,7 +708,9 @@ describe("a sign-in form shown again", () => {
 
   it("never fills in a password", () => {
     expect(
-      signUpPage(local, form, "/authorize", { email: "alice@mail.example" })
+      signUpPage(local, form, { google: false }, "/authorize", {
+        email: "alice@mail.example",
+      })
     ).toMatch(/<input type="password" name="password" [^>]*required>/u);
   });
 });
@@ -650,5 +724,32 @@ describe("the sign-in page's ways out", () => {
     );
     expect(html).toContain('href="/signup?request=sealed-request"');
     expect(html).toContain("Email or handle");
+  });
+
+  it("offers Google first, then the password, with linking Google as a quiet choice under Sign in", () => {
+    const html = signInPage(claude, form, { google: true });
+    const google = html.indexOf("Continue with Google");
+    const or = html.indexOf('class="or');
+    const formAt = html.indexOf("<form");
+    const signIn = html.indexOf('<button type="submit">Sign in</button>');
+
+    const link = html.indexOf(
+      '<button type="submit" class="link" formaction="/oauth/google/link">Sign in and link your Google account</button>'
+    );
+
+    expect(or).toBeGreaterThan(google);
+    expect(formAt).toBeGreaterThan(or);
+    expect(signIn).toBeGreaterThan(formAt);
+    expect(link).toBeGreaterThan(signIn);
+    expect(signInPage(claude, form, { google: false })).not.toMatch(
+      /Continue with Google|formaction=/u
+    );
+  });
+
+  it("offers Google on the sign-up page too, when the platform has it", () => {
+    expect(PAGES["sign-up"]).toContain("Continue with Google");
+    expect(
+      signUpPage(local, form, { google: false }, "/authorize", {})
+    ).not.toContain("Continue with Google");
   });
 });

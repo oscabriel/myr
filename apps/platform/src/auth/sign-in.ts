@@ -32,6 +32,7 @@ import { SignInAttempts } from "./attempts.ts";
 import { CLI_CLIENT_PATH, cliClientMetadata } from "./cli-client.ts";
 import { codeMatches, codeTag, deadTag, freshCode } from "./codes.ts";
 import type { CodePurpose } from "./codes.ts";
+import { firstPartyOf } from "./first-party.ts";
 import { Mailer } from "./mailer.ts";
 import { OAuthStore } from "./oauth-store.ts";
 import {
@@ -73,6 +74,12 @@ export class SignInOffers extends Context.Service<
   SignInOffers,
   { readonly google: Option.Option<string> }
 >()("platform/SignInOffers") {}
+
+// The web's address, when the platform knows it: the wordmark links there, and its client is told apart from any other.
+export class SignInHome extends Context.Service<
+  SignInHome,
+  { readonly webUrl: Option.Option<string> }
+>()("platform/SignInHome") {}
 
 // Nobody signs up as a handle a named session holds, or an account would call as that person.
 export class HeldHandles extends Context.Service<
@@ -280,6 +287,8 @@ const forProvider = (request: AuthRequest) => {
 export const askerOf = (request: AuthRequest) =>
   Effect.gen(function* () {
     const api = yield* oauthApi;
+    const { origin } = yield* Authorization;
+    const { webUrl } = yield* SignInHome;
 
     const consent = yield* provider(() =>
       api.describeConsent(forProvider(request))
@@ -288,6 +297,8 @@ export const askerOf = (request: AuthRequest) =>
     const asker: Asker = {
       clientDomain: consent.clientDomain,
       clientName: consent.clientName,
+      firstParty: firstPartyOf(request.clientId, origin, webUrl),
+      home: Option.getOrElse(webUrl, () => "/"),
       redirectHost: consent.redirectHost,
       redirectIsLoopback: consent.redirectIsLoopback,
     };
@@ -844,11 +855,13 @@ const showSignUp = Effect.gen(function* () {
   const pending = yield* openState(cookieKey, sealed);
 
   const asker = yield* askerOf(pending.request);
+  const { google } = yield* SignInOffers;
 
   return htmlPage(
     signUpPage(
       asker,
       { csrf: pending.csrf, request: sealed },
+      { google: Option.isSome(google) },
       authorizeHref(pending.request),
       {}
     ),
@@ -933,13 +946,23 @@ const signUpPageFor = (
   status: number,
   message: string
 ) =>
-  Effect.map(askerOf(request), (asker) =>
-    htmlPage(
-      signUpPage(asker, form, authorizeHref(request), values, message),
+  Effect.gen(function* () {
+    const asker = yield* askerOf(request);
+    const { google } = yield* SignInOffers;
+
+    return htmlPage(
+      signUpPage(
+        asker,
+        form,
+        { google: Option.isSome(google) },
+        authorizeHref(request),
+        values,
+        message
+      ),
       status,
       request.redirectUri
-    )
-  );
+    );
+  });
 
 const signUpCode = (request: AuthRequest, email: Email): CodeForm => ({
   action: ACCOUNT_PATHS.signUpVerify,
@@ -1297,9 +1320,15 @@ const authorizationServer = (request: HttpServerRequest.HttpServerRequest) =>
   });
 
 export const failedPage = (failed: SignInFailed) =>
-  Effect.succeed(
+  Effect.map(Effect.service(SignInHome), ({ webUrl }) =>
     failed.redirectTo === undefined
-      ? htmlPage(problemPage(failed.reason), 400)
+      ? htmlPage(
+          problemPage(
+            failed.reason,
+            Option.getOrElse(webUrl, () => "/")
+          ),
+          400
+        )
       : HttpServerResponse.redirect(failed.redirectTo, {
           headers: { "cache-control": "no-store" },
           status: 302,
@@ -1312,6 +1341,7 @@ export type SignInServices =
   | Mailer
   | OAuthStore
   | SignInAttempts
+  | SignInHome
   | SignInKeys
   | SignInOffers;
 
@@ -1322,6 +1352,7 @@ export const signInRoutes = HttpRouter.use((router) =>
       Context.add(Mailer, yield* Mailer),
       Context.add(OAuthStore, yield* OAuthStore),
       Context.add(SignInAttempts, yield* SignInAttempts),
+      Context.add(SignInHome, yield* SignInHome),
       Context.add(SignInKeys, yield* SignInKeys),
       Context.add(SignInOffers, yield* SignInOffers)
     );

@@ -45,6 +45,7 @@ import {
   htmlPage,
   Says,
   SignInKeys,
+  SignInHome,
   SignInOffers,
   signInPageFor,
 } from "./sign-in.ts";
@@ -834,6 +835,7 @@ export const googleRoutes = HttpRouter.use((router) =>
       Context.add(Mailer, yield* Mailer),
       Context.add(OAuthStore, yield* OAuthStore),
       Context.add(SignInAttempts, yield* SignInAttempts),
+      Context.add(SignInHome, yield* SignInHome),
       Context.add(SignInKeys, yield* SignInKeys),
       Context.add(SignInOffers, yield* SignInOffers)
     );
