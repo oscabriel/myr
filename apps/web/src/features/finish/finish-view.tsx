@@ -1,10 +1,8 @@
-import type { Finish } from "@repo/protocol/contracts";
-import type { AnswerReceipt, Verdict } from "@repo/protocol/domain/answer";
+/** The web never calls `finish` itself: a maintainer finishes from the CLI. */
+import type { Verdict } from "@repo/protocol/domain/answer";
 import type { Ask } from "@repo/protocol/domain/ask";
 import type { ChangedFile } from "@repo/protocol/domain/code";
-import { RequestId } from "@repo/protocol/ids";
 import type { CommitSha } from "@repo/protocol/ids";
-import { Option } from "effect";
 import type { DateTime } from "effect";
 import { ChevronLeft, ChevronRight, FileDiff, RotateCw } from "lucide-react";
 import { useState } from "react";
@@ -33,7 +31,6 @@ import type { PatchFile } from "./files.ts";
 import { FinishPlainDiff } from "./finish-plain.tsx";
 import type { LineNote } from "./finish-plain.tsx";
 import { MarkRead } from "./mark-read.tsx";
-import { forkOf } from "./patch.ts";
 import type { FinishDecision } from "./patch.ts";
 import type { MarkedFile } from "./read-marks.ts";
 
@@ -69,8 +66,6 @@ const VerdictFacts = ({ verdict }: { readonly verdict: Verdict }) => (
   </FactBlock>
 );
 
-export type FinishInput = typeof Finish.payloadSchema.Type;
-
 export interface FinishViewProps {
   readonly decision: FinishDecision;
   readonly ask?: Ask | undefined;
@@ -93,13 +88,6 @@ export interface FinishViewProps {
   readonly filesButton?: ReactNode;
   readonly stamp?: boolean;
   readonly failure?: ReactNode;
-  /** The answer fork's newest commit; undefined while it is read, none when it could not be. */
-  readonly forkHead?: Option.Option<CommitSha> | undefined;
-  readonly onReadFork?: (() => void) | undefined;
-  readonly onFinish?: ((input: FinishInput) => void) | undefined;
-  readonly finishing?: boolean;
-  readonly finished?: AnswerReceipt | undefined;
-  readonly finishFailure?: ReactNode;
 }
 
 const NO_FILES: ReadonlySet<string> = new Set();
@@ -462,144 +450,6 @@ const PhoneFinish = ({
   </div>
 );
 
-const ForkHeadLine = ({
-  answer,
-  forkHead,
-}: {
-  readonly answer: CommitSha;
-  readonly forkHead: Option.Option<CommitSha> | undefined;
-}) => {
-  if (forkHead === undefined) {
-    return (
-      <p className="text-ui text-muted-foreground">
-        Reading the fork&apos;s head…
-      </p>
-    );
-  }
-
-  if (Option.isNone(forkHead)) {
-    return (
-      <p className="text-ui text-muted-foreground">
-        The fork&apos;s head could not be read.
-      </p>
-    );
-  }
-
-  const head = forkHead.value;
-
-  return head === answer ? (
-    <p className="text-ui text-muted-foreground" data-fork-head={head}>
-      Nothing is on top of the answer yet: the fork&apos;s head is still{" "}
-      <code className="text-mono font-mono">{shortSha(head)}</code>.
-    </p>
-  ) : (
-    <p className="text-ui" data-fork-head={head}>
-      The fork&apos;s head is{" "}
-      <code className="text-mono font-mono">{shortSha(head)}</code>, on top of
-      the answer.
-    </p>
-  );
-};
-
-/** A head on top of the answer's, with the verdict's base to finish from. */
-export const finishInput = (
-  decision: FinishDecision,
-  verdict: Verdict | undefined,
-  forkHead: Option.Option<CommitSha> | undefined
-): Option.Option<FinishInput> =>
-  Option.flatMap(
-    Option.filter(
-      Option.flatten(Option.fromUndefinedOr(forkHead)),
-      (head) => head !== decision.subject.head
-    ),
-    (head) =>
-      Option.map(Option.fromUndefinedOr(verdict), ({ base }) => ({
-        ask: decision.subject.ask,
-        base,
-        head,
-        project: decision.project,
-        requestId: RequestId.make(`finish-${head}`),
-      }))
-  );
-
-const FinishItFacts = ({
-  decision,
-  finishFailure,
-  finished,
-  finishing = false,
-  forkHead,
-  onFinish,
-  onReadFork,
-  verdict,
-}: Pick<
-  FinishViewProps,
-  | "decision"
-  | "finishFailure"
-  | "finished"
-  | "finishing"
-  | "forkHead"
-  | "onFinish"
-  | "onReadFork"
-  | "verdict"
->) => {
-  const fork = forkOf(decision);
-  const input = finishInput(decision, verdict, forkHead);
-
-  return (
-    <FactBlock label="Finish it">
-      <p className="text-ui">
-        To finish it with your own changes, push your commits onto the
-        answer&apos;s fork, on top of its head, then finish it here. They are
-        checked again, and you are credited as Finished-by.
-      </p>
-      {Option.isSome(fork) ? (
-        <p className="text-ui text-muted-foreground">
-          The fork:{" "}
-          <code className="text-mono text-foreground font-mono [overflow-wrap:anywhere]">
-            {fork.value}
-          </code>
-        </p>
-      ) : null}
-      <ForkHeadLine answer={decision.subject.head} forkHead={forkHead} />
-      <div className="flex flex-wrap items-center gap-2">
-        <Button
-          data-action="finish"
-          disabled={finishing || onFinish === undefined || Option.isNone(input)}
-          onClick={() => {
-            if (Option.isSome(input)) {
-              onFinish?.(input.value);
-            }
-          }}
-          size="sm"
-        >
-          Finish with these commits
-        </Button>
-        {onReadFork === undefined ? null : (
-          <Button onClick={onReadFork} size="sm" variant="outline">
-            <RotateCw aria-hidden="true" strokeWidth={1.75} />
-            Read the fork again
-          </Button>
-        )}
-      </div>
-      {finished === undefined ? null : (
-        <div data-finished={finished.head}>
-          <StatusLine
-            subject={{
-              kind: "answer",
-              outcome: finished.outcome,
-              project: finished.project,
-            }}
-          />
-        </div>
-      )}
-      <Failure>{finishFailure}</Failure>
-      <p className="text-ui text-muted-foreground">
-        To land the answer as it is, accept the decision instead.
-      </p>
-    </FactBlock>
-  );
-};
-
 const FinishFacts = ({
   ask,
   busy,
@@ -610,24 +460,13 @@ const FinishFacts = ({
   soon,
   stamp,
   verdict,
-  ...finish
 }: Required<
   Pick<
     FinishViewProps,
     "busy" | "decision" | "files" | "now" | "onDecide" | "soon" | "stamp"
   >
 > &
-  Pick<
-    FinishViewProps,
-    | "ask"
-    | "finishFailure"
-    | "finished"
-    | "finishing"
-    | "forkHead"
-    | "onFinish"
-    | "onReadFork"
-    | "verdict"
-  >) => (
+  Pick<FinishViewProps, "ask" | "verdict">) => (
   <>
     {ask === undefined ? null : <WantFacts ask={ask} />}
     {verdict === undefined ? null : <VerdictFacts verdict={verdict} />}
@@ -650,9 +489,6 @@ const FinishFacts = ({
         stamp={stamp}
       />
     </FactBlock>
-    {decision.decided === undefined ? (
-      <FinishItFacts {...finish} decision={decision} verdict={verdict} />
-    ) : null}
     {files.length === 0 ? null : (
       <DiffStatsFacts stats={statsOf(files, ask?.territory.paths ?? [])} />
     )}

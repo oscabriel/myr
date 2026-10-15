@@ -124,7 +124,8 @@ const servedOn = {
   [envSchemaTag]: SurfaceName.literals,
   // A log may hold text an agent's transcript should not carry: never MCP.
   evidence: ["rpc", "cli", "web"],
-  finish: SurfaceName.literals,
+  // A finish lands a maintainer's commits: the CLI and MCP, as every change does, never the web.
+  finish: ["rpc", "mcp", "cli"],
   fork: ["rpc", "mcp", "cli"],
   frontPage: SurfaceName.literals,
   initProject: ["rpc", "mcp", "cli", "web"],

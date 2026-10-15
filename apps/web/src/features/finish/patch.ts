@@ -1,7 +1,6 @@
 import { DecisionSubject } from "@repo/protocol/domain/decision";
 import type { Decision } from "@repo/protocol/domain/decision";
-import { Handle } from "@repo/protocol/ids";
-import { Array as Arr, Option, Schema } from "effect";
+import { Array as Arr, Option } from "effect";
 
 export const PATCH_LABEL = "patch";
 
@@ -16,24 +15,6 @@ const finishes = DecisionSubject.isAnyOf(["Finish"]);
 export const isFinishDecision = (
   decision: Decision
 ): decision is FinishDecision => finishes(decision.subject);
-
-const evidenceOf = (decision: Decision, label: string) =>
-  Arr.findFirst(decision.evidence, (fact) => fact.label === label);
-
-const decodeHandle = Schema.decodeUnknownOption(Handle);
-
-/** The answerer, as the decision's `answer` evidence names them: `<handle> at <head> (<request>)`. */
-export const answererOf = (decision: FinishDecision): Option.Option<Handle> =>
-  Option.flatMap(evidenceOf(decision, "answer"), ({ value }) =>
-    decodeHandle(value.split(" at ")[0])
-  );
-
-/** The answer's fork, as its `fork` evidence names it: a link when it carries one, else the fork's repo. */
-export const forkOf = (decision: FinishDecision): Option.Option<string> =>
-  Option.map(
-    evidenceOf(decision, FORK_LABEL),
-    ({ href, value }) => href ?? value.trim()
-  );
 
 export const patchOf = (decision: Decision): Option.Option<string> =>
   isFinishDecision(decision)
