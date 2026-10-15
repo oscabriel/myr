@@ -1,9 +1,5 @@
-import { Check, Copy } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { Button } from "../../../components/ui/button.tsx";
-import { useCopy } from "../copy-action.tsx";
-import { useNumberedCommand } from "../keys.tsx";
 import { AppLink } from "../link.tsx";
 import { GUTTER } from "./gutter.ts";
 import type { Crumb } from "./sections.ts";
@@ -57,43 +53,13 @@ export const Breadcrumb = ({
   </nav>
 );
 
-export const CopyCommand = ({ command }: { readonly command: string }) => {
-  const { copied, copy } = useCopy(command);
-  const number = useNumberedCommand(command);
-
-  return (
-    <Button
-      onClick={copy}
-      size="sm"
-      title={
-        number === undefined
-          ? `Copy: ${command}`
-          : `Copy (${number}): ${command}`
-      }
-      variant="outline"
-    >
-      {copied ? (
-        <Check aria-hidden="true" strokeWidth={1.75} />
-      ) : (
-        <Copy aria-hidden="true" strokeWidth={1.75} />
-      )}
-      <span aria-hidden="true">{copied ? "Copied" : "Copy"}</span>
-      <code className="sr-only">
-        {copied ? `Copied ${command}` : `Copy ${command}`}
-      </code>
-    </Button>
-  );
-};
-
 export const ContextBar = ({
   count,
   crumbs,
-  primaryCommand,
   state,
 }: {
   readonly count?: string | undefined;
   readonly crumbs: readonly Crumb[];
-  readonly primaryCommand?: string | undefined;
   readonly state?: ReactNode;
 }) => (
   <div
@@ -108,9 +74,6 @@ export const ContextBar = ({
       )}
       {state === undefined ? null : (
         <div className="text-ui flex items-center">{state}</div>
-      )}
-      {primaryCommand === undefined ? null : (
-        <CopyCommand command={primaryCommand} />
       )}
     </div>
   </div>

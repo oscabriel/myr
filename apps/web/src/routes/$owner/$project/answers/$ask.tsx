@@ -14,6 +14,7 @@ import { askStates, projectEventsAtom } from "../../../../client/events.ts";
 import { SeededAtoms, seedSuccess } from "../../../../client/seeded.ts";
 import { watchAtom } from "../../../../client/watch.ts";
 import { AnswerView } from "../../../../features/answer/answer-page.tsx";
+import { EvidenceLog } from "../../../../features/answer/lane-log.tsx";
 import {
   AnswerPageData,
   landedBy,
@@ -92,6 +93,7 @@ const FreshAnswer = ({
       ask={ask}
       head={read.head}
       landing={landing}
+      LogReader={EvidenceLog}
       now={read.now}
       parent={read.parent}
       // A landing the server's read already held never stamps.

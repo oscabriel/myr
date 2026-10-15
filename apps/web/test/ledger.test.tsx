@@ -396,7 +396,7 @@ describe("a project's ledger", () => {
     expect(markup).not.toMatch(/>in \d+ (?:min|h|d)</u);
   });
 
-  it("puts what is held back, the CLI line and what each disclosure means in its facts, and says the posture in its status line, not again there", () => {
+  it("puts what is held back and what each disclosure means in its facts, with no CLI line, and says the posture in its status line, not again there", () => {
     const markup = markupOf(page);
     const facts = factsOf(markup);
     const text = plainText(facts);
@@ -412,17 +412,11 @@ describe("a project's ledger", () => {
         "7 sealed checks",
         "parser",
         "4 sealed checks",
-        `${Brand.cli} ledger --project oscabriel/datekit`,
         "sealed: counts, authors and a salted root",
         "write-only: names, and who set each value and when",
       ])
     ).toBeTruthy();
-    // The command is the text of the one code element a tap selects whole.
-    expect(
-      plainText(
-        /<code\b[^>]*select-all[^>]*>.*?<\/code>/u.exec(facts)?.[0] ?? ""
-      )
-    ).toContain("ledger --project oscabriel/datekit");
+    expect(text).not.toContain(`${Brand.cli} ledger`);
   });
 
   it("shows a project without layers as Open, with nothing held back", () => {

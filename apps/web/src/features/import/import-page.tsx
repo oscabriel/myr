@@ -1,28 +1,22 @@
-import { CommandLine } from "../shared/command.tsx";
 import { FactBlock } from "../shared/facts.tsx";
 import { Workspace } from "../shared/shell/workspace.tsx";
-import { ImportForm, importCommand } from "./import-form.tsx";
+import { ImportForm } from "./import-form.tsx";
 import type { Importer } from "./import-form.tsx";
 
 export const ImportFacts = () => (
-  <>
-    <FactBlock label="What an import does">
-      <ul className="text-ui flex list-disc flex-col gap-1.5 pl-4">
-        <li>
-          The platform clones the repo once, over HTTPS. Later pushes to the
-          source do not follow it.
-        </li>
-        <li>You become the project&apos;s maintainer.</li>
-        <li>
-          A repo with no config folder takes its checks from its CI and its test
-          command.
-        </li>
-      </ul>
-    </FactBlock>
-    <FactBlock label="From a terminal">
-      <CommandLine command={importCommand()} numbered />
-    </FactBlock>
-  </>
+  <FactBlock label="What an import does">
+    <ul className="text-ui flex list-disc flex-col gap-1.5 pl-4">
+      <li>
+        The platform clones the repo once, over HTTPS. Later pushes to the
+        source do not follow it.
+      </li>
+      <li>You become the project&apos;s maintainer.</li>
+      <li>
+        A repo with no config folder takes its checks from its CI and its test
+        command.
+      </li>
+    </ul>
+  </FactBlock>
 );
 
 export const ImportView = ({

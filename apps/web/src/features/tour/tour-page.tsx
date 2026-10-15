@@ -1,24 +1,19 @@
 /**
- * The guided walkthrough: six steps, each one sentence, the command that
- * runs it (the page's `1` to `6` keys copy them) and a screen drawn by the
- * real components over example data. The refusal is the renderer's own
+ * The guided walkthrough: six steps, each one sentence and a screen drawn by
+ * the real components over example data. The refusal is the renderer's own
  * words, through the landing's transcript, so it cannot drift from git's.
  */
-import { Brand } from "@repo/brand";
 import type { ReactNode } from "react";
 
 import { Brief } from "../ask/ask-page.tsx";
 import { Output } from "../landing/gate-drawing.tsx";
 import {
-  CLAIM,
   claimReceipt,
   EXAMPLE,
   landedPush,
-  PUSH,
   refusedPush,
 } from "../landing/transcript.ts";
 import { LINK } from "../shared/classes.ts";
-import { CommandLine } from "../shared/command.tsx";
 import { CreditTrailers } from "../shared/credits.tsx";
 import { TerritoryFacts } from "../shared/facts.tsx";
 import { AppLink } from "../shared/link.tsx";
@@ -30,72 +25,48 @@ import {
 } from "../shared/paths.ts";
 import { AskRow, RowList } from "../shared/row.tsx";
 import { GUTTER } from "../shared/shell/gutter.ts";
-import {
-  ASK,
-  claimOf,
-  LANDING,
-  LISTING,
-  VERDICT,
-  WHY_LOCATION,
-} from "./example.ts";
+import { ASK, claimOf, LANDING, LISTING, VERDICT } from "./example.ts";
 import type { TourLive } from "./read.ts";
 import { EXAMPLE_NOTE, TOUR_LEDE, TOUR_TITLE } from "./words.ts";
-
-/** The six commands, in the order the keys number them. */
-export const TOUR_COMMANDS = {
-  ask: `${Brand.cli} ask ${EXAMPLE.ask} --project ${EXAMPLE.project}`,
-  check: `${Brand.cli} check`,
-  claim: CLAIM,
-  front: `${Brand.cli} front`,
-  push: PUSH,
-  why: `${Brand.cli} why ${WHY_LOCATION} --project ${EXAMPLE.project}`,
-} as const;
 
 interface StepWords {
   readonly id: string;
   readonly title: string;
   readonly sentence: string;
-  readonly command: string;
 }
 
 const WORDS = {
   claim: {
-    command: TOUR_COMMANDS.claim,
     id: "claim",
     sentence:
       "A claim is exclusive and expires unless you push; it gives you a fork of your own at the platform.",
     title: "Claim it",
   },
   credit: {
-    command: TOUR_COMMANDS.why,
     id: "credit",
     sentence:
       "The landing commit credits the asker and the answerer in its trailers; an agent is disclosed, never credited. Any line's history leads back to them.",
     title: "See the credit",
   },
   find: {
-    command: TOUR_COMMANDS.front,
     id: "find",
     sentence:
       "Every open ask across every public project, each a change its maintainers want and will land.",
     title: "Find an ask",
   },
   land: {
-    command: TOUR_COMMANDS.check,
     id: "land",
     sentence:
       "Put the file back, run the checks locally, push again: the gate merges the answer onto main, runs every check on that exact tree, and lands it.",
     title: "Fix it, and land",
   },
   read: {
-    command: TOUR_COMMANDS.ask,
     id: "read",
     sentence:
       "The brief says what done means, the territory which files an answer may change, and the check what judges it.",
     title: "Read it",
   },
   refused: {
-    command: TOUR_COMMANDS.push,
     id: "refused",
     sentence:
       "A push that strays outside the territory is refused in git's own output, with the reason, the command to run next and whether trying again can help.",
@@ -103,7 +74,7 @@ const WORDS = {
   },
 } as const satisfies Record<string, StepWords>;
 
-/** The six steps in the order the page walks them, and the keys number their commands. */
+/** The six steps in the order the page walks them. */
 export const STEPS: readonly StepWords[] = [
   WORDS.find,
   WORDS.read,
@@ -135,7 +106,6 @@ const Step = ({
       </h2>
       <p className="text-body text-muted-foreground">{words.sentence}</p>
     </div>
-    <CommandLine command={words.command} numbered />
     <div
       className="border-rule bg-card flex min-w-0 flex-col gap-4 rounded-md border p-4"
       data-screen={words.id}

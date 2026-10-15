@@ -1,4 +1,3 @@
-import { Brand } from "@repo/brand";
 import type {
   Discussion,
   DiscussionPost,
@@ -6,14 +5,15 @@ import type {
 import type { DateTime } from "effect";
 import type { ReactNode } from "react";
 
-import { CommandLine } from "../shared/command.tsx";
 import { FactBlock } from "../shared/facts.tsx";
 import { HandleLink } from "../shared/handle.tsx";
 import { AppLink } from "../shared/link.tsx";
 import { askPath } from "../shared/paths.ts";
 import { Workspace } from "../shared/shell/workspace.tsx";
 import { When } from "../shared/time.tsx";
-import { replyCommand, STATE_LABEL } from "./discussions-view.tsx";
+import { STATE_LABEL } from "./discussions-view.tsx";
+import { PostForm } from "./post-form.tsx";
+import type { Poster } from "./post-form.tsx";
 
 const LINK = "decoration-rule underline hover:decoration-current";
 
@@ -56,15 +56,10 @@ const Became = ({ discussion }: { readonly discussion: Discussion }) =>
 const ThreadFacts = ({ discussion }: { readonly discussion: Discussion }) => (
   <FactBlock label="This discussion">
     {discussion.state === "open" ? (
-      <>
-        <p className="text-ui">
-          Reply from a terminal; anyone not denounced may. A maintainer may open
-          an ask from the thread with{" "}
-          <code className="text-mono font-mono">{`${Brand.cli} ask open <ask> --discussion ${discussion.id}`}</code>
-          .
-        </p>
-        <CommandLine command={replyCommand(discussion)} numbered />
-      </>
+      <p className="text-ui">
+        Anyone not denounced may reply. A maintainer may open an ask from the
+        thread.
+      </p>
     ) : (
       <p className="text-ui">
         {discussion.state === "closed"
@@ -75,12 +70,28 @@ const ThreadFacts = ({ discussion }: { readonly discussion: Discussion }) => (
   </FactBlock>
 );
 
+const ReplyHere = ({ poster }: { readonly poster: Poster }) => (
+  <section
+    aria-labelledby="reply-here"
+    className="flex flex-col gap-3"
+    data-reply=""
+  >
+    <h2 className="text-ui font-semibold" id="reply-here">
+      Reply
+    </h2>
+    <PostForm {...poster} doing="reply" kind="reply" />
+  </section>
+);
+
+/** Without a `poster`, the thread alone; a closed or asked thread takes no reply. */
 export const DiscussionView = ({
   discussion,
   now,
+  poster,
 }: {
   readonly discussion: Discussion;
   readonly now: DateTime.Utc;
+  readonly poster?: Poster | undefined;
 }): ReactNode => (
   <Workspace
     facts={<ThreadFacts discussion={discussion} />}
@@ -105,5 +116,8 @@ export const DiscussionView = ({
         <Post key={index} now={now} post={post} />
       ))}
     </div>
+    {poster === undefined || discussion.state !== "open" ? null : (
+      <ReplyHere poster={poster} />
+    )}
   </Workspace>
 );

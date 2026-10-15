@@ -32,24 +32,19 @@ const refsPage = createServerFn({ method: "GET" })
   .handler(({ data }) =>
     Effect.runPromise(
       readRefsPage(data).pipe(
-        Effect.map((refs) => ({ platformUrl: env.PUBLIC_PLATFORM_URL, refs })),
+        Effect.map((refs) => ({ refs })),
         Effect.provide(serverClient(env))
       )
     )
   );
 
 const RefsPage = () => {
-  const { platformUrl, refs: read } = Route.useLoaderData();
+  const { refs: read } = Route.useLoaderData();
   const refs = Schema.decodeSync(Refs)(read);
   const search = Route.useSearch();
 
   return (
-    <RefsView
-      from={search.from ?? 0}
-      package={search.package}
-      platformUrl={platformUrl}
-      refs={refs}
-    />
+    <RefsView from={search.from ?? 0} package={search.package} refs={refs} />
   );
 };
 

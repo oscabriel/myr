@@ -68,7 +68,7 @@ What it declines:
 
 ## Operating Context
 
-- Work happens in git and the CLI (`Brand.cli` in code; the name lives only in `packages/brand`). The CLI is a single binary served by the platform itself (`/install.sh`, `/releases/…`), with a versioned `--json` envelope on every command, `--dry-run` and `--yes` where a command writes, and `mcp` to serve the platform's tools over stdio. Every web page that suggests an action shows its command, copyable.
+- Work happens in git and the CLI (`Brand.cli` in code; the name lives only in `packages/brand`). The CLI is a single binary served by the platform itself (`/install.sh`, `/releases/…`), with a versioned `--json` envelope on every command, `--dry-run` and `--yes` where a command writes, and `mcp` to serve the platform's tools over stdio. The web shows no CLI command: an action a person takes there is a control on the page.
 - Harnesses plug in without installing anything: the project's AGENTS.md block and skill, `/llms.txt`, an ask as Markdown, and `/.well-known/mcp.json`. The CLI also answers harness hooks (`hook`), and pi users can load a user-level adapter.
 - Every page sits in one of four shells, named by its route: `site` (the landing, Explore, the asks board, Install), `project` (a project's tabs, the inbox, settings, a person), `docs`, and `focus` (sign-in, MCP consent and the forms that make something). The top bar is the same everywhere (Explore, Asks, Docs, Install, search, the keys and the account with its inbox count); there is no global rail, and a side column holds only facts about what is on screen. Below 1100 px each side column stacks under its page; below 900 px the top bar's links fold into a menu.
 - Pages per job on the web:
@@ -78,18 +78,18 @@ What it declines:
   - **Project** (`/$project`, the Overview tab): a header that stays across the tabs (the name, the posture said once, a description, its facts and Watch, Clone and Contribute), then the tabs Overview, Code, Asks, Landings, Discussions, Policy and Visibility. Overview holds its asks, recent landings and README, beside an about column with how a change lands here and who decides. The same as the project's `llms.txt` by `Accept: text/markdown`.
   - **Code** (`/$project/tree/…`, `blob/…`, `why/…`, `commits/…`, `commit/…`, `refs`): the files at any commit, tag or answer fork with a persistent tree, highlighted code with `#L` links, why each line is there, the landings by day, each commit's diff, and the refs; raw bytes under a sandboxing CSP.
   - **Asks** (`/$project/asks`): the project's open asks, each saying whether it is open to take.
-  - **Ask** (`/$project/asks/$ask`): the want, the territory, the check, who may claim, and the commands; the same as Markdown by `Accept: text/markdown` or at `/$project/asks/$ask.md`.
+  - **Ask** (`/$project/asks/$ask`): the want, the territory, the check, who may claim, and a Claim button; the same as Markdown by `Accept: text/markdown` or at `/$project/asks/$ask.md`.
   - **Answer** (`/$project/answers/$ask`): the outcome, the gate's stages, the rounds, the lanes, held-back results as one line per area, the refusal, and the landing. A waiting answer says the one thing the contributor needs; a landed one is told as a sentence first, then credits its people, and only then shows its sealed roots.
   - **Person** (`/people/$handle`): their credits by role and area, in words, never a number or a score.
-  - **Policy** (`/$project/policy`; `/$project/people` moves here): who decides which paths, who is vouched for or denounced, the limits and the agent rules, read from the config folder at the landed commit, with the commands that change them.
-  - **Discussions** (`/$project/discussions`, `/$project/discussions/$discussion`): a project's public, freeform threads, open to anyone not denounced, that land nothing themselves; each page shows its posts, the ask a maintainer opened from it, and the command to post, since the web adds no form for it.
+  - **Policy** (`/$project/policy`; `/$project/people` moves here): who decides which paths, who is vouched for or denounced, the limits and the agent rules, read from the config folder at the landed commit, and how to change them.
+  - **Discussions** (`/$project/discussions`, `/$project/discussions/$discussion`): a project's public, freeform threads, open to anyone not denounced, that land nothing themselves; each page shows its posts, the ask a maintainer opened from it, and a form to open a thread or reply.
   - **Inbox** (`/inbox`; `/home` and `/today` move here): the reader's own page. A maintainer's decisions in sections (due today, later), every open one, each with its evidence, safe default, expiry and one-tap choices whose consequence is written under each, with how many wait said as a sentence; the asks the reader holds and where each answer stands in the gate; the asks they may take next. Each decision has its own page (`/$project/decisions/$decision`), where a finish shows the answer's diff with refusals marked at their lines.
   - **Visibility** (`/$project/visibility`; `/$project/ledger` and `/$project/env` move here): the posture, each declared layer with its reason, each sealed area's count, authors, committed root and admission; the Environment, every item the project's committed `.env.schema` declares, parsed at the landed commit and never resolved, with who set a sensitive item's value and when, never a value; and the ledger, newest first.
   - **Settings** (`/settings`): the theme, the system's or its opposite, kept in this browser's `localStorage`, never a cookie.
   - **Sign-in** (`/auth/signin`): through the platform's own accounts; the session lives in an HttpOnly cookie the browser cannot read.
   - **Install** (`/install`; `/agents` moves here, and `/agents.md` stays): every way in, the CLI, remote and stdio MCP, the skills and `llms.txt`, each snippet copyable. The reference lives in the docs (`/docs`), over `/llms.txt`, `/llms-full.txt`, each project's `/$project/llms.txt`, `/.well-known/mcp.json` and the skills under `/.well-known/agent-skills/`.
 - Pages arrive with their data in the server's HTML, and moving between them never reloads the document. The project, ask and answer pages update live while open (the project's `watch` stream), and fall back to reading again every 5 s when the stream cannot be held.
-- A minimal keyboard set works on every page: `?` (the keys, with a switch that turns the rest off), `j`/`k` through a list, `J`/`K` through files, `1`–`9` to copy the page's numbered commands, and Escape.
+- A minimal keyboard set works on every page: `?` (the keys, with a switch that turns the rest off), `j`/`k` through a list, `J`/`K` through files, and Escape.
 - A project may not take a name the web uses for its own pages (`reservedProjectNames` in `@repo/protocol`: `explore`, `inbox`, `install`, `settings`, `asks`, `docs`, `people`, `auth`, `rpc` and the rest, the old `agents`, `home` and `today` kept).
 - Phone width is a first-class target (the web installs as a PWA that opens on the inbox).
 
@@ -114,7 +114,7 @@ What it declines:
 
 ## Product Principles
 
-1. **The terminal is the workplace; the web is the window.** Every action shows its command; nothing adds a second way to land.
+1. **The terminal is the workplace; the web is the window.** An action on the web is a control, never a command to copy; nothing adds a second way to land.
 2. **Render the typed value, not a paraphrase.** Refusals, credits, postures and outcomes read the same on every surface, because one renderer and one component draw each.
 3. **Waiting is not refusing.** Checking, waiting on a parent ask, a finish or a decision each read as waiting, never as an error.
 4. **Credit people, disclose agents, score no one.**

@@ -1,4 +1,3 @@
-import { Brand } from "@repo/brand";
 import type { Ask, AskListing } from "@repo/protocol/domain/ask";
 import type { AskId, ProjectName } from "@repo/protocol/ids";
 import type { DateTime } from "effect";
@@ -127,10 +126,7 @@ export const OpenAskRows = ({
   }
 
   return asks.length === 0 ? (
-    <EmptyState
-      command={`${Brand.cli} ask open <ask> --files <files>`}
-      title="No open asks. A maintainer opens one from an ask file."
-    />
+    <EmptyState title="No open asks." />
   ) : (
     <AskList asks={asks} {...props} />
   );

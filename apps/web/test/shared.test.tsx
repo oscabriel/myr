@@ -69,15 +69,13 @@ describe(StateBadge, () => {
 });
 
 describe(CopyAction, () => {
-  it("holds its command as text and is named for what it copies", () => {
-    const command = `${Brand.cli} claim fix-week-start --project oscabriel/datekit`;
+  it("holds its text as text and is named for what it copies", () => {
+    const text = "4f1c2a9e0b7d3c5f6a8e1d2b4c6f8a0e2d4b6c8f";
 
-    const markup = markupOf(
-      <CopyAction command={command} label="Copy claim command" />
-    );
+    const markup = markupOf(<CopyAction label="Copy Head" text={text} />);
 
-    expect(markup).toMatch(/^<button\b[^>]*aria-label="Copy claim command"/u);
-    expect(markup).toContain(`<code class="sr-only">${command}</code>`);
+    expect(markup).toMatch(/^<button\b[^>]*aria-label="Copy Head"/u);
+    expect(markup).toContain(`<code class="sr-only">${text}</code>`);
     expect(markup).toContain('aria-live="polite"');
   });
 });
@@ -186,18 +184,16 @@ describe(CommandLine, () => {
 });
 
 describe(EmptyState, () => {
-  it("says what is empty and the command that would change it", () => {
-    const command = `${Brand.cli} ask open`;
-    const text = textOf(<EmptyState command={command} title="No open asks" />);
+  it("says what is empty, and no command", () => {
+    const markup = markupOf(<EmptyState title="No open asks" />);
 
-    expect(text).toContain("No open asks");
-    expect(text).toContain(command);
-    expect(
-      markupOf(<EmptyState command={command} title="No open asks" />)
-    ).toContain(markupOf(<CommandLine command={command} />));
+    expect(textOf(<EmptyState title="No open asks" />)).toContain(
+      "No open asks"
+    );
+    expect(markup).not.toContain("<code");
   });
 
-  it("gives a way onward when no command changes it", () => {
+  it("gives a way onward", () => {
     const text = textOf(
       <EmptyState
         onward={<a href="/oscabriel/datekit">Back to datekit</a>}

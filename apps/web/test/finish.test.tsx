@@ -21,24 +21,32 @@ import {
   RepoPath,
   TreeSha,
 } from "@repo/protocol/ids";
-import { Weakened } from "@repo/protocol/refusal";
-import { DateTime, Option } from "effect";
+import { StaleBase, Weakened } from "@repo/protocol/refusal";
+import { Cause, DateTime, Option } from "effect";
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import type { PlacedRefusal } from "../src/features/finish/annotation.tsx";
 import { patchFiles } from "../src/features/finish/files.ts";
-import { FinishView } from "../src/features/finish/finish-view.tsx";
+import {
+  finishInput,
+  FinishView,
+} from "../src/features/finish/finish-view.tsx";
 import type {
   FinishDecision,
   FinishViewProps,
 } from "../src/features/finish/finish-view.tsx";
-import { changedFiles, patchOf } from "../src/features/finish/patch.ts";
+import {
+  answererOf,
+  changedFiles,
+  patchOf,
+} from "../src/features/finish/patch.ts";
 import {
   marksKey,
   readMarks,
   writeMark,
 } from "../src/features/finish/read-marks.ts";
+import { CallFailure } from "../src/features/shared/call-failure.tsx";
 
 const ENTITIES: ReadonlyMap<string, string> = new Map([
   ["&#x27;", "'"],
@@ -60,8 +68,6 @@ const textIn = (markup: string) =>
     .replaceAll(/\s+/gu, " ");
 
 const textOf = (element: ReactElement) => textIn(markupOf(element));
-
-const PLATFORM_URL = "https://platform-test.example.workers.dev";
 
 const datekit = ProjectName.make("oscabriel/datekit");
 
@@ -195,7 +201,6 @@ const pageOf = (
     files={filesOf(decision)}
     now={now}
     onDecide={() => {}}
-    platformUrl={PLATFORM_URL}
     {...extra}
   />
 );
@@ -280,41 +285,21 @@ describe(FinishView, () => {
     );
   });
 
-  it("numbers the three lines that finish it", () => {
-    const markup = markupOf(pageOf(withPatch));
+  it("gives no command lines to finish it from a clone", () => {
+    const markup = markupOf(pageOf(withPatch, { verdict }));
+    const text = textOf(pageOf(withPatch, { verdict }));
 
-    const list =
-      /<ol[^>]*data-finish-lines=""[^>]*>(?<items>[\s\S]*?)<\/ol>/u.exec(markup)
-        ?.groups?.items;
-
-    expect([...(list ?? "").matchAll(/<li\b/gu)]).toHaveLength(3);
+    expect(markup).not.toContain("data-finish-lines");
+    expect(text).not.toContain("git fetch");
+    expect(text).not.toContain(`${Brand.cli} finish`);
   });
 
-  it("without a patch, shows the lines that fetch the head and finish it, and no diff", () => {
+  it("without a patch, shows no diff and no command lines", () => {
     const element = pageOf(withoutPatch);
-    const text = textOf(element);
 
-    expect(text).toContain(`git fetch ${PLATFORM_URL}/`);
-    expect(text).toContain(` ${head}`);
-    expect(text).toContain(
-      `${Brand.cli} finish parse-iso --project oscabriel/datekit`
-    );
+    expect(textOf(element)).not.toContain(`${Brand.cli} finish`);
     expect(markupOf(element)).not.toContain("<diffs-container");
     expect(markupOf(element)).not.toContain('data-diff="');
-  });
-
-  it("fetches from the answer's fork when the decision names it, and finishes from the verdict's base", () => {
-    const named = finishOf([
-      ...withoutPatch.evidence,
-      { label: "fork", value: "datekit--parse-iso--ines-v" },
-    ]);
-
-    const text = textOf(pageOf(named, { verdict }));
-
-    expect(text).toContain(
-      `git fetch ${PLATFORM_URL}/datekit--parse-iso--ines-v.git ${head}`
-    );
-    expect(text).toContain(`--base ${base}`);
   });
 
   it("shows the ask's want and the verdict beside the diff", () => {
@@ -334,6 +319,81 @@ describe(FinishView, () => {
     );
     expect(text).toContain(
       "Nothing lands; the answer keeps waiting for a finish."
+    );
+  });
+});
+
+const finishButtonOf = (markup: string) =>
+  /<button\b[^>]*data-action="finish"[^>]*>/u.exec(markup)?.[0] ?? "";
+
+const onTop = CommitSha.make("f".repeat(40));
+
+describe("finishing it from the page", () => {
+  it("offers no Finish while the fork's head is still the answer's own", () => {
+    const element = pageOf(withPatch, {
+      forkHead: Option.some(head),
+      onFinish: () => {},
+      verdict,
+    });
+
+    expect(finishButtonOf(markupOf(element))).toContain('disabled=""');
+    expect(textOf(element)).toContain("Nothing is on top of the answer yet");
+  });
+
+  it("offers Finish once commits sit on top, and finishes from the verdict's base at the fork's head", () => {
+    const markup = markupOf(
+      pageOf(withPatch, {
+        forkHead: Option.some(onTop),
+        onFinish: () => {},
+        verdict,
+      })
+    );
+
+    expect(finishButtonOf(markup)).not.toBe("");
+    expect(finishButtonOf(markup)).not.toContain('disabled=""');
+    expect(finishInput(withPatch, verdict, Option.some(onTop))).toStrictEqual(
+      Option.some({
+        ask: parseIso,
+        base,
+        head: onTop,
+        project: datekit,
+        requestId: `finish-${onTop}`,
+      })
+    );
+  });
+
+  it("finishes nothing with no verdict to take the base from, or no fork head", () => {
+    expect(finishInput(withPatch, undefined, Option.some(onTop))).toStrictEqual(
+      Option.none()
+    );
+    expect(finishInput(withPatch, verdict, Option.none())).toStrictEqual(
+      Option.none()
+    );
+  });
+
+  it("shows a refused finish as the refusal", () => {
+    const markup = markupOf(
+      pageOf(withPatch, {
+        finishFailure: (
+          <CallFailure
+            cause={Cause.fail(
+              new StaleBase({ base, conflicts: [], main: onTop })
+            )}
+            doing="finish it"
+            here="/oscabriel/datekit/decisions/dec-000007"
+          />
+        ),
+        forkHead: Option.some(onTop),
+        verdict,
+      })
+    );
+
+    expect(markup).toContain('data-refusal="StaleBase"');
+  });
+
+  it("reads the answerer from the decision's answer evidence, to find their fork", () => {
+    expect(answererOf(withPatch)).toStrictEqual(
+      Option.some(Handle.make("ines-v"))
     );
   });
 });

@@ -1,5 +1,7 @@
+import type { PostDiscussion } from "@repo/protocol/contracts";
 import type { DiscussionId, ProjectName } from "@repo/protocol/ids";
-import { Atom } from "effect/reactivity";
+import { Effect } from "effect";
+import { Atom, Reactivity } from "effect/reactivity";
 
 import { ContractsClient } from "../surfaces.ts";
 import { keys } from "./keys.ts";
@@ -24,4 +26,21 @@ export const discussionAtom = Atom.family((project: ProjectName) =>
       )
     )
   )
+);
+
+/** A reply refetches its thread and the list; a new thread, the list. */
+export const postDiscussionAtom = ContractsClient.runtime.fn<
+  typeof PostDiscussion.payloadSchema.Type
+>()(
+  Effect.fnUntraced(function* (input) {
+    const client = yield* ContractsClient;
+
+    return yield* client("postDiscussion", input).pipe(
+      Reactivity.mutation(
+        input.discussion === undefined
+          ? keys.discussions(input.project)
+          : keys.discussion(input.project, input.discussion)
+      )
+    );
+  })
 );

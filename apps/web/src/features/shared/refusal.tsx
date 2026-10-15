@@ -7,8 +7,6 @@ import { explain, headline } from "@repo/protocol/render";
 import type { Array } from "effect";
 import { OctagonX, RotateCcw } from "lucide-react";
 
-import { CommandLine } from "./command.tsx";
-
 const Lines = ({ refusal }: { readonly refusal: Refusal }) => {
   const prefix = `${refusal._tag}:`;
 
@@ -61,7 +59,6 @@ export const RefusalView = ({
               />
               <Lines refusal={refusal} />
             </div>
-            <CommandLine command={refusal.next} />
           </li>
         );
       })}

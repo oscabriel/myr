@@ -35,10 +35,6 @@ import {
 import type { FrontFilter } from "../src/features/front/filter.ts";
 import { FrontPageView } from "../src/features/front/front-page.tsx";
 import type { FrontPageProps } from "../src/features/front/front-page.tsx";
-import {
-  dismissHowTo,
-  readHowToDismissed,
-} from "../src/features/front/how-to.tsx";
 import { FrontPageData, readFrontPage } from "../src/server/front-page.ts";
 import { ask as parseIsoWeek } from "./ask-fixtures.ts";
 import { textIn } from "./markup.ts";
@@ -76,9 +72,6 @@ const listIn = (markup: string) =>
 
 const filtersIn = (markup: string) =>
   /<nav aria-label="Filter the asks"[\s\S]*?<\/nav>/u.exec(markup)?.[0] ?? "";
-
-const stripIn = (markup: string) =>
-  /<section\b[^>]*data-how-to=""[\s\S]*?<\/section>/u.exec(markup)?.[0] ?? "";
 
 const now = DateTime.makeUnsafe("2026-10-07T12:00:00Z");
 
@@ -435,18 +428,13 @@ describe(FrontPageView, () => {
   );
 
   it.effect(
-    "gives an ask the viewer may take its claim command as text in its copy button, with no command box",
+    "gives an ask the viewer may take no claim command, no copy button and no command box",
     () =>
       Effect.gen(function* () {
         const row = rowOf(yield* front({}), "fix-week-start");
 
-        expect(row).toMatch(
-          new RegExp(
-            `<button[^>]*aria-label="Copy claim command"[\\s\\S]*?<code[^>]*>${Brand.cli} claim fix-week-start --project oscabriel/datekit</code>`,
-            "u"
-          )
-        );
-        // A command box's text is selectable whole; a row's command is a button's.
+        expect(row).not.toContain(`${Brand.cli} claim`);
+        expect(row).not.toContain('aria-label="Copy claim command"');
         expect(row).not.toContain("select-all");
       })
   );
@@ -558,53 +546,14 @@ describe(FrontPageView, () => {
       })
   );
 
-  it.effect(
-    "keeps one command box in the strip on a phone, the other two steps as code in the list",
-    () =>
-      Effect.gen(function* () {
-        const strip = stripIn(yield* front({}));
+  it.effect("puts no strip of steps and no command box above the list", () =>
+    Effect.gen(function* () {
+      const markup = yield* front({});
 
-        expect(
-          [
-            ...strip.matchAll(
-              /<code\b[^>]*data-step-text=""[^>]*>(?<command>[^<]*)<\/code>/gu
-            ),
-          ].map(({ groups }) => groups?.command)
-        ).toStrictEqual([
-          `${Brand.cli} check`,
-          `git push ${Brand.slug} HEAD:main`,
-        ]);
-        expect(strip.match(/<div class="max-tablet:hidden">/gu)).toHaveLength(
-          2
-        );
-      })
-  );
-
-  it.effect(
-    "puts one strip of three steps above the list, each a command, with a control that dismisses it",
-    () =>
-      Effect.gen(function* () {
-        const markup = yield* front({});
-        const strip = stripIn(markup);
-
-        expect([
-          ...strip.matchAll(/<code\b[^>]*select-all[^>]*>/gu),
-        ]).toHaveLength(3);
-        expect(
-          [
-            `${Brand.cli} claim <ask> --project <owner>/<name>`,
-            `${Brand.cli} check`,
-            `git push ${Brand.slug} HEAD:main`,
-          ].filter((command) => !textIn(strip).includes(command))
-        ).toStrictEqual([]);
-        expect(strip).toMatch(
-          /<button\b[^>]*aria-label="Dismiss how to take an ask"/u
-        );
-        expect(markup.indexOf("data-how-to")).toBeLessThan(
-          markup.indexOf("data-board=")
-        );
-        expect(strip).toContain('href="/llms.txt"');
-      })
+      expect(markup).not.toContain("data-how-to");
+      expect(markup).not.toMatch(/<code\b[^>]*select-all/u);
+      expect(textIn(markup)).not.toContain(Brand.cli);
+    })
   );
 
   it.effect("with an ask selected, marks its row and opens no inspector", () =>
@@ -632,24 +581,28 @@ describe(FrontPageView, () => {
   );
 
   it.effect(
-    "says an empty front page is empty, with the command that starts a project",
+    "says an empty front page is empty, with a link to bring a project and no command",
     () =>
       Effect.gen(function* () {
-        const text = textIn(yield* front({}, { entries: [], projects: [] }));
+        const markup = yield* front({}, { entries: [], projects: [] });
+        const text = textIn(markup);
 
         expect(text).toContain("No open asks");
-        expect(text).toContain(`${Brand.cli} init`);
+        expect(markup).toMatch(
+          /<a\b[^>]*href="\/import"[^>]*>Bring a project here<\/a>/u
+        );
+        expect(text).not.toContain(Brand.cli);
       })
   );
 
   it.effect(
-    "says a front page with projects but no asks needs an ask opened",
+    "says a front page with projects but no asks has none open, with no command",
     () =>
       Effect.gen(function* () {
         const text = textIn(yield* front({}, { entries: [] }));
 
         expect(text).toContain("No open asks");
-        expect(text).toContain(`${Brand.cli} ask open`);
+        expect(text).not.toContain(Brand.cli);
       })
   );
 });
@@ -826,63 +779,6 @@ describe("the front page as the server sends it", () => {
   );
 });
 
-/** A browser's storage held in a map, so a test reads back what was kept. */
-const memoryStorage = (): Storage => {
-  const kept = new Map<string, string>();
-
-  return {
-    clear: () => {
-      kept.clear();
-    },
-    getItem: (key) => kept.get(key) ?? null,
-    key: (index) => [...kept.keys()][index] ?? null,
-    get length() {
-      return kept.size;
-    },
-    removeItem: (key) => {
-      kept.delete(key);
-    },
-    setItem: (key, value) => {
-      kept.set(key, value);
-    },
-  };
-};
-
-const blocked = () => {
-  throw new Error("blocked");
-};
-
-/** Storage a private window or a blocked site refuses. */
-const refusingStorage = (): Storage => ({
-  clear: blocked,
-  getItem: blocked,
-  key: blocked,
-  length: 0,
-  removeItem: blocked,
-  setItem: blocked,
-});
-
-describe("the strip's dismissal", () => {
-  it("is remembered in the storage it is given, and is not until then", () => {
-    const storage = memoryStorage();
-
-    expect(readHowToDismissed(storage)).toBeFalsy();
-
-    dismissHowTo(storage);
-
-    expect(readHowToDismissed(storage)).toBeTruthy();
-    expect(storage).toHaveLength(1);
-  });
-
-  it("shows the strip when there is no storage, or the storage refuses", () => {
-    expect(readHowToDismissed()).toBeFalsy();
-    expect(readHowToDismissed(refusingStorage())).toBeFalsy();
-    expect(() => {
-      dismissHowTo(refusingStorage());
-    }).not.toThrow();
-  });
-});
-
 describe("the front page's views", () => {
   const sources: Readonly<Record<string, string>> = import.meta.glob(
     "../src/features/front/**/*.{ts,tsx}",
@@ -894,14 +790,11 @@ describe("the front page's views", () => {
     expect(reachingTransport(sources)).toStrictEqual([]);
   });
 
-  it("never write a cookie: the strip's dismissal is kept in localStorage", () => {
+  it("never write a cookie", () => {
     expect(
       Object.entries(sources).flatMap(([path, source]) =>
         /document\.cookie|cookieStore|set-cookie/iu.test(source) ? [path] : []
       )
     ).toStrictEqual([]);
-    expect(sources["../src/features/front/how-to.tsx"]).toContain(
-      "localStorage"
-    );
   });
 });

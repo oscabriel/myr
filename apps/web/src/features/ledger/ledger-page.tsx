@@ -4,7 +4,6 @@
  * adds one; the layer read log is maintainers' data and never reaches the
  * public ledger. A layer's files are never browsed here (principle 7).
  */
-import { Brand } from "@repo/brand";
 import { LedgerEntry } from "@repo/protocol/domain/visibility";
 import type { Layer, Ledger, Members } from "@repo/protocol/domain/visibility";
 import type { Handle, ProjectName } from "@repo/protocol/ids";
@@ -16,7 +15,6 @@ import type { ReactNode } from "react";
 import { Definition, Definitions, Region } from "../ask/fields.tsx";
 import { commitHref, shortSha } from "../code/paths.ts";
 import { postureLabel } from "../project/posture-label.ts";
-import { CommandLine } from "../shared/command.tsx";
 import { CopyAction } from "../shared/copy-action.tsx";
 import { disclosureWords } from "../shared/disclosure.ts";
 import { EmptyState } from "../shared/empty.tsx";
@@ -166,8 +164,8 @@ const AreaBlock = ({
           <span className="flex min-w-0 items-center gap-2">
             <CodeValue value={summary.root.value} />
             <CopyAction
-              command={summary.root.value}
               label={`Copy ${summary.area}'s root`}
+              text={summary.root.value}
             />
           </span>
         ) : (
@@ -339,10 +337,8 @@ const Disclosures = () => (
 
 export const LedgerFacts = ({
   areas,
-  ledger,
 }: {
   readonly areas: readonly AreaSummary[];
-  readonly ledger: Ledger;
 }) => (
   <>
     <HeldBackFacts
@@ -351,12 +347,6 @@ export const LedgerFacts = ({
         detail: plural(summary.checks, "sealed check", "sealed checks"),
       }))}
     />
-    <FactBlock label="Read it in a terminal">
-      <CommandLine
-        command={`${Brand.cli} ledger --project ${ledger.project}`}
-        numbered
-      />
-    </FactBlock>
     <Disclosures />
   </>
 );

@@ -2,13 +2,12 @@
  * The switch turns every key but `?` off (WCAG 2.2 SC 2.1.4), and is on
  * whenever the storage cannot be read.
  */
-import { Effect, Option, Result } from "effect";
+import { Result } from "effect";
 import {
   createContext,
   useCallback,
   useContext,
   useEffect,
-  useId,
   useMemo,
   useRef,
   useState,
@@ -26,17 +25,15 @@ export interface KeyPress {
   readonly metaKey: boolean;
 }
 
-export type KeyIntent =
-  | { readonly index: number; readonly kind: "copy" }
-  | {
-      readonly kind:
-        | "clear"
-        | "keys"
-        | "next"
-        | "nextFile"
-        | "previous"
-        | "previousFile";
-    };
+export interface KeyIntent {
+  readonly kind:
+    | "clear"
+    | "keys"
+    | "next"
+    | "nextFile"
+    | "previous"
+    | "previousFile";
+}
 
 const MOVES = {
   J: "nextFile",
@@ -44,8 +41,6 @@ const MOVES = {
   j: "next",
   k: "previous",
 } as const satisfies Record<string, KeyIntent["kind"]>;
-
-const DIGIT = /^[1-9]$/u;
 
 export const intentOf = (
   press: KeyPress,
@@ -65,10 +60,6 @@ export const intentOf = (
 
   if (!on) {
     return undefined;
-  }
-
-  if (DIGIT.test(press.key)) {
-    return { index: Number(press.key), kind: "copy" };
   }
 
   const move = Object.entries(MOVES).find(([key]) => key === press.key);
@@ -95,7 +86,6 @@ const KEYS = [
   { does: "Open the focused row", keys: ["Enter"] },
   { does: "Next or previous file", keys: ["J", "K"] },
   { does: "Go to file, in the Code tab", keys: ["t"] },
-  { does: "Copy the page's numbered command", keys: ["1", "…", "9"] },
   { does: "Close, or clear the selection", keys: ["Esc"] },
 ] as const;
 
@@ -116,15 +106,9 @@ export const KeysHelp = ({
       {KEYS.map(({ does, keys }) => (
         <div className="contents" key={does}>
           <dt className="flex items-center gap-1">
-            {keys.map((key) =>
-              key === "…" ? (
-                <span className="text-muted-foreground" key={key}>
-                  to
-                </span>
-              ) : (
-                <Kbd key={key}>{key}</Kbd>
-              )
-            )}
+            {keys.map((key) => (
+              <Kbd key={key}>{key}</Kbd>
+            ))}
           </dt>
           <dd>{does}</dd>
         </div>
@@ -156,18 +140,6 @@ export const KeysHelp = ({
   </div>
 );
 
-export type CommandSlot = "facts" | "main";
-
-const SlotContext = createContext<CommandSlot>("main");
-
-export const CommandSlotProvider = ({
-  children,
-  slot,
-}: {
-  readonly children: ReactNode;
-  readonly slot: CommandSlot;
-}) => <SlotContext value={slot}>{children}</SlotContext>;
-
 interface ListRegistration {
   readonly focus: (id: string) => void;
   readonly read: () => {
@@ -184,22 +156,13 @@ interface FileRegistration {
   at?: string;
 }
 
-interface Command {
-  readonly command: string;
-  readonly id: string;
-  readonly slot: CommandSlot;
-}
-
 interface Registry {
   readonly clearers: Set<() => void>;
   readonly files: Set<FileRegistration>;
   readonly lists: Set<ListRegistration>;
-  readonly register: (command: Command) => () => void;
 }
 
 interface KeysState {
-  readonly copied: string | undefined;
-  readonly numbered: ReadonlyMap<string, number>;
   readonly on: boolean;
   readonly setOn: (on: boolean) => void;
 }
@@ -232,37 +195,6 @@ export const inField = (event: KeyboardEvent) => {
       ) !== null)
   );
 };
-
-const numberOf = (
-  commands: readonly Command[]
-): ReadonlyMap<string, number> => {
-  const ordered = [
-    ...commands.filter(({ slot }) => slot === "facts"),
-    ...commands.filter(({ slot }) => slot === "main"),
-  ];
-
-  const unique = [...new Set(ordered.map(({ command }) => command))];
-
-  return new Map(
-    unique.slice(0, 9).map((command, index) => [command, index + 1])
-  );
-};
-
-const copyNumbered = (command: string, shown: (copied?: string) => void) =>
-  Effect.tryPromise(() => navigator.clipboard.writeText(command)).pipe(
-    Effect.andThen(
-      Effect.sync(() => {
-        shown(command);
-      })
-    ),
-    Effect.andThen(Effect.sleep("2 seconds")),
-    Effect.andThen(
-      Effect.sync(() => {
-        shown();
-      })
-    ),
-    Effect.ignore
-  );
 
 const moveTo = (list: ListRegistration, step: 1 | -1) => {
   const { ids } = list.read();
@@ -303,8 +235,6 @@ const moveFile = (files: FileRegistration, step: 1 | -1) => {
 };
 
 interface Pressing {
-  readonly copy: (command: string) => void;
-  readonly numbered: ReadonlyMap<string, number>;
   readonly on: boolean;
   readonly openDialog: () => void;
   readonly registry: Registry;
@@ -326,18 +256,6 @@ const act = (intent: KeyIntent, now: Pressing): boolean => {
     }
 
     return false;
-  }
-
-  if (intent.kind === "copy") {
-    const command = [...now.numbered].find(
-      ([, index]) => index === intent.index
-    )?.[0];
-
-    if (command !== undefined) {
-      now.copy(command);
-    }
-
-    return command !== undefined;
   }
 
   if (intent.kind === "next" || intent.kind === "previous") {
@@ -369,21 +287,12 @@ export const KeysProvider = ({
   // The server has no storage and renders the keys on; nothing it renders
   // depends on them.
   const [on, setOn] = useState(() => readShortcuts(browserStorage()));
-  const [commands, setCommands] = useState<readonly Command[]>([]);
-  const [copied, setCopied] = useState<string>();
 
   const registry = useMemo<Registry>(
     () => ({
       clearers: new Set(),
       files: new Set(),
       lists: new Set(),
-      register: (command) => {
-        setCommands((now) => [...now, command]);
-
-        return () => {
-          setCommands((now) => now.filter(({ id }) => id !== command.id));
-        };
-      },
     }),
     []
   );
@@ -393,16 +302,10 @@ export const KeysProvider = ({
     writeShortcuts(browserStorage(), next);
   }, []);
 
-  const numbered = useMemo(() => numberOf(commands), [commands]);
-
   const pressing = useRef<Pressing | null>(null);
 
   useEffect(() => {
     pressing.current = {
-      copy: (command) => {
-        Effect.runFork(copyNumbered(command, setCopied));
-      },
-      numbered,
       on,
       openDialog,
       registry,
@@ -440,19 +343,11 @@ export const KeysProvider = ({
     };
   }, []);
 
-  const state = useMemo(
-    () => ({ copied, numbered, on, setOn: turn }),
-    [copied, numbered, on, turn]
-  );
+  const state = useMemo(() => ({ on, setOn: turn }), [on, turn]);
 
   return (
     <RegistryContext value={registry}>
-      <StateContext value={state}>
-        {children}
-        <output aria-live="polite" className="sr-only">
-          {copied === undefined ? "" : `Copied: ${copied}`}
-        </output>
-      </StateContext>
+      <StateContext value={state}>{children}</StateContext>
     </RegistryContext>
   );
 };
@@ -503,23 +398,6 @@ export const useFileKeys = (
     [latest, registry]
   );
 };
-
-export const useNumberedCommand = (command: string): number | undefined => {
-  const registry = useContext(RegistryContext);
-  const state = useContext(StateContext);
-  const slot = useContext(SlotContext);
-  const id = useId();
-
-  useEffect(
-    () => registry?.register({ command, id, slot }),
-    [command, id, registry, slot]
-  );
-
-  return state?.on === true ? state.numbered.get(command) : undefined;
-};
-
-export const useCopiedCommand = (): Option.Option<string> =>
-  Option.fromUndefinedOr(useContext(StateContext)?.copied);
 
 export const useEscapeClears = (clear: () => void): void => {
   const registry = useContext(RegistryContext);

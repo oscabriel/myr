@@ -7,7 +7,6 @@ import type { ReactNode } from "react";
 import { Fragment } from "react";
 
 import type { AskProgress } from "./ask-progress.ts";
-import { ClaimAction } from "./copy-action.tsx";
 import { useListKeys } from "./keys.tsx";
 import { AppLink } from "./link.tsx";
 import { STATE_MARKS, StateMarkIcon } from "./marks.tsx";
@@ -371,15 +370,9 @@ export const AskRow = ({
 
   const claimant = progress?.claimant;
   const rounds = progress?.rounds.length ?? 0;
-  const open = state.mark === "open";
 
   return (
     <Row
-      action={
-        open && takeable !== false ? (
-          <ClaimAction ask={listing.ask} project={project} />
-        ) : undefined
-      }
       data={{
         "data-ask": listing.ask,
         "data-project": project,

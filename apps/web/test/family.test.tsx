@@ -199,24 +199,14 @@ describe(FamilyStrip, () => {
     })
   );
 
-  it.effect(
-    "holds each open child's claim command as text, folded or not",
-    () =>
-      Effect.gen(function* () {
-        for (const expanded of [false, true]) {
-          const markup = yield* strip({ expanded });
+  it.effect("holds no claim command for any child, folded or not", () =>
+    Effect.gen(function* () {
+      for (const expanded of [false, true]) {
+        const markup = yield* strip({ expanded });
 
-          for (const open of ["burrow-notify", "burrow-search"]) {
-            expect(markup).toContain(
-              `<code class="sr-only">${Brand.cli} claim ${id(open)} --project oscabriel/burrow</code>`
-            );
-          }
-
-          // A child someone holds, or that landed, has none.
-          expect(markup).not.toContain(`claim ${id("burrow-catalog")} `);
-          expect(markup).not.toContain(`claim ${id("burrow-auth")} `);
-        }
-      })
+        expect(markup).not.toContain(`${Brand.cli} claim`);
+      }
+    })
   );
 
   it.effect(

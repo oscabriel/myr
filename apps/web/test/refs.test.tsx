@@ -31,8 +31,6 @@ const slice = (markup: string, marker: string, value: string) => {
     : markup.slice(start, next === -1 ? undefined : next);
 };
 
-const platformUrl = "https://platform-test.example.workers.dev";
-
 const LANDED = "1".repeat(40);
 
 const IMPORTED = "2".repeat(40);
@@ -63,7 +61,7 @@ describe(RefsView, () => {
     ],
   });
 
-  const page = <RefsView platformUrl={platformUrl} refs={refs} />;
+  const page = <RefsView refs={refs} />;
 
   it("is titled Refs", () => {
     expect(markupOf(page)).toMatch(/<h1\b[^>]*>Refs<\/h1>/u);
@@ -92,9 +90,9 @@ describe(RefsView, () => {
       tags: [],
     });
 
-    expect(
-      textOf(<RefsView platformUrl={platformUrl} refs={empty} />)
-    ).toContain("Nothing has landed on main yet.");
+    expect(textOf(<RefsView refs={empty} />)).toContain(
+      "Nothing has landed on main yet."
+    );
   });
 
   it("lists the tags newest first, each linking its tree first and its commit", () => {
@@ -141,19 +139,12 @@ describe(RefsView, () => {
     expect(hrefsOf(fork)).toContain("/people/bram");
   });
 
-  it("puts the clone command and what a claim fork is in its facts", () => {
+  it("says what a claim fork is in its facts, and gives no command there", () => {
     const facts = factsOf(markupOf(page));
 
-    expect(plainText(facts)).toContain(
-      `git clone ${platformUrl}/oscabriel/datekit.git`
-    );
-    // The command is the text of the one code element a tap selects whole.
-    expect(
-      plainText(
-        /<code\b[^>]*select-all[^>]*>.*?<\/code>/u.exec(facts)?.[0] ?? ""
-      )
-    ).toMatch(/^ ?git clone /u);
     expect(plainText(facts)).toContain("claim fork");
+    expect(plainText(facts)).not.toContain("git clone");
+    expect(facts).not.toContain("select-all");
   });
 
   it("never names the platform's own refs, and says tags, not releases", () => {
@@ -175,7 +166,7 @@ describe(RefsView, () => {
       ],
     });
 
-    const view = <RefsView platformUrl={platformUrl} refs={one} />;
+    const view = <RefsView refs={one} />;
 
     expect(markupOf(page)).not.toContain("data-package=");
     expect(markupOf(view)).not.toContain("data-package=");
@@ -196,7 +187,7 @@ describe(RefsView, () => {
 });
 
 const viewOf = (refs: Refs, only?: string, from?: number) => (
-  <RefsView from={from} package={only} platformUrl={platformUrl} refs={refs} />
+  <RefsView from={from} package={only} refs={refs} />
 );
 
 describe("a monorepo's refs page", () => {

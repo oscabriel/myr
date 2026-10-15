@@ -75,21 +75,15 @@ describe(AskRow, () => {
   );
 
   it.effect(
-    "holds the claim command as text inside its copy button, named for what it copies",
+    "gives an ask open to take no claim command to copy: the row is a link to the ask",
     () =>
       Effect.gen(function* () {
         const markup = yield* rowsAt(
           <AskRow listing={listing("@burrow/auth")} project={burrow} takeable />
         );
 
-        const command = `${Brand.cli} claim fix-week-start --project oscabriel/burrow`;
-
-        expect(markup).toMatch(
-          new RegExp(
-            `<button\\b[^>]*aria-label="Copy claim command"[^>]*>.*<code class="sr-only">${command}</code>.*</button>`,
-            "su"
-          )
-        );
+        expect(markup).not.toContain("Copy claim command");
+        expect(markup).not.toContain(`${Brand.cli} claim`);
       })
   );
 
@@ -111,7 +105,7 @@ describe(AskRow, () => {
   );
 
   it.effect(
-    "says an ask it may take is open to take, and gives one it may not no command",
+    "says an ask it may take is open to take, and one it may not is claimed",
     () =>
       Effect.gen(function* () {
         const open = textIn(

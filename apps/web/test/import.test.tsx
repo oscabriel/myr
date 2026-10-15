@@ -65,14 +65,14 @@ describe("the import page", () => {
     expect(importSearch({ url: 3 })).toStrictEqual({});
   });
 
-  it("signed out, shows no form and a sign-in link that comes back to /import", () => {
+  it("signed out, shows no form, no command and a sign-in link that comes back to /import", () => {
     const markup = markupOf(
       <ImportView handle={Option.none()} here="/import" />
     );
 
     expect(markup).not.toContain("<form");
     expect(returnOf(markup)).toBe("/import");
-    expect(textIn(markup)).toContain(`${Brand.cli} init --project`);
+    expect(textIn(markup)).not.toContain(`${Brand.cli} init`);
   });
 
   it("says so while it learns who is signed in", () => {

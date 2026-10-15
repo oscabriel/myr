@@ -1,5 +1,4 @@
 import { describe, expect, it } from "@effect/vitest";
-import { commandDocs } from "@repo/agent-kit/command-doc";
 import { Brand } from "@repo/brand";
 import { Client, Contracts } from "@repo/protocol/contracts";
 import { AskListing } from "@repo/protocol/domain/ask";
@@ -304,7 +303,7 @@ const page = (more: Partial<ProjectViewProps> = {}) =>
 
 describe(ProjectView, () => {
   it.effect(
-    "lists every open ask with its want as the link, then its kind, territory and id",
+    "lists every open ask with its want as the link, then its kind, territory and id, and no claim command",
     () =>
       Effect.gen(function* () {
         const row = rowOf(yield* page(), "fix-week-start");
@@ -314,9 +313,7 @@ describe(ProjectView, () => {
         );
         expect(textIn(row)).toContain("bug · core · fix-week-start");
         expect(textIn(row)).toContain("Open to take");
-        expect(textIn(row)).toContain(
-          `${Brand.cli} claim fix-week-start --project oscabriel/datekit`
-        );
+        expect(textIn(row)).not.toContain(`${Brand.cli} claim`);
       })
   );
 
@@ -467,19 +464,17 @@ describe(ProjectView, () => {
   );
 
   it.effect(
-    "gives the clone command and the claim command in the about column, and the last three landings as one-line credits in the main one",
+    "gives the clone command, and no claim command, in the about column, and the last three landings as one-line credits in the main one",
     () =>
       Effect.gen(function* () {
         const markup = yield* page();
         const about = textIn(aboutOf(markup));
         const landed = mainColumnOf(markup);
 
-        expect(
-          allInOrder(about, [
-            `git clone ${platformUrl}/oscabriel/datekit.git`,
-            `${Brand.cli} claim <ask> --project oscabriel/datekit`,
-          ])
-        ).toBeTruthy();
+        expect(about).toContain(
+          `git clone ${platformUrl}/oscabriel/datekit.git`
+        );
+        expect(about).not.toContain(`${Brand.cli} `);
         expect(landed.match(/data-landing="/gu)).toHaveLength(3);
         expect(
           missingFrom(textIn(landed), [
@@ -513,29 +508,24 @@ describe(ProjectView, () => {
       })
   );
 
-  it.effect(
-    "says an empty project is empty, with the commands that would fill it",
-    () =>
-      Effect.gen(function* () {
-        const { landedAt: _landed, ...unlanded } = listing;
+  it.effect("says an empty project is empty, with no command to fill it", () =>
+    Effect.gen(function* () {
+      const { landedAt: _landed, ...unlanded } = listing;
 
-        const text = textIn(
-          yield* page({
-            asks: [],
-            landings: [],
-            listing: { ...unlanded, openAsks: 0 },
-          })
-        );
+      const text = textIn(
+        yield* page({
+          asks: [],
+          landings: [],
+          listing: { ...unlanded, openAsks: 0 },
+        })
+      );
 
-        expect(text).toContain("No open asks");
-        expect(text).toContain(`${Brand.cli} ask open`);
-        expect(text).toContain("Nothing has landed");
-        // The project exists, so `init` would refuse it: its first push lands main.
-        expect(text).toContain(
-          `git push ${platformUrl}/oscabriel/datekit.git HEAD:main`
-        );
-        expect(text).not.toContain(`${Brand.cli} init`);
-      })
+      expect(text).toContain("No open asks");
+      expect(text).toContain("Nothing has landed");
+      expect(text).toContain("The first push to main lands it.");
+      expect(text).not.toContain(`${Brand.cli} `);
+      expect(text).not.toContain("git push");
+    })
   );
 
   it.effect(
@@ -1104,29 +1094,16 @@ describe("a project's page in its frame", () => {
       })
   );
 
-  it("says the commands its popovers give whole, each a real CLI command with its project", () => {
+  it("gives the clone command in its Clone popover, and no CLI command in it or in Watch", () => {
     const steps = textOf(
       <>
         <CloneSteps platformUrl={platformUrl} project={headerFacts.project} />
-        <WatchSteps project={headerFacts.project} />
+        <WatchSteps />
       </>
     );
 
-    expect(
-      allInOrder(steps, [
-        `git clone ${platformUrl}/oscabriel/datekit.git`,
-        `${Brand.cli} claim <ask> --project oscabriel/datekit`,
-        `${Brand.cli} status --project oscabriel/datekit`,
-      ])
-    ).toBeTruthy();
-    expect(
-      commandDocs(Contracts)
-        .filter(({ path }) => ["claim", "status"].includes(path.join(" ")))
-        .map(({ flags, path }) => [path.join(" "), flags.includes("--project")])
-    ).toStrictEqual([
-      ["claim", true],
-      ["status", true],
-    ]);
+    expect(steps).toContain(`git clone ${platformUrl}/oscabriel/datekit.git`);
+    expect(steps).not.toContain(`${Brand.cli} `);
   });
 });
 

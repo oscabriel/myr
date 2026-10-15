@@ -1,6 +1,6 @@
 ---
 name: Myr web
-description: Four shells on warm paper, three of them ruled. What state a change is in, whose move it is, and the command that runs next.
+description: Four shells on warm paper, three of them ruled. What state a change is in, whose move it is, and what to do next.
 colors:
   paper: "#f8f7f4"
   paper-dark: "#0a0a0a"
@@ -258,7 +258,7 @@ components:
 
 # Design System: the web
 
-The web's look, for anyone adding or changing a page. Tokens live in `apps/web/src/styles.css`. The pieces every page shares (the top bar, the footer, the project header, the row, the status line, the family fan, the fact blocks, the copy action, refusals, credit, posture, outcomes, stages, commands, marks, times, people, empty and pending states) live in `apps/web/src/features/shared/`. A page uses them rather than drawing its own. Pierre's code drawing is configured once, in `apps/web/src/features/code/pierre.ts`. Words follow `GLOSSARY.md` and `PRODUCT.md`.
+The web's look, for anyone adding or changing a page. Tokens live in `apps/web/src/styles.css`. The pieces every page shares (the top bar, the footer, the project header, the row, the status line, the family fan, the fact blocks, the copy action, refusals, credit, posture, outcomes, stages, the command line, marks, times, people, empty and pending states) live in `apps/web/src/features/shared/`. A page uses them rather than drawing its own. Pierre's code drawing is configured once, in `apps/web/src/features/code/pierre.ts`. Words follow `GLOSSARY.md` and `PRODUCT.md`.
 
 The rules here are ADR 0041 (four shells, Overview first, no logomark, a plain sans), ADR 0042 (the theme preference), ADR 0043 (fork browsing) and the maintainer's overrides of 2026-10-12 (IBM Plex, the sage garden palette, the repeat button icon, the footer's wordmark, no fingernails, no eyebrows). Where the code has not caught up yet, this file is the target and `apps/web/test/design-rules.test.tsx` holds what it can.
 
@@ -266,7 +266,7 @@ The rules here are ADR 0041 (four shells, Overview first, no logomark, a plain s
 
 **Creative North Star: "Four shells on warm paper"**
 
-The web serves four jobs, and each gets its own frame: a site that explains the platform and lists its projects, a project with one header and its tabs, a docs site, and a focused card for signing in. All four share the top bar's contents, so moving between them never reads as a different app. Three of them are ruled: two hairlines run down the container's edges the page's full height, the top bar is a box between them under a small gap, and every rule inside runs rail to rail, so the page reads as one sheet pinned to the bench, like the music box's own ruler. A project is full-bleed: its code and diffs want the whole window. Every screen still answers three questions in this order: what state is it in, whose move is it, and what runs next. The answer to the last one is a command you can copy, shown once.
+The web serves four jobs, and each gets its own frame: a site that explains the platform and lists its projects, a project with one header and its tabs, a docs site, and a focused card for signing in. All four share the top bar's contents, so moving between them never reads as a different app. Three of them are ruled: two hairlines run down the container's edges the page's full height, the top bar is a box between them under a small gap, and every rule inside runs rail to rail, so the page reads as one sheet pinned to the bench, like the music box's own ruler. A project is full-bleed: its code and diffs want the whole window. Every screen still answers three questions in this order: what state is it in, whose move is it, and what to do next. The answer to the last one is a control on the page, never a command to copy: the terminal has its own surface, the CLI.
 
 The pages are for operating, with one page that persuades: the landing at `/`, which draws the platform as a music box whose cylinder only its own press can pin, and leads to the open asks. Density is set by a maintainer clearing the inbox on a phone and a contributor reading a refusal beside a terminal: two-line rows (64 px), 14 px metadata, a 13 px floor. Colour means state, and always sits beside a word and a mark, so a page read in grayscale, by a screen reader or in a terminal says the same thing. In a list the colour sits on the mark and the word stays ink. The one colour that is not a state is the sage primary: the page's main action and the focus ring.
 
@@ -277,7 +277,7 @@ Rejected on purpose: the dashboard look (stat tiles, big numbers over small labe
 - Four shells (site, project, docs, focus), each named by its route, with no global rail and no generic right rail. The site, the docs and a focused page are ruled (the rails); a project is full-bleed.
 - A project has one header and eight tabs, and opens on Overview.
 - State is a mark, then a word, then a colour; red belongs to refusals, violet to sealed things, green to what is on main, olive to waiting, blue to checking. In a row the colour is the mark's; the word is ink, except Refused and Landed.
-- Every action is a command to copy, shown once per screen. The only web controls that change anything are a maintainer's choices, the theme preference, and signing in or out.
+- A page names no CLI command. What a person does on the web is a control: a maintainer's choices, claiming and releasing an ask, posting in a discussion, reading a failed lane's log, finishing an answer, importing a repo, the theme preference, and signing in or out. A command box shows only the install line and `git clone` (`apps/web/test/no-cli-commands.test.ts`).
 - Light and dark follow the system setting, or its opposite by the reader's choice on `/settings` (ADR 0042).
 - Motion carries state, never decoration: transitions of 120 to 200 ms, the landing's stamp, and the landing's music box, whose every move is a step of an answer through the gate.
 
@@ -412,7 +412,7 @@ From `columns` (1100 px, `--breakpoint-columns`) a side column stands beside its
 
 - **No global left rail.** The project list moves to Explore and the account menu; a project's navigation is its tabs.
 - **No generic right rail.** A side column exists only where it holds facts about what is on screen (a project's about column, a doc's headings), 220 to 340 px wide, and stacks under 1100 px. The asks board's filters are the one column that is not facts: they narrow the list beside them, and stand above it under 1100 px.
-- **A command at most once per screen.** As content, a command sits in a popover, a single strip or a card. Never a column of code blocks.
+- **No CLI command on a page.** The install line on the landing and Install, and `git clone` in the Clone popover, are the only command boxes. Never a column of code blocks.
 - **Prose stops at 72 to 80ch.** Lists and tables run to the container; prose, a README and a doc's article stop at `--measure` (72ch). A project page's head, facts, toolbar and document body stop at `--measure-page` (56rem), so its prose and the table beside it share one edge.
 
 ### Inside a page
@@ -451,7 +451,7 @@ Square. The radius is 2 px (`--radius: 0.125rem`), and shadcn's base-lyra compon
 
 ### Project header and tabs
 
-- **Header:** the name (`owner / project`, the owner muted, both in the UI sans at Headline size), the posture (`PostureBadge`), the description (the README's first sentence), a facts row in UI type, muted (open asks, last landing, latest tag, licence if known, deciders), and three actions at the right: **Watch** (a popover: what already follows the project, this page and its events, plus `myr status --project` for your own claims and answers; the CLI has no watch command), **Clone** (a popover: the `git clone` URL, `myr claim <ask> --project`, and that forks come with a claim), **Contribute** (a popover: take an ask, start a discussion, read the policy). It never changes between tabs.
+- **Header:** the name (`owner / project`, the owner muted, both in the UI sans at Headline size), the posture (`PostureBadge`), the description (the README's first sentence), a facts row in UI type, muted (open asks, last landing, latest tag, licence if known, deciders), and three actions at the right: **Watch** (a popover: what already follows the project, this page and its events, and a link to the events), **Clone** (a popover: the `git clone` URL), **Contribute** (a popover: take an ask, start a discussion, read the policy). It never changes between tabs.
 - **Tabs:** Overview · Code · Asks · Landings · Discussions · Policy · Visibility, each a text tab with its count in label type; the current one ink at 500 with a 2 px ink underline (the one current-tab style of the whole web), the rest muted. The header and tabs stick under the top bar together; on a phone the tabs scroll sideways inside their own strip.
 - **Overview** (the default tab): open asks, recent landings and the README in the main column (its headings a level down, so the project's name stays the page's one h1); the about column (`--column-about`) with clone, how a change lands (the seven stages), who decides, a visibility summary and languages.
 - **Code:** under the header, the code bar: a Files/History toggle, the revision picker (`main`, tags, and answers in claim forks, ADR 0043), the HEAD commit, Go to file and Clone; then the file tree in `--column-tree` beside every page of the tab. The history is git's first-parent log with the platform's landing record on each commit that has one, filtered to Landings, Answers, Ask openings or Every commit (Landings by default on main); the Landings tab opens that history of main filtered to its landings, and a commit's page sits under it.
@@ -472,20 +472,18 @@ Square. The radius is 2 px (`--radius: 0.125rem`), and shadcn's base-lyra compon
 ### The asks board (`/asks`)
 
 - **Shape:** the page's title and its one line, then one strip, then the filters in `--column-filters` on the left and the list running to the container on the right. Under 1100 px the filters stand above the list, their three groups side by side from `tablet`.
-- **Strip:** "How to take an ask", a plain bordered card with three numbered steps, each a `CommandLine` (claim, check, push), and a line onward to Install and `llms.txt`. A ghost X button dismisses it; the dismissal is kept in `localStorage`, never a cookie, and "How to take an ask" at the foot of the filters brings it back. The server always draws it, so a reader who dismissed it sees it go once the page reads the storage.
 - **Filters:** a `nav` landmark ("Filter the asks") of three groups, Kind, State (who may take it: any, open to take, held for newcomers or for people) and Project, each a list of links with its count, the current one on the field surface at 600 with `aria-current="page"`. Every filter is an address (`/asks?kind=fix&take=open`), each link keeps the other filters, and "Reset filters" shows once one is set. Sticky under the top bar from 1100 px.
 - **List:** rows in a `RowGroup` per project, sticky under the top bar; a migrate family is its parent row with the family fan, its children listed under it.
 - **Open asks only:** the board lists the asks still open, as the `frontPage` contract gives them, so it has no filter to show landed asks. Listing those needs a read of landed asks across every project, which no contract gives yet.
 
-### Copy action (`CopyAction`, `CommandChip`) and command line (`CommandLine`)
+### Copy action (`CopyAction`) and command line (`CommandLine`)
 
-- **Copy action:** a 32 px ghost button at a row's end, named for what it copies ("Copy claim command"), its command always in the DOM as text (`<code class="sr-only">`), never only a clipboard payload. After a copy it shows a check and says "Copied" for 2 s in a polite live region.
-- **Command chip:** the command shown whole, small, at the end of a status line; pressing it copies it.
+- **Copy action:** a 32 px ghost button beside a value, named for what it copies ("Copy Head"), its text always in the DOM (`<code class="sr-only">`), never only a clipboard payload. After a copy it shows a check and says "Copied" for 2 s in a polite live region.
 - **Command line:** a field-surface box with a hairline border that hugs its command; a muted `$` that selection skips; the command in mono at terminal leading, broken only between words, each wrapped line hanging 6ch; a ghost Copy button. A command is always shown whole; it never ellipsises, and a screen shows it once.
 
 ### Status line (`StatusLine`) and state badge (`StateBadge`)
 
-- **Status line:** one sentence: the mark, the lead word in its role at 600, the rest in ink, then whose move in muted, then the next command as a chip. "Open to take", "Claimed by tamsin, no answer pushed yet · tamsin's move", "Checking at the checks stage · the platform's move", "Refused at Shape: OutOfScope", "Waiting on decision dec-000001 · a maintainer's move", "Landed as 9b1c3e5". A refusal's lead and tag come from `headline`, never a paraphrase. `data-tone` and `data-mark` carry it.
+- **Status line:** one sentence: the mark, the lead word in its role at 600, the rest in ink, then whose move in muted. "Open to take", "Claimed by tamsin, no answer pushed yet · tamsin's move", "Checking at the checks stage · the platform's move", "Refused at Shape: OutOfScope", "Waiting on decision dec-000001 · a maintainer's move", "Landed as 9b1c3e5". A refusal's lead and tag come from `headline`, never a paraphrase. `data-tone` and `data-mark` carry it.
 - **State badge:** the one way a state shows as a word: its mark, then its word in the role, at the size of its line. No pill, no fill, no box. `data-mark` (and `data-posture` on a posture's label) carry it.
 
 ### Marks (`marks.tsx`)
@@ -505,7 +503,7 @@ Lucide, one family, the mark `aria-hidden` and its word beside it: check (landed
 - **Waiting:** under the strip, the one sentence a contributor needs, from the typed state ("Nothing for you to run. A maintainer has until Thu 14:00."). Never a spinner.
 - **Landed:** told as a sentence before it is shown as a hash: one `StatusLine` at Title size, then the credit trailers under "Credit", then the held-back lines, then "The landing commit".
 - **Stage strip:** seven ruled cells in cost order (Parse, Shape, Merge, Cheap, Checks, Held-back, Maintainer), each a mark, its label and a 13 px state word: passed, now, refused, not yet, not needed. The current cell is on the surface with `aria-current="step"`.
-- **Refusal:** a hairline above and below (no coloured top rule), then `headline(refusals)` in mono red with an octagon mark, then one row per refusal parted by hairlines: its `explain` lines verbatim, then its `next` as a command line. A retryable refusal's mark is the olive turn-back arrow. `data-refusal` and `data-retryable` carry it. The web never rewords a refusal.
+- **Refusal:** a hairline above and below (no coloured top rule), then `headline(refusals)` in mono red with an octagon mark, then one row per refusal parted by hairlines: its `explain` lines verbatim. A retryable refusal's mark is the olive turn-back arrow. `data-refusal` and `data-retryable` carry it. The web never rewords a refusal.
 
 ### Credit trailers (`CreditTrailers`, `CompactCredit`) and held-back lines
 
@@ -518,9 +516,9 @@ The platform's own label, never rewritten, through the state badge: a lock and t
 
 ### Decisions, the inbox and the finish
 
-- **Inbox** (`/inbox`, once Home and Today, which redirect to it with their query kept): the reader's handle and record, how many decisions wait as one sentence for a decider, then sections under sticky headers: the decisions (Due today, Later), every open one, each decided in its row; Your claims, each answer's stage strip under its row and its next command as the row's copy action; Asks you may take; and what happened lately in the projects the reader decides for (Newcomers to welcome, Landed without a decision). `?project=` narrows it to one project. A personal page: never kept at the edge.
+- **Inbox** (`/inbox`, once Home and Today, which redirect to it with their query kept): the reader's handle and record, how many decisions wait as one sentence for a decider, then sections under sticky headers: the decisions (Due today, Later), every open one, each decided in its row; Your claims, each answer's stage strip under its row; Asks you may take; and what happened lately in the projects the reader decides for (Newcomers to welcome, Landed without a decision). `?project=` narrows it to one project. A personal page: never kept at the edge.
 - **Choices:** one tap each, no confirm. Primary buttons, the default the outline button with "default" beside its name; 36 px in a row from 640 px, 44 px in a two-column grid on a phone. Under each, a 13 px muted consequence line written from what the platform does. After a choice the record replaces the buttons, landed green only for a choice that took effect.
-- **Finish:** the changed files in the tree column with status letters, `+n −m` and a local read mark; the diff with sticky file headers and "Mark read"; the want, verdict, choices and the finish commands in a strip.
+- **Finish:** the changed files in the tree column with status letters, `+n −m` and a local read mark; the diff with sticky file headers and "Mark read"; the want, verdict, choices, and Finish it: the answer fork's head, read in the browser, and a button that finishes with the commits on top of the answer.
 
 ### Code browser (the Code tab)
 
@@ -542,12 +540,12 @@ The platform's own label, never rewritten, through the state badge: a lock and t
 
 - **Ledger:** the head sentence carries the facts; layers as rows (name in sealed-violet mono, readers, writers, disclosure, reason), sealed areas with root and admission, history newest first. No path, check name or file name.
 - **Environment:** items as definition rows, sensitive first: the key in mono, the sealed lock and "sensitive", "set by ines-v" or "not set", type, required, proxy hosts. Never a value.
-- **Policy:** maintainers by path, vouching one line per vouch, limits in tabular figures, agents, one line per layer; the commands that change it, each flag on its own line.
+- **Policy:** maintainers by path, vouching one line per vouch, limits in tabular figures, agents, one line per layer; how to change it, in words.
 - **Refs:** main ("moves only by a landing"), tags, and forks with their claim's state word.
 
 ### Empty, pending and error states
 
-- **Empty (`EmptyState`):** a dashed hairline block: one sentence saying what is empty, then the command that changes it or a link onward.
+- **Empty (`EmptyState`):** a dashed hairline block: one sentence saying what is empty, then a link onward.
 - **Pending:** the shell and header stay; after 300 ms main shows its title over rows of skeleton (outlined bars, no shimmer).
 - **Not found:** the trail up to what exists, a title saying what was asked for ("No such ask"), `RefusalView` verbatim, then one or two onward links.
 - **Unreachable:** "The platform did not answer.", "Try again in a minute; nothing was changed. Git and the CLI reach it directly." and Reload. Never red.
@@ -565,7 +563,7 @@ The platform's own label, never rewritten, through the state badge: a lock and t
 ### Navigation and keys
 
 - **Links:** every link between pages is the router's (`AppLink`), preloading on hover or focus; the page being read is `aria-current="page"`. Links in running text are ink, underlined in the hairline colour, ink on hover. A skip link to `#main` is the first tab stop.
-- **Keys:** `?` opens the keys dialog with "Single-key shortcuts: On / Off"; `j`/`k` move through a list's rows, Enter opens; `J`/`K` move between files; `t` opens Go to file and `y` makes the address a permalink on a Code tab page; `1` to `9` copy the page's numbered commands; Escape closes a sheet. No key acts in a field. Every key has a pointer twin.
+- **Keys:** `?` opens the keys dialog with "Single-key shortcuts: On / Off"; `j`/`k` move through a list's rows, Enter opens; `J`/`K` move between files; `t` opens Go to file and `y` makes the address a permalink on a Code tab page; Escape closes a sheet. No key acts in a field. Every key has a pointer twin.
 
 ### Owners and imports
 
@@ -612,7 +610,7 @@ shadcn 4.21.2, style `base-lyra` on Base UI, in `src/components/ui/` (generated,
 
 - **Do** name exactly one shell per route, and read every width from its token (`max-w-site`, `w-(--column-about)`, `max-w-(--measure)`, `max-w-(--measure-page)`).
 - **Do** draw rows, status lines, the fan, refusals, credit, held-back lines, posture, outcomes and stages with the shared components; change the component, not a page's copy of it.
-- **Do** show the command for every action once, its text in the DOM, through `CommandLine` or `CopyAction`.
+- **Do** give every action a control on the page, and never a CLI command to copy.
 - **Do** carry every state as a mark, then a word, then a colour, and key tests and styles on the `data-*` attribute that names it.
 - **Do** link between pages with `AppLink`, and read a list's rows in its loader so they arrive in the HTML.
 - **Do** keep text at 4.5:1, controls and borders at 3:1, every control reachable and visibly focused by keyboard, and nothing below 13 px.

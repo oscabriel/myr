@@ -1,4 +1,3 @@
-import { Brand } from "@repo/brand";
 import type { Ask } from "@repo/protocol/domain/ask";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
 import type { Decision } from "@repo/protocol/domain/decision";
@@ -12,7 +11,6 @@ import { MarkerNote } from "../finish/annotation.tsx";
 import type { PatchFile } from "../finish/files.ts";
 import { FinishPlainDiff } from "../finish/finish-plain.tsx";
 import type { LineNote } from "../finish/finish-plain.tsx";
-import { CommandLine } from "../shared/command.tsx";
 import { EmptyState } from "../shared/empty.tsx";
 import { FactBlock, PostureFacts } from "../shared/facts.tsx";
 import { HandleLink } from "../shared/handle.tsx";
@@ -163,7 +161,6 @@ const ForAnyone = ({
       </AppLink>
     </p>
     {children}
-    <CommandLine command={`${Brand.cli} today --project ${project}`} />
   </div>
 );
 
@@ -293,7 +290,6 @@ export const DecisionView = ({
     NotOnToday: () => (
       <Apart data={data}>
         <EmptyState
-          command={`${Brand.cli} today --project ${data.project}`}
           title={`Decision ${data.decision} is not on your Today: it was decided, or it expired to its default.`}
         />
       </Apart>

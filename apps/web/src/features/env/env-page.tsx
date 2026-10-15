@@ -4,7 +4,6 @@
  * or show one: `setEnv` is RPC and CLI alone. Lint keeps "shape" out of code
  * names, so the prop is `schema`.
  */
-import { Brand } from "@repo/brand";
 import type { EnvItem, EnvSchemaView } from "@repo/protocol/domain/env";
 import type { ProjectName } from "@repo/protocol/ids";
 import { DateTime } from "effect";
@@ -13,7 +12,6 @@ import type { ReactNode } from "react";
 
 import { Definition, Definitions, Region } from "../ask/fields.tsx";
 import { commitHref, shortSha } from "../code/paths.ts";
-import { CommandLine } from "../shared/command.tsx";
 import { EmptyState } from "../shared/empty.tsx";
 import { HandleLink } from "../shared/handle.tsx";
 import { AppLink } from "../shared/link.tsx";
@@ -284,16 +282,10 @@ const WhereRead = ({ schema }: { readonly schema: EnvSchemaView }) => (
   </div>
 );
 
-const SetValue = ({ project }: { readonly project: ProjectName }) => (
-  <div className="flex flex-col gap-2">
-    <p className="text-ui text-muted-foreground">
-      A maintainer sets a sensitive value from a terminal; nobody reads it back.
-    </p>
-    <CommandLine
-      command={`${Brand.cli} env set <KEY> --project ${project} --yes`}
-      numbered
-    />
-  </div>
+const SetValue = () => (
+  <p className="text-ui text-muted-foreground">
+    A maintainer sets a sensitive value; nobody reads it back.
+  </p>
 );
 
 const Items = ({
@@ -321,7 +313,7 @@ const Items = ({
           ))}
         </ol>
       )}
-      <SetValue project={schema.project} />
+      <SetValue />
     </>
   );
 };
@@ -340,7 +332,6 @@ export const EnvironmentRegion = ({
     <Caption />
     {schema === undefined ? (
       <EmptyState
-        command={`${Brand.cli} env shape --project ${project}`}
         title={`Nothing has landed in ${project} yet, so there is no .env.schema to read. Its environment appears here once its main lands.`}
       />
     ) : (

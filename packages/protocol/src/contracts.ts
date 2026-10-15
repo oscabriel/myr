@@ -118,13 +118,13 @@ export {
 const envSchemaTag = "envShape";
 
 const servedOn = {
-  claim: ["rpc", "mcp", "cli"],
+  claim: SurfaceName.literals,
   credits: SurfaceName.literals,
   decide: SurfaceName.literals,
   [envSchemaTag]: SurfaceName.literals,
   // A log may hold text an agent's transcript should not carry: never MCP.
-  evidence: ["rpc", "cli"],
-  finish: ["rpc", "mcp", "cli"],
+  evidence: ["rpc", "cli", "web"],
+  finish: SurfaceName.literals,
   fork: ["rpc", "mcp", "cli"],
   frontPage: SurfaceName.literals,
   initProject: ["rpc", "mcp", "cli", "web"],
@@ -140,14 +140,13 @@ const servedOn = {
   listRefs: ["rpc", "mcp", "web"],
   log: ["rpc", "mcp", "web"],
   openAsk: ["rpc", "mcp", "cli"],
-  // The web adds no form for what the CLI does: a post is made from a terminal.
-  postDiscussion: ["rpc", "mcp", "cli"],
+  postDiscussion: SurfaceName.literals,
   projectPolicy: SurfaceName.literals,
   readFile: ["rpc", "mcp", "web"],
   readTree: ["rpc", "mcp", "web"],
   // A list with no command: an agent asks it over MCP, a person reads it on the landing.
   recentLandings: ["rpc", "mcp", "web"],
-  release: ["rpc", "mcp", "cli"],
+  release: SurfaceName.literals,
   // A value must never pass through an agent's transcript, so never MCP.
   setEnv: ["rpc", "cli"],
   showAsk: SurfaceName.literals,

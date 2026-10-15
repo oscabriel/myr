@@ -224,7 +224,7 @@ describe("a project's environment", () => {
     );
   });
 
-  it("shows no value and no control to set or read one, only the CLI line, numbered", () => {
+  it("shows no value, no control to set or read one, and no command", () => {
     const markup = markupOf(page);
 
     for (const control of ["<input", "<textarea", "<form", "<select"]) {
@@ -234,9 +234,7 @@ describe("a project's environment", () => {
     expect(markup).not.toMatch(/reveal|show value/iu);
     // The placeholder unlanded code sees is not a value, but reads like one.
     expect(markup).not.toContain("placeholder-sentry-auth-token");
-    expect(plainText(environmentOf(markup))).toContain(
-      `${Brand.cli} env set <KEY> --project oscabriel/datekit --yes`
-    );
+    expect(plainText(environmentOf(markup))).not.toContain(Brand.cli);
   });
 
   it("shows the posture the project's own ledger gives in its status line", () => {
@@ -327,15 +325,13 @@ describe("a project's environment", () => {
 });
 
 describe("a project with nothing landed", () => {
-  it("says it has no environment yet, rather than that it is unknown, with the command to read it", () => {
+  it("says it has no environment yet, rather than that it is unknown, with no command", () => {
     const view = tabWith();
     const text = plainText(environmentOf(markupOf(view)));
 
     expect(markupOf(view)).toMatch(/<h1\b[^>]*>Visibility<\/h1>/u);
     expect(text).toContain("Nothing has landed in oscabriel/datekit yet");
-    expect(text).toContain(
-      `${Brand.cli} env shape --project oscabriel/datekit`
-    );
+    expect(text).not.toContain(`${Brand.cli} env shape`);
     expect(text).not.toContain("UnknownProject");
   });
 });
