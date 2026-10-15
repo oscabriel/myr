@@ -88,7 +88,8 @@ const LATEST = "latest";
 
 const FOREVER = "public, max-age=31536000, immutable";
 
-const BRIEFLY = "public, max-age=300";
+// The install script, the manifest and `latest` move with each release, so no cache may serve one stale.
+const BRIEFLY = "public, max-age=300, must-revalidate";
 
 const NO_STORE = "no-store";
 

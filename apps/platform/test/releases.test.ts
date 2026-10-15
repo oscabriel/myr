@@ -107,7 +107,7 @@ describe("the CLI's releases, served by the platform", () => {
           status: response.status,
           type: response.headers.get("content-type"),
         }).toStrictEqual({
-          cache: "public, max-age=300",
+          cache: "public, max-age=300, must-revalidate",
           status: 200,
           type: "text/x-shellscript; charset=utf-8",
         });
@@ -190,12 +190,12 @@ describe("the CLI's releases, served by the platform", () => {
           }))
         ).toStrictEqual([
           {
-            cache: "public, max-age=300",
+            cache: "public, max-age=300, must-revalidate",
             location: `/releases/0.1.0/${linux}`,
             status: 302,
           },
           {
-            cache: "public, max-age=300",
+            cache: "public, max-age=300, must-revalidate",
             location: "/releases/0.1.0/SHA256SUMS",
             status: 302,
           },
@@ -218,7 +218,7 @@ describe("the CLI's releases, served by the platform", () => {
           status: listed.status,
           type: listed.headers.get("content-type"),
         }).toStrictEqual({
-          cache: "public, max-age=300",
+          cache: "public, max-age=300, must-revalidate",
           status: 200,
           type: "application/json",
         });

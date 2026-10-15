@@ -35,12 +35,20 @@ const keptNowhere = (cacheControl: string) =>
     (directive) => directive === "private" || directive === "no-store"
   );
 
-// Only a found page with an age of its own: a miss may be answered once it is made, and an immutable answer is never stale.
+// Only a found page with an age of its own: a miss may be answered once it is made, an immutable answer is never
+// stale, and one that forbids serving it stale (a release's moving pointers) is kept to its own word.
+const FORBIDS_STALE = new Set([
+  "must-revalidate",
+  "proxy-revalidate",
+  "no-cache",
+]);
+
 const staleLonger = (cacheControl: string, status: number) => {
   const directives = directivesOf(cacheControl);
 
   return status !== 200 ||
     directives.includes("immutable") ||
+    directives.some((directive) => FORBIDS_STALE.has(directive)) ||
     !directives.some((directive) => directive.startsWith("max-age="))
     ? undefined
     : [
