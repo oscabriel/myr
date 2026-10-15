@@ -1,9 +1,8 @@
 // The site has no logomark: wherever a file must stand for it (the tab's icon, a home screen's, the manifest's),
-// it draws the repeat button emoji as text on the paper, and each raster is that drawing at its size.
+// it draws the repeat button emoji as text, filling the square, and each raster is that drawing at its size.
 import { describe, expect, it } from "@effect/vitest";
 
 import svg from "../public/icons/icon.svg?raw";
-import { themeColors } from "../src/features/shared/theme.ts";
 
 const rasters: Readonly<Record<string, string>> = import.meta.glob(
   "../public/**/*.{png,ico}",
@@ -49,8 +48,9 @@ describe("the site's icon", () => {
     );
   });
 
-  it("lays the emoji on the light paper", () => {
-    expect(svg).toContain(`fill="${themeColors.light}"`);
+  it("lays the emoji on no ground of its own, in its own colours", () => {
+    expect(svg).not.toMatch(/<rect\b/u);
+    expect(svg).not.toContain("filter");
   });
 
   it("keeps each raster at the size its place asks for", () => {

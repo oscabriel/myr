@@ -9,15 +9,14 @@ import { themeColors } from "../shared/theme.ts";
 
 const rasters = [192, 512] as const;
 
+// The emoji fills its square, so no raster is offered as maskable: a launcher's mask would cut its corners.
 const icons = [
-  ...rasters.flatMap((size) =>
-    (["any", "maskable"] as const).map((purpose) => ({
-      purpose,
-      sizes: `${size}x${size}`,
-      src: `/icons/icon-${size}.png`,
-      type: "image/png",
-    }))
-  ),
+  ...rasters.map((size) => ({
+    purpose: "any",
+    sizes: `${size}x${size}`,
+    src: `/icons/icon-${size}.png`,
+    type: "image/png",
+  })),
   {
     purpose: "any",
     sizes: "any",
