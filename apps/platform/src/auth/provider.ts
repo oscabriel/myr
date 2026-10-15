@@ -20,6 +20,7 @@ import {
   AUTHORIZATION_SERVER_PATHS,
   HeldHandles,
   SIGN_IN_PATHS,
+  SignInHome,
   SignInKeys,
   SignInOffers,
   signInRoutes,
@@ -120,6 +121,10 @@ export const signInSettings = (config: PlatformConfig) =>
       SignInOffers.of({
         google: Option.as(googleClientOf(config), GOOGLE_ACCOUNTS),
       })
+    ),
+    Layer.succeed(
+      SignInHome,
+      SignInHome.of({ webUrl: Option.fromUndefinedOr(config.PUBLIC_WEB_URL) })
     ),
     Layer.succeed(
       SignInKeys,

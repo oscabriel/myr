@@ -249,6 +249,19 @@ const visit = (at: string) =>
     return response.status;
   }).pipe(Effect.provide(FetchHttpClient.layer));
 
+/** What the browser is shown at the end: the callback's page. */
+const landing = (at: string) =>
+  Effect.gen(function* () {
+    const client = yield* HttpClient.HttpClient;
+    const response = yield* client.get(at);
+
+    return {
+      status: response.status,
+      text: yield* response.text,
+      type: response.headers["content-type"],
+    };
+  }).pipe(Effect.provide(FetchHttpClient.layer));
+
 const fieldsOf = (query: URLSearchParams | undefined) =>
   Object.fromEntries(query?.entries() ?? []);
 
@@ -511,7 +524,19 @@ describe(`${Brand.cli} login in the browser (PKCE)`, () => {
           )
         );
 
-        expect(yield* visit(yield* signInUrl(server.origin))).toBe(200);
+        const shown = yield* landing(yield* signInUrl(server.origin));
+
+        expect({
+          said: shown.text.includes(
+            "You can close this tab and go back to your terminal."
+          ),
+          status: shown.status,
+          type: shown.type,
+        }).toStrictEqual({
+          said: true,
+          status: 200,
+          type: "text/html; charset=utf-8",
+        });
         expect(Exit.isSuccess(yield* Fiber.join(fiber))).toBeTruthy();
 
         const [query] = yield* server.authorizations;

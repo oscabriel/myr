@@ -286,6 +286,31 @@ const challengeOf = (verifier: string) =>
     Effect.orDie
   );
 
+// The browser's last stop, in the sign-in pages' look: their paper, ink and
+// muted values, light and dark, and nothing loaded. The text is fixed, so
+// nothing in it needs escaping.
+const callbackPage = (title: string, line: string) => `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>${title} · ${Brand.name}</title>
+<style>
+:root{color-scheme:light dark;--paper:#f8f7f4;--ink:#1a1f2e;--muted:#5d6371}
+@media (prefers-color-scheme:dark){:root{--paper:#0a0a0a;--ink:#f5f5f5;--muted:#a0a0a0}}
+body{margin:0;background-color:var(--paper);color:var(--ink);font-family:"IBM Plex Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:16px;line-height:1.5}
+main{max-width:25rem;margin:0 auto;padding:20vh 16px 48px;text-align:center}
+.wordmark{margin:0 0 28px;font-size:1.1875rem;font-weight:600;letter-spacing:-.02em}
+h1{margin:0 0 8px;font-size:1.5rem;line-height:2rem;font-weight:600;letter-spacing:-.015em}
+p{margin:0;color:var(--muted)}
+p.wordmark{color:var(--ink)}
+</style>
+</head>
+<body><main><p class="wordmark">${Brand.name}</p><h1>${title}</h1><p>${line}</p></main></body>
+</html>
+`;
+
 const loopback = Effect.gen(function* () {
   const { listen } = yield* Loopback;
   const server = yield* listen({ hostname: LOOPBACK, port: 0 });
@@ -304,9 +329,13 @@ const loopback = Effect.gen(function* () {
 
       return HttpServerResponse.text(
         first
-          ? `${Brand.cli} login has the sign-in. You can close this tab; the terminal says how it ended.`
-          : "This sign-in has already come back.",
+          ? callbackPage(
+              "Signed in",
+              "You can close this tab and go back to your terminal."
+            )
+          : callbackPage("Already signed in", "This sign-in already finished."),
         {
+          contentType: "text/html; charset=utf-8",
           // One request per connection, so closing the server waits on none.
           headers: { "cache-control": "no-store", connection: "close" },
           status: first ? 200 : 410,
