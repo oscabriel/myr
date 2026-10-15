@@ -265,7 +265,7 @@ const table = [
       "CapReached",
     ],
     flags: "",
-    on: "RMC",
+    on: "RMCW",
     tag: "postDiscussion",
   },
   {
@@ -296,7 +296,7 @@ const table = [
       "Denounced",
     ],
     flags: "I",
-    on: "RMC",
+    on: "RMCW",
     tag: "claim",
   },
   {
@@ -304,7 +304,7 @@ const table = [
     cli: "release <ask>",
     errors: ["UnknownProject", "NotClaimed"],
     flags: "I",
-    on: "RMC",
+    on: "RMCW",
     tag: "release",
   },
   {
@@ -337,7 +337,7 @@ const table = [
       "TouchedJudge",
     ],
     flags: "IA",
-    on: "RMC",
+    on: "RMCW",
     tag: "finish",
   },
   {
@@ -369,7 +369,7 @@ const table = [
     cli: "evidence <ref>",
     errors: ["UnknownProject", "NotDecider"],
     flags: "RI",
-    on: "RC",
+    on: "RCW",
     tag: "evidence",
   },
   {

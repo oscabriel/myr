@@ -3,7 +3,6 @@ import { Predicate } from "effect";
 import { ChevronDown } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { CommandSlotProvider } from "../keys.tsx";
 import { ContextBar } from "./context-bar.tsx";
 import { GUTTER } from "./gutter.ts";
 import { crumbsFor } from "./sections.ts";
@@ -18,7 +17,6 @@ export interface WorkspaceProps {
   readonly meta?: ReactNode;
   readonly state?: ReactNode;
   readonly count?: string;
-  readonly primaryCommand?: string;
   readonly toolbar?: ReactNode;
   readonly facts?: ReactNode;
   readonly factsHeading?: string;
@@ -121,7 +119,6 @@ const WorkspaceView = ({
   factsKey,
   factsSummary,
   meta,
-  primaryCommand,
   said,
   state,
   status,
@@ -146,66 +143,58 @@ const WorkspaceView = ({
       id="main"
       tabIndex={-1}
     >
-      <CommandSlotProvider slot="main">
-        {focus || quietHead ? null : (
-          <ContextBar
-            count={count}
-            crumbs={crumbs ?? crumbsFor(pathname)}
-            primaryCommand={primaryCommand}
-            state={state}
-          />
-        )}
-        {/* A quiet head draws nothing, but keeps a region's gap under the code bar. */}
-        <div
-          className={`${GUTTER} ${code ? "" : MEASURE} ${quietHead ? "pt-6" : ""}`}
-        >
-          <PageHead
-            meta={meta}
-            quiet={quietHead}
-            said={said}
-            status={status}
-            title={title}
-          />
-        </div>
-        {hasFacts ? (
-          <CommandSlotProvider slot="facts">
-            {/* A new selection's facts settle in rather than swap. */}
-            <div
-              className="animate-in fade-in-0 duration-[120ms]"
-              key={factsKey}
-            >
-              <div className={GUTTER}>
-                <InlineFacts
-                  facts={facts}
-                  heading={factsHeading}
-                  list={variant !== "document"}
-                  summary={factsSummary}
-                />
-              </div>
-            </div>
-          </CommandSlotProvider>
-        ) : null}
-        {toolbar === undefined ? null : (
-          <div
-            className={`border-rule bg-background sticky top-(--stick-bar) z-10 h-(--toolbar) shrink-0 border-y ${GUTTER}`}
-            data-toolbar=""
-          >
-            {/* Its controls end where the rows end; its rules run the pane. */}
-            <div
-              className={`flex h-full items-center gap-3 ${code ? "" : MEASURE}`}
-            >
-              {toolbar}
-            </div>
+      {focus || quietHead ? null : (
+        <ContextBar
+          count={count}
+          crumbs={crumbs ?? crumbsFor(pathname)}
+          state={state}
+        />
+      )}
+      {/* A quiet head draws nothing, but keeps a region's gap under the code bar. */}
+      <div
+        className={`${GUTTER} ${code ? "" : MEASURE} ${quietHead ? "pt-6" : ""}`}
+      >
+        <PageHead
+          meta={meta}
+          quiet={quietHead}
+          said={said}
+          status={status}
+          title={title}
+        />
+      </div>
+      {hasFacts ? (
+        // A new selection's facts settle in rather than swap.
+        <div className="animate-in fade-in-0 duration-[120ms]" key={factsKey}>
+          <div className={GUTTER}>
+            <InlineFacts
+              facts={facts}
+              heading={factsHeading}
+              list={variant !== "document"}
+              summary={factsSummary}
+            />
           </div>
-        )}
-        <div
-          className={`flex flex-1 flex-col gap-8 pb-16 ${
-            code ? "" : `${GUTTER} ${board ? "" : MEASURE}`
-          } ${toolbar === undefined ? "" : "pt-6"}`}
-        >
-          {children}
         </div>
-      </CommandSlotProvider>
+      ) : null}
+      {toolbar === undefined ? null : (
+        <div
+          className={`border-rule bg-background sticky top-(--stick-bar) z-10 h-(--toolbar) shrink-0 border-y ${GUTTER}`}
+          data-toolbar=""
+        >
+          {/* Its controls end where the rows end; its rules run the pane. */}
+          <div
+            className={`flex h-full items-center gap-3 ${code ? "" : MEASURE}`}
+          >
+            {toolbar}
+          </div>
+        </div>
+      )}
+      <div
+        className={`flex flex-1 flex-col gap-8 pb-16 ${
+          code ? "" : `${GUTTER} ${board ? "" : MEASURE}`
+        } ${toolbar === undefined ? "" : "pt-6"}`}
+      >
+        {children}
+      </div>
     </main>
   );
 };

@@ -1,4 +1,3 @@
-import { Brand } from "@repo/brand";
 import type {
   Handle,
   Owner,
@@ -14,7 +13,6 @@ import { Button } from "../../components/ui/button.tsx";
 import { Input } from "../../components/ui/input.tsx";
 import { Spinner } from "../../components/ui/spinner.tsx";
 import { signInHref } from "../auth/session-slot.tsx";
-import { CommandLine } from "../shared/command.tsx";
 import { ClientOwnerSelect } from "./client-owner.tsx";
 import {
   importPayload,
@@ -44,9 +42,6 @@ export interface ImportFormProps extends Importer {
   readonly fixedOwner?: SourceNamespace | undefined;
   readonly here: string;
 }
-
-export const importCommand = (project = "<owner>/<name>", url = "<url>") =>
-  `${Brand.cli} init --project ${project} --import ${url}`;
 
 const LINK = "decoration-rule font-medium underline hover:decoration-current";
 
@@ -141,15 +136,9 @@ const SignInToImport = ({
           <a className={LINK} href={signInHref(here)}>
             Sign in
           </a>{" "}
-          to import it here, or import from a terminal:
+          to import it here.
         </span>
       </p>
-      <CommandLine
-        command={importCommand(
-          project,
-          prefill === undefined || prefill.url === "" ? undefined : prefill.url
-        )}
-      />
     </section>
   );
 };

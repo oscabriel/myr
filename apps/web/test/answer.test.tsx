@@ -5,27 +5,41 @@ import type { Verdict } from "@repo/protocol/domain/answer";
 import type { Ask } from "@repo/protocol/domain/ask";
 import { Outcome } from "@repo/protocol/domain/outcome";
 import type { StageName } from "@repo/protocol/domain/outcome";
-import { AreaName, AskId, CommitSha, DecisionId } from "@repo/protocol/ids";
+import {
+  AreaName,
+  AskId,
+  CommitSha,
+  DecisionId,
+  LaneName,
+} from "@repo/protocol/ids";
 import {
   ChecksFailed,
   HeldBackFailed,
+  NotDecider,
   UnknownAsk,
   UnknownCommit,
 } from "@repo/protocol/refusal";
 import { explain } from "@repo/protocol/render";
 import { asTester, unanswered } from "@repo/protocol/testing";
 import { isNotFound } from "@tanstack/react-router";
-import { Effect, Layer, Ref, Schema, Stream } from "effect";
+import { Cause, Effect, Layer, Ref, Result, Schema, Stream } from "effect";
+import { AsyncResult, Atom, AtomRegistry, Reactivity } from "effect/reactivity";
 import { RpcTest } from "effect/rpc";
+import { renderToStaticMarkup } from "react-dom/server";
 
+import { evidenceAtom } from "../src/client/evidence.ts";
+import type { Evidence } from "../src/client/evidence.ts";
 import {
   AnswerView,
   durationText,
   HeldBackBits,
 } from "../src/features/answer/answer-page.tsx";
+import { LaneLogView } from "../src/features/answer/lane-log.tsx";
+import type { LogReaderProps } from "../src/features/answer/lane-log.tsx";
 import { readAnswer } from "../src/features/answer/reads.ts";
 import { askStates } from "../src/features/shared/ask-progress.ts";
 import { Refusals } from "../src/features/shared/refusals.ts";
+import { ContractsClient, webContracts } from "../src/surfaces.ts";
 import {
   ask,
   askId,
@@ -200,7 +214,7 @@ describe("the answer page", () => {
     ]);
   });
 
-  it("opens failed lanes first, each with the command that reads its log, and folds the passed ones into a line", () => {
+  it("opens failed lanes first, each saying its log is kept, and folds the passed ones into a line", () => {
     const markup = markupOf(refusedPage);
     const text = textOf(refusedPage);
 
@@ -209,7 +223,7 @@ describe("the answer page", () => {
       ["lint", "passed"],
     ]);
     expect(text).toContain(
-      `${Brand.cli} evidence logs/datekit/parse-iso-week/unit --project oscabriel/datekit`
+      "Its log is kept for the answerer and the project's maintainers."
     );
     expect(text).toContain("1 lane passed in 1.2 s");
     expect(
@@ -279,21 +293,15 @@ describe("the answer page", () => {
     expect(markupOf(page({ verdict: undefined }))).toContain(">Open to take<");
   });
 
-  it("names a lane's log only as the command that reads it", () => {
+  it("names a lane's log by no ref and no command, only that it is kept", () => {
     const passing = verdictOf(Outcome.cases.Checking.make({ stage: "checks" }));
     const text = textOf(page({ verdict: passing }));
 
-    const mentions = [
-      ...text.matchAll(/logs\/datekit\/parse-iso-week\/unit/gu),
-    ];
-
-    expect(mentions.length).toBeGreaterThan(0);
-
-    for (const { index } of mentions) {
-      expect(text.slice(index - `${Brand.cli} evidence `.length, index)).toBe(
-        `${Brand.cli} evidence `
-      );
-    }
+    expect(text).toContain(
+      "Its log is kept for the answerer and the project's maintainers."
+    );
+    expect(text).not.toContain("logs/datekit/parse-iso-week/unit");
+    expect(text).not.toContain(`${Brand.cli} evidence`);
   });
 
   it("shows held-back checks only as an area's counts and its suite root, shortened, the whole root in its title", () => {
@@ -422,13 +430,11 @@ describe("the answer page", () => {
     expect(text).toContain("Waiting on decision dec-000001");
   });
 
-  it("gives an ask nobody answered the command that claims it", () => {
+  it("says an ask nobody answered is unanswered, with no command to claim it", () => {
     const text = textOf(page({ verdict: undefined }));
 
     expect(text).toContain("Nobody has answered this ask yet.");
-    expect(text).toContain(
-      `${Brand.cli} claim ${askId} --project oscabriel/datekit`
-    );
+    expect(text).not.toContain(`${Brand.cli} claim`);
     expect(markupOf(page({ verdict: undefined }))).not.toContain("data-stage");
   });
 
@@ -441,7 +447,7 @@ describe("the answer page", () => {
     expect(main).toContain(`href="/oscabriel/datekit/asks/${askId}"`);
   });
 
-  it("shows a landed answer's credit trailers in trailer order, its held-back trailer, and its commit", () => {
+  it("shows a landed answer's credit trailers in trailer order and its held-back trailer, with no git command", () => {
     const landed = verdictOf(Outcome.cases.Landed.make({ sha: landedSha }));
     const text = textOf(page({ landing, verdict: landed }));
 
@@ -451,7 +457,7 @@ describe("the answer page", () => {
     ).toBeTruthy();
     expect(text).toContain(`Held-back: export 7/7 @ ${suite}`);
     expect(text).toContain("Assisted-by: claude-code:opus-5 (verified)");
-    expect(text).toContain(`git show ${landedSha}`);
+    expect(text).not.toContain(`git show ${landedSha}`);
   });
 
   it("links a landed answer's landing (from the hero and the landing) and its base to their commit pages", () => {
@@ -746,5 +752,157 @@ describe(readAnswer, () => {
         ).toBeUndefined();
         expect(yield* Ref.get(asked)).toStrictEqual(nothingAsked);
       })
+  );
+});
+
+const Reader = ({ lane, logRef, project: of }: LogReaderProps) => (
+  <span data-reader={`${of} ${lane} ${logRef}`} />
+);
+
+const readersOf = (markup: string) =>
+  [...markup.matchAll(/data-reader="(?<value>[^"]+)"/gu)].map(
+    ({ groups }) => groups?.value
+  );
+
+const withheld = {
+  ...refused,
+  lanes: refused.lanes.map((lane) =>
+    lane.logRef === undefined
+      ? lane
+      : { ...lane, logRef: ChecksFailed.withheld }
+  ),
+};
+
+const unitLog: Evidence = {
+  lane: LaneName.make("unit"),
+  text: "expected 1 <b>to</b> be 2",
+  truncated: false,
+};
+
+const view = (
+  result: AsyncResult.AsyncResult<Evidence, unknown>,
+  signedOut = false
+) =>
+  renderToStaticMarkup(
+    <LaneLogView
+      here="/oscabriel/datekit/answers/parse-iso-week"
+      onShow={() => {
+        // Nothing to read in a static render.
+      }}
+      result={result}
+      signedOut={signedOut}
+    />
+  );
+
+describe("a failed lane's log", () => {
+  it("hands a kept log's lane and ref to the page's reader, and a withheld one to none", () => {
+    expect(
+      readersOf(markupOf(page({ LogReader: Reader, verdict: refused })))
+    ).toStrictEqual([`${project} unit logs/datekit/parse-iso-week/unit`]);
+    expect(
+      readersOf(markupOf(page({ LogReader: Reader, verdict: withheld })))
+    ).toStrictEqual([]);
+    expect(textOf(page({ LogReader: Reader, verdict: withheld }))).toContain(
+      "Its log was not kept: it held a write-only value."
+    );
+  });
+
+  it("offers to show the log before it is read, and a sign-in link back to the page when signed out", () => {
+    expect(plainText(view(AsyncResult.initial()))).toContain("Show the log");
+    expect(view(AsyncResult.initial(true))).toContain("disabled");
+    expect(view(AsyncResult.initial(), true)).toContain(
+      'href="/auth/signin?return=%2Foscabriel%2Fdatekit%2Fanswers%2Fparse-iso-week"'
+    );
+  });
+
+  it("shows the log as text, never markup, and says when it was cut to its tail", () => {
+    const markup = view(AsyncResult.success(unitLog));
+
+    expect(markup).toContain("expected 1 &lt;b&gt;to&lt;/b&gt; be 2");
+    expect(markup).not.toContain("<b>to</b>");
+    expect(plainText(markup)).not.toContain("Truncated");
+    expect(
+      plainText(view(AsyncResult.success({ ...unitLog, truncated: true })))
+    ).toContain("Truncated: the last 256 KiB.");
+  });
+
+  it("shows a refusal as the refusal, with the button to try again", () => {
+    const markup = view(AsyncResult.failure(Cause.fail(new NotDecider({}))));
+
+    expect(markup).toContain('data-refusal="NotDecider"');
+    expect(plainText(markup)).toContain("Show the log");
+  });
+
+  type EvidenceAsked = readonly {
+    readonly project: string;
+    readonly ref: string;
+  }[];
+
+  const readOnce = (answer: Effect.Effect<Evidence, NotDecider>) =>
+    Effect.gen(function* () {
+      const asked = yield* Ref.make<EvidenceAsked>([]);
+
+      const handlers = Layer.mergeAll(
+        unanswered,
+        Contracts.toLayerHandler("evidence", (payload) =>
+          Ref.update(asked, (all) => [...all, payload]).pipe(
+            Effect.andThen(answer)
+          )
+        )
+      );
+
+      const layer = Layer.effect(ContractsClient)(
+        RpcTest.makeClient(webContracts, { flatten: true })
+      ).pipe(
+        Layer.provide([handlers, asTester]),
+        Layer.provideMerge(Reactivity.layer)
+      );
+
+      const registry = yield* Effect.acquireRelease(
+        Effect.sync(() =>
+          AtomRegistry.make({
+            initialValues: [
+              Atom.initialValue(ContractsClient.runtime.layer, layer),
+            ],
+          })
+        ),
+        (made) =>
+          Effect.sync(() => {
+            made.dispose();
+          })
+      );
+
+      const ref = "logs/datekit/parse-iso-week/unit";
+      const atom = evidenceAtom(ref);
+
+      registry.mount(atom);
+      registry.set(atom, { project, ref });
+
+      const read = yield* AtomRegistry.getResult(registry, atom, {
+        suspendOnWaiting: true,
+      }).pipe(Effect.result);
+
+      return { asked: yield* Ref.get(asked), read };
+    });
+
+  it.effect(
+    "asks for the lane's log by its ref, once pressed, and shows its text",
+    () =>
+      Effect.gen(function* () {
+        const { asked, read } = yield* readOnce(Effect.succeed(unitLog));
+
+        expect(asked).toStrictEqual([
+          { project, ref: "logs/datekit/parse-iso-week/unit" },
+        ]);
+        expect(read).toStrictEqual(Result.succeed(unitLog));
+      }).pipe(Effect.scoped)
+  );
+
+  it.effect("keeps a refusal as the refusal", () =>
+    Effect.gen(function* () {
+      const { read } = yield* readOnce(Effect.fail(new NotDecider({})));
+
+      expect(read).toStrictEqual(Result.fail(new NotDecider({})));
+    }).pipe(Effect.scoped)
   );
 });

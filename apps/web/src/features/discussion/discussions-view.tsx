@@ -1,13 +1,10 @@
-import { Brand } from "@repo/brand";
 import type {
   DiscussionListing,
   DiscussionState,
 } from "@repo/protocol/domain/discussion";
-import type { ProjectName } from "@repo/protocol/ids";
 import type { DateTime } from "effect";
 import type { ReactNode } from "react";
 
-import { CommandLine } from "../shared/command.tsx";
 import { EmptyState } from "../shared/empty.tsx";
 import { FactBlock } from "../shared/facts.tsx";
 import { HandleLink } from "../shared/handle.tsx";
@@ -15,6 +12,8 @@ import { AppLink } from "../shared/link.tsx";
 import { askPath, discussionPath } from "../shared/paths.ts";
 import { Workspace } from "../shared/shell/workspace.tsx";
 import { When } from "../shared/time.tsx";
+import { PostForm } from "./post-form.tsx";
+import type { Poster } from "./post-form.tsx";
 
 const LINK = "decoration-rule underline hover:decoration-current";
 
@@ -27,14 +26,6 @@ export const STATE_LABEL = {
   closed: "Closed",
   open: "Open",
 } as const satisfies Record<DiscussionState, string>;
-
-export const openCommand = (project: ProjectName) =>
-  `${Brand.cli} discussion post --project ${project} --title "<title>" --body "<post>"`;
-
-export const replyCommand = (
-  listing: Pick<DiscussionListing, "id" | "project">
-) =>
-  `${Brand.cli} discussion post ${listing.id} --project ${listing.project} --body "<post>"`;
 
 const Row = ({
   listing,
@@ -80,37 +71,47 @@ const Row = ({
   </li>
 );
 
-const PostFacts = ({ project }: { readonly project: ProjectName }) => (
-  <FactBlock label="How to post">
+const PostFacts = () => (
+  <FactBlock label="Who may post">
     <p className="text-ui">
-      Anyone not denounced may open a thread or reply, from a terminal. A
-      discussion lands nothing itself; a maintainer may open an ask from one.
+      Anyone not denounced may open a thread or reply. A discussion lands
+      nothing itself; a maintainer may open an ask from one.
     </p>
-    <CommandLine command={openCommand(project)} numbered />
   </FactBlock>
 );
 
+const OpenOne = ({ poster }: { readonly poster: Poster }) => (
+  <section
+    aria-labelledby="open-a-discussion"
+    className="flex flex-col gap-3"
+    data-open-discussion=""
+  >
+    <h2 className="text-ui font-semibold" id="open-a-discussion">
+      Open a discussion
+    </h2>
+    <PostForm {...poster} doing="open a discussion" kind="open" />
+  </section>
+);
+
+/** Without a `poster`, the list alone: no way to post is drawn. */
 export const DiscussionsView = ({
   discussions,
   now,
-  project,
+  poster,
 }: {
   readonly discussions: readonly DiscussionListing[];
   readonly now: DateTime.Utc;
-  readonly project: ProjectName;
+  readonly poster?: Poster | undefined;
 }): ReactNode => (
   <Workspace
     count={plural(discussions.length, "discussion", "discussions")}
-    facts={<PostFacts project={project} />}
+    facts={<PostFacts />}
     factsHeading="Discussions here"
     title="Discussions"
     variant="list"
   >
     {discussions.length === 0 ? (
-      <EmptyState
-        command={openCommand(project)}
-        title="No discussions yet. Open one from a terminal; anyone not denounced may."
-      />
+      <EmptyState title="No discussions yet." />
     ) : (
       <ul className="border-rule flex flex-col border-t" data-discussions="">
         {discussions.map((listing) => (
@@ -118,5 +119,6 @@ export const DiscussionsView = ({
         ))}
       </ul>
     )}
+    {poster === undefined ? null : <OpenOne poster={poster} />}
   </Workspace>
 );

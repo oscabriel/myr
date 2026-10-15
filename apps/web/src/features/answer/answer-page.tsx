@@ -1,4 +1,3 @@
-import { Brand } from "@repo/brand";
 import type {
   HeldBackResult,
   LaneOutcome,
@@ -13,11 +12,11 @@ import { ChecksFailed } from "@repo/protocol/refusal";
 import type { DateTime } from "effect";
 import { ArrowRight, ChevronDown, LockKeyhole } from "lucide-react";
 import { useState } from "react";
+import type { ComponentType } from "react";
 
 import { Region } from "../ask/fields.tsx";
 import { commitHref, shortSha } from "../code/paths.ts";
 import type { AskProgress, Round } from "../shared/ask-progress.ts";
-import { CommandLine } from "../shared/command.tsx";
 import { CompactCredit, CreditTrailers } from "../shared/credits.tsx";
 import { EmptyState } from "../shared/empty.tsx";
 import {
@@ -40,6 +39,7 @@ import { Workspace } from "../shared/shell/workspace.tsx";
 import { readStatus, StatusLine } from "../shared/status-line.tsx";
 import type { StatusSubject } from "../shared/status-line.tsx";
 import { distanceInWords, When } from "../shared/time.tsx";
+import type { LogReaderProps } from "./lane-log.tsx";
 import {
   deleteChildOf,
   familyHead,
@@ -80,34 +80,51 @@ export const answerCrumbs = (ask: Ask): readonly Crumb[] => [
   { label: "Answer" },
 ];
 
+/** Reads a kept log in the browser; absent, the page only says it is kept. */
+export type LogReader = ComponentType<LogReaderProps>;
+
+interface Reading {
+  readonly LogReader?: LogReader | undefined;
+  readonly project: ProjectName;
+}
+
 const LaneLog = ({
   lane,
-  project,
+  reading: { LogReader, project },
 }: {
   readonly lane: LaneResult;
-  readonly project: Ask["project"];
+  readonly reading: Reading;
 }) => {
   if (lane.logRef === undefined) {
     return null;
   }
 
-  return lane.logRef === ChecksFailed.withheld ? (
-    <p className="text-ui text-muted-foreground">
-      Its log was not kept: it held a write-only value.
-    </p>
-  ) : (
-    <CommandLine
-      command={`${Brand.cli} evidence ${lane.logRef} --project ${project}`}
-    />
+  if (lane.logRef === ChecksFailed.withheld) {
+    return (
+      <p className="text-ui text-muted-foreground">
+        Its log was not kept: it held a write-only value.
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex min-w-0 flex-col gap-2">
+      <p className="text-ui text-muted-foreground">
+        Its log is kept for the answerer and the project&apos;s maintainers.
+      </p>
+      {LogReader === undefined ? null : (
+        <LogReader lane={lane.lane} logRef={lane.logRef} project={project} />
+      )}
+    </div>
   );
 };
 
 const LaneRow = ({
   lane,
-  project,
+  reading,
 }: {
   readonly lane: LaneResult;
-  readonly project: Ask["project"];
+  readonly reading: Reading;
 }) => {
   const { mark, tone, word } = results[lane.result];
 
@@ -134,7 +151,7 @@ const LaneRow = ({
       </div>
       {lane.result === "passed" ? null : (
         <div className="pl-7">
-          <LaneLog lane={lane} project={project} />
+          <LaneLog lane={lane} reading={reading} />
         </div>
       )}
     </li>
@@ -149,10 +166,10 @@ const passedLine = (lanes: readonly LaneResult[]) =>
 export const Lanes = ({
   checking = false,
   lanes,
-  project,
+  reading,
 }: {
   readonly lanes: readonly LaneResult[];
-  readonly project: Ask["project"];
+  readonly reading: Reading;
   readonly checking?: boolean;
 }) => {
   if (lanes.length === 0) {
@@ -176,7 +193,7 @@ export const Lanes = ({
           className="border-rule border-t"
         >
           {open.map((lane) => (
-            <LaneRow key={lane.lane} lane={lane} project={project} />
+            <LaneRow key={lane.lane} lane={lane} reading={reading} />
           ))}
         </ul>
       )}
@@ -195,7 +212,7 @@ export const Lanes = ({
           </summary>
           <ul aria-label="Lanes that passed" className="border-rule border-t">
             {passed.map((lane) => (
-              <LaneRow key={lane.lane} lane={lane} project={project} />
+              <LaneRow key={lane.lane} lane={lane} reading={reading} />
             ))}
           </ul>
         </details>
@@ -346,10 +363,7 @@ const NoAnswerYet = ({
 
   if (ask.state === "open") {
     return (
-      <EmptyState
-        command={`${Brand.cli} claim ${ask.id} --project ${ask.project}`}
-        title="Nobody has answered this ask yet."
-      />
+      <EmptyState onward={toAsk} title="Nobody has answered this ask yet." />
     );
   }
 
@@ -414,12 +428,14 @@ const Hero = ({
 const Run = ({
   holds,
   landing,
+  LogReader,
   now,
   round,
   verdict,
 }: {
   readonly holds: ReturnType<typeof holdsOf>;
   readonly landing: LandingView | undefined;
+  readonly LogReader: LogReader | undefined;
   readonly now: DateTime.Utc;
   readonly round: ReturnType<typeof roundOf>;
   readonly verdict: Verdict;
@@ -457,7 +473,7 @@ const Run = ({
       <Lanes
         checking={Outcome.isAnyOf(["Checking"])(verdict.outcome)}
         lanes={verdict.lanes}
-        project={verdict.project}
+        reading={{ LogReader, project: verdict.project }}
       />
     </Region>
 
@@ -516,12 +532,6 @@ const Run = ({
               : { heldBack: landing.heldBackTrailer })}
           />
         </div>
-        <div className="flex min-w-0 flex-col gap-1.5">
-          <span className="text-label text-muted-foreground">
-            In a clone of {landing.project}
-          </span>
-          <CommandLine command={`git show ${landing.sha}`} />
-        </div>
         <AppLink
           className="text-ui flex items-center gap-1.5 self-start font-medium no-underline hover:underline"
           to={commitHref(landing.project, landing.sha)}
@@ -553,6 +563,7 @@ export interface AnswerViewProps {
   readonly head?: CommitSha | undefined;
   readonly stamp?: boolean;
   readonly viewer?: Handle | undefined;
+  readonly LogReader?: LogReader | undefined;
 }
 
 const NONE: ReadonlyMap<AskId, AskProgress> = new Map();
@@ -656,6 +667,7 @@ export const AnswerView = ({
   ask,
   head,
   landing,
+  LogReader,
   now,
   parent,
   stamp = false,
@@ -746,6 +758,7 @@ export const AnswerView = ({
         <Run
           holds={holdsOf(verdict, landing, progress?.rounds ?? [])}
           landing={landing}
+          LogReader={LogReader}
           now={now}
           round={roundOf(progress?.rounds ?? [], verdict.head)}
           verdict={verdict}

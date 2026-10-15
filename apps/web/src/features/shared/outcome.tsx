@@ -37,7 +37,7 @@ export const OutcomeView = ({
         data-outcome={outcome._tag}
         data-state="final"
       >
-        <StatusLine command={false} size={size} subject={subject} />
+        <StatusLine size={size} subject={subject} />
         <RefusalView refusals={outcome.refusals} />
       </div>
     );

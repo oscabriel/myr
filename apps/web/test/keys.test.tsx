@@ -74,16 +74,10 @@ describe("a single key", () => {
     ]);
   });
 
-  it("copies the page's numbered commands with 1 to 9, and nothing with 0", () => {
-    expect(intentOf(press("1"), true)).toStrictEqual({
-      index: 1,
-      kind: "copy",
-    });
-    expect(intentOf(press("9"), true)).toStrictEqual({
-      index: 9,
-      kind: "copy",
-    });
-    expect(intentOf(press("0"), true)).toBeUndefined();
+  it("leaves the digits to the browser: no page has a numbered command to copy", () => {
+    for (const key of ["0", "1", "9"]) {
+      expect(intentOf(press(key), true)).toBeUndefined();
+    }
   });
 
   it("clears with Escape", () => {
@@ -92,20 +86,20 @@ describe("a single key", () => {
 
   it("does nothing once the switch is off, but ? still opens the dialog that holds it", () => {
     expect(intentOf(press("j"), false)).toBeUndefined();
-    expect(intentOf(press("1"), false)).toBeUndefined();
+    expect(intentOf(press("J"), false)).toBeUndefined();
     expect(intentOf(press("?"), false)).toStrictEqual({ kind: "keys" });
   });
 
   it("does nothing while focus is in a text field, ? and Escape included", () => {
     expect(
-      ["j", "?", "1", "Escape"].map((key) => intentOf(press(key, true), true))
+      ["j", "?", "J", "Escape"].map((key) => intentOf(press(key, true), true))
     ).toStrictEqual([undefined, undefined, undefined, undefined]);
   });
 
   it("leaves a press with Ctrl, Alt or Meta to the browser", () => {
     expect(intentOf({ ...press("k"), ctrlKey: true }, true)).toBeUndefined();
     expect(intentOf({ ...press("j"), metaKey: true }, true)).toBeUndefined();
-    expect(intentOf({ ...press("1"), altKey: true }, true)).toBeUndefined();
+    expect(intentOf({ ...press("J"), altKey: true }, true)).toBeUndefined();
   });
 });
 
@@ -192,9 +186,11 @@ describe("the switch", () => {
       )
     ).toStrictEqual([]);
 
-    for (const key of ["?", "j", "k", "J", "K", "1", "9", "Esc"]) {
+    for (const key of ["?", "j", "k", "J", "K", "Esc"]) {
       expect(markup).toContain(`<kbd`);
       expect(text).toContain(key);
     }
+
+    expect(text).not.toContain("numbered command");
   });
 });

@@ -1,6 +1,4 @@
-import { Brand } from "@repo/brand";
 import type { FrontPageEntry } from "@repo/protocol/domain/front-page";
-import { Outcome } from "@repo/protocol/domain/outcome";
 import type { Handle } from "@repo/protocol/ids";
 import { Option } from "effect";
 import type { DateTime } from "effect";
@@ -9,8 +7,6 @@ import type { ReactNode } from "react";
 
 import { signInHref } from "../auth/session-slot.tsx";
 import type { DecideInput } from "../decision/decision-card.tsx";
-import { CommandLine } from "../shared/command.tsx";
-import { CopyAction } from "../shared/copy-action.tsx";
 import { EmptyState } from "../shared/empty.tsx";
 import { HandleLink } from "../shared/handle.tsx";
 import { AppLink } from "../shared/link.tsx";
@@ -74,21 +70,6 @@ const Empty = (props: Parameters<typeof EmptyState>[0]) => (
   </li>
 );
 
-const nextOf = ({ answer, claim }: Work) => {
-  if (answer !== undefined) {
-    return Outcome.guards.Refused(answer.outcome)
-      ? {
-          command: answer.outcome.refusals[0].next,
-          label: "Copy next command",
-        }
-      : undefined;
-  }
-
-  return isRunning(claim)
-    ? { command: claim.checkCommand, label: "Copy check command" }
-    : undefined;
-};
-
 const ClaimRow = ({
   now,
   work,
@@ -97,11 +78,9 @@ const ClaimRow = ({
   readonly work: Work;
 }) => {
   const { answer, claim, holds, stage, want } = work;
-  const next = nextOf(work);
 
   return (
     <Row
-      action={next === undefined ? undefined : <CopyAction {...next} />}
       data={{
         "data-claim": claim.ask,
         "data-project": claim.project,
@@ -173,11 +152,6 @@ const ClaimRows = ({
       >
         {read.work.length === 0 ? (
           <Empty
-            command={
-              first === undefined
-                ? `${Brand.cli} front`
-                : `${Brand.cli} claim ${first.ask.ask} --project ${first.project}`
-            }
             onward={
               <AppLink className={LINK} to={ASKS_PATH}>
                 The open asks
@@ -200,12 +174,9 @@ const ClaimRows = ({
         )}
       </RowGroup>
       {read.held > WORK_SHOWN ? (
-        <div className="flex flex-col items-start gap-2">
-          <p className="text-ui text-muted-foreground">
-            The newest {WORK_SHOWN} of your {read.held} claims; every one:
-          </p>
-          <CommandLine command={`${Brand.cli} status`} />
-        </div>
+        <p className="text-ui text-muted-foreground">
+          The newest {WORK_SHOWN} of your {read.held} claims.
+        </p>
       ) : null}
     </div>
   );
@@ -229,7 +200,7 @@ const EVERY_ASK = (
 );
 
 const NoAsks = ({ title }: { readonly title: string }) => (
-  <Empty command={`${Brand.cli} front`} onward={EVERY_ASK} title={title} />
+  <Empty onward={EVERY_ASK} title={title} />
 );
 
 const AskList = ({ asks }: { readonly asks: Takeable }) =>
@@ -275,9 +246,8 @@ const SignedOutNotice = () => (
       <a className={LINK} href={signInHref(INBOX_PATH)}>
         Sign in
       </a>{" "}
-      to see yours, or read it from a terminal:
+      to see yours.
     </p>
-    <CommandLine command={`${Brand.cli} status`} />
   </div>
 );
 
@@ -296,10 +266,7 @@ const DecidedFailure = ({ decided }: { readonly decided: Decided }) => {
 
 const UnreachableDecisions = () => (
   <RowGroup label="Decisions waiting" name="Decisions waiting" under="bar">
-    <Empty
-      command={`${Brand.cli} today`}
-      title="Your decisions did not come: the platform did not answer. Read them from a terminal."
-    />
+    <Empty title="Your decisions did not come: the platform did not answer." />
   </RowGroup>
 );
 
@@ -404,7 +371,6 @@ export const InboxView = ({
       <Unlisted>
         <p className="text-body max-w-(--measure)">{WHAT_THE_INBOX_IS}</p>
         <RefusalView refusals={[refusal]} />
-        <CommandLine command={`${Brand.cli} status`} />
       </Unlisted>
     ),
     SignedOut: () => (

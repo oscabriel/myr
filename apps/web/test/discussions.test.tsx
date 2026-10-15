@@ -1,19 +1,30 @@
+import { RegistryContext } from "@effect/atom-react";
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { Client, Contracts } from "@repo/protocol/contracts";
+import type { PostDiscussion } from "@repo/protocol/contracts";
 import {
   Discussion,
   DiscussionListing,
 } from "@repo/protocol/domain/discussion";
-import { DiscussionId, ProjectName } from "@repo/protocol/ids";
-import { UnknownDiscussion, UnknownProject } from "@repo/protocol/refusal";
-import { asTester, unanswered } from "@repo/protocol/testing";
+import { DiscussionId, Handle, ProjectName } from "@repo/protocol/ids";
+import {
+  Denounced,
+  UnknownDiscussion,
+  UnknownProject,
+} from "@repo/protocol/refusal";
+import { asPerson, asTester, unanswered } from "@repo/protocol/testing";
 import { isNotFound } from "@tanstack/react-router";
-import { DateTime, Effect, Layer, Schema } from "effect";
+import { Cause, DateTime, Effect, Exit, Layer, Option, Schema } from "effect";
+import { Atom, AtomRegistry, Reactivity } from "effect/reactivity";
 import { RpcTest } from "effect/rpc";
 
+import { postDiscussionAtom } from "../src/client/discussion.ts";
 import { DiscussionView } from "../src/features/discussion/discussion-view.tsx";
 import { DiscussionsView } from "../src/features/discussion/discussions-view.tsx";
+import type { Poster } from "../src/features/discussion/post-form.tsx";
+import { usePoster } from "../src/features/discussion/use-poster.tsx";
+import { CallFailure } from "../src/features/shared/call-failure.tsx";
 import {
   crumbsFor,
   projectSections,
@@ -21,6 +32,7 @@ import {
 } from "../src/features/shared/shell/sections.ts";
 import { readDiscussion } from "../src/routes/$owner/$project/discussions/$discussion.tsx";
 import { readDiscussions } from "../src/routes/$owner/$project/discussions/index.tsx";
+import { ContractsClient, webContracts } from "../src/surfaces.ts";
 import { inOrder, markupOf, plainText } from "./ask-fixtures.ts";
 import { elementWith, mainOf } from "./records.ts";
 import { renderAt } from "./render.tsx";
@@ -102,9 +114,36 @@ const commandsOf = (markup: string) =>
     plainText((found.groups?.line ?? "").replaceAll(/ \\\n\s*/gu, " ")).trim()
   );
 
-const list = (
-  <DiscussionsView discussions={listings} now={now} project={datekit} />
-);
+const list = <DiscussionsView discussions={listings} now={now} />;
+
+const wren = Handle.make("wren");
+
+const signedIn: Poster = {
+  handle: Option.some(wren),
+  here: "/oscabriel/datekit/discussions",
+};
+
+const signedOut: Poster = { ...signedIn, handle: Option.none() };
+
+const formsIn = (markup: string) =>
+  [...markup.matchAll(/<form\b[^>]*data-post-form="(?<kind>\w+)"/gu)].map(
+    (found) => found.groups?.kind
+  );
+
+const fieldsIn = (markup: string) =>
+  [...markup.matchAll(/<(?:input|textarea)\b[^>]*name="(?<name>\w+)"/gu)].map(
+    (found) => found.groups?.name
+  );
+
+const returnOf = (markup: string) => {
+  const href = /href="(?<href>\/auth\/signin[^"]*)"/u
+    .exec(markup)
+    ?.groups?.href?.replaceAll("&amp;", "&");
+
+  return href === undefined
+    ? undefined
+    : new URL(href, "https://web.test").searchParams.get("return");
+};
 
 describe("a project's discussions page", () => {
   it("lists each thread by title, opener, posts, last post and state, each linked to its page", () => {
@@ -131,19 +170,32 @@ describe("a project's discussions page", () => {
     ).toBeTruthy();
   });
 
-  it("shows the command to open a thread, copyable, and no form", () => {
-    const markup = markupOf(list);
-
-    expect(commandsOf(markup)).toContain(
-      `${Brand.cli} discussion post --project oscabriel/datekit --title "<title>" --body "<post>"`
+  it("says who may open a thread, and gives a signed-in reader a form for its title and first post, with no command", () => {
+    const markup = markupOf(
+      <DiscussionsView discussions={listings} now={now} poster={signedIn} />
     );
-    expect(markup).not.toMatch(/<form\b|<textarea\b/u);
+
+    expect(plainText(markup)).toContain(
+      "Anyone not denounced may open a thread"
+    );
+    expect(formsIn(markup)).toStrictEqual(["open"]);
+    expect(fieldsIn(markup)).toStrictEqual(["title", "body"]);
+    expect(commandsOf(markup)).toStrictEqual([]);
+    expect(plainText(markup)).not.toContain(`${Brand.cli} discussion post`);
   });
 
-  it("says so, with the command, when there are none", () => {
+  it("gives a signed-out reader no form, only a way to sign in that comes back here", () => {
     const markup = markupOf(
-      <DiscussionsView discussions={[]} now={now} project={datekit} />
+      <DiscussionsView discussions={listings} now={now} poster={signedOut} />
     );
+
+    expect(formsIn(markup)).toStrictEqual([]);
+    expect(returnOf(markup)).toBe("/oscabriel/datekit/discussions");
+    expect(plainText(markup)).toContain("Sign in to open a discussion");
+  });
+
+  it("says so when there are none", () => {
+    const markup = markupOf(<DiscussionsView discussions={[]} now={now} />);
 
     expect(plainText(mainOf(markup))).toContain("No discussions yet");
     expect(markup).not.toContain("data-discussions");
@@ -180,8 +232,11 @@ describe("a project's discussions page", () => {
 });
 
 describe("a discussion's page", () => {
-  it("shows the posts in order, each by its person and time, and the reply command while open", () => {
-    const markup = markupOf(<DiscussionView discussion={open} now={now} />);
+  it("shows the posts in order, each by its person and time, and a reply form while open, with no command", () => {
+    const markup = markupOf(
+      <DiscussionView discussion={open} now={now} poster={signedIn} />
+    );
+
     const main = mainOf(markup);
     const posts = elementWith(main, "data-posts");
 
@@ -197,14 +252,14 @@ describe("a discussion's page", () => {
       ])
     ).toBeTruthy();
     expect(posts).toMatch(/<a\b[^>]*href="\/people\/wren"[^>]*>wren<\/a>/u);
-    expect(commandsOf(markup)).toContain(
-      `${Brand.cli} discussion post disc-000001 --project oscabriel/datekit --body "<post>"`
-    );
-    expect(markup).not.toMatch(/<form\b|<textarea\b/u);
+    expect(commandsOf(markup)).toStrictEqual([]);
+    expect(formsIn(markup)).toStrictEqual(["reply"]);
   });
 
   it("names the ask a maintainer opened from it, linked, and offers no reply", () => {
-    const markup = markupOf(<DiscussionView discussion={asked} now={now} />);
+    const markup = markupOf(
+      <DiscussionView discussion={asked} now={now} poster={signedIn} />
+    );
 
     const became = elementWith(mainOf(markup), "data-became");
 
@@ -213,8 +268,157 @@ describe("a discussion's page", () => {
     );
     expect(plainText(markup)).toContain("Became an ask");
     expect(plainText(markup)).toContain("takes no more posts");
-    expect(commandsOf(markup)).toStrictEqual([]);
+    expect(formsIn(markup)).toStrictEqual([]);
   });
+
+  it("offers a signed-out reader of an open thread no form, only a way to sign in", () => {
+    const markup = markupOf(
+      <DiscussionView
+        discussion={open}
+        now={now}
+        poster={{
+          ...signedOut,
+          here: "/oscabriel/datekit/discussions/disc-000001",
+        }}
+      />
+    );
+
+    expect(formsIn(markup)).toStrictEqual([]);
+    expect(returnOf(markup)).toBe("/oscabriel/datekit/discussions/disc-000001");
+  });
+});
+
+type PostPayload = typeof PostDiscussion.payloadSchema.Type;
+
+const browserWith = (
+  sent: PostPayload[],
+  answer: (
+    payload: PostPayload
+  ) => Effect.Effect<
+    typeof PostDiscussion.successSchema.Type,
+    typeof PostDiscussion.errorSchema.Type
+  >
+) =>
+  AtomRegistry.make({
+    initialValues: [
+      Atom.initialValue(
+        ContractsClient.runtime.layer,
+        Layer.effect(
+          ContractsClient,
+          RpcTest.makeClient(webContracts, { flatten: true })
+        ).pipe(
+          Layer.provide([
+            Layer.mergeAll(
+              unanswered,
+              Contracts.toLayerHandler("postDiscussion", (payload) => {
+                sent.push(payload);
+
+                return answer(payload);
+              })
+            ),
+            asPerson(wren),
+          ]),
+          Layer.provideMerge(Reactivity.layer)
+        )
+      ),
+    ],
+  });
+
+// A server's render reads who is signed in as not yet known; this one says, as the browser would, that wren is.
+const Thread = ({ seen }: { readonly seen?: (poster: Poster) => void }) => {
+  const poster = usePoster(datekit, first);
+
+  seen?.(poster);
+
+  return (
+    <DiscussionView
+      discussion={open}
+      now={now}
+      poster={{ ...poster, checking: false, handle: Option.some(wren) }}
+    />
+  );
+};
+
+const reply = (registry: AtomRegistry.AtomRegistry, body: string) =>
+  Effect.gen(function* () {
+    const posters: Poster[] = [];
+
+    yield* renderAt(
+      "/oscabriel/datekit/discussions/disc-000001",
+      <RegistryContext.Provider value={registry}>
+        <Thread
+          seen={(poster) => {
+            posters.push(poster);
+          }}
+        />
+      </RegistryContext.Provider>
+    );
+
+    // A page in the browser keeps the atom mounted while it waits; a
+    // server's render keeps nothing.
+    registry.mount(postDiscussionAtom);
+    posters.at(-1)?.onPost?.({ body });
+
+    return yield* Effect.exit(
+      AtomRegistry.getResult(registry, postDiscussionAtom, {
+        suspendOnWaiting: true,
+      })
+    );
+  });
+
+describe("posting from the web", () => {
+  it.live("sends a reply to postDiscussion, named for its thread", () =>
+    Effect.gen(function* () {
+      const sent: PostPayload[] = [];
+
+      const registry = browserWith(sent, () =>
+        Effect.succeed({ discussion: open })
+      );
+
+      const answered = yield* reply(registry, "Monday, then.");
+
+      expect(Exit.isSuccess(answered)).toBeTruthy();
+      expect(sent).toStrictEqual([
+        { body: "Monday, then.", discussion: first, project: datekit },
+      ]);
+    })
+  );
+
+  it.live(
+    "hears a refusal as the platform gave it, and draws it inside the reply form",
+    () =>
+      Effect.gen(function* () {
+        const registry = browserWith([], () => Effect.fail(new Denounced()));
+
+        const answered = yield* reply(registry, "Monday, then.");
+
+        const markup = markupOf(
+          <DiscussionView
+            discussion={open}
+            now={now}
+            poster={{
+              ...signedIn,
+              refusal: (
+                <CallFailure
+                  cause={Cause.fail(new Denounced())}
+                  doing="reply"
+                  here="/oscabriel/datekit/discussions/disc-000001"
+                />
+              ),
+            }}
+          />
+        );
+
+        const refused = Exit.isFailure(answered)
+          ? Cause.findErrorOption(answered.cause)
+          : Option.none();
+
+        expect(Option.exists(refused, Schema.is(Denounced))).toBeTruthy();
+        expect(elementWith(markup, 'data-post-form="reply"')).toContain(
+          'data-refusal="Denounced"'
+        );
+      })
+  );
 });
 
 const platformOf = () =>

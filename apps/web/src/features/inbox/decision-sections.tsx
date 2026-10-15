@@ -1,4 +1,3 @@
-import { Brand } from "@repo/brand";
 import type { Decision, Today } from "@repo/protocol/domain/decision";
 import type { LandingView } from "@repo/protocol/domain/landing";
 import { Array as Arr, Option, Order } from "effect";
@@ -407,10 +406,7 @@ export const DecisionGroups = ({
   return listed.length === 0 ? (
     <Section name="Decisions waiting">
       <li className="pt-3">
-        <EmptyState
-          command={`${Brand.cli} today`}
-          title="Nothing to decide today. Undecided decisions expire to their safe default."
-        />
+        <EmptyState title="Nothing to decide today. Undecided decisions expire to their safe default." />
       </li>
     </Section>
   ) : (

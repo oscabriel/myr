@@ -458,7 +458,7 @@ describe(DecisionView, () => {
     expect(refusal).toBeLessThan(markup.indexOf("data-choices="));
   });
 
-  it("signed out, says what a decision is and who takes it, with no choices and no evidence", () => {
+  it("signed out, says what a decision is and who takes it, with no choices, no evidence and no command", () => {
     const markup = pageOf(DecisionRead.cases.SignedOut.make({}));
     const text = plainTextOf(markup);
 
@@ -466,6 +466,6 @@ describe(DecisionView, () => {
     expect(markup).not.toContain(".skip(");
     expect(text).toContain("A maintainer takes it on their Today");
     expect(markup).toContain('href="/oscabriel/vellum/policy"');
-    expect(text).toContain(`${Brand.cli} today --project oscabriel/vellum`);
+    expect(text).not.toContain(`${Brand.cli} today`);
   });
 });

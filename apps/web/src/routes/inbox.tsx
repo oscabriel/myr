@@ -88,7 +88,7 @@ const InboxPage = () => {
 };
 
 export const Route = createFileRoute("/inbox")({
-  staticData: { shell: "project" },
+  staticData: { shell: "site" },
   validateSearch: (search: {
     readonly decision?: unknown;
     readonly project?: unknown;

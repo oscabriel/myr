@@ -3,7 +3,6 @@ import type { CSSProperties } from "react";
 
 import { Button } from "../../components/ui/button.tsx";
 import { useCopy } from "./copy-action.tsx";
-import { useNumberedCommand } from "./keys.tsx";
 
 const HANG = 6;
 
@@ -63,25 +62,11 @@ const wordsOf = (command: string) =>
     );
   });
 
-const Line = ({
-  command,
-  number,
-}: {
-  readonly command: string;
-  readonly number: number | undefined;
-}) => {
+export const CommandLine = ({ command }: { readonly command: string }) => {
   const { copied, copy } = useCopy(command);
 
   return (
     <div className={BOX}>
-      {number === undefined ? null : (
-        <span
-          aria-hidden="true"
-          className="text-muted-foreground font-sans tabular-nums select-none"
-        >
-          {number}
-        </span>
-      )}
       <span aria-hidden="true" className="text-muted-foreground select-none">
         $
       </span>
@@ -92,7 +77,6 @@ const Line = ({
         className="shrink-0 font-sans"
         onClick={copy}
         size="sm"
-        title={number === undefined ? undefined : `Copy (${number})`}
         type="button"
         variant="ghost"
       >
@@ -104,20 +88,3 @@ const Line = ({
     </div>
   );
 };
-
-const NumberedLine = ({ command }: { readonly command: string }) => (
-  <Line command={command} number={useNumberedCommand(command)} />
-);
-
-export const CommandLine = ({
-  command,
-  numbered = false,
-}: {
-  readonly command: string;
-  readonly numbered?: boolean;
-}) =>
-  numbered ? (
-    <NumberedLine command={command} />
-  ) : (
-    <Line command={command} number={undefined} />
-  );

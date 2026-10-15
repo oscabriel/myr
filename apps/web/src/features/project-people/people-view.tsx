@@ -9,7 +9,6 @@ import type { ReactNode } from "react";
 
 import { Definition, Definitions, Region } from "../ask/fields.tsx";
 import { blobHref, commitHref, shortSha, treeHref } from "../code/paths.ts";
-import { CommandLine } from "../shared/command.tsx";
 import { EmptyState } from "../shared/empty.tsx";
 import { FactBlock } from "../shared/facts.tsx";
 import { HandleLink } from "../shared/handle.tsx";
@@ -359,13 +358,8 @@ const Pending = ({
         <p className="text-ui max-w-(--measure)">
           {"To make it evaluate, a maintainer lands a "}
           <Code>{PROJECT_FILE}</Code>
-          {
-            " that names the test command. In a clone, this prints the file the CLI proposes from the repo's own files; add the test command to it, commit it, and land it as the facts say."
-          }
+          {" that names the test command."}
         </p>
-        <CommandLine
-          command={`${Brand.cli} init --project ${project} --dry-run`}
-        />
       </>
     ) : (
       <>
@@ -388,46 +382,11 @@ const Pending = ({
   </div>
 );
 
-const Step = ({
-  command,
-  label,
-}: {
-  readonly command: string;
-  readonly label: string;
-}) => (
-  <div className="flex min-w-0 flex-col gap-1">
-    <p className="text-label text-muted-foreground">{label}</p>
-    <CommandLine command={command} numbered />
-  </div>
-);
-
-const lines = (command: string, flags: readonly string[]) =>
-  [command, ...flags].join(" \\\n  ");
-
-const ChangeFacts = ({ project }: { readonly project: ProjectName }) => (
+const ChangeFacts = () => (
   <FactBlock label="How to change these">
     <p className="text-ui">
       {`Land a change to ${CONFIG_DIR}: open an ask for it, or, as a maintainer, land your own from a clone.`}
     </p>
-    <Step
-      command={lines(`${Brand.cli} ask open <ask>`, [
-        `--project ${project}`,
-        "--files <files>",
-        "--yes",
-      ])}
-      label="Open an ask for the change"
-    />
-    <Step
-      command={lines(`${Brand.cli} land`, [
-        `--project ${project}`,
-        "--base <base>",
-        "--head $(git rev-parse HEAD)",
-        "--message <message>",
-        "--requestId land-$(git rev-parse HEAD)",
-        "--yes",
-      ])}
-      label="Or land your own, as a maintainer"
-    />
   </FactBlock>
 );
 
@@ -443,7 +402,7 @@ export const PeopleView = ({
   readonly unevaluated: Option.Option<PolicyPending>;
 }): ReactNode => (
   <Workspace
-    facts={<ChangeFacts project={project} />}
+    facts={<ChangeFacts />}
     factsHeading="This policy"
     meta={
       Option.isSome(policy) ? (

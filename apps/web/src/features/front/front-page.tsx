@@ -1,4 +1,3 @@
-import { Brand } from "@repo/brand";
 import { Reserve } from "@repo/protocol/domain/ask";
 import type { Ask } from "@repo/protocol/domain/ask";
 import type { ProjectEvent } from "@repo/protocol/domain/event";
@@ -17,7 +16,7 @@ import type { AskProgress } from "../shared/ask-progress.ts";
 import { EmptyState } from "../shared/empty.tsx";
 import { FamilyStrip } from "../shared/family.tsx";
 import { AppLink } from "../shared/link.tsx";
-import { projectPath, TOUR_PATH } from "../shared/paths.ts";
+import { IMPORT_PATH, projectPath, TOUR_PATH } from "../shared/paths.ts";
 import { PostureBadge } from "../shared/posture.tsx";
 import { AskRow, RowGroup, useRowSelection } from "../shared/row.tsx";
 import { Workspace } from "../shared/shell/workspace.tsx";
@@ -27,7 +26,6 @@ import type { Arranged } from "./families.ts";
 import { compact, countWith, filterEntries, frontPath } from "./filter.ts";
 import type { FrontFilter, FrontFilterInput } from "./filter.ts";
 import { EXPLAINER } from "./head.ts";
-import { HOW_TO_TITLE, HowToTake, useHowTo } from "./how-to.tsx";
 
 export const frontCount = (shown: readonly FrontPageEntry[]) =>
   `${plural(shown.length, "open ask", "open asks")}, ${
@@ -134,11 +132,9 @@ const LINK = "decoration-rule underline hover:decoration-current";
 const Filters = ({
   entries,
   filter,
-  onRestore,
 }: {
   readonly entries: readonly FrontPageEntry[];
   readonly filter: FrontFilter;
-  readonly onRestore: (() => void) | undefined;
 }) => {
   const held = Reserve.literals.filter(
     (reserved) =>
@@ -216,22 +212,11 @@ const Filters = ({
           />
         ))}
       </Facet>
-      {filtered || onRestore !== undefined ? (
+      {filtered ? (
         <div className="text-ui flex flex-col items-start gap-2 px-2">
-          {filtered ? (
-            <AppLink className={LINK} to={frontPath({})}>
-              Reset filters
-            </AppLink>
-          ) : null}
-          {onRestore === undefined ? null : (
-            <button
-              className={`text-muted-foreground hover:text-foreground ${LINK}`}
-              onClick={onRestore}
-              type="button"
-            >
-              {HOW_TO_TITLE}
-            </button>
-          )}
+          <AppLink className={LINK} to={frontPath({})}>
+            Reset filters
+          </AppLink>
         </div>
       ) : null}
     </nav>
@@ -251,16 +236,18 @@ const NoAsks = ({
 }) =>
   projects?.length === 0 ? (
     <EmptyState
-      command={`${Brand.cli} init`}
-      onward={<TakeTheTour />}
-      title="No open asks, and no project yet. Run init in a repo to bring it here."
+      onward={
+        <>
+          <AppLink className={LINK} to={IMPORT_PATH}>
+            Bring a project here
+          </AppLink>
+          <TakeTheTour />
+        </>
+      }
+      title="No open asks, and no project yet."
     />
   ) : (
-    <EmptyState
-      command={`${Brand.cli} ask open <ask> --files <files>`}
-      onward={<TakeTheTour />}
-      title="No open asks on any project. A maintainer opens one from an ask file."
-    />
+    <EmptyState onward={<TakeTheTour />} title="No open asks on any project." />
   );
 
 interface Group {
@@ -372,7 +359,6 @@ export const FrontPageView = ({
   stampsOf,
 }: FrontPageProps) => {
   const shown = filterEntries(entries, filter);
-  const { dismiss, dismissed, restore } = useHowTo();
 
   const states = useMemo(
     () =>
@@ -410,45 +396,38 @@ export const FrontPageView = ({
       {entries.length === 0 ? (
         <NoAsks projects={projects} />
       ) : (
-        <>
-          {dismissed ? null : <HowToTake onDismiss={dismiss} />}
-          <div
-            className="columns:grid columns:grid-cols-[var(--column-filters)_minmax(0,1fr)] flex flex-col gap-8"
-            data-board=""
-          >
-            <Filters
-              entries={entries}
-              filter={filter}
-              onRestore={dismissed ? restore : undefined}
-            />
-            <div className="flex min-w-0 flex-col gap-6" data-board-list="">
-              {shown.length === 0 ? (
-                <EmptyState
-                  onward={
-                    <AppLink className={LINK} to={frontPath({})}>
-                      Show every open ask
-                    </AppLink>
-                  }
-                  title="No open asks match this filter."
+        <div
+          className="columns:grid columns:grid-cols-[var(--column-filters)_minmax(0,1fr)] flex flex-col gap-8"
+          data-board=""
+        >
+          <Filters entries={entries} filter={filter} />
+          <div className="flex min-w-0 flex-col gap-6" data-board-list="">
+            {shown.length === 0 ? (
+              <EmptyState
+                onward={
+                  <AppLink className={LINK} to={frontPath({})}>
+                    Show every open ask
+                  </AppLink>
+                }
+                title="No open asks match this filter."
+              />
+            ) : (
+              groups.map((group) => (
+                <ProjectGroup
+                  group={group}
+                  key={group.project}
+                  listing={projects?.find(
+                    ({ project }) => project === group.project
+                  )}
+                  now={now}
+                  parents={parents}
+                  selected={selected}
+                  stamps={stampsOf?.(group.project) ?? new Set()}
                 />
-              ) : (
-                groups.map((group) => (
-                  <ProjectGroup
-                    group={group}
-                    key={group.project}
-                    listing={projects?.find(
-                      ({ project }) => project === group.project
-                    )}
-                    now={now}
-                    parents={parents}
-                    selected={selected}
-                    stamps={stampsOf?.(group.project) ?? new Set()}
-                  />
-                ))
-              )}
-            </div>
+              ))
+            )}
           </div>
-        </>
+        </div>
       )}
     </Workspace>
   );

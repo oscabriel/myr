@@ -47,7 +47,7 @@ export const VisibilityView = ({
 
   return (
     <Workspace
-      facts={<LedgerFacts areas={areas} ledger={ledger} />}
+      facts={<LedgerFacts areas={areas} />}
       factsHeading="This project's visibility"
       meta={metaOf(ledger, areas.length, env)}
       status={<HeadSentence ledger={ledger} />}

@@ -12,6 +12,7 @@ import { SeededAtoms, seedSuccess } from "../../../../client/seeded.ts";
 import { watchAtom } from "../../../../client/watch.ts";
 import { NotFoundView } from "../../../../features/ask/refused.tsx";
 import { DiscussionView } from "../../../../features/discussion/discussion-view.tsx";
+import { usePoster } from "../../../../features/discussion/use-poster.tsx";
 import { pageHead } from "../../../../features/shared/head.ts";
 import { notFoundFor, Refusals } from "../../../../features/shared/refusals.ts";
 import { branchPage } from "../../../../server/cache-headers.ts";
@@ -62,6 +63,7 @@ const FreshDiscussion = ({
   readonly read: Shown;
 }) => {
   useAtomMount(watchAtom(project));
+  const poster = usePoster(project, read.discussion.id);
 
   const { discussion } = Option.getOrElse(
     AsyncResult.value(
@@ -70,7 +72,13 @@ const FreshDiscussion = ({
     () => read
   );
 
-  return <DiscussionView discussion={discussion} now={DateTime.nowUnsafe()} />;
+  return (
+    <DiscussionView
+      discussion={discussion}
+      now={DateTime.nowUnsafe()}
+      poster={poster}
+    />
+  );
 };
 
 const DiscussionPage = () => {

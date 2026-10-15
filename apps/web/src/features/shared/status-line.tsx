@@ -15,7 +15,6 @@ import type { ReactNode } from "react";
 import { commitHref, shortSha } from "../code/paths.ts";
 import { whoseMove } from "./ask-progress.ts";
 import type { Family, Move } from "./ask-progress.ts";
-import { CommandChip } from "./copy-action.tsx";
 import { HandleLink } from "./handle.tsx";
 import { AppLink } from "./link.tsx";
 import { StateMarkIcon } from "./marks.tsx";
@@ -118,7 +117,6 @@ interface Reading {
   readonly lead: string;
   readonly rest?: ReactNode;
   readonly after: readonly string[];
-  readonly next?: string;
 }
 
 const Code = ({ children }: { readonly children: ReactNode }) => (
@@ -255,7 +253,6 @@ const answerReading = ({
       after: after(),
       lead: "Refused",
       mark: refusals[0].retryable ? "retry" : "refused",
-      next: refusals[0].next,
       rest: (
         <>
           {stage === undefined ? (
@@ -480,21 +477,18 @@ const SIZE = {
 
 export interface StatusLineProps {
   readonly subject: StatusSubject;
-  readonly command?: string | false;
   readonly compact?: boolean;
   readonly size?: keyof typeof SIZE;
   readonly stamp?: boolean;
 }
 
 export const StatusLine = ({
-  command,
   compact = false,
   size = "body",
   stamp = false,
   subject,
 }: StatusLineProps) => {
   const reading = readStatus(subject);
-  const next = command === false ? undefined : (command ?? reading.next);
 
   if (compact) {
     return (
@@ -535,14 +529,6 @@ export const StatusLine = ({
             <span className="text-muted-foreground">{part}</span>
           </Fragment>
         ))}
-        {next === undefined ? null : (
-          <>
-            <span aria-hidden="true" className="text-muted-foreground">
-              {" · "}
-            </span>
-            <CommandChip command={next} />
-          </>
-        )}
       </span>
     </p>
   );

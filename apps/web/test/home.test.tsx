@@ -77,9 +77,13 @@ const stagesOf = (markup: string) =>
     ),
   ].map((found) => `${found.groups?.stage} ${found.groups?.state}`);
 
-const commandsOf = (markup: string) =>
-  [...markup.matchAll(/<code\b[^>]*>(?<command>.*?)<\/code>/gsu)].map((found) =>
-    textIn(found.groups?.command ?? "").trim()
+const cliCommandsOf = (markup: string) =>
+  [...markup.matchAll(/<code\b[^>]*>(?<command>.*?)<\/code>/gsu)].flatMap(
+    (found) => {
+      const code = textIn(found.groups?.command ?? "").trim();
+
+      return code.startsWith(`${Brand.cli} `) ? [code] : [];
+    }
   );
 
 const claim = (fields: Partial<typeof ClaimView.Encoded> = {}) =>
@@ -146,7 +150,7 @@ const takeable = Schema.decodeSync(FrontPageEntry)({
 
 describe("the inbox, for the asks a reader holds and may take", () => {
   it.effect(
-    "shows a running claim by its want, with its check command, and a refused answer with its next command",
+    "shows a running claim by its want and a refused answer, with no command to copy for either",
     () =>
       Effect.gen(function* () {
         const markup = yield* pageOf({
@@ -171,12 +175,8 @@ describe("the inbox, for the asks a reader holds and may take", () => {
         expect(textIn(markup)).toContain(
           "A week starts on the locale's first day."
         );
-        expect(commandsOf(markup)).toStrictEqual(
-          expect.arrayContaining([
-            `${Brand.cli} check fix-week-start --project oscabriel/datekit`,
-            `${Brand.cli} claim parse-iso-week`,
-          ])
-        );
+        expect(cliCommandsOf(markup)).toStrictEqual([]);
+        expect(markup).not.toMatch(/Copy (?:next|check) command/u);
         // A refusal a new push can mend turns back, in its own mark.
         expect(markup).toContain("lucide-rotate-ccw");
         expect(markup).toContain(
@@ -306,7 +306,7 @@ describe("the inbox, for the asks a reader holds and may take", () => {
   );
 
   it.effect(
-    "says so, with a command, when the decisions or the asks did not come, rather than showing none",
+    "says so, with no command, when the decisions or the asks did not come, rather than showing none",
     () =>
       Effect.gen(function* () {
         const markup = yield* pageOf({
@@ -319,25 +319,19 @@ describe("the inbox, for the asks a reader holds and may take", () => {
         expect(text).toContain("Your decisions did not come");
         expect(text).toContain("The asks did not come");
         expect(text).not.toContain("No open ask is yours to take");
-        expect(commandsOf(markup)).toStrictEqual(
-          expect.arrayContaining([`${Brand.cli} today`, `${Brand.cli} front`])
-        );
+        expect(cliCommandsOf(markup)).toStrictEqual([]);
       })
   );
 
-  it.effect(
-    "with no claim, gives the claim command for the first ask the reader may take",
-    () =>
-      Effect.gen(function* () {
-        const markup = yield* pageOf({
-          asks: Takeable.cases.Listed.make({ asks: [takeable] }),
-        });
+  it.effect("with no claim, says so and gives no claim command", () =>
+    Effect.gen(function* () {
+      const markup = yield* pageOf({
+        asks: Takeable.cases.Listed.make({ asks: [takeable] }),
+      });
 
-        expect(textIn(markup)).toContain("You hold no claim.");
-        expect(commandsOf(markup)).toContain(
-          `${Brand.cli} claim split-format --project oscabriel/burrow`
-        );
-      })
+      expect(textIn(markup)).toContain("You hold no claim.");
+      expect(cliCommandsOf(markup)).toStrictEqual([]);
+    })
   );
 
   it.effect("links the reader's handle and their record", () =>
@@ -350,7 +344,7 @@ describe("the inbox, for the asks a reader holds and may take", () => {
   );
 
   it.effect(
-    "past the claims it shows, says how many there are and gives the command for every one",
+    "past the claims it shows, says how many there are, with no command",
     () =>
       Effect.gen(function* () {
         const markup = yield* pageOf({
@@ -360,7 +354,7 @@ describe("the inbox, for the asks a reader holds and may take", () => {
         });
 
         expect(textIn(markup)).toContain("The newest 10 of your 14 claims");
-        expect(commandsOf(markup)).toContain(`${Brand.cli} status`);
+        expect(cliCommandsOf(markup)).toStrictEqual([]);
       })
   );
 });
@@ -477,12 +471,12 @@ describe("the inbox, read on the server with the reader's session", () => {
   );
 
   it.live(
-    "signed out, says what the page is, how to sign in and come back, and the command",
+    "signed out, says what the page is and how to sign in and come back, with no command",
     () =>
       Effect.gen(function* () {
         const markup = yield* pageFrom(yield* readInbox({}));
 
-        expect(textIn(markup)).toContain(`${Brand.cli} status`);
+        expect(textIn(markup)).not.toContain(`${Brand.cli} status`);
         expect(markup).toContain(
           `href="/auth/signin?return=${encodeURIComponent("/inbox")}"`
         );
@@ -498,8 +492,8 @@ describe("the inbox, read on the server with the reader's session", () => {
     });
   });
 
-  it("is drawn in the project shell", () => {
-    expect(Route.options.staticData?.shell).toBe("project");
+  it("is drawn in the site shell, ruled as Explore and Asks are", () => {
+    expect(Route.options.staticData?.shell).toBe("site");
   });
 });
 

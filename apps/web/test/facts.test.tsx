@@ -17,15 +17,8 @@ import {
   TerritoryFacts,
   verdictProvenance,
 } from "../src/features/shared/facts.tsx";
-import {
-  ask,
-  askId,
-  landing,
-  now,
-  project,
-  suite,
-  verdictOf,
-} from "./ask-fixtures.ts";
+import type { ClaimControl } from "../src/features/shared/facts.tsx";
+import { ask, landing, now, suite, verdictOf } from "./ask-fixtures.ts";
 import {
   allInOrder,
   attributeOf,
@@ -37,6 +30,25 @@ import {
 import { renderAt } from "./render.tsx";
 
 const tamsin = Handle.make("tamsin");
+
+const ignore = () => {};
+
+const control = (overrides: Partial<ClaimControl> = {}): ClaimControl => ({
+  busy: false,
+  here: "/oscabriel/datekit/asks/parse-iso-week",
+  onClaim: ignore,
+  onRelease: ignore,
+  signedIn: true,
+  ...overrides,
+});
+
+const actions = (markup: string, action: string) =>
+  tagsWith(markup, "data-action").filter((tag) =>
+    tag.includes(`data-action="${action}"`)
+  );
+
+const remote =
+  "https://git.example.dev/oscabriel/datekit--parse-iso-week--tamsin.git";
 
 const checking = Outcome.cases.Checking.make({ stage: "checks" });
 
@@ -66,14 +78,61 @@ describe(ClaimFacts, () => {
     expect(text).not.toMatch(/until|deadline|expires|lapses|left/iu);
   });
 
-  it("tells the claimant they hold it, with what they run next", () => {
+  it("tells the claimant they hold it, with no command to run", () => {
     const text = textOf(
       <ClaimFacts claimant={tamsin} now={now} viewer={tamsin} />
     );
 
     expect(text).toContain("You hold this claim");
-    expect(text).toContain(`${Brand.cli} check`);
-    expect(text).toContain("git push");
+    expect(text).not.toContain(`${Brand.cli} check`);
+    expect(text).not.toContain("git push");
+  });
+
+  it("gives the claimant their fork's address to push to, copyable, and a way to release it", () => {
+    const markup = markupOf(
+      <ClaimFacts
+        claimant={tamsin}
+        control={control({ remote })}
+        now={now}
+        viewer={tamsin}
+      />
+    );
+
+    expect(textIn(markup)).toContain("Push your answer to your fork");
+    expect(actions(markup, "release")).toHaveLength(1);
+    expect(markup).toContain('aria-label="Copy the fork&#x27;s address"');
+    expect(textIn(markup)).toContain(remote);
+  });
+
+  it("offers no release to someone who does not hold the claim", () => {
+    const markup = markupOf(
+      <ClaimFacts
+        claimant={tamsin}
+        control={control({ remote })}
+        now={now}
+        viewer={Handle.make("okonkwo")}
+      />
+    );
+
+    expect(markup).not.toContain('data-action="release"');
+    expect(markup).not.toContain(remote);
+  });
+
+  it("holds its button while a release is on its way, and says why one failed", () => {
+    const markup = markupOf(
+      <ClaimFacts
+        claimant={tamsin}
+        control={control({ busy: true, failure: <p>NotClaimed</p> })}
+        now={now}
+        viewer={tamsin}
+      />
+    );
+
+    expect(attributeOf(actions(markup, "release")[0] ?? "", "disabled")).toBe(
+      ""
+    );
+    expect(textIn(markup)).toContain("Releasing…");
+    expect(textIn(markup)).toContain("NotClaimed");
   });
 });
 
@@ -197,36 +256,54 @@ describe(HeldBackFacts, () => {
 });
 
 describe(StateFacts, () => {
-  it("repeats the status line and gives the next command", () => {
+  it("repeats the status line, with no next command", () => {
     const text = textOf(
-      <StateFacts
-        command={`${Brand.cli} status`}
-        subject={{ kind: "answer", outcome: checking }}
-      />
+      <StateFacts subject={{ kind: "answer", outcome: checking }} />
     );
 
     expect(text).toContain("Checking at the checks stage");
-    expect(text).toContain(`${Brand.cli} status`);
+    expect(text).not.toContain(Brand.cli);
   });
 });
 
 describe(TakeItFacts, () => {
-  it("says who may take an ask held for newcomers, then clone, claim and check in order", () => {
+  it("says who may take an ask held for newcomers, with no command to clone, claim or check", () => {
     const text = textOf(
       <TakeItFacts
         ask={{ ...ask, mentor: Handle.make("okonkwo"), reserve: "newcomers" }}
-        platformUrl="https://platform.example"
       />
     );
 
     expect(text).toContain("Held for newcomers, mentored by okonkwo");
-    expect(
-      allInOrder(text, [
-        `git clone https://platform.example/${project}.git`,
-        `${Brand.cli} claim ${askId} --project ${project}`,
-        `${Brand.cli} check`,
-      ])
-    ).toBeTruthy();
+    expect(text).not.toContain("git clone");
+    expect(text).not.toContain(Brand.cli);
+  });
+
+  it("claims it with a button for a signed-in reader", () => {
+    const markup = markupOf(<TakeItFacts ask={ask} control={control()} />);
+
+    expect(actions(markup, "claim")).toHaveLength(1);
+    expect(textIn(markup)).toContain("Claim it");
+    expect(markup).not.toContain("/auth/signin");
+  });
+
+  it("asks a signed-out reader to sign in and come back, with no button", () => {
+    const markup = markupOf(
+      <TakeItFacts ask={ask} control={control({ signedIn: false })} />
+    );
+
+    expect(markup).not.toContain('data-action="claim"');
+    expect(markup).toContain(
+      'href="/auth/signin?return=%2Foscabriel%2Fdatekit%2Fasks%2Fparse-iso-week"'
+    );
+    expect(textIn(markup)).toContain("Sign in to claim it");
+  });
+
+  it("draws no control at all when the page hands it none", () => {
+    const markup = markupOf(<TakeItFacts ask={ask} />);
+
+    expect(markup).not.toContain("<button");
+    expect(markup).not.toContain("/auth/signin");
   });
 });
 

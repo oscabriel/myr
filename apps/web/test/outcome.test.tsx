@@ -1,5 +1,4 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Brand } from "@repo/brand";
 import { Outcome } from "@repo/protocol/domain/outcome";
 import type { StageName } from "@repo/protocol/domain/outcome";
 import {
@@ -52,21 +51,18 @@ const sha = Schema.decodeSync(LandedSha)(
 const landed = Outcome.cases.Landed.make({ sha });
 
 describe(RefusalView, () => {
-  it("shows every line explain gives, in order, each refusal's tag, and then its next command", () => {
-    const text = textOf(<RefusalView refusals={refusals} />);
+  it("shows every line explain gives, in order, and each refusal's tag, with no command to copy beside them", () => {
+    const element = <RefusalView refusals={refusals} />;
+    const text = textOf(element);
 
-    const expected = refusals.flatMap((refusal) => [
-      ...explain([refusal]).map((line) => line.trim()),
-      refusal.next,
-    ]);
+    const expected = refusals.flatMap((refusal) =>
+      explain([refusal]).map((line) => line.trim())
+    );
 
     expect(allInOrder(text, expected)).toBeTruthy();
     expect(text).toContain("OutOfScope");
     expect(text).toContain("Weakened");
-
-    for (const refusal of refusals) {
-      expect(refusal.next.startsWith(`${Brand.cli} `)).toBeTruthy();
-    }
+    expect(markupOf(element)).not.toContain("<button");
   });
 
   it("points at the path and line of a refusal that has one", () => {

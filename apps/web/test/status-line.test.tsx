@@ -32,8 +32,6 @@ const formatOrdinal: Ask = {
   reserve: "newcomers",
 };
 
-const claim = `${Brand.cli} claim format-ordinal --project ${project}`;
-
 const refusals = [
   new OutOfScope({ paths: [RepoPath.make("README.md")] }),
   new Weakened({
@@ -63,25 +61,20 @@ const rendered = (element: ReactElement) => {
   };
 };
 
-const line = (subject: StatusSubject, command?: string) =>
-  rendered(
-    command === undefined ? (
-      <StatusLine subject={subject} />
-    ) : (
-      <StatusLine command={command} subject={subject} />
-    )
-  );
+const line = (subject: StatusSubject) =>
+  rendered(<StatusLine subject={subject} />);
 
 describe(StatusLine, () => {
-  it("says an open ask the viewer may take is open to take, who it is held for, and the claim", () => {
-    const { markup, text, tone } = line(
-      { ask: formatOrdinal, kind: "ask", takeable: true },
-      claim
-    );
+  it("says an open ask the viewer may take is open to take and who it is held for, with no command", () => {
+    const { text, tone } = line({
+      ask: formatOrdinal,
+      kind: "ask",
+      takeable: true,
+    });
 
     expect(text).toContain("Open to take");
     expect(text).toContain("held for newcomers, mentored by okonkwo");
-    expect(markup).toMatch(new RegExp(`<code\\b[^>]*>${claim}</code>`, "u"));
+    expect(text).not.toContain(Brand.cli);
     expect(tone).toBe("muted");
   });
 
@@ -109,20 +102,17 @@ describe(StatusLine, () => {
     expect(tone).toBe("checking");
   });
 
-  it("names a refusal by its headline and stage, leaves it to the answerer, and never paraphrases it", () => {
-    const { text, tone } = line(
-      {
-        claimant: tamsin,
-        kind: "answer",
-        outcome: Outcome.cases.Refused.make({ refusals }),
-        stage: "shape",
-      },
-      `${Brand.cli} check`
-    );
+  it("names a refusal by its headline and stage, leaves it to the answerer, and never paraphrases it or gives its next command", () => {
+    const { text, tone } = line({
+      claimant: tamsin,
+      kind: "answer",
+      outcome: Outcome.cases.Refused.make({ refusals }),
+      stage: "shape",
+    });
 
     expect(text).toContain(`Refused at Shape: ${headline(refusals)}`);
     expect(text).toContain("tamsin's move");
-    expect(text).toContain(`${Brand.cli} check`);
+    expect(text).not.toContain(refusals[0].next);
     expect(tone).toBe("refused");
 
     for (const words of explain(refusals).slice(1)) {

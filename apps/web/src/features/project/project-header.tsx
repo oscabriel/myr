@@ -3,7 +3,6 @@
  * and three actions, then its nine tabs. Every page of the project draws it
  * the same; only the current tab moves.
  */
-import { Brand } from "@repo/brand";
 import type { RefsView, TagName } from "@repo/protocol/domain/code";
 import type { Handle, ProjectName } from "@repo/protocol/ids";
 import type { Posture } from "@repo/protocol/posture";
@@ -76,10 +75,7 @@ const ownerAndName = (project: ProjectName) => {
 export const cloneCommand = (platformUrl: string, project: ProjectName) =>
   `git clone ${platformUrl}/${project}.git`;
 
-/**
- * Clone with git, or claim an ask to answer it: a claim brings its own fork.
- * The Clone popover and Overview's clone card say the same thing.
- */
+/** The Clone popover and Overview's clone card say the same thing. */
 export const CloneSteps = ({
   platformUrl,
   project,
@@ -92,31 +88,16 @@ export const CloneSteps = ({
       <p className="text-ui">Clone it with git</p>
       <CommandLine command={cloneCommand(platformUrl, project)} />
     </div>
-    <div className="flex min-w-0 flex-col gap-1">
-      <p className="text-ui">Or claim an ask to answer it</p>
-      <CommandLine command={`${Brand.cli} claim <ask> --project ${project}`} />
-    </div>
-    <p className="text-ui text-muted-foreground">
-      A claim comes with a fork to push your answer to, so there is nothing to
-      fork by hand.
-    </p>
   </div>
 );
 
-/**
- * The CLI has no command that follows a project, so Watch says what already
- * follows it (this page, and the events) and how to read your own part in it.
- */
-export const WatchSteps = ({ project }: { readonly project: ProjectName }) => (
+/** Watch says what already follows the project: this page, and the events. */
+export const WatchSteps = () => (
   <div className="flex min-w-0 flex-col gap-3" data-steps="watch">
     <p className="text-ui">
       This page follows the project as it happens: claims, pushes, verdicts and
       landings arrive without a reload.
     </p>
-    <div className="flex min-w-0 flex-col gap-1">
-      <p className="text-ui">Your own claims and answers here</p>
-      <CommandLine command={`${Brand.cli} status --project ${project}`} />
-    </div>
     <AppLink className={`text-ui ${LINK} self-start`} to="/docs/events">
       Follow its events from a program
     </AppLink>
@@ -185,7 +166,7 @@ const Actions = ({
 }) => (
   <div className="flex shrink-0 flex-wrap items-center gap-2">
     <Action label="Watch">
-      <WatchSteps project={project} />
+      <WatchSteps />
     </Action>
     <Action label="Clone" wide>
       <CloneSteps platformUrl={platformUrl} project={project} />

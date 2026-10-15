@@ -1,4 +1,3 @@
-import { Brand } from "@repo/brand";
 import type { Verdict } from "@repo/protocol/domain/answer";
 import type { Ask } from "@repo/protocol/domain/ask";
 import { CheckSpec } from "@repo/protocol/domain/check";
@@ -28,6 +27,7 @@ import {
   TakeItFacts,
   TerritoryFacts,
 } from "../shared/facts.tsx";
+import type { ClaimControl } from "../shared/facts.tsx";
 import { FamilyStrip } from "../shared/family.tsx";
 import { HandleLink } from "../shared/handle.tsx";
 import { AppLink } from "../shared/link.tsx";
@@ -58,9 +58,6 @@ export const askCrumbs = (ask: Ask): readonly Crumb[] => [
   { label: "Asks", to: `/${ask.project}` },
   { label: ask.id, mono: true },
 ];
-
-export const claimCommand = (ask: Ask) =>
-  `${Brand.cli} claim ${ask.id} --project ${ask.project}`;
 
 const CheckSummary = ({ ask }: { readonly ask: Ask }) =>
   CheckSpec.match(ask.check, {
@@ -339,13 +336,16 @@ export interface AskViewProps {
   readonly ask: Ask;
   readonly brief: string;
   readonly now: DateTime.Utc;
-  readonly platformUrl: string;
   readonly states?: ReadonlyMap<AskId, AskProgress>;
   readonly parent?: Ask | undefined;
   readonly verdict?: Verdict | undefined;
   readonly check?: CheckSource | undefined;
   readonly posture?: Posture | undefined;
   readonly viewer?: Handle | undefined;
+  /** Claiming and releasing from the page; read-only without it. */
+  readonly control?: ClaimControl | undefined;
+  /** Who claimed it from this page, before the project's events say so. */
+  readonly claimedHere?: Handle | undefined;
 }
 
 const subjectOf = (
@@ -426,32 +426,37 @@ const standing = (
 
 const AskFacts = ({
   ask,
+  claimedHere,
+  control,
   now,
   parent,
-  platformUrl,
   posture,
   states,
   viewer,
 }: {
   readonly ask: Ask;
+  readonly claimedHere: Handle | undefined;
+  readonly control: ClaimControl | undefined;
   readonly now: DateTime.Utc;
   readonly parent: Ask | undefined;
-  readonly platformUrl: string;
   readonly posture: Posture | undefined;
   readonly states: ReadonlyMap<AskId, AskProgress>;
   readonly viewer: Handle | undefined;
 }) => {
-  const { held, progress, takeable } = standing(ask, states, parent);
+  const standingNow = standing(ask, states, parent);
+  const { progress } = standingNow;
+  const claimant = progress?.claimant ?? claimedHere;
+  const takeable = standingNow.takeable && claimedHere === undefined;
+  const held = standingNow.held || claimedHere !== undefined;
 
   return (
     <>
-      {takeable ? <TakeItFacts ask={ask} platformUrl={platformUrl} /> : null}
+      {takeable ? <TakeItFacts ask={ask} control={control} /> : null}
       {!takeable && held && ask.state !== "closed" ? (
         <ClaimFacts
+          control={control}
           now={now}
-          {...(progress?.claimant === undefined
-            ? {}
-            : { claimant: progress.claimant })}
+          {...(claimant === undefined ? {} : { claimant })}
           {...(progress?.lastPush === undefined
             ? {}
             : { lastPush: progress.lastPush })}
@@ -534,9 +539,10 @@ export const AskView = ({
   ask,
   brief,
   check,
+  claimedHere,
+  control,
   now,
   parent,
-  platformUrl,
   posture,
   states = NONE,
   verdict,
@@ -556,9 +562,10 @@ export const AskView = ({
       facts={
         <AskFacts
           ask={ask}
+          claimedHere={claimedHere}
+          control={control}
           now={now}
           parent={parent}
-          platformUrl={platformUrl}
           posture={posture}
           states={states}
           viewer={viewer}
@@ -597,7 +604,6 @@ export const AskView = ({
       }
       said
       title={ask.brief.want}
-      {...(takeable ? { primaryCommand: claimCommand(ask) } : {})}
     >
       <Brief ask={ask} />
 

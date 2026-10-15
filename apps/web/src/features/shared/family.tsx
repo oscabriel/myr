@@ -5,7 +5,6 @@ import { useId, useState } from "react";
 
 import { familyMarks, markOf } from "./ask-progress.ts";
 import type { AskProgress, Mark } from "./ask-progress.ts";
-import { ClaimAction } from "./copy-action.tsx";
 import { AppLink } from "./link.tsx";
 import { StateMarkIcon } from "./marks.tsx";
 import type { StateMark } from "./marks.tsx";
@@ -243,9 +242,6 @@ export const FamilyStrip = ({
             <span className="text-label text-muted-foreground ml-auto shrink-0">
               {words[mark]}
             </span>
-            {mark === "open" ? (
-              <ClaimAction ask={ask} project={project} />
-            ) : null}
           </li>
         ))}
       </ul>

@@ -4,7 +4,6 @@ import { Contracts } from "@repo/protocol/contracts";
 import { explain } from "@repo/protocol/render";
 import { Effect } from "effect";
 
-import { commands } from "../src/features/agents/catalog.ts";
 import {
   EXAMPLE,
   EXAMPLE_REFUSALS,
@@ -41,63 +40,31 @@ const stepsOf = (markup: string) =>
     ].map(([step, id]) => [id, step])
   );
 
-/** A CLI command's words: its path and flags, as `commandDocs` lists them. */
-const partsOf = (command: string) => {
-  const [, ...words] = command.split(/\s+/u);
-
-  return {
-    flags: words
-      .filter((word) => word.startsWith("--"))
-      .map((word) => word.split("=")[0] ?? word),
-    name: words[0] ?? "",
-  };
-};
-
 describe(TourView, () => {
-  it.effect("walks six steps, each with its numbered command, in order", () =>
-    Effect.gen(function* () {
-      const markup = yield* pageWith(NEITHER);
-      const steps = stepsOf(markup);
+  it.effect(
+    "walks six steps in order, each its title and sentence, with no command box",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* pageWith(NEITHER);
+        const steps = stepsOf(markup);
 
-      expect([...steps.keys()]).toStrictEqual([
-        "find",
-        "read",
-        "claim",
-        "refused",
-        "land",
-        "credit",
-      ]);
-      expect(
-        allInOrder(
-          textIn(markup),
-          STEPS.map(({ command }) => command)
-        )
-      ).toBeTruthy();
-      // One command box per step; the keys number them once the page has a registry, which the server has not.
-      expect(markup.match(/<code class="[^"]*select-all"/gu)).toHaveLength(6);
-    })
+        expect([...steps.keys()]).toStrictEqual([
+          "find",
+          "read",
+          "claim",
+          "refused",
+          "land",
+          "credit",
+        ]);
+        expect(
+          allInOrder(
+            textIn(markup),
+            STEPS.flatMap(({ sentence, title }) => [title, sentence])
+          )
+        ).toBeTruthy();
+        expect(markup).not.toMatch(/<code class="[^"]*select-all"/u);
+      })
   );
-
-  it("gives each CLI command only flags the command list says it takes", () => {
-    const wrong = STEPS.flatMap(({ command }) => {
-      if (!command.startsWith(`${Brand.cli} `)) {
-        return [];
-      }
-
-      const { flags, name } = partsOf(command);
-      const doc = commands.find(({ path }) => path.join(" ") === name);
-
-      if (doc === undefined) {
-        return [`${command}: no such command`];
-      }
-
-      return flags
-        .filter((flag) => !doc.flags.includes(flag))
-        .map((flag) => `${command}: ${name} takes no ${flag}`);
-    });
-
-    expect(wrong).toStrictEqual([]);
-  });
 
   it.effect(
     "prints the refusal as the one renderer gives it, through git, with its next command and whether retrying helps",

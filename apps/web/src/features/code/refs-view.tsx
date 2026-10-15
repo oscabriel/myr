@@ -8,7 +8,6 @@ import { defaultStringifySearch } from "@tanstack/react-router";
 import { Option } from "effect";
 import type { ReactNode } from "react";
 
-import { CommandLine } from "../shared/command.tsx";
 import { EmptyState } from "../shared/empty.tsx";
 import { FactBlock } from "../shared/facts.tsx";
 import { HandleLink } from "../shared/handle.tsx";
@@ -272,38 +271,22 @@ const WorkingFork = ({ fork }: { readonly fork: ForkRef }) => (
 const noTags = (only: string | undefined) =>
   only === undefined ? "No tags." : `No tags for ${only}.`;
 
-const Facts = ({
-  platformUrl,
-  project,
-}: {
-  readonly platformUrl: string;
-  readonly project: Refs["project"];
-}) => (
-  <>
-    <FactBlock label="Clone it">
-      <CommandLine
-        command={`git clone ${platformUrl}/${project}.git`}
-        numbered
-      />
-    </FactBlock>
-    <FactBlock label="Claim forks">
-      <p className="text-ui text-muted-foreground">
-        A claim fork is the copy a claim gives its claimant, the one place their
-        answer is pushed.
-      </p>
-    </FactBlock>
-  </>
+const Facts = () => (
+  <FactBlock label="Claim forks">
+    <p className="text-ui text-muted-foreground">
+      A claim fork is the copy a claim gives its claimant, the one place their
+      answer is pushed.
+    </p>
+  </FactBlock>
 );
 
 export const RefsView = ({
   from = 0,
   package: only,
-  platformUrl,
   refs,
 }: {
   readonly from?: number | undefined;
   readonly package?: string | undefined;
-  readonly platformUrl: string;
   readonly refs: Refs;
 }) => {
   const { forks, landed, project } = refs;
@@ -322,7 +305,7 @@ export const RefsView = ({
 
   return (
     <Workspace
-      facts={<Facts platformUrl={platformUrl} project={project} />}
+      facts={<Facts />}
       factsHeading="These refs"
       meta={
         <MetaLine

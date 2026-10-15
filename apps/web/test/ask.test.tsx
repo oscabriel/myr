@@ -2,6 +2,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { Client, Contracts } from "@repo/protocol/contracts";
 import type { Ask } from "@repo/protocol/domain/ask";
+import type { ClaimView } from "@repo/protocol/domain/claim";
 import { Outcome } from "@repo/protocol/domain/outcome";
 import {
   AskId,
@@ -9,6 +10,7 @@ import {
   CommitSha,
   Handle,
   ProjectName,
+  RepoName,
   RepoPath,
 } from "@repo/protocol/ids";
 import {
@@ -20,14 +22,19 @@ import {
 import { explain } from "@repo/protocol/render";
 import { asTester, unanswered } from "@repo/protocol/testing";
 import { isNotFound } from "@tanstack/react-router";
-import { Effect, Layer, Ref, Schema, Stream } from "effect";
+import { DateTime, Effect, Exit, Layer, Ref, Schema, Stream } from "effect";
+import { Atom, AtomRegistry, Reactivity } from "effect/reactivity";
 import { RpcTest } from "effect/rpc";
 
+import { claimAtom, releaseAtom } from "../src/client/claim.ts";
+import { keys } from "../src/client/keys.ts";
 import { readAsk } from "../src/features/answer/reads.ts";
 import { AskView } from "../src/features/ask/ask-page.tsx";
 import { NoSuchAsk } from "../src/features/ask/refused.tsx";
 import { askStates } from "../src/features/shared/ask-progress.ts";
+import type { ClaimControl } from "../src/features/shared/facts.tsx";
 import { Refusals } from "../src/features/shared/refusals.ts";
+import { ContractsClient, webContracts } from "../src/surfaces.ts";
 import {
   ask,
   askId,
@@ -47,8 +54,6 @@ import {
 } from "./ask-fixtures.ts";
 import { textIn } from "./markup.ts";
 
-const platformUrl = "https://platform-test.example.workers.dev";
-
 const inPre = (markup: string) =>
   /<pre\b[^>]*>(?<inner>.*?)<\/pre>/su.exec(markup)?.groups?.inner;
 
@@ -61,14 +66,24 @@ const trailOf = (markup: string) =>
 
 type AskProps = Parameters<typeof AskView>[0];
 
+const tamsin = Handle.make("tamsin");
+
+const ignore = () => {};
+
+const forkRemote =
+  "https://git.example.dev/oscabriel/datekit--parse-iso-week--tamsin.git";
+
+const claiming = (overrides: Partial<ClaimControl> = {}): ClaimControl => ({
+  busy: false,
+  here: `/${project}/asks/${askId}`,
+  onClaim: ignore,
+  onRelease: ignore,
+  signedIn: true,
+  ...overrides,
+});
+
 const page = (shown = ask, more: Partial<AskProps> = {}) => (
-  <AskView
-    ask={shown}
-    brief={brief}
-    now={now}
-    platformUrl={platformUrl}
-    {...more}
-  />
+  <AskView ask={shown} brief={brief} now={now} {...more} />
 );
 
 const checkSource = (lines: number) => ({
@@ -167,14 +182,58 @@ describe(AskView, () => {
     );
   });
 
-  it("gives the lines that clone the project, claim the ask and check an answer, with the CLI's own name", () => {
-    expect(
-      inOrder(textOf(page()), [
-        `git clone ${platformUrl}/oscabriel/datekit.git`,
-        `${Brand.cli} claim ${askId} --project oscabriel/datekit`,
-        `${Brand.cli} check`,
-      ])
-    ).toBeTruthy();
+  it("says who may take an open ask, with no command to clone, claim or check", () => {
+    const text = textOf(page());
+
+    expect(text).toContain("Take it");
+    expect(text).not.toContain("git clone");
+    expect(text).not.toContain(`${Brand.cli} claim`);
+    expect(text).not.toContain(`${Brand.cli} check`);
+  });
+
+  it("claims an ask open to take with a button, once the page hands it a control", () => {
+    const markup = markupOf(page(ask, { control: claiming(), viewer: tamsin }));
+
+    expect(markup).toContain('data-action="claim"');
+    expect(markup).not.toContain('data-action="release"');
+  });
+
+  it("says the reader holds a claim they made from the page, before the events say so", () => {
+    const text = textIn(
+      markupOf(
+        page(ask, {
+          claimedHere: tamsin,
+          control: claiming({ remote: forkRemote }),
+          viewer: tamsin,
+        })
+      )
+    );
+
+    expect(text).toContain("You hold this claim");
+    expect(text).toContain(forkRemote);
+    expect(text).toContain("Release it");
+    expect(text).not.toContain("Claim it");
+  });
+
+  it("offers a claimed ask's holder a release, and anyone else neither claim nor release", () => {
+    const states = askStates([claimedEvent(1, "tamsin")]);
+    const claimed = { ...ask, state: "claimed" } as const;
+
+    const holder = markupOf(
+      page(claimed, { control: claiming(), states, viewer: tamsin })
+    );
+
+    const other = markupOf(
+      page(claimed, {
+        control: claiming(),
+        states,
+        viewer: Handle.make("okonkwo"),
+      })
+    );
+
+    expect(holder).toContain('data-action="release"');
+    expect(other).not.toContain('data-action="release"');
+    expect(other).not.toContain('data-action="claim"');
   });
 
   it("names who holds a claimed ask and offers no way to take it", () => {
@@ -190,7 +249,7 @@ describe(AskView, () => {
     expect(text).not.toContain(`${Brand.cli} claim`);
   });
 
-  it("says where a refused answer was refused, whose move it is and what to run", () => {
+  it("says where a refused answer was refused and whose move it is", () => {
     const refusal = new OutOfScope({ paths: [RepoPath.make("README.md")] });
     const outcome = Outcome.cases.Refused.make({ refusals: [refusal] });
 
@@ -207,13 +266,7 @@ describe(AskView, () => {
     );
 
     expect(
-      inOrder(text, [
-        "Refused",
-        "at Shape",
-        "OutOfScope",
-        "tamsin's move",
-        refusal.next,
-      ])
+      inOrder(text, ["Refused", "at Shape", "OutOfScope", "tamsin's move"])
     ).toBeTruthy();
   });
 
@@ -430,7 +483,6 @@ describe(NoSuchAsk, () => {
       inOrder(textOf(<NoSuchAsk data={data} />), [
         "No such ask",
         ...explain([refusal]).map((line) => line.trim()),
-        `${Brand.cli} asks`,
       ])
     ).toBeTruthy();
   });
@@ -655,6 +707,143 @@ describe(readAsk, () => {
           isNotFound(failed) ? failed.data : "not a not-found"
         ).toBeUndefined();
         expect(yield* Ref.get(asked)).toStrictEqual(nothingAsked);
+      })
+  );
+});
+
+const claimView: ClaimView = {
+  ask: askId,
+  base: CommitSha.make("a".repeat(40)),
+  checkCommand: "bun test",
+  claimant: tamsin,
+  fork: RepoName.make("datekit--parse-iso-week--tamsin"),
+  lapsesAt: DateTime.add(now, { days: 3 }),
+  openedAt: now,
+  project,
+  remote: forkRemote,
+  state: "live",
+  warnsAt: DateTime.add(now, { days: 2 }),
+};
+
+interface Sent {
+  readonly claim: readonly unknown[];
+  readonly release: readonly unknown[];
+  readonly showAsk: number;
+}
+
+const claimContracts = (sent: Ref.Ref<Sent>) =>
+  Layer.effect(ContractsClient)(
+    RpcTest.makeClient(webContracts, { flatten: true })
+  ).pipe(
+    Layer.provide([
+      Layer.mergeAll(
+        unanswered,
+        Contracts.toLayerHandler("claim", (payload) =>
+          Ref.update(sent, (all) => ({
+            ...all,
+            claim: [...all.claim, payload],
+          })).pipe(Effect.as({ claim: claimView }))
+        ),
+        Contracts.toLayerHandler("release", (payload) =>
+          Ref.update(sent, (all) => ({
+            ...all,
+            release: [...all.release, payload],
+          })).pipe(Effect.as({ released: true }))
+        ),
+        Contracts.toLayerHandler("showAsk", () =>
+          Ref.update(sent, (all) => ({
+            ...all,
+            showAsk: all.showAsk + 1,
+          })).pipe(Effect.as({ ask, brief }))
+        )
+      ),
+      asTester,
+    ]),
+    Layer.provideMerge(Reactivity.layer)
+  );
+
+const theAsk = ContractsClient.query(
+  "showAsk",
+  { ask: askId, project },
+  { reactivityKeys: keys.ask(project, askId) }
+);
+
+const pressing = (which: "claim" | "release") =>
+  Effect.gen(function* () {
+    const sent = yield* Ref.make<Sent>({ claim: [], release: [], showAsk: 0 });
+
+    const registry = yield* Effect.acquireRelease(
+      Effect.sync(() =>
+        AtomRegistry.make({
+          initialValues: [
+            Atom.initialValue(
+              ContractsClient.runtime.layer,
+              claimContracts(sent)
+            ),
+          ],
+        })
+      ),
+      (made) =>
+        Effect.sync(() => {
+          made.dispose();
+        })
+    );
+
+    registry.mount(theAsk);
+    yield* AtomRegistry.getResult(registry, theAsk);
+
+    const input = { ask: askId, project };
+
+    const succeeded =
+      which === "claim"
+        ? yield* Effect.exit(
+            Effect.suspend(() => {
+              registry.mount(claimAtom);
+              registry.set(claimAtom, input);
+
+              return AtomRegistry.getResult(registry, claimAtom, {
+                suspendOnWaiting: true,
+              });
+            })
+          ).pipe(Effect.map(Exit.isSuccess))
+        : yield* Effect.exit(
+            Effect.suspend(() => {
+              registry.mount(releaseAtom);
+              registry.set(releaseAtom, input);
+
+              return AtomRegistry.getResult(registry, releaseAtom, {
+                suspendOnWaiting: true,
+              });
+            })
+          ).pipe(Effect.map(Exit.isSuccess));
+
+    yield* AtomRegistry.getResult(registry, theAsk, { suspendOnWaiting: true });
+
+    return { sent: yield* Ref.get(sent), succeeded };
+  }).pipe(Effect.scoped);
+
+describe("claiming from the ask page", () => {
+  it.live(
+    "sends the ask and its project as the claim, and reads the ask again",
+    () =>
+      Effect.gen(function* () {
+        const { sent, succeeded } = yield* pressing("claim");
+
+        expect(succeeded).toBeTruthy();
+        expect(sent.claim).toStrictEqual([{ ask: askId, project }]);
+        expect(sent.showAsk).toBe(2);
+      })
+  );
+
+  it.live(
+    "sends the ask and its project as the release, and reads the ask again",
+    () =>
+      Effect.gen(function* () {
+        const { sent, succeeded } = yield* pressing("release");
+
+        expect(succeeded).toBeTruthy();
+        expect(sent.release).toStrictEqual([{ ask: askId, project }]);
+        expect(sent.showAsk).toBe(2);
       })
   );
 });

@@ -20,8 +20,6 @@ import { ForAgents, Onward, plural } from "../front/facts.tsx";
 import { stillWaiting } from "../front/families.ts";
 import type { AskProgress } from "../shared/ask-progress.ts";
 import { LINK } from "../shared/classes.ts";
-import { CommandLine } from "../shared/command.tsx";
-import { CommandSlotProvider } from "../shared/keys.tsx";
 import { AppLink } from "../shared/link.tsx";
 import {
   ENVIRONMENT_ANCHOR,
@@ -352,13 +350,11 @@ const RecentLandings = ({
   landedAt,
   landings,
   now,
-  platformUrl,
   project,
 }: {
   readonly landedAt: DateTime.Utc | undefined;
   readonly landings: readonly LandingView[];
   readonly now: DateTime.Utc;
-  readonly platformUrl: string;
   readonly project: ProjectName;
 }) => {
   let shown: ReactNode;
@@ -367,15 +363,9 @@ const RecentLandings = ({
     shown = <LandingList landings={recentShown(landings)} now={now} />;
   } else if (landedAt === undefined) {
     shown = (
-      <>
-        <p className="text-ui">
-          Nothing has landed yet. The first push to main, by whoever ran init,
-          lands it.
-        </p>
-        <CommandLine
-          command={`git push ${platformUrl}/${project}.git HEAD:main`}
-        />
-      </>
+      <p className="text-ui">
+        Nothing has landed yet. The first push to main lands it.
+      </p>
     );
   } else {
     shown = (
@@ -436,37 +426,34 @@ const ProjectPanes = ({
       id="main"
       tabIndex={-1}
     >
-      <CommandSlotProvider slot="main">
-        <div
-          className={`columns:grid columns:grid-cols-[minmax(0,1fr)_var(--column-about)] columns:items-start flex flex-col gap-10 pt-6 pb-16 ${GUTTER}`}
-        >
-          <div className="flex min-w-0 flex-col gap-8">
-            <AsksSection
-              asks={asks}
-              now={props.now}
-              parents={props.parents ?? []}
-              project={project}
-              selected={selected}
-              stamps={props.stamps ?? new Set()}
-              states={states}
-              unreachable={props.unreachable === true}
-            />
-            <RecentLandings
-              landedAt={props.lastLanded ?? listing.landedAt}
-              landings={props.landings}
-              now={props.now}
-              platformUrl={props.platformUrl}
-              project={project}
-            />
-            {code?.readme === undefined ? null : (
-              <div className="max-w-(--measure) min-w-0">
-                <ReadmeSection file={code.readme} project={project} />
-              </div>
-            )}
-          </div>
-          <About props={props} />
+      <div
+        className={`columns:grid columns:grid-cols-[minmax(0,1fr)_var(--column-about)] columns:items-start flex flex-col gap-10 pt-6 pb-16 ${GUTTER}`}
+      >
+        <div className="flex min-w-0 flex-col gap-8">
+          <AsksSection
+            asks={asks}
+            now={props.now}
+            parents={props.parents ?? []}
+            project={project}
+            selected={selected}
+            stamps={props.stamps ?? new Set()}
+            states={states}
+            unreachable={props.unreachable === true}
+          />
+          <RecentLandings
+            landedAt={props.lastLanded ?? listing.landedAt}
+            landings={props.landings}
+            now={props.now}
+            project={project}
+          />
+          {code?.readme === undefined ? null : (
+            <div className="max-w-(--measure) min-w-0">
+              <ReadmeSection file={code.readme} project={project} />
+            </div>
+          )}
         </div>
-      </CommandSlotProvider>
+        <About props={props} />
+      </div>
     </main>
   );
 };

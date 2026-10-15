@@ -385,10 +385,10 @@ describe("the inbox, for the decisions waiting on a reader", () => {
 
     expect(markup).toContain(markupOf(<RefusalView refusals={[refused]} />));
     expect(markup).not.toContain("data-decision");
-    expect(textIn(markup)).toContain(`${Brand.cli} status`);
+    expect(textIn(markup)).not.toContain(`${Brand.cli} status`);
   });
 
-  it("signed out, says what the inbox is in one sentence, links to sign in, and gives the command", () => {
+  it("signed out, says what the inbox is in one sentence and links to sign in, with no command", () => {
     const markup = markupOf(viewOf(InboxRead.cases.SignedOut.make({})));
     const text = textIn(markup);
 
@@ -396,7 +396,7 @@ describe("the inbox, for the decisions waiting on a reader", () => {
     expect(markup).toMatch(
       /<a[^>]*href="\/auth\/signin[^"]*"[^>]*>Sign in<\/a>/u
     );
-    expect(text).toContain(`${Brand.cli} status`);
+    expect(text).not.toContain(Brand.cli);
     expect(markup).not.toContain("data-decision");
   });
 

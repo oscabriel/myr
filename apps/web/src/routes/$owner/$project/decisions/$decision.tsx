@@ -1,22 +1,29 @@
-import { useAtom, useAtomMount, useAtomValue } from "@effect/atom-react";
+import {
+  useAtom,
+  useAtomMount,
+  useAtomRefresh,
+  useAtomValue,
+} from "@effect/atom-react";
+import { forkRev } from "@repo/protocol/domain/code";
 import type { Decision } from "@repo/protocol/domain/decision";
+import type { CommitSha } from "@repo/protocol/ids";
 import {
   createFileRoute,
-  getRouteApi,
   useLocation,
   useRouter,
 } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { env } from "cloudflare:workers";
-import { Effect, Option, Schema } from "effect";
+import { Array as Arr, Effect, Option, Schema } from "effect";
 import type { DateTime } from "effect";
-import { AsyncResult } from "effect/reactivity";
+import { Atom, AsyncResult } from "effect/reactivity";
 import { useCallback, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
 import { decideAtom } from "../../../../client/decide.ts";
 import { projectEventsAtom } from "../../../../client/events.ts";
+import { finishAtom, forkHeadAtom } from "../../../../client/finish.ts";
 import { watchAtom } from "../../../../client/watch.ts";
 import { hereOf } from "../../../../features/auth/session-slot.tsx";
 import { useCodeFileKeys } from "../../../../features/code/file-keys.ts";
@@ -37,6 +44,7 @@ import { FinishColumn } from "../../../../features/finish/finish-column.tsx";
 import { FinishFilesButton } from "../../../../features/finish/finish-files-button.tsx";
 import { FinishView } from "../../../../features/finish/finish-view.tsx";
 import {
+  answererOf,
   isFinishDecision,
   patchOf,
   waiverPatchOf,
@@ -52,8 +60,6 @@ import { personalPage } from "../../../../server/cache-headers.ts";
 import { serverClient } from "../../../../server/client.ts";
 
 // The decision comes from `today` alone: someone who decides nothing there sees no evidence.
-
-const root = getRouteApi("__root__");
 
 interface DecisionParams {
   readonly project: string;
@@ -92,6 +98,34 @@ const takenHere = (
     )
   );
 
+type ForkLog = AsyncResult.AsyncResult<
+  { readonly commits: readonly { readonly sha: CommitSha }[] },
+  unknown
+>;
+
+// A decision that names no answerer has no fork to read.
+const noFork: Atom.Atom<ForkLog> = Atom.make<ForkLog>(
+  AsyncResult.success({ commits: [] })
+);
+
+const forkLogOf = (decision: FinishDecision): Atom.Atom<ForkLog> =>
+  Option.match(answererOf(decision), {
+    onNone: () => noFork,
+    onSome: (handle) =>
+      forkHeadAtom(decision.project)(
+        forkRev({ ask: decision.subject.ask, handle })
+      ),
+  });
+
+/** Undefined while it is read; none when the fork could not be read or holds nothing. */
+const headOf = (log: ForkLog): Option.Option<CommitSha> | undefined => {
+  if (AsyncResult.isSuccess(log)) {
+    return Option.map(Arr.head(log.value.commits), ({ sha }) => sha);
+  }
+
+  return AsyncResult.isFailure(log) ? Option.none() : undefined;
+};
+
 const Finish = ({
   busy,
   decision,
@@ -109,9 +143,14 @@ const Finish = ({
   readonly taken: Decision | undefined;
   readonly failure: ReactNode;
 }) => {
-  const { platformUrl } = root.useLoaderData();
   const router = useRouter();
+  const here = useLocation({ select: hereOf });
   const { ask, head } = decision.subject;
+
+  const forkLog = useMemo(() => forkLogOf(decision), [decision]);
+  const forkHead = headOf(useAtomValue(forkLog));
+  const readFork = useAtomRefresh(forkLog);
+  const [finished, finish] = useAtom(finishAtom);
 
   useAtomMount(watchAtom(decision.project));
   const events = useAtomValue(projectEventsAtom(decision.project));
@@ -214,7 +253,15 @@ const Finish = ({
       failure={failure}
       files={files}
       filesButton={<FinishFilesButton />}
+      finishFailure={
+        AsyncResult.isFailure(finished) ? (
+          <CallFailure cause={finished.cause} doing="finish it" here={here} />
+        ) : undefined
+      }
+      finished={Option.getOrUndefined(AsyncResult.value(finished))}
+      finishing={finished.waiting}
       folded={folded}
+      forkHead={forkHead}
       newerHead={newerHead}
       now={now}
       onDecide={onDecide}
@@ -222,10 +269,11 @@ const Finish = ({
       onFoldAll={(fold) => {
         setFolded(fold ? new Set(paths) : new Set());
       }}
+      onFinish={finish}
       onMark={mark}
+      onReadFork={readFork}
       onSplit={setChosen}
       placed={found.placed}
-      platformUrl={platformUrl}
       read={read}
       soon={found.soon}
       split={split}

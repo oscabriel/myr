@@ -11,6 +11,7 @@ import { discussionsAtom } from "../../../../client/discussion.ts";
 import { SeededAtoms, seedSuccess } from "../../../../client/seeded.ts";
 import { watchAtom } from "../../../../client/watch.ts";
 import { DiscussionsView } from "../../../../features/discussion/discussions-view.tsx";
+import { usePoster } from "../../../../features/discussion/use-poster.tsx";
 import { UnknownProjectView } from "../../../../features/project/unknown-project.tsx";
 import { pageHead } from "../../../../features/shared/head.ts";
 import { branchPage } from "../../../../server/cache-headers.ts";
@@ -52,6 +53,7 @@ const FreshDiscussions = ({
   readonly read: Listed;
 }) => {
   useAtomMount(watchAtom(project));
+  const poster = usePoster(project);
 
   const { discussions } = Option.getOrElse(
     AsyncResult.value(useAtomValue(discussionsAtom(project))),
@@ -62,7 +64,7 @@ const FreshDiscussions = ({
     <DiscussionsView
       discussions={discussions}
       now={DateTime.nowUnsafe()}
-      project={project}
+      poster={poster}
     />
   );
 };

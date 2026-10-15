@@ -1,5 +1,4 @@
 import { describe, expect, it } from "@effect/vitest";
-import { commandDocs } from "@repo/agent-kit/command-doc";
 import { Brand } from "@repo/brand";
 import { Client, Contracts } from "@repo/protocol/contracts";
 import { PolicyPending, PublicPolicy } from "@repo/protocol/domain/policy";
@@ -130,12 +129,6 @@ const commandsOf = (markup: string) =>
   ].map((found) =>
     plainText((found.groups?.line ?? "").replaceAll(/ \\\n\s*/gu, " ")).trim()
   );
-
-const commandOf = (line: string) =>
-  commandDocs(Contracts)
-    .filter(({ path }) => line.startsWith(`${Brand.cli} ${path.join(" ")} `))
-    .toSorted((one, other) => other.path.length - one.path.length)
-    .at(0);
 
 const decidersOf = (markup: string) =>
   elementsWith(mainOf(markup), "data-paths=").map((row) =>
@@ -325,54 +318,8 @@ describe("a project's policy page", () => {
     }
 
     expect(facts).toContain(`Land a change to ${Brand.configDir}/`);
-    expect(facts).toContain(`${Brand.cli} ask open`);
-    expect(facts).toContain(`${Brand.cli} land`);
-  });
-
-  it("puts each change command on lines of its own, numbered, never one wall", () => {
-    const facts = factsOf(markupOf(page));
-
-    const raw = [
-      ...facts.matchAll(/<code\b[^>]*select-all[^>]*>(?<line>.*?)<\/code>/gsu),
-    ].map((found) => found.groups?.line ?? "");
-
-    expect(raw).toHaveLength(2);
-
-    for (const command of raw) {
-      expect(command.split("\n").length).toBeGreaterThan(1);
-
-      for (const line of command.split("\n")) {
-        expect(line.split("$(git rev-parse HEAD)").length).toBeLessThan(3);
-      }
-    }
-
-    expect([...facts.matchAll(/<code\b[^>]*select-all/gu)]).toHaveLength(2);
-  });
-
-  it("shows each command whole: a real CLI command, with every flag its payload takes and --yes", () => {
-    const lines = commandsOf(factsOf(markupOf(page)));
-
-    expect(lines.map((line) => commandOf(line)?.contract)).toStrictEqual([
-      "openAsk",
-      "land",
-    ]);
-
-    for (const line of lines) {
-      const doc = commandOf(line);
-      const given = line.split(" ").filter((word) => word.startsWith("--"));
-
-      // `--discussion` names the thread an ask came from; a change to the config folder comes from none.
-      const payload = (doc?.flags ?? []).filter(
-        (flag) =>
-          !["--dry-run", "--json", "--yes", "--discussion"].includes(flag)
-      );
-
-      expect(
-        given.filter((flag) => !(doc?.flags ?? []).includes(flag))
-      ).toStrictEqual([]);
-      expect(payload.filter((flag) => !given.includes(flag))).toStrictEqual([]);
-      expect(given.includes("--yes")).toBe(doc?.needsApproval);
-    }
+    expect(facts).not.toContain(`${Brand.cli} `);
+    expect(commandsOf(markup)).toStrictEqual([]);
   });
 
   it("adds no sealed path, check name, salt or read log to what it was given", () => {
@@ -462,8 +409,8 @@ describe("a project's policy page", () => {
     ]).toStrictEqual([true, false]);
   });
 
-  it("offers the CLI lines that make a config with no config folder evaluate, each a real command", () => {
-    const markup = markupOf(
+  it("says the file that makes a config with no config folder evaluate, with no command to run", () => {
+    const view = (
       <PeopleView
         ledger={burrowLedger}
         policy={Option.none()}
@@ -472,28 +419,15 @@ describe("a project's policy page", () => {
       />
     );
 
-    const lines = [
-      ...commandsOf(mainOf(markup)),
-      ...commandsOf(factsOf(markup)),
-    ];
-
-    expect(lines.map((line) => commandOf(line)?.path.join(" "))).toStrictEqual([
-      "init",
-      "ask open",
-      "land",
-    ]);
-    expect(lines[0]).toContain("--dry-run");
-
-    for (const line of lines) {
-      const flags = commandOf(line)?.flags ?? [];
-
-      expect(
-        line
-          .split(" ")
-          .filter((word) => word.startsWith("--"))
-          .filter((flag) => !flags.includes(flag))
-      ).toStrictEqual([]);
-    }
+    expect(
+      inOrder(textOf(view), [
+        "To make it evaluate, a maintainer lands a",
+        `${Brand.configDir}/project.ts`,
+        "that names the test command.",
+      ])
+    ).toBeTruthy();
+    expect(textOf(view)).not.toContain(`${Brand.cli} `);
+    expect(commandsOf(markupOf(view))).toStrictEqual([]);
   });
 
   it("says a config folder that did not evaluate has not been evaluated, linking the folder at that commit", () => {

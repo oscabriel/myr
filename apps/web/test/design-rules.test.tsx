@@ -331,12 +331,12 @@ describe("DESIGN.md's shells", () => {
     expect(rows).toStrictEqual(["site", "project", "docs", "focus"]);
   });
 
-  it("states ADR 0041's four rules", () => {
+  it("states ADR 0041's four rules, the third as the maintainer amended it: no CLI command on a page", () => {
     const shells = section("Shells");
 
     expect(shells).toContain("**No global left rail.**");
     expect(shells).toContain("**No generic right rail.**");
-    expect(shells).toContain("**A command at most once per screen.**");
+    expect(shells).toContain("**No CLI command on a page.**");
     expect(shells).toContain("**Prose stops at 72 to 80ch.**");
   });
 

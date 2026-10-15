@@ -146,6 +146,3 @@ export const LANDING: LandingView = {
   project,
   sha: landed,
 };
-
-/** A line of the territory, for `why`. */
-export const WHY_LOCATION = "src/parse.ts:4";

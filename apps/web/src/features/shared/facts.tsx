@@ -1,4 +1,3 @@
-import { Brand } from "@repo/brand";
 import type { Verdict } from "@repo/protocol/domain/answer";
 import type { Ask } from "@repo/protocol/domain/ask";
 import { CheckSpec } from "@repo/protocol/domain/check";
@@ -13,9 +12,10 @@ import { ChevronDown, LockKeyhole } from "lucide-react";
 import { useState } from "react";
 import type { ReactNode } from "react";
 
+import { Button } from "../../components/ui/button.tsx";
+import { signInHref } from "../auth/session-slot.tsx";
 import { blobHref, shortSha, treeHref } from "../code/paths.ts";
 import type { AskProgress } from "./ask-progress.ts";
-import { CommandLine } from "./command.tsx";
 import { CopyAction } from "./copy-action.tsx";
 import { CreditTrailers } from "./credits.tsx";
 import { FamilyTree } from "./family.tsx";
@@ -28,12 +28,7 @@ import type { StageHolds, StageState } from "./outcome.tsx";
 import { LEDGER_ANCHOR, visibilityPath } from "./paths.ts";
 import { PostureBadge } from "./posture.tsx";
 import { MetaCode } from "./row.tsx";
-import {
-  StatusLine,
-  readStatus,
-  stageNames,
-  stageRuns,
-} from "./status-line.tsx";
+import { StatusLine, stageNames, stageRuns } from "./status-line.tsx";
 import type { StatusSubject } from "./status-line.tsx";
 import { When } from "./time.tsx";
 
@@ -77,33 +72,13 @@ export const CodeValue = ({ value }: { readonly value: string }) => (
 );
 
 export const StateFacts = ({
-  command,
   subject,
 }: {
   readonly subject: StatusSubject;
-  readonly command?: string;
-}) => {
-  const next = command ?? readStatus(subject).next;
-
-  return (
-    <FactBlock label="State">
-      <StatusLine command={false} subject={subject} />
-      {next === undefined ? null : <CommandLine command={next} numbered />}
-    </FactBlock>
-  );
-};
-
-const Step = ({
-  command,
-  label,
-}: {
-  readonly command: string;
-  readonly label: string;
 }) => (
-  <div className="flex min-w-0 flex-col gap-1">
-    <p className="text-label text-muted-foreground">{label}</p>
-    <CommandLine command={command} numbered />
-  </div>
+  <FactBlock label="State">
+    <StatusLine subject={subject} />
+  </FactBlock>
 );
 
 const whoMayTake = (ask: Ask) => {
@@ -118,25 +93,90 @@ const whoMayTake = (ask: Ask) => {
     : `Anyone vouched in ${ask.project}, or with a record in its area`;
 };
 
+/**
+ * What a reader can do about a claim from the page: claim an ask open to take,
+ * or release the claim they hold. The page reads and sends; these views only
+ * draw what it hands them.
+ */
+export interface ClaimControl {
+  readonly busy: boolean;
+  /** Why the last claim or release did not go through. */
+  readonly failure?: ReactNode;
+  /** The page, for signing in and coming back to it. */
+  readonly here: string;
+  readonly onClaim: () => void;
+  readonly onRelease: () => void;
+  /** The fork the reader's claim pushes to, once it is read. */
+  readonly remote?: string | undefined;
+  readonly signedIn: boolean;
+}
+
+const ClaimButton = ({ control }: { readonly control: ClaimControl }) =>
+  control.signedIn ? (
+    <Button
+      className="self-start"
+      data-action="claim"
+      disabled={control.busy}
+      onClick={() => {
+        control.onClaim();
+      }}
+      type="button"
+    >
+      {control.busy ? "Claiming…" : "Claim it"}
+    </Button>
+  ) : (
+    <a className={`text-ui self-start ${LINK}`} href={signInHref(control.here)}>
+      Sign in to claim it
+    </a>
+  );
+
 export const TakeItFacts = ({
   ask,
-  platformUrl,
+  control,
 }: {
   readonly ask: Ask;
-  readonly platformUrl: string;
+  readonly control?: ClaimControl | undefined;
 }) => (
   <FactBlock label="Take it">
     <p className="text-ui">{whoMayTake(ask)}</p>
-    <Step
-      command={`git clone ${platformUrl}/${ask.project}.git`}
-      label="Clone the project"
-    />
-    <Step
-      command={`${Brand.cli} claim ${ask.id} --project ${ask.project}`}
-      label="Claim it, in the clone"
-    />
-    <Step command={`${Brand.cli} check`} label="Check before you push" />
+    {control === undefined ? null : (
+      <>
+        <ClaimButton control={control} />
+        {control.failure}
+      </>
+    )}
   </FactBlock>
+);
+
+const YourClaim = ({ control }: { readonly control: ClaimControl }) => (
+  <>
+    {control.remote === undefined ? null : (
+      <div className="flex min-w-0 flex-col gap-1" data-claim-remote="">
+        <p className="text-label text-muted-foreground">
+          Push your answer to your fork
+        </p>
+        <p className="text-ui flex min-h-8 min-w-0 items-center gap-3">
+          <code className="text-mono min-w-0 flex-1 truncate font-mono">
+            {control.remote}
+          </code>
+          <CopyAction label="Copy the fork's address" text={control.remote} />
+        </p>
+      </div>
+    )}
+    <Button
+      className="self-start"
+      data-action="release"
+      disabled={control.busy}
+      onClick={() => {
+        control.onRelease();
+      }}
+      type="button"
+      variant="outline"
+    >
+      {control.busy ? "Releasing…" : "Release it"}
+    </Button>
+    {control.failure}
+  </>
 );
 
 const Holder = ({
@@ -162,11 +202,13 @@ const Holder = ({
 /** No read carries a claim's deadline, so none is shown. */
 export const ClaimFacts = ({
   claimant,
+  control,
   lastPush,
   now,
   viewer,
 }: {
   readonly claimant?: Handle;
+  readonly control?: ClaimControl | undefined;
   readonly lastPush?: AskProgress["lastPush"];
   readonly now: DateTime.Utc;
   readonly viewer?: Handle;
@@ -184,12 +226,7 @@ export const ClaimFacts = ({
           <CodeValue value={lastPush.head} />
         </p>
       )}
-      {yours ? (
-        <>
-          <Step command={`${Brand.cli} check`} label="Check before you push" />
-          <Step command="git push" label="Push your answer" />
-        </>
-      ) : null}
+      {yours && control !== undefined ? <YourClaim control={control} /> : null}
     </FactBlock>
   );
 };
@@ -540,7 +577,7 @@ export const ProvenanceFacts = ({
                 {shown ?? <CodeValue value={value} />}
               </span>
               {shown === undefined ? (
-                <CopyAction command={value} label={`Copy ${label}`} />
+                <CopyAction label={`Copy ${label}`} text={value} />
               ) : (
                 <span aria-hidden="true" className="size-8 shrink-0" />
               )}
