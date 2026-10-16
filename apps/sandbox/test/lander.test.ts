@@ -293,7 +293,9 @@ const claimant = (record: number): Claimant => ({
   vouched: true,
 });
 
-describe("the Lander's git", () => {
+// Each case makes and merges real repos with git, which outlasts the default
+// 5s while every workspace's tests share the machine, as in the Checker.
+describe("the Lander's git", { timeout: 30_000 }, () => {
   describe(merge, () => {
     it.live(
       "merges a clean answer onto main: the tree git's own merge makes, the answer's changes, nothing written to canonical, and the merged commit kept on the fork for the Checker",
