@@ -130,11 +130,16 @@ export class Project extends DurableObject<Env> {
     return this.#watched((room) => room.heard(socket));
   }
 
+  // A close needs neither the env nor the storage, so it never waits on the
+  // runtime: a socket that goes while the object wakes, or while its storage
+  // fails, is let go without failing the close.
+  // oxlint-disable-next-line eslint/class-methods-use-this -- workerd calls a hibernation handler on the instance, and a close needs nothing the instance holds.
   override webSocketClose(
     socket: WebSocket,
     code: number,
-    reason: string
-  ): Promise<void> {
-    return this.#runtime.runPromise(closeEnd(socket, code, reason));
+    reason: string,
+    wasClean: boolean
+  ): void {
+    Effect.runSync(closeEnd(socket, { code, reason, wasClean }));
   }
 }

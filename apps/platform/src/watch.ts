@@ -180,12 +180,27 @@ export const watchRoom = (state: SocketState, shell: ProjectShell) => {
   };
 };
 
+// Codes a close only reports, which `close()` refuses to send.
 const reportOnly: ReadonlySet<number> = new Set([1005, 1006, 1015]);
 
-export const closeEnd = (socket: WebSocket, code: number, reason: string) =>
-  Effect.try(() => {
-    socket.close(reportOnly.has(code) ? 1000 : code, reason);
-  }).pipe(Effect.ignore);
+// A clean close is answered with the peer's code. A socket that went without a
+// close frame (1006) has no peer left to answer: it is let go untouched.
+export const closeEnd = (
+  socket: WebSocket,
+  close: {
+    readonly code: number;
+    readonly reason: string;
+    readonly wasClean: boolean;
+  }
+): Effect.Effect<void> =>
+  close.wasClean
+    ? Effect.try(() => {
+        socket.close(
+          reportOnly.has(close.code) ? 1000 : close.code,
+          close.reason
+        );
+      }).pipe(Effect.ignore)
+    : Effect.void;
 
 interface Upgraded {
   readonly webSocket: WebSocket | null;
