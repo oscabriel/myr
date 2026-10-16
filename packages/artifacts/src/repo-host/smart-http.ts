@@ -52,6 +52,14 @@ const ABSENT = "0".repeat(40);
 // `fetch first` is git's client-side word and never reaches a server.
 const MOVED = ["stale ref", "incorrect old value provided", "non-fast-forward"];
 
+// An older receive-pack (2.47, Debian trixie's) says only that the update
+// failed, and why in a message: the ref's lock found it at another commit.
+const FAILED = "failed to update ref";
+
+const lockFoundMoved = (ref: RefName, said: string) =>
+  said.includes(`cannot lock ref '${ref}': is at `) &&
+  said.includes(" but expected ");
+
 // Artifacts' whole reply to a push it is too busy for: one side-band 3
 // (fatal) packet and no report.
 const BUSY = "artifacts_git_receive_pack_busy";
@@ -304,9 +312,17 @@ export const listRefs = (
 const isMoved = (reason: string) =>
   MOVED.some((moved) => reason.includes(moved));
 
-const refusedAsMoved = ({ cause }: GitFailure, ref: RefName) =>
-  cause instanceof Errors.GitPushError &&
-  isMoved(cause.data.result.refs[ref]?.error ?? "");
+const refusedAsMoved = ({ cause }: GitFailure, ref: RefName, said: string) => {
+  if (!(cause instanceof Errors.GitPushError)) {
+    return false;
+  }
+
+  const reason = cause.data.result.refs[ref]?.error ?? "";
+
+  return (
+    isMoved(reason) || (reason.includes(FAILED) && lockFoundMoved(ref, said))
+  );
+};
 
 /**
  * One ref's compare-and-swap: the push's own ref discovery is the check, so
@@ -323,12 +339,17 @@ const pushOne = (
   Effect.gen(function* () {
     const expected = Option.getOrElse(update.from, () => ABSENT);
     let found = ABSENT;
+    // What the server says beside its report, where an older git names why.
+    let said = "";
 
     const pushed = yield* git((signal) =>
       push({
         ...source,
         force: true,
         http,
+        onMessage: (message) => {
+          said += message;
+        },
         onPrePush: ({ remoteRef }) => {
           found = remoteRef.oid;
 
@@ -355,7 +376,7 @@ const pushOne = (
               )
           ),
           Match.when(
-            (refused) => refusedAsMoved(refused, update.ref),
+            (refused) => refusedAsMoved(refused, update.ref, said),
             () =>
               refsAt(remote, http).pipe(
                 Effect.map((refs) =>
