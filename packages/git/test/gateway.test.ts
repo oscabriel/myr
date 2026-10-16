@@ -9,6 +9,7 @@ import { Effect, Option, Ref } from "effect";
 
 import { Custody } from "../src/custody.ts";
 import { gitRoute } from "../src/gateway.ts";
+import { concat, FLUSH, pkt, utf8 } from "../src/pkt-line.ts";
 import { admitAll, commit, world } from "./world.ts";
 
 const refusing = (ref: string, refusals: readonly Refusal[]) =>
@@ -24,6 +25,32 @@ const artifactsBusy = () =>
   new Response("0024\u0003artifacts_git_receive_pack_busy", {
     headers: { "content-type": "application/x-git-receive-pack-result" },
   });
+
+const band = (channel: number, payload: Uint8Array) =>
+  pkt(concat([Uint8Array.of(channel), payload]));
+
+/** git 2.47's receive-pack when a ref moved under a push: the reason in a message, the status only "failed". */
+const olderGitMoved = (ref: string, tip: string, base: string) =>
+  new Response(
+    concat([
+      band(
+        2,
+        utf8(
+          `error: cannot lock ref '${ref}': is at ${tip} but expected ${base}\n`
+        )
+      ),
+      band(
+        1,
+        concat([
+          pkt(utf8("unpack ok\n")),
+          pkt(utf8(`ng ${ref} failed to update ref\n`)),
+          FLUSH,
+        ])
+      ),
+      FLUSH,
+    ]),
+    { headers: { "content-type": "application/x-git-receive-pack-result" } }
+  );
 
 const remoteLines = (stderr: string) =>
   stderr
@@ -283,6 +310,54 @@ describe("the gateway between git and its upstream", () => {
         const tip = Option.getOrThrow(yield* Ref.get(moved));
 
         expect(pushed.exitCode).toBe(1);
+        expect(remoteLines(pushed.stderr).slice(-3)).toStrictEqual([
+          `remote: StaleBase: main moved to ${tip.slice(0, 7)}, past your base ${base.slice(0, 7)}, while this answer was checked; push again and the platform merges it onto the moved main`,
+          `remote:   next: git push ${Brand.slug} HEAD:main`,
+          "remote:   retryable: yes",
+        ]);
+        expect(pushed.stderr).toContain(
+          " ! [remote rejected] HEAD -> main (StaleBase)"
+        );
+        expect(yield* gitOk(upstream, "rev-parse", "main")).toBe(tip);
+      }).pipe(Effect.provide(NodeServices.layer)),
+    20_000
+  );
+
+  it.live(
+    "names a ref an older git found moved under the push StaleBase, from the reason only its message gives",
+    () =>
+      Effect.gen(function* () {
+        const moved = yield* Ref.make(Option.none<string>());
+
+        const { root, upstream, url } = yield* world(admitAll, (repos) =>
+          Effect.gen(function* () {
+            const base = yield* gitOk(repos.upstream, "rev-parse", "main");
+            const tip = yield* commit(repos.seed, "moved", { "c.txt": "c\n" });
+
+            yield* gitOk(
+              repos.seed,
+              "push",
+              "--quiet",
+              repos.upstream,
+              "HEAD:refs/heads/main"
+            );
+            yield* Ref.set(moved, Option.some(tip));
+
+            return Option.some(olderGitMoved("refs/heads/main", tip, base));
+          })
+        );
+
+        const clone = `${root}/clone`;
+
+        yield* gitOk(root, "clone", "--quiet", url, clone);
+
+        const base = yield* gitOk(clone, "rev-parse", "HEAD");
+
+        yield* commit(clone, "answer", { "b.txt": "b\n" });
+
+        const pushed = yield* git(clone, "push", "origin", "HEAD:main");
+        const tip = Option.getOrThrow(yield* Ref.get(moved));
+
         expect(remoteLines(pushed.stderr).slice(-3)).toStrictEqual([
           `remote: StaleBase: main moved to ${tip.slice(0, 7)}, past your base ${base.slice(0, 7)}, while this answer was checked; push again and the platform merges it onto the moved main`,
           `remote:   next: git push ${Brand.slug} HEAD:main`,

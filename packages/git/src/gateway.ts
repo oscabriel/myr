@@ -123,6 +123,22 @@ const result = (report: Uint8Array) =>
 // git's own receive-pack (2.56).
 const MOVED = new Set(["stale ref", "incorrect old value provided"]);
 
+// An older receive-pack (2.47, Debian trixie's) says only that the update
+// failed, and why in a message: the ref's lock found it at another commit.
+const FAILED = "failed to update ref";
+
+const lockFoundMoved = (ref: string, said: string) =>
+  said.includes(`cannot lock ref '${ref}': is at `) &&
+  said.includes(" but expected ");
+
+const movedUnder = (status: RefStatus, said: string) =>
+  Option.exists(
+    status.ng,
+    (reason) =>
+      MOVED.has(reason) ||
+      (reason === FAILED && lockFoundMoved(status.ref, said))
+  );
+
 // Artifacts' whole reply to a push it is too busy for: one fatal side-band
 // message and no report.
 const BUSY = "artifacts_git_receive_pack_busy";
@@ -152,12 +168,13 @@ const tipsOf = (repo: RepoName) =>
 const translate = (
   repo: RepoName,
   commands: readonly Command[],
-  refs: readonly RefStatus[]
+  refs: readonly RefStatus[],
+  messages: readonly Uint8Array[]
 ) =>
   Effect.gen(function* () {
-    const moved = refs.filter(({ ng }) =>
-      Option.exists(ng, (reason) => MOVED.has(reason))
-    );
+    const decoder = new TextDecoder();
+    const said = messages.map((message) => decoder.decode(message)).join("");
+    const moved = refs.filter((status) => movedUnder(status, said));
 
     if (moved.length === 0) {
       return new Map<string, StaleBase>();
@@ -226,7 +243,7 @@ const answer = (
       );
     }
 
-    const translated = yield* translate(repo, commands, refs);
+    const translated = yield* translate(repo, commands, refs, messages);
 
     if (translated.size > 0) {
       return result(
