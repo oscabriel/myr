@@ -1,6 +1,6 @@
 # The Checker's image: where an answer's checks run, with no credentials
 # (`src/checker/run.ts` runs the phases). Debian trixie slim with
-# Node 24, Bun 1.4.2, git and corepack (pnpm and Yarn, fetched from the npm
+# Node 26, Bun 1.4.2, git and corepack (pnpm and Yarn, fetched from the npm
 # registry during setup), plus the Sandbox SDK's `sandbox-shim`, which `Files`
 # runs. Nothing is copied from the build context, and no token, remote or
 # secret is baked in: the clone goes through the Worker's clone gateway.
@@ -11,11 +11,14 @@
 # Checker points git, Node, Bun, pip and cargo at it through their env vars.
 FROM docker.io/cloudflare/sandbox:1.0.0 AS shim
 FROM docker.io/oven/bun:1.4.2-slim AS bun
-FROM docker.io/library/node:24-trixie-slim
+# Node 26 for `node:ffi`, which a terminal UI's tests load under Node. It no
+# longer ships corepack, so corepack comes from npm, pinned.
+FROM docker.io/library/node:26-trixie-slim
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ca-certificates git \
   && rm -rf /var/lib/apt/lists/* \
+  && npm install -g corepack@0.34.0 \
   && corepack enable
 
 COPY --from=shim /usr/local/bin/sandbox-shim /usr/local/bin/sandbox-shim
