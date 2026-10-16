@@ -412,9 +412,17 @@ const GoogleSays = {
     "Google did not share a verified email for that account. Sign up with an email and password instead.",
 } as const;
 
-// `SameSite=Lax`: Google's redirect back is a cross-site top-level navigation, which a `Strict` cookie misses.
-const GOOGLE_COOKIE = "__Host-google-sign-in";
+/**
+ * One cookie per leg to Google, holding its verifier and named by the head of
+ * its challenge, which the state Google hands back seals: a second Google
+ * sign-in in the same browser (the CLI's beside an agent's, each in its own
+ * tab) never replaces the first's verifier, so neither is told to start again.
+ * Each lapses with its leg, and a finished one is cleared.
+ */
+export const googleCookieName = (challenge: string) =>
+  `__Host-google-sign-in-${challenge.slice(0, 16)}`;
 
+// `SameSite=Lax`: Google's redirect back is a cross-site top-level navigation, which a `Strict` cookie misses.
 const googleCookie = {
   httpOnly: true,
   path: "/",
@@ -422,14 +430,16 @@ const googleCookie = {
   secure: true,
 } as const;
 
-const legDone = (response: HttpServerResponse.HttpServerResponse) =>
-  response.pipe(
-    HttpServerResponse.setCookie(GOOGLE_COOKIE, "", {
-      ...googleCookie,
-      maxAge: 0,
-    }),
-    Effect.orDie
-  );
+// Only this leg's cookie: another in progress in this browser keeps its own.
+const legDone =
+  (challenge: string) => (response: HttpServerResponse.HttpServerResponse) =>
+    response.pipe(
+      HttpServerResponse.setCookie(googleCookieName(challenge), "", {
+        ...googleCookie,
+        maxAge: 0,
+      }),
+      Effect.orDie
+    );
 
 // Carries the challenge of the verifier in this browser's cookie, so only this browser finishes the leg.
 const GoogleLeg = Schema.Struct({
@@ -509,7 +519,7 @@ const toGoogle = (
         status: 302,
       }
     ).pipe(
-      HttpServerResponse.setCookie(GOOGLE_COOKIE, verifier, {
+      HttpServerResponse.setCookie(googleCookieName(challenge), verifier, {
         ...googleCookie,
         maxAge: SIGN_IN_LIFETIME,
       }),
@@ -693,7 +703,7 @@ const cameBack =
 
       const leg = yield* legs.open(cookieKey, query.state);
 
-      const verifier = request.cookies[GOOGLE_COOKIE] ?? "";
+      const verifier = request.cookies[googleCookieName(leg.challenge)] ?? "";
 
       if ((yield* challengeOf(verifier)) !== leg.challenge) {
         return yield* startAgain;
@@ -721,7 +731,7 @@ const cameBack =
           leg.request,
           401,
           confirmed.failure.reason
-        ).pipe(Effect.flatMap(legDone));
+        ).pipe(Effect.flatMap(legDone(leg.challenge)));
       }
 
       const answered = yield* Option.match(Option.fromUndefinedOr(leg.link), {
@@ -729,7 +739,7 @@ const cameBack =
         onSome: (handle) => linkedTo(confirmed.success, handle, leg.request),
       });
 
-      return yield* legDone(answered);
+      return yield* legDone(leg.challenge)(answered);
     });
 
 const PostedProfile = Schema.Struct({

@@ -20,6 +20,7 @@ import { Email } from "../src/auth/accounts.ts";
 import {
   GOOGLE_DISCOVERY,
   googleAuthorizeUrl,
+  googleCookieName,
   GoogleKeysPerIsolate,
   googlePerson,
 } from "../src/auth/google.ts";
@@ -663,8 +664,13 @@ describe("Google sign-in, with a Google OAuth client", () => {
           true,
         ]);
         expect(
-          Option.isSome(world.browser.cookie("__Host-google-sign-in"))
-        ).toBeTruthy();
+          world.browser
+            .cookie(googleCookieName(query.code_challenge ?? ""))
+            .pipe(Option.map((kept) => kept.length))
+        ).toStrictEqual(Option.some(43));
+        expect(googleCookieName(query.code_challenge ?? "")).toMatch(
+          /^__Host-google-sign-in-[\w-]{16}$/u
+        );
       })
   );
 
@@ -764,6 +770,82 @@ const propsFor = (world: GoogleWorld, response: Response) =>
   });
 
 const isPickHandle = (page: Page) => page.html.includes("Set up your profile");
+
+const challengeIn = (response: Response) =>
+  Effect.fromOption(
+    locationOf(response).pipe(
+      Option.flatMap((location) =>
+        Option.fromNullishOr(location.searchParams.get("code_challenge"))
+      )
+    )
+  ).pipe(Effect.orDie);
+
+describe("two Google sign-ins in progress in one browser", () => {
+  it.live(
+    "lets each come back and finish, the first after the second started, each clearing only its own cookie",
+    () =>
+      Effect.gen(function* () {
+        const world = yield* googleWorld();
+
+        const first = yield* continueWithGoogle(world);
+
+        const second = yield* continueWithGoogle(world);
+
+        const [firstCookie, secondCookie] = yield* Effect.forEach(
+          [first, second],
+          (started) => Effect.map(challengeIn(started), googleCookieName)
+        );
+
+        const firstBack = yield* backFromGoogle(world, first, { sub: "1042" });
+
+        const kept = [firstCookie, secondCookie].map((name) =>
+          Option.isSome(world.browser.cookie(name ?? ""))
+        );
+
+        const secondBack = yield* backFromGoogle(world, second, {
+          sub: "2077",
+        });
+
+        expect({
+          firstBack: [firstBack.response.status, isPickHandle(firstBack)],
+          kept,
+          left: Option.isSome(world.browser.cookie(secondCookie ?? "")),
+          secondBack: [secondBack.response.status, isPickHandle(secondBack)],
+        }).toStrictEqual({
+          firstBack: [200, true],
+          kept: [false, true],
+          left: false,
+          secondBack: [200, true],
+        });
+      })
+  );
+
+  it.live(
+    "keeps each verifier HttpOnly, Secure and SameSite=Lax, under a __Host- name",
+    () =>
+      Effect.gen(function* () {
+        const world = yield* googleWorld();
+
+        const started = yield* continueWithGoogle(world);
+
+        const name = googleCookieName(yield* challengeIn(started));
+
+        const line =
+          started.headers
+            .getSetCookie()
+            .find((each) => each.startsWith(`${name}=`)) ?? "";
+
+        expect(
+          line
+            .split(";")
+            .slice(1)
+            .map((attribute) => attribute.trim().toLowerCase())
+            .filter((attribute) => !attribute.startsWith("max-age"))
+            .toSorted()
+        ).toStrictEqual(["httponly", "path=/", "samesite=lax", "secure"]);
+      })
+  );
+});
 
 describe("coming back from Google", () => {
   it.live(
