@@ -53,6 +53,24 @@ const platformWith = (reads: Option.Option<Ref.Ref<number>>) =>
       return sha;
     }).pipe(Effect.orDie, Effect.provide(world));
 
+    // The ids of the first commit's tree and its README's blob, which no commit has.
+    const others = yield* Effect.gen(function* () {
+      const host = yield* RepoHost;
+      const repo = RepoName.make(keyOf(project));
+      const commit = Option.getOrThrow(yield* host.readCommit(repo, first));
+
+      const entries = Option.getOrThrow(
+        yield* host.readTree(repo, commit.tree)
+      );
+
+      return [
+        commit.tree,
+        ...entries.flatMap(({ name, sha }) =>
+          name === "README.md" ? [sha] : []
+        ),
+      ];
+    }).pipe(Effect.orDie, Effect.provide(world));
+
     const cached = yield* Option.match(reads, {
       onNone: () => Effect.succeed(world),
       onSome: (count) =>
@@ -85,7 +103,7 @@ const platformWith = (reads: Option.Option<Ref.Ref<number>>) =>
       )
     );
 
-    return { fetch, first };
+    return { fetch, first, others };
   });
 
 const platform = platformWith(Option.none());
@@ -188,6 +206,30 @@ describe("a project's raw files", () => {
         );
 
         expect(answers).toStrictEqual(answers.map(() => [404, ""]));
+      })
+  );
+
+  it.effect(
+    "is a 404 at a full SHA that names a tree or a blob, which is no commit",
+    () =>
+      Effect.gen(function* () {
+        const { fetch, others } = yield* platform;
+
+        const answers = yield* Effect.forEach(others, (sha) =>
+          Effect.map(
+            get(fetch, `/${project}/raw/${sha}/README.md`),
+            ({ headers, status, text }) => [
+              status,
+              text,
+              headers.get("x-content-type-options"),
+            ]
+          )
+        );
+
+        expect(answers).toStrictEqual([
+          [404, "", "nosniff"],
+          [404, "", "nosniff"],
+        ]);
       })
   );
 

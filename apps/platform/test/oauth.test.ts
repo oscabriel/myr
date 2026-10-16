@@ -47,6 +47,7 @@ import {
   signInWorld,
   redirectUri,
   tokenRequest,
+  verifier,
   webCallback,
   webClient,
 } from "./oauth.fixtures.ts";
@@ -2305,5 +2306,186 @@ describe("a session's lifetime", () => {
 
       expect([before, yield* opened()]).toStrictEqual([true, false]);
     }).pipe(Effect.provide(AccountsMemory.layer))
+  );
+});
+
+// MCP's authorization has a client name its server's own URL as the resource, and
+// some name it only when they trade a code or refresh: the platform is one
+// protected resource, its origin, so a resource anywhere on it names the platform.
+const mcpEndpoint = `${origin}/mcp`;
+
+const TokenOutcome = Schema.Struct({
+  access_token: Schema.optionalKey(Schema.String),
+  error: Schema.optionalKey(Schema.String),
+  refresh_token: Schema.optionalKey(Schema.String),
+});
+
+const outcomeOf = (response: Response) =>
+  Effect.promise(() => response.json()).pipe(
+    Effect.flatMap(Schema.decodeUnknownEffect(TokenOutcome)),
+    Effect.orDie,
+    Effect.map((body) => ({ body, status: response.status }))
+  );
+
+const toToken = (fields: URLSearchParams | Readonly<Record<string, string>>) =>
+  new Request(new URL("/token", origin), {
+    body: new URLSearchParams(fields),
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    method: "POST",
+  });
+
+const tradeCode = (code: string, resource?: string) => {
+  const fields = new URLSearchParams({
+    client_id: cliClient,
+    code,
+    code_verifier: verifier,
+    grant_type: "authorization_code",
+    redirect_uri: redirectUri,
+  });
+
+  if (resource !== undefined) {
+    fields.set("resource", resource);
+  }
+
+  return toToken(fields);
+};
+
+const refresh = (refreshToken: string, resource: string) =>
+  toToken({
+    client_id: cliClient,
+    grant_type: "refresh_token",
+    refresh_token: refreshToken,
+    resource,
+  });
+
+const authorizeNaming = (resource?: string) => {
+  const url = authorizeUrl();
+
+  if (resource !== undefined) {
+    url.searchParams.set("resource", resource);
+  }
+
+  return new Request(url);
+};
+
+// Alice's password sign-in, from an authorize request that names `resource` if given.
+const codeNaming = (world: World, resource?: string) =>
+  Effect.gen(function* () {
+    yield* signUp(world, "alice", alicePassword);
+
+    const form = yield* world.fetch(authorizeNaming(resource)).pipe(
+      Effect.flatMap(read),
+      Effect.flatMap((page) => formIn(page))
+    );
+
+    return yield* world
+      .fetch(
+        post(
+          "/authorize",
+          {
+            csrf: form.csrf,
+            login: "alice",
+            password: alicePassword,
+            request: form.request,
+          },
+          form.cookie
+        )
+      )
+      .pipe(Effect.flatMap(codeIn));
+  });
+
+describe("a resource named on the platform", () => {
+  it.live(
+    "trades a code for a token when the authorize and token requests both name the MCP endpoint",
+    () =>
+      Effect.gen(function* () {
+        const world = yield* signInWorld();
+
+        const code = yield* codeNaming(world, mcpEndpoint);
+
+        const { body, status } = yield* world
+          .fetch(tradeCode(code, mcpEndpoint))
+          .pipe(Effect.flatMap(outcomeOf));
+
+        expect([
+          status,
+          body.error,
+          body.access_token === undefined,
+        ]).toStrictEqual([200, undefined, false]);
+      })
+  );
+
+  it.live(
+    "trades a code granted for the platform's origin at a token request that names the MCP endpoint",
+    () =>
+      Effect.gen(function* () {
+        const world = yield* signInWorld();
+
+        const code = yield* codeNaming(world, origin);
+
+        const { body, status } = yield* world
+          .fetch(tradeCode(code, mcpEndpoint))
+          .pipe(Effect.flatMap(outcomeOf));
+
+        expect([status, body.error]).toStrictEqual([200, undefined]);
+      })
+  );
+
+  it.live(
+    "refreshes a grant at a refresh that names the MCP endpoint, or the origin with or without its slash",
+    () =>
+      Effect.gen(function* () {
+        const world = yield* signInWorld();
+
+        const code = yield* codeNaming(world);
+
+        const traded = yield* world
+          .fetch(tradeCode(code))
+          .pipe(Effect.flatMap(outcomeOf));
+
+        const none: readonly number[] = [];
+
+        const { statuses } = yield* Effect.reduce(
+          [mcpEndpoint, `${origin}/`, origin],
+          () => ({
+            refreshToken: traded.body.refresh_token ?? "",
+            statuses: none,
+          }),
+          (held, resource) =>
+            world.fetch(refresh(held.refreshToken, resource)).pipe(
+              Effect.flatMap(outcomeOf),
+              Effect.map(({ body, status }) => ({
+                refreshToken: body.refresh_token ?? "",
+                statuses: [...held.statuses, status],
+              }))
+            )
+        );
+
+        expect(statuses).toStrictEqual([200, 200, 200]);
+      })
+  );
+
+  it.live("still refuses a resource on another origin", () =>
+    Effect.gen(function* () {
+      const world = yield* signInWorld();
+
+      const code = yield* codeNaming(world);
+
+      const traded = yield* world
+        .fetch(tradeCode(code, "https://elsewhere.test/mcp"))
+        .pipe(Effect.flatMap(outcomeOf));
+
+      const asked = yield* world.fetch(
+        authorizeNaming("https://elsewhere.test")
+      );
+
+      expect([
+        traded.status,
+        traded.body.error,
+        URL.parse(asked.headers.get("location") ?? "")?.searchParams.get(
+          "error"
+        ),
+      ]).toStrictEqual([400, "invalid_target", "invalid_target"]);
+    })
   );
 });

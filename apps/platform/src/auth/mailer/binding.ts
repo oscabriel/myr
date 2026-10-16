@@ -3,6 +3,7 @@
 import { Brand } from "@repo/brand";
 import { Effect, Layer } from "effect";
 
+import { disposed } from "../../adapters/rpc-result.ts";
 import { MailFailed, Mailer } from "../mailer.ts";
 
 export const MAIL_FROM = {
@@ -24,6 +25,6 @@ export const MailerBinding = (binding: SendEmail) =>
               text: mail.text,
               to: mail.to,
             }),
-        }).pipe(Effect.asVoid),
+        }).pipe(Effect.flatMap(disposed), Effect.asVoid),
     })
   );

@@ -31,21 +31,67 @@ const WITHHELD = "<withheld>";
 
 const FRAME = /^\s+at /u;
 
-const withheld = (reason: Cause.Die): Cause.Die => {
-  const [error] = Cause.prettyErrors(Cause.fromReasons([reason]));
+const CONSTANT = /^[A-Z][A-Z0-9_]{0,63}$/u;
+
+/** The defect as Effect prints it: an `Error`, whatever it died with. */
+export const prettyOf = (reason: Cause.Die): Error | undefined =>
+  Cause.prettyErrors(Cause.fromReasons([reason]))[0];
+
+/**
+ * A defect's `code` where it is a constant's name or a whole number
+ * (`INTERNAL_ERROR`, `ENOENT`, `10400`): one of a closed set, which can quote
+ * no repo, path or value, and tells one failure of a port from another.
+ */
+export const codeOf = (reason: Cause.Die): string | number | undefined => {
+  const { defect } = reason;
+
+  if (!Predicate.hasProperty(defect, "code")) {
+    return undefined;
+  }
+
+  const { code } = defect;
+
+  if (Predicate.isString(code)) {
+    return CONSTANT.test(code) ? code : undefined;
+  }
+
+  return Predicate.isNumber(code) && Number.isSafeInteger(code)
+    ? code
+    : undefined;
+};
+
+/** `kept` with the defect's code, where `codeOf` keeps one. */
+export const withCode = (kept: Error, reason: Cause.Die): Error => {
+  const code = codeOf(reason);
+
+  return code === undefined ? kept : Object.assign(kept, { code });
+};
+
+/**
+ * A defect kept by its name, its code where `codeOf` keeps one, and the
+ * frames of its stack alone: an `Error`, so it reads as itself where it is
+ * turned into text, never as `[object Object]`.
+ */
+export const keptByName = (reason: Cause.Die): Error => {
+  const error = prettyOf(reason);
   const name = error?.name ?? "Error";
-  const kept = new Error(WITHHELD);
+  const code = codeOf(reason);
+  const message = code === undefined ? WITHHELD : `${WITHHELD} (${code})`;
+  const kept = new Error(message);
 
   kept.name = name;
   // The frames Effect adds for its spans included; the message, and any
   // cause the defect carries, left out.
   kept.stack = [
-    `${name}: ${WITHHELD}`,
+    `${name}: ${message}`,
     ...(error?.stack ?? "").split("\n").filter((line) => FRAME.test(line)),
   ].join("\n");
 
-  return Cause.makeDieReason(kept);
+  return withCode(kept, reason);
 };
+
+const withheld = (reason: Cause.Die): Cause.Die =>
+  Cause.makeDieReason(keptByName(reason));
 
 /** `cause` with each defect kept by its name and stack frames alone. */
 export const unquoted = <E>(cause: Cause.Cause<E>): Cause.Cause<E> =>

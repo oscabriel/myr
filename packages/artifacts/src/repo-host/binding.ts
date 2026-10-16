@@ -91,7 +91,7 @@ const whileLimited = Schedule.exponential(Duration.millis(250)).pipe(
   )
 );
 
-const attempt = <A>(run: () => Promise<A>) =>
+const tried = <A>(run: () => Promise<A>) =>
   Effect.tryPromise({
     catch: (error) => {
       const message = error instanceof Error ? error.message : String(error);
@@ -107,6 +107,28 @@ const attempt = <A>(run: () => Promise<A>) =>
     },
     try: run,
   }).pipe(Effect.retry(whileLimited));
+
+/**
+ * Workers RPC puts a `Symbol.dispose` on every object a call returns, and
+ * where the service's own result carried a disposer, its call stays open until
+ * that is called: a result left to the garbage collector draws the runtime's
+ * "An RPC result was not disposed properly". Every result but a repo's handle
+ * is data, whole once it arrives, so each is disposed as soon as it lands.
+ */
+const disposed = <A>(result: A): Effect.Effect<A> =>
+  Effect.try(() => {
+    const dispose = Predicate.hasProperty(result, Symbol.dispose)
+      ? result[Symbol.dispose]
+      : undefined;
+
+    if (Predicate.isFunction(dispose)) {
+      dispose.call(result);
+    }
+  }).pipe(Effect.ignore, Effect.as(result));
+
+/** A call whose result is data: the handle alone is kept, by `withRepo`. */
+const attempt = <A>(run: () => Promise<A>) =>
+  tried(run).pipe(Effect.flatMap(disposed));
 
 const threw =
   (code: Code) =>
@@ -209,7 +231,7 @@ const whileMaking = Schedule.min([
 );
 
 const handleOf = (binding: Artifacts, name: RepoName) =>
-  attempt(() => binding.get(name)).pipe(
+  tried(() => binding.get(name)).pipe(
     Effect.retry(whileMaking),
     Effect.catchTag("Thrown", (thrown) => fromArtifactsError(name, thrown))
   );
@@ -340,6 +362,44 @@ const blobOrCommit = (name: RepoName, repo: ArtifactsRepo, id: string) =>
           )
         : Effect.succeed(true)
     )
+  );
+
+/** `readBlob` answers `null` for any other kind, and `readTree` throws for a non-tree. */
+const blobOrTree = (name: RepoName, repo: ArtifactsRepo, id: string) =>
+  call(name, () => repo.readBlob(id)).pipe(
+    Effect.flatMap((blob) =>
+      blob === null
+        ? attempt(() => repo.readTree(id)).pipe(
+            Effect.map((tree) => tree !== null),
+            Effect.catchIf(threw("INTERNAL_ERROR"), () =>
+              Effect.succeed(false)
+            ),
+            Effect.catchTag("Thrown", (thrown) =>
+              fromArtifactsError(name, thrown)
+            )
+          )
+        : Effect.succeed(true)
+    )
+  );
+
+/**
+ * Artifacts throws `INTERNAL_ERROR` for an object that is no commit
+ * (workers-types), as a full SHA in a URL may name a tree or a blob: that is
+ * no commit, as a missing one is.
+ */
+const commitAt = (name: RepoName, repo: ArtifactsRepo, sha: string) =>
+  attempt(() => repo.readCommit(sha)).pipe(
+    Effect.flatMap((found) =>
+      found === null ? Effect.succeedNone : Effect.asSome(commitOf(found))
+    ),
+    Effect.catchIf(threw("INTERNAL_ERROR"), ({ error }) =>
+      blobOrTree(name, repo, sha).pipe(
+        Effect.flatMap((other) =>
+          other ? Effect.succeedNone : Effect.die(error)
+        )
+      )
+    ),
+    Effect.catchTag("Thrown", (thrown) => fromArtifactsError(name, thrown))
   );
 
 /** Artifacts throws `INTERNAL_ERROR` for an object that is no tree (workers-types). */
@@ -529,15 +589,7 @@ const make = (binding: Artifacts) =>
           )
         ),
       readCommit: (name, sha) =>
-        read(name, (repo) =>
-          call(name, () => repo.readCommit(sha)).pipe(
-            Effect.flatMap((found) =>
-              found === null
-                ? Effect.succeedNone
-                : Effect.asSome(commitOf(found))
-            )
-          )
-        ),
+        read(name, (repo) => commitAt(name, repo, sha)),
       readFile: (name, at, path) =>
         read(name, (repo) =>
           call(name, () => repo.readFile({ path, ref: refOf(at) })).pipe(

@@ -44,6 +44,7 @@ import {
   Layer,
   Logger,
   Option,
+  Predicate,
   Redacted,
   Result,
   Schema,
@@ -52,6 +53,7 @@ import {
 import { CheckRunnerSandbox } from "../src/adapters/check-runner-sandbox.ts";
 import type { SandboxBinding } from "../src/adapters/check-runner-sandbox.ts";
 import { LanderSandbox } from "../src/adapters/lander-sandbox.ts";
+import type { SandboxMethod } from "../src/adapters/sandbox-credentials.ts";
 
 const project = ProjectName.make("alice/datekit");
 
@@ -735,5 +737,69 @@ describe("a sandbox job's tokens", () => {
       expect(leaked(JSON.stringify(exit), minted)).toStrictEqual([]);
       expect(leaked(JSON.stringify(lines), minted)).toStrictEqual([]);
     })
+  );
+});
+
+// The runtime gives each object an RPC call returns a disposer of its own,
+// which holds the far side's call open until it is called.
+const recorded =
+  <WI, X>(
+    disposals: string[],
+    method: SandboxMethod,
+    send: (wire: WI) => Promise<X>
+  ) =>
+  (wire: WI): Promise<X> =>
+    Effect.runPromise(
+      Effect.tap(
+        Effect.promise(() => send(wire)),
+        (reply) =>
+          Effect.sync(() => {
+            if (Predicate.isObjectKeyword(reply)) {
+              Object.defineProperty(reply, Symbol.dispose, {
+                enumerable: false,
+                value: () => {
+                  disposals.push(method);
+                },
+              });
+            }
+          })
+      )
+    );
+
+describe("a sandbox job's result", () => {
+  it.effect(
+    "is disposed once it is read, so no job holds the sandbox's call open",
+    () =>
+      Effect.gen(function* () {
+        const disposals: string[] = [];
+
+        const ok = yield* world({
+          binding: (sandbox) => ({
+            bundleRules: recorded(
+              disposals,
+              "bundleRules",
+              sandbox.bundleRules
+            ),
+            check: recorded(disposals, "check", sandbox.check),
+            compose: recorded(disposals, "compose", sandbox.compose),
+            land: recorded(disposals, "land", sandbox.land),
+            merge: recorded(disposals, "merge", sandbox.merge),
+          }),
+        });
+
+        const exits = yield* Effect.forEach(everyJob(ok), (job) =>
+          Effect.exit(job)
+        );
+
+        expect(exits.every(Exit.isSuccess)).toBeTruthy();
+        expect(disposals.toSorted()).toStrictEqual([
+          "bundleRules",
+          "check",
+          "compose",
+          "land",
+          "land",
+          "merge",
+        ]);
+      })
   );
 });

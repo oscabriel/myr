@@ -304,7 +304,7 @@ const listedFrom = (listings: Ref.Ref<readonly ProjectListing[]>) =>
 
 describe("the agent skills index, kept by each project's landed commit", () => {
   it.effect(
-    "reads each skill once while no main moves, wakes no project while no listed project lands, and reads again only the skill whose main moved",
+    "reads each skill once while no main moves, wakes no project while no listed project lands, and after a landing wakes only the project that landed and reads again only its skill",
     () =>
       Effect.gen(function* () {
         const counts = yield* Ref.make({ files: 0, refs: 0 });
@@ -404,7 +404,7 @@ describe("the agent skills index, kept by each project's landed commit", () => {
           }).toStrictEqual({
             afterMove: ["Answer any one of datekit's asks."],
             once: ["Answer one of datekit's asks."],
-            readAfterMove: { files: 1, heads: 2, refs: 0 },
+            readAfterMove: { files: 1, heads: 1, refs: 0 },
             readOnce: { files: 2, heads: 2, refs: 0 },
             readTwice: { files: 0, heads: 0, refs: 0 },
             twice: ["Answer one of datekit's asks."],

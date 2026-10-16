@@ -2,11 +2,19 @@ import { describe, expect, it } from "@effect/vitest";
 import { AnswerRuns } from "@repo/project/answer-runs";
 import type { AnswerQueue } from "@repo/project/answer-runs";
 import { ProjectGenerator } from "@repo/project/generated";
-import { RequestId } from "@repo/protocol/ids";
+import { keyOf, RequestId } from "@repo/protocol/ids";
 import { UnknownProject } from "@repo/protocol/refusal";
 import { advanceTo, at } from "@repo/testkit/clock";
 import { untouchable } from "@repo/testkit/untouchable";
-import { Context, DateTime, Deferred, Effect, Layer, Option } from "effect";
+import {
+  Context,
+  DateTime,
+  Deferred,
+  Effect,
+  Exit,
+  Layer,
+  Option,
+} from "effect";
 
 import { AnswerRunsWorkflow } from "../src/adapters/answer-runs-workflow.ts";
 import type { AnswerWorkflow } from "../src/adapters/answer-runs-workflow.ts";
@@ -336,6 +344,53 @@ describe("the Project DO class", () => {
       "webSocketMessage",
     ]);
   });
+
+  it.effect(
+    "lets a watch socket go without its runtime: a close that comes while the object's storage cannot be opened neither throws nor rejects",
+    () =>
+      Effect.gen(function* () {
+        const builds: Promise<unknown>[] = [];
+
+        const closes: (readonly [number | undefined, string | undefined])[] =
+          [];
+
+        // The runtime is built over storage that fails, as one being reset does.
+        const state = untouchable<DurableObjectState>("DurableObjectState", {
+          blockConcurrencyWhile: <T>(build: () => Promise<T>) => {
+            const building = build();
+
+            builds.push(building);
+
+            return building;
+          },
+          id: untouchable<DurableObjectId>("DurableObjectId", {
+            name: keyOf(project),
+          }),
+          storage: untouchable<DurableObjectStorage>("storage"),
+        });
+
+        const socket = untouchable<WebSocket>("WebSocket", {
+          close: (code?: number, reason?: string) => {
+            closes.push([code, reason]);
+          },
+        });
+
+        const object = new Project(state, fakeEnv());
+
+        const built = yield* Effect.exit(
+          Effect.tryPromise(() => Promise.all(builds))
+        );
+
+        // A close that waited on this runtime would reject, unhandled, and fail the run.
+        object.webSocketClose(socket, 1006, "", false);
+        object.webSocketClose(socket, 1000, "bye", true);
+
+        expect({ built: Exit.isFailure(built), closes }).toStrictEqual({
+          built: true,
+          closes: [[1000, "bye"]],
+        });
+      })
+  );
 
   it.effect(
     "runs on ports that carry the platform's generator, so a landing that changes the config is followed",

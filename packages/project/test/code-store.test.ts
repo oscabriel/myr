@@ -1,10 +1,20 @@
 import { describe, expect, it } from "@effect/vitest";
 import { RepoHostMemory } from "@repo/artifacts/repo-host/memory";
 import { RepoPath } from "@repo/protocol/ids";
-import { Effect, Exit, Layer, Logger, Option } from "effect";
+import {
+  Deferred,
+  Effect,
+  Exit,
+  Fiber,
+  Layer,
+  Logger,
+  Option,
+  References,
+} from "effect";
+import { TestClock } from "effect/testing";
 
 import { CodeStore } from "../src/code-store.ts";
-import { CodeStoreR2 } from "../src/code-store/binding.ts";
+import { CodeStoreR2, WRITE_HELD } from "../src/code-store/binding.ts";
 import type { BucketLike, EdgeCacheLike } from "../src/code-store/binding.ts";
 import { CodeStoreCounts, CodeStoreMemory } from "../src/code-store/memory.ts";
 import { fileOf, treeOf } from "../src/code.ts";
@@ -102,6 +112,49 @@ const countedBucket = (bucket: BucketLike) => {
 
   return { bucket: counted, got };
 };
+
+/** A bucket whose every put is written down. */
+const writtenBucket = (bucket: BucketLike) => {
+  const written: string[] = [];
+
+  const counted: BucketLike = {
+    ...bucket,
+    put: (name, value) => {
+      written.push(name);
+
+      return bucket.put(name, value);
+    },
+  };
+
+  return { bucket: counted, written };
+};
+
+/** A bucket whose puts wait until `open` is done, so two can be under way at once. */
+const heldBucket = (bucket: BucketLike) =>
+  Effect.map(Deferred.make<boolean>(), (open) => {
+    const { bucket: counted, written } = writtenBucket({
+      ...bucket,
+      put: (name, value) =>
+        Effect.runPromise(Deferred.await(open)).then(() =>
+          bucket.put(name, value)
+        ),
+    });
+
+    return { bucket: counted, open, written };
+  });
+
+/** Two reads that keep one key at once, the second asking while the first's write is under way. */
+const twoPutsAtOnce = (open: Deferred.Deferred<boolean>) =>
+  Effect.gen(function* () {
+    const put = Effect.flatMap(CodeStore, (store) => store.put(key, "{}"));
+    const first = yield* Effect.forkChild(put);
+    const second = yield* Effect.forkChild(put);
+
+    yield* Effect.yieldNow;
+    yield* Deferred.succeed(open, true);
+    yield* Fiber.join(first);
+    yield* Fiber.join(second);
+  });
 
 const logged = <A, E>(effect: Effect.Effect<A, E>) =>
   Effect.gen(function* () {
@@ -258,6 +311,135 @@ describe("the code store", () => {
       )
   );
 
+  it.effect(
+    "over R2, writes a key once while a write of it is under way, as R2 refuses a second write to one object",
+    () =>
+      Effect.gen(function* () {
+        const held = yield* heldBucket(bucketOf({}));
+
+        const got = yield* Effect.gen(function* () {
+          yield* twoPutsAtOnce(held.open);
+
+          return yield* Effect.flatMap(CodeStore, (store) => store.get(key));
+        }).pipe(Effect.provide(CodeStoreR2(held.bucket)));
+
+        expect({ got, written: held.written }).toStrictEqual({
+          got: Option.some("{}"),
+          written: [key],
+        });
+      })
+  );
+
+  it.effect(
+    "over R2 behind the colo's cache, keeps a key two reads keep at once in each store once",
+    () =>
+      Effect.gen(function* () {
+        const held = yield* heldBucket(bucketOf({}));
+        const front = edgeOf({});
+
+        yield* twoPutsAtOnce(held.open).pipe(
+          Effect.provide(CodeStoreR2(held.bucket, front.edge))
+        );
+
+        expect({
+          kept: [...front.entries.values()],
+          written: held.written,
+        }).toStrictEqual({ kept: ["{}"], written: [key] });
+      })
+  );
+
+  it.effect(
+    "over R2, writes a key it wrote lately no more, until the hold lapses",
+    () =>
+      Effect.gen(function* () {
+        const { bucket, written } = writtenBucket(bucketOf({}));
+        const put = Effect.flatMap(CodeStore, (store) => store.put(key, "{}"));
+
+        yield* Effect.gen(function* () {
+          yield* put;
+          yield* put;
+          yield* TestClock.adjust(WRITE_HELD);
+          yield* put;
+        }).pipe(Effect.provide(CodeStoreR2(bucket)));
+
+        expect(written).toStrictEqual([key, key]);
+      })
+  );
+
+  it.effect("over R2, writes a key again once a write of it failed", () =>
+    Effect.gen(function* () {
+      const objects = bucketOf({});
+      let refused = false;
+
+      const once: BucketLike = {
+        ...objects,
+        put: (name, value) => {
+          if (!refused) {
+            refused = true;
+
+            return Promise.reject(new Error("R2 is down"));
+          }
+
+          return objects.put(name, value);
+        },
+      };
+
+      const { bucket, written } = writtenBucket(once);
+
+      const got = yield* Effect.gen(function* () {
+        const store = yield* CodeStore;
+
+        yield* store.put(key, "{}");
+        yield* store.put(key, "{}");
+
+        return yield* store.get(key);
+      }).pipe(Effect.provide(CodeStoreR2(bucket)));
+
+      expect({ got, written }).toStrictEqual({
+        got: Option.some("{}"),
+        written: [key, key],
+      });
+    })
+  );
+
+  it.effect(
+    "over R2, names a refused write's failure by its name and code, never its text",
+    () =>
+      Effect.gen(function* () {
+        const refusal = Object.assign(
+          new Error("put: a refusal whose text is the bucket's (10058)"),
+          { code: 10_058, name: "R2Error" }
+        );
+
+        const refusing: BucketLike = {
+          ...bucketOf({}),
+          put: () => Promise.reject(refusal),
+        };
+
+        const lines: { message: unknown; annotations: unknown }[] = [];
+
+        const capture = Logger.make(({ fiber, message }) => {
+          lines.push({
+            annotations: fiber.getRef(References.CurrentLogAnnotations),
+            message,
+          });
+        });
+
+        yield* Effect.flatMap(CodeStore, (store) => store.put(key, "{}")).pipe(
+          Effect.provide(
+            Layer.merge(CodeStoreR2(refusing), Logger.layer([capture]))
+          )
+        );
+
+        expect(lines).toStrictEqual([
+          {
+            annotations: { code: 10_058, failure: "R2Error" },
+            message: [`the code store could not keep ${key}`],
+          },
+        ]);
+      })
+  );
+
   it.effect.each([
     ["the default", Layer.empty],
     ["memory", CodeStoreMemory],
@@ -309,6 +491,33 @@ describe("the code reads over the code store", () => {
 
         expect(exit).toStrictEqual(Exit.succeed(plain));
         expect(messages.length).toBeGreaterThan(0);
+      })
+  );
+
+  it.effect(
+    "keep each object once over R2 when a page's reads of one revision run at once",
+    () =>
+      Effect.gen(function* () {
+        const { bucket, written } = writtenBucket(bucketOf({}));
+
+        yield* Effect.gen(function* () {
+          const { code } = yield* datekit;
+
+          // Each read is a request of its own, as a page's are: none shares another's view.
+          yield* Effect.all(
+            [
+              treeOf(code, Option.none(), Option.none()),
+              treeOf(code, Option.none(), Option.none()),
+              fileOf(code, Option.none(), RepoPath.make("README.md")),
+            ],
+            { concurrency: "unbounded" }
+          );
+        }).pipe(
+          Effect.provide(Layer.merge(RepoHostMemory, CodeStoreR2(bucket)))
+        );
+
+        expect(written.length).toBeGreaterThan(0);
+        expect(written).toStrictEqual([...new Set(written)]);
       })
   );
 

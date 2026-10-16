@@ -582,6 +582,49 @@ const make = (options: {
         )
       );
 
+    const treeOrBlob = (name: RepoName, id: ObjectId) =>
+      optional(
+        name,
+        httpGet(`${repoPath(name)}/blob/${id}`).pipe(Effect.flatMap(bytesOf))
+      ).pipe(
+        Effect.flatMap((blob) =>
+          Option.isSome(blob)
+            ? Effect.succeed(true)
+            : httpGet(`${repoPath(name)}/tree/${id}`).pipe(
+                Effect.flatMap(accepted),
+                Effect.as(true),
+                Effect.catchTag("Refused", (refused) =>
+                  is("NOT_FOUND", "INTERNAL_ERROR")(refused)
+                    ? Effect.succeed(false)
+                    : Effect.die(refused)
+                )
+              )
+        )
+      );
+
+    // Artifacts answers 500 for an object that is no commit, as a full SHA a
+    // reader hands in (a raw URL, a code read's `at`) may name a tree or a blob.
+    const readCommit = (name: RepoName, sha: CommitSha) =>
+      httpGet(`${repoPath(name)}/commit/${sha}`).pipe(
+        Effect.flatMap(decoded(CommitReply)),
+        Effect.map(({ result }) => Option.some(commitOf(result))),
+        Effect.catchTag("Refused", (refused) =>
+          Match.value(refused).pipe(
+            Match.when(is("NOT_FOUND"), () =>
+              remoteOf(name).pipe(Effect.as(Option.none<Commit>()))
+            ),
+            Match.when(is("INTERNAL_ERROR"), () =>
+              treeOrBlob(name, ObjectId.make(sha)).pipe(
+                Effect.flatMap((other) =>
+                  other ? Effect.succeedNone : Effect.die(refused)
+                )
+              )
+            ),
+            Match.orElse(Effect.die)
+          )
+        )
+      );
+
     const readTree = (name: RepoName, tree: ObjectId) =>
       httpGet(`${repoPath(name)}/tree/${tree}`).pipe(
         Effect.flatMap(decoded(TreeReply)),
@@ -709,14 +752,7 @@ const make = (options: {
             Effect.flatMap(bytesOf)
           )
         ),
-      readCommit: (name, sha) =>
-        optional(
-          name,
-          httpGet(`${repoPath(name)}/commit/${sha}`).pipe(
-            Effect.flatMap(decoded(CommitReply)),
-            Effect.map(({ result }) => commitOf(result))
-          )
-        ),
+      readCommit,
       readFile: (name, at, path) =>
         optional(
           name,

@@ -17,6 +17,7 @@ import {
   FileSystem,
   Layer,
   Option,
+  Predicate,
   Redacted,
   Ref,
 } from "effect";
@@ -95,6 +96,14 @@ const olderGitMovedReply = (ref: RefName, tip: string, base: string) =>
     ]),
     { headers: { "content-type": "application/x-git-receive-pack-result" } }
   );
+
+/** What the binding throws for an unexpected read, as workers-types gives it. */
+const internalError = () =>
+  Object.assign(new Error("An internal error occurred."), {
+    code: "INTERNAL_ERROR",
+    name: "ArtifactsError",
+    numericCode: 10_400,
+  });
 
 const busyReply = () =>
   new Response(fatal("artifacts_git_receive_pack_busy\n"), {
@@ -604,15 +613,87 @@ describe("the Workers binding's surprises, typed", () => {
 
               return Option.isNone(tree) &&
                 (Option.isSome(blob) || Option.isSome(commit))
-                ? yield* Effect.die(
-                    Object.assign(new Error("An internal error occurred."), {
-                      code: "INTERNAL_ERROR",
-                      name: "ArtifactsError",
-                      numericCode: 10_400,
-                    })
-                  )
+                ? yield* Effect.die(internalError())
                 : tree;
             }),
+        }),
+      }
+    )
+  );
+
+  // A full SHA in a raw URL or a code read may name a tree or a blob, which
+  // the binding's `readCommit` throws `INTERNAL_ERROR` for, as its `readTree`
+  // does for a commit or a blob.
+  it.live("reads no commit at a tree's id or a blob's id", () =>
+    within(
+      () =>
+        Effect.gen(function* () {
+          const repos = yield* RepoHost;
+          const name = RepoName.make("kinds");
+          const { first } = yield* seeded(name);
+
+          const commit = yield* repos
+            .readCommit(name, first)
+            .pipe(Effect.orDie);
+
+          const tree = Option.getOrThrow(
+            Option.map(commit, (read) => read.tree)
+          );
+
+          const entries = yield* repos.readTree(name, tree).pipe(Effect.orDie);
+          const blob = Option.getOrThrow(entries)[0]?.sha ?? tree;
+
+          expect(blob).not.toBe(tree);
+          expect(
+            yield* Effect.exit(repos.readCommit(name, CommitSha.make(tree)))
+          ).toStrictEqual(Exit.succeed(Option.none()));
+          expect(
+            yield* Effect.exit(repos.readCommit(name, CommitSha.make(blob)))
+          ).toStrictEqual(Exit.succeed(Option.none()));
+        }),
+      {
+        wrap: (host) => ({
+          ...host,
+          readCommit: (repo, sha) =>
+            Effect.gen(function* () {
+              const tree = yield* host.readTree(repo, ObjectId.make(sha));
+              const blob = yield* host.readBlob(repo, ObjectId.make(sha));
+
+              return Option.isSome(tree) || Option.isSome(blob)
+                ? yield* Effect.die(internalError())
+                : yield* host.readCommit(repo, sha);
+            }),
+          readTree: (repo, sha) =>
+            Effect.gen(function* () {
+              const tree = yield* host.readTree(repo, sha);
+              const blob = yield* host.readBlob(repo, sha);
+
+              return Option.isNone(tree) && Option.isSome(blob)
+                ? yield* Effect.die(internalError())
+                : tree;
+            }),
+        }),
+      }
+    )
+  );
+
+  it.live("still dies where the object it could not read is none of them", () =>
+    within(
+      () =>
+        Effect.gen(function* () {
+          const repos = yield* RepoHost;
+          const name = RepoName.make("failing");
+          const { first } = yield* seeded(name);
+
+          const read = yield* Effect.exit(repos.readCommit(name, first));
+
+          expect(Exit.hasDies(read)).toBeTruthy();
+        }),
+      {
+        wrap: (host) => ({
+          ...host,
+          readCommit: () => Effect.die(internalError()),
+          readTree: () => Effect.die(internalError()),
         }),
       }
     )
@@ -802,6 +883,133 @@ describe("tokens and handles the binding takes", () => {
           expect(counts.disposed).toBe(counts.gets);
         })
       )
+  );
+});
+
+// The runtime gives each object an RPC call returns a disposer of its own,
+// which holds the far side's call open until it is called. This wrapper gives
+// one to every object the binding returns, a repo's handle aside, and records
+// each one given and each one called.
+const disposing = (binding: Artifacts) => {
+  const given: string[] = [];
+  const disposals: string[] = [];
+
+  const marked = <X>(method: string, call: () => Promise<X>): Promise<X> =>
+    Effect.runPromise(
+      Effect.map(Effect.promise(call), (result) => {
+        if (!Predicate.isObjectKeyword(result)) {
+          return result;
+        }
+
+        given.push(method);
+
+        return Object.defineProperty(result, Symbol.dispose, {
+          configurable: true,
+          enumerable: false,
+          value: () => {
+            disposals.push(method);
+          },
+        });
+      })
+    );
+
+  const wrapped: Artifacts = {
+    ...binding,
+    create: (name, opts) => marked("create", () => binding.create(name, opts)),
+    get: (name) =>
+      Effect.runPromise(
+        Effect.map(
+          Effect.promise(() => binding.get(name)),
+          (repo): ArtifactsRepo => ({
+            ...repo,
+            createToken: (scope, ttl) =>
+              marked("createToken", () => repo.createToken(scope, ttl)),
+            fork: (forked, opts) =>
+              marked("fork", () => repo.fork(forked, opts)),
+            info: () => marked("info", () => repo.info()),
+            listTokens: () => marked("listTokens", () => repo.listTokens()),
+            log: (opts) => marked("log", () => repo.log(opts)),
+            readBlob: (hash) => marked("readBlob", () => repo.readBlob(hash)),
+            readCommit: (hash) =>
+              marked("readCommit", () => repo.readCommit(hash)),
+            readFile: (args) => marked("readFile", () => repo.readFile(args)),
+            readTree: (hash) => marked("readTree", () => repo.readTree(hash)),
+            revokeToken: (token) =>
+              marked("revokeToken", () => repo.revokeToken(token)),
+          })
+        )
+      ),
+    import: (params) => marked("import", () => binding.import(params)),
+  };
+
+  return { disposals, given, wrapped };
+};
+
+describe("results the binding gives back", () => {
+  it.live(
+    "are each disposed once read, so no call holds Artifacts' side open",
+    () =>
+      Effect.gen(function* () {
+        const made = yield* world();
+        const { disposals, given, wrapped } = disposing(made.binding);
+
+        yield* Effect.gen(function* () {
+          const repos = yield* RepoHost;
+          const name = RepoName.make("results");
+          const { first } = yield* seeded(name);
+          const at = Revision.Branch({ name: BranchName.make("main") });
+
+          yield* repos.refs(name).pipe(Effect.orDie);
+          yield* repos.remote(name).pipe(Effect.orDie);
+          yield* repos
+            .readFile(name, at, RepoPath.make("a.txt"))
+            .pipe(Effect.orDie);
+          yield* repos.log(name, at, 5).pipe(Effect.orDie);
+
+          const commit = yield* repos
+            .readCommit(name, first)
+            .pipe(Effect.orDie);
+
+          const tree = Option.getOrThrow(
+            Option.map(commit, (read) => read.tree)
+          );
+
+          const entries = yield* repos.readTree(name, tree).pipe(Effect.orDie);
+          const blob = Option.getOrThrow(entries)[0]?.sha ?? tree;
+
+          yield* repos.readBlob(name, blob).pipe(Effect.orDie);
+
+          const token = yield* repos
+            .mintToken(name, "read", Duration.minutes(5))
+            .pipe(Effect.orDie);
+
+          yield* repos.revokeToken(name, token.id).pipe(Effect.orDie);
+          yield* repos
+            .fork(name, RepoName.make("results--fork"))
+            .pipe(Effect.orDie);
+        }).pipe(
+          Effect.provide(
+            RepoHostBinding.layer(wrapped).pipe(
+              Layer.provide(Layer.succeed(Fetch, made.fetch))
+            )
+          )
+        );
+
+        expect(new Set(given)).toStrictEqual(
+          new Set([
+            "create",
+            "createToken",
+            "fork",
+            "info",
+            "log",
+            "readBlob",
+            "readCommit",
+            "readFile",
+            "readTree",
+          ])
+        );
+        expect(disposals.toSorted()).toStrictEqual(given.toSorted());
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
   );
 });
 

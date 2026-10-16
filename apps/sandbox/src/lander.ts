@@ -18,6 +18,7 @@ import type { Box } from "./box.ts";
 import { SdkBox } from "./box/sdk.ts";
 import { answerJob } from "./job.ts";
 import { bundleRules, compose, land, merge } from "./lander/run.ts";
+import { passedOn } from "./rpc-result.ts";
 
 export const landImage = "land";
 
@@ -144,19 +145,23 @@ const landerOf = (
 export const runMerge = (
   env: Landers,
   wire: typeof MergeWire.Encoded
-): Promise<typeof MergeExit.Encoded> => landerOf(env, wire).merge(wire);
+): Promise<typeof MergeExit.Encoded> =>
+  passedOn(() => landerOf(env, wire).merge(wire));
 
 export const runLand = (
   env: Landers,
   wire: typeof LandWire.Encoded
-): Promise<typeof LandExit.Encoded> => landerOf(env, wire).land(wire);
+): Promise<typeof LandExit.Encoded> =>
+  passedOn(() => landerOf(env, wire).land(wire));
 
 export const runCompose = (
   env: Landers,
   wire: typeof ComposeWire.Encoded
-): Promise<typeof ComposeExit.Encoded> => landerOf(env, wire).compose(wire);
+): Promise<typeof ComposeExit.Encoded> =>
+  passedOn(() => landerOf(env, wire).compose(wire));
 
 export const runBundleRules = (
   env: Landers,
   wire: typeof BundleWire.Encoded
-): Promise<typeof BundleExit.Encoded> => landerOf(env, wire).bundleRules(wire);
+): Promise<typeof BundleExit.Encoded> =>
+  passedOn(() => landerOf(env, wire).bundleRules(wire));

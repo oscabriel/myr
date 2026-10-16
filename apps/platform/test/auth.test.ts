@@ -106,6 +106,23 @@ describe("discovering how to sign in", () => {
       })
   );
 
+  // RFC 9728 §3.1 has a client try the MCP endpoint's own document first; with
+  // none there it reads the origin's, so it names the resource /token takes.
+  it.effect(
+    "keeps no document for the MCP endpoint alone, so a client reads the origin's",
+    () =>
+      Effect.gen(function* () {
+        const { fetch } = yield* served(Layer.mergeAll(noProjects, sessions));
+
+        const responses = yield* Effect.forEach(
+          [`${metadataUrl}/mcp`, `${metadataUrl}/mcp/public`],
+          (url) => fetch(new Request(url))
+        );
+
+        expect(responses.map(({ status }) => status)).toStrictEqual([404, 404]);
+      })
+  );
+
   it.effect(
     "never turns away /health or the sign-in paths, whatever credential they carry",
     () =>

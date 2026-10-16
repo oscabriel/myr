@@ -10,6 +10,7 @@ import {
   noAskAt,
 } from "../../../../features/ask/markdown.ts";
 import { serverClient } from "../../../../server/client.ts";
+import { keptPage } from "../../../../server/kept-pages.ts";
 
 export interface AskParams {
   readonly ask: string;
@@ -54,7 +55,9 @@ export const askMarkdownHandler =
 export const Route = createFileRoute("/$owner/$project/asks/{$ask}.md")({
   server: {
     handlers: {
-      GET: askMarkdownHandler((request) => serverClient(env, request)),
+      GET: keptPage(
+        askMarkdownHandler((request) => serverClient(env, request))
+      ),
     },
   },
 });
