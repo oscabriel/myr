@@ -1,4 +1,12 @@
-import { Data, Effect, Layer, Option } from "effect";
+import {
+  Clock,
+  Data,
+  Duration,
+  Effect,
+  Layer,
+  Option,
+  Predicate,
+} from "effect";
 
 import { CodeStore, fittingKey } from "../code-store.ts";
 import type { CodeStoreApi } from "../code-store.ts";
@@ -19,6 +27,78 @@ export interface EdgeCacheLike {
   readonly match: (url: string) => Promise<Response | undefined>;
   readonly put: (url: string, response: Response) => Promise<void>;
 }
+
+/**
+ * How long a write this isolate started holds its key: R2 refuses a second
+ * write to one object while a first is under way, and a page's reads, each
+ * its own request, ask for the same commit at once. A write that never ends
+ * (its request cancelled where it stands) lets its key go when the hold lapses.
+ */
+export const WRITE_HELD = Duration.minutes(1);
+
+/** The most keys held at once; past it, the oldest hold is let go. */
+export const WRITES_HELD = 4096;
+
+/**
+ * The keys this isolate wrote lately, and when. What a key names never
+ * changes, so a write the hold skips is the one already under way or done; a
+ * failed write lets its key go at once, for the next read to keep.
+ */
+const writeHolds = () => {
+  const started = new Map<string, number>();
+  const held = Duration.toMillis(WRITE_HELD);
+
+  return {
+    let: (key: string) =>
+      Effect.sync(() => {
+        started.delete(key);
+      }),
+    take: (key: string) =>
+      Effect.map(Clock.currentTimeMillis, (now) => {
+        const since = started.get(key);
+
+        if (since !== undefined && now - since < held) {
+          return false;
+        }
+
+        started.delete(key);
+        started.set(key, now);
+
+        if (started.size > WRITES_HELD) {
+          const [oldest] = started.keys();
+
+          if (oldest !== undefined) {
+            started.delete(oldest);
+          }
+        }
+
+        return true;
+      }),
+  };
+};
+
+type WriteHolds = ReturnType<typeof writeHolds>;
+
+/**
+ * R2's failure, logged with its name and numeric code (10058 is a write
+ * refused while another to the object is under way). Never its text, and
+ * never the error itself, which a Worker's log line would carry as an empty
+ * object.
+ */
+const unreached = (said: string, cause: unknown) => {
+  const warned = Effect.logWarning(said).pipe(
+    Effect.annotateLogs(
+      "failure",
+      Predicate.hasProperty(cause, "name") && Predicate.isString(cause.name)
+        ? cause.name
+        : "Unknown"
+    )
+  );
+
+  return Predicate.hasProperty(cause, "code") && Predicate.isNumber(cause.code)
+    ? Effect.annotateLogs(warned, "code", cause.code)
+    : warned;
+};
 
 class CodeStoreUnreachable extends Data.TaggedError("CodeStoreUnreachable")<{
   readonly cause: unknown;
@@ -67,11 +147,11 @@ const edgeReads = (edge: () => EdgeCacheLike) => ({
     ),
 });
 
-/**
- * R2, with the colo's cache in front when one is given: a few milliseconds on
- * a hit where R2 takes a hundred, which a cold isolate's chain of reads feels.
- */
-export const CodeStoreR2 = (bucket: BucketLike, edge?: () => EdgeCacheLike) => {
+const storeOver = (
+  bucket: BucketLike,
+  holds: WriteHolds,
+  edge?: () => EdgeCacheLike
+): CodeStoreApi => {
   const front = edge === undefined ? undefined : edgeReads(edge);
 
   const fromBucket = (fit: string) =>
@@ -83,7 +163,7 @@ export const CodeStoreR2 = (bucket: BucketLike, edge?: () => EdgeCacheLike) => {
       ),
       Effect.catchTag("CodeStoreUnreachable", ({ cause }) =>
         Effect.as(
-          Effect.logWarning(`the code store could not read ${fit}`, cause),
+          unreached(`the code store could not read ${fit}`, cause),
           Option.none<string>()
         )
       )
@@ -93,8 +173,12 @@ export const CodeStoreR2 = (bucket: BucketLike, edge?: () => EdgeCacheLike) => {
     reach(() => bucket.put(fit, value)).pipe(
       Effect.asVoid,
       Effect.catchTag("CodeStoreUnreachable", ({ cause }) =>
-        Effect.logWarning(`the code store could not keep ${fit}`, cause)
-      )
+        Effect.andThen(
+          holds.let(fit),
+          unreached(`the code store could not keep ${fit}`, cause)
+        )
+      ),
+      Effect.onInterrupt(() => holds.let(fit))
     );
 
   const store: CodeStoreApi = {
@@ -118,15 +202,33 @@ export const CodeStoreR2 = (bucket: BucketLike, edge?: () => EdgeCacheLike) => {
             )
       ),
     put: (key, value) =>
-      Effect.flatMap(fittingKey(key), (fit) =>
-        front === undefined
+      Effect.gen(function* () {
+        const fit = yield* fittingKey(key);
+
+        if (!(yield* holds.take(fit))) {
+          return;
+        }
+
+        yield* front === undefined
           ? toBucket(fit, value)
           : Effect.all([toBucket(fit, value), front.put(fit, value)], {
               concurrency: "unbounded",
               discard: true,
-            })
-      ),
+            });
+      }),
   };
 
-  return Layer.succeed(CodeStore, store);
+  return store;
 };
+
+/**
+ * R2, with the colo's cache in front when one is given: a few milliseconds on
+ * a hit where R2 takes a hundred, which a cold isolate's chain of reads feels.
+ * Each build holds its own writes (see `WRITE_HELD`): the Worker's one build
+ * holds them for the isolate.
+ */
+export const CodeStoreR2 = (bucket: BucketLike, edge?: () => EdgeCacheLike) =>
+  Layer.effect(
+    CodeStore,
+    Effect.sync(() => storeOver(bucket, writeHolds(), edge))
+  );
