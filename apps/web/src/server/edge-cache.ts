@@ -1,8 +1,10 @@
 // Workers Cache keys an answer by path and query alone, not by host, `Cookie` or `Authorization`.
 // An answer to a request with a credential, one that sets a cookie, or one with no `Cache-Control` is kept nowhere;
 // any other varies by `Cookie`, so a signed-in reader is never handed a page kept from a signed-out one.
-// A page the edge keeps is served stale for a day while it is read again, so a page seldom visited still answers
-// at the edge's speed; the browser keeps its own `Cache-Control`, and a page's events bring it up to date once drawn.
+// A page the edge keeps is served stale for a day to the readers who come while it is read again, though the one
+// reader who finds it expired waits for the Worker (`EXPIRED`), as does the first after a deploy; an agent's page is
+// kept by the Worker as well (`kept-pages.ts`), so that reader is answered at once too. The browser keeps its own
+// `Cache-Control`, and a page's events bring it up to date once drawn.
 import { Effect } from "effect";
 
 export const KEPT_NOWHERE = "private, no-store";
@@ -19,7 +21,7 @@ const directivesOf = (cacheControl: string) =>
     .map((directive) => directive.trim().toLowerCase())
     .filter((directive) => directive !== "");
 
-const speaksForSomeone = (request: Request) =>
+export const speaksForSomeone = (request: Request) =>
   request.headers.has("cookie") || request.headers.has("authorization");
 
 // A field-naming directive (`private="set-cookie"`) lets the cache store the answer with that field stripped.

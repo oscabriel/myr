@@ -151,6 +151,58 @@ const landedSkill = (
     })
   );
 
+const LISTED_SKILL_VERSION = 1;
+
+// A project's main moves by a landing alone, so its skill is the same while
+// its listing's last landing stands: an index read again after another
+// project lands finds this one's kept by that instant, and wakes only the
+// project whose main moved. A project not yet landed is read where it is.
+const listedSkill = ({
+  landedAt,
+  project,
+}: ProjectListing): Effect.Effect<
+  Option.Option<string>,
+  never,
+  Projects | RepoHost
+> =>
+  landedAt === undefined
+    ? landedSkill(project)
+    : Effect.gen(function* () {
+        const cache = yield* CodeCache;
+        const store = yield* CodeStore;
+        const key = `${keyOf(project)}/skill-landed/v${LISTED_SKILL_VERSION}/${DateTime.formatIso(landedAt)}`;
+
+        return yield* cache.through(
+          key,
+          Effect.gen(function* () {
+            const kept = Option.flatMap(yield* store.get(key), decodeKept);
+
+            if (Option.isSome(kept)) {
+              return Option.fromUndefinedOr(kept.value.content);
+            }
+
+            const read = yield* landedSkill(project);
+
+            yield* encodeKept(
+              Option.match(read, {
+                onNone: () => ({}),
+                onSome: (content) => ({ content }),
+              })
+            ).pipe(
+              Effect.flatMap((text) => store.put(key, text)),
+              Effect.catch((error) =>
+                Effect.logWarning(
+                  `${project}'s listed skill was not kept`,
+                  error
+                )
+              )
+            );
+
+            return read;
+          })
+        );
+      });
+
 const decodeKey = Schema.decodeUnknownOption(ProjectKey);
 
 const INDEX_VERSION = 1;
@@ -163,20 +215,20 @@ const decodeKeptIndex = Schema.decodeOption(KeptIndex);
 
 const encodeKeptIndex = Schema.encodeEffect(KeptIndex);
 
-const indexOf = (projects: readonly ProjectName[]) =>
+const indexOf = (listed: readonly ProjectListing[]) =>
   Effect.gen(function* () {
     const found = yield* Effect.forEach(
-      projects,
-      (project) =>
+      listed,
+      (listing) =>
         Effect.map(
-          landedSkill(project),
+          listedSkill(listing),
           Option.map((content) => ({
             content,
             description: Option.getOrElse(describedIn(content), () =>
-              contributeDescription(project)
+              contributeDescription(listing.project)
             ),
-            name: contributeSkillName(project),
-            url: skillUrl(project),
+            name: contributeSkillName(listing.project),
+            url: skillUrl(listing.project),
           }))
         ),
       { concurrency: FAN_OUT }
@@ -230,7 +282,7 @@ const index = Effect.gen(function* () {
         return kept.value.content;
       }
 
-      const built = yield* indexOf(listed.map(({ project }) => project));
+      const built = yield* indexOf(listed);
 
       yield* encodeKeptIndex({ content: built }).pipe(
         Effect.flatMap((text) => store.put(key, text)),

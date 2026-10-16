@@ -6,3 +6,6 @@ export const env: Env = {
   PLATFORM: untouchable<Fetcher>("PLATFORM"),
   PUBLIC_PLATFORM_URL: "http://localhost:8787",
 };
+
+// A route module's background work runs to its end in a test only when the test awaits it itself.
+export const waitUntil = (_promise: Promise<unknown>): void => undefined;
