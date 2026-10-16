@@ -106,10 +106,13 @@ export class Checker extends DurableObject<Env> {
           SdkChecker.layer(
             container,
             exports,
+            // A snapshot is the whole root filesystem, so it is kept by the
+            // image that took it: a new image sets up again rather than bring
+            // back an older image's toolchain.
             {
-              find: (key) => index.snapshotOf(key),
-              forget: (key) => index.forgetSnapshot(key),
-              keep: (key, id) => index.keepSnapshot(key, id),
+              find: (key) => index.snapshotOf(`${image}:${key}`),
+              forget: (key) => index.forgetSnapshot(`${image}:${key}`),
+              keep: (key, id) => index.keepSnapshot(`${image}:${key}`, id),
             },
             {
               instance: checkInstance,

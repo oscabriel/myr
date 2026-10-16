@@ -707,6 +707,8 @@ describe("the egress gateway", () => {
 const checkerWorld = (options: {
   readonly withGateways: boolean;
   readonly running?: boolean;
+  /** Each container's image, in turn; the last one stays. */
+  readonly images?: readonly string[];
 }) => {
   const boxes: ReturnType<typeof fakeContainer>[] = [];
   const index = new Map<string, string>();
@@ -744,7 +746,10 @@ const checkerWorld = (options: {
   const checkers: Checkers = {
     CHECKER: {
       get: () => {
-        const box = fakeContainer({ running: options.running ?? true });
+        const box = fakeContainer({
+          image: options.images?.[boxes.length] ?? options.images?.at(-1),
+          running: options.running ?? true,
+        });
 
         boxes.push(box);
 
@@ -872,6 +877,42 @@ describe(runCheck, () => {
             (call) => call.kind === "exec" && call.argv.includes(SETUP)
           )
         ).toStrictEqual([]);
+      })
+  );
+
+  it.effect(
+    "sets up again on a new image, never starting from a snapshot an older image took",
+    () =>
+      Effect.gen(function* () {
+        const world = checkerWorld({
+          images: [
+            "registry.cloudflare.com/sandbox/check:315",
+            "registry.cloudflare.com/sandbox/check:316",
+            "registry.cloudflare.com/sandbox/check:316",
+          ],
+          withGateways: true,
+        });
+
+        const wire = yield* encodedWire();
+
+        yield* Effect.forEach([wire, wire, wire], (each) =>
+          Effect.promise(() => runCheck(world.checkers, each))
+        );
+
+        expect(
+          world.boxes.map(({ calls }) =>
+            calls.flatMap((call) => (call.kind === "start" ? [call.from] : []))
+          )
+        ).toStrictEqual([[], [], ["snapshot-1"]]);
+        expect(
+          world.boxes.map(
+            ({ calls }) =>
+              calls.filter(
+                (call) => call.kind === "exec" && call.argv.includes(SETUP)
+              ).length
+          )
+        ).toStrictEqual([1, 1, 0]);
+        expect(world.index.size).toBe(2);
       })
   );
 

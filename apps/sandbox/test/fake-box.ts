@@ -219,7 +219,10 @@ const bytes = (text: string) => {
   return buffer;
 };
 
-export const fakeContainer = ({ running = true } = {}) => {
+export const fakeContainer = ({
+  image = "registry.cloudflare.com/sandbox/check:315",
+  running = true,
+} = {}) => {
   const calls: ContainerCall[] = [];
   const gateways = new Map<Fetcher, string>();
 
@@ -253,7 +256,7 @@ export const fakeContainer = ({ running = true } = {}) => {
         })
       );
     },
-    images: { check: "registry.cloudflare.com/sandbox/check:315" },
+    images: { check: image },
     interceptAllOutboundHttp: (binding) => {
       calls.push({
         kind: "intercept",
