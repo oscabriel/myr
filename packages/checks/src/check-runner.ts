@@ -123,6 +123,7 @@ export type CheckJob = typeof CheckJob.Type;
 export const LaneEvidence = Schema.Struct({
   lane: LaneName,
   signature: Schema.optionalKey(Schema.NonEmptyString),
+  threw: Schema.optionalKey(Schema.NonEmptyString),
   weakness: Schema.optionalKey(Schema.Literal("no assertion")),
 });
 
@@ -131,11 +132,17 @@ export type LaneEvidence = typeof LaneEvidence.Type;
 export const evidenceFrom = (lane: LaneName, exit: RunExit): LaneEvidence =>
   Diagnosis.$match(diagnose(exit), {
     Blocked: () => ({ lane }),
-    Failed: ({ signature }) =>
-      Option.match(signature, {
-        onNone: () => ({ lane }),
-        onSome: (text) => ({ lane, signature: text }),
+    Failed: ({ signature, threw }) => ({
+      lane,
+      ...Option.match(signature, {
+        onNone: () => ({}),
+        onSome: (text) => ({ signature: text }),
       }),
+      ...Option.match(threw, {
+        onNone: () => ({}),
+        onSome: (text) => ({ threw: text }),
+      }),
+    }),
     LoadError: () => ({ lane }),
     NoTests: () => ({ lane, weakness: "no assertion" as const }),
     Passed: () => ({ lane }),

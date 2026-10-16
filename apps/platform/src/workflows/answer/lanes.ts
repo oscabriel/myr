@@ -124,6 +124,9 @@ export const laneLog = (
       )
     ),
     ...Option.toArray(
+      Option.flatMap(evidence, ({ threw }) => Option.fromUndefinedOr(threw))
+    ),
+    ...Option.toArray(
       Option.flatMap(evidence, ({ weakness }) =>
         Option.fromUndefinedOr(weakness)
       )

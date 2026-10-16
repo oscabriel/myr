@@ -13,7 +13,13 @@ export interface RunExit {
 
 export type Diagnosis =
   | { readonly _tag: "Blocked" }
-  | { readonly _tag: "Failed"; readonly signature: Option.Option<string> }
+  | {
+      readonly _tag: "Failed";
+      // What asserted: red-first's evidence, the same for two runs that failed alike.
+      readonly signature: Option.Option<string>;
+      // What failed tests threw when none asserted (a timeout, a throw): shown, never red.
+      readonly threw: Option.Option<string>;
+    }
   | { readonly _tag: "LoadError" }
   | { readonly _tag: "NoTests" }
   | { readonly _tag: "Passed" };
@@ -68,6 +74,12 @@ const FAILED_TEST = [
   /^FAILED (?<name>\S+)/u,
   /^FAIL\s+(?<name>.+)$/u,
 ];
+
+// turbo's "<package>:<task>: " before each line a workspace's task prints.
+const TASK_PREFIX = /^(?:@[\w.-]+\/)?[\w.-]+:[a-z][\w-]*: /u;
+
+// The error a failed test threw, when it was no assertion: a timeout, a throw.
+const THROWN = /^\w*Error: /u;
 
 const ANSI = new RegExp(
   `${globalThis.String.fromCharCode(27)}\\[[0-9;]*m`,
@@ -126,9 +138,25 @@ const failedTestsOf = (lines: readonly string[]) =>
     Array.map(normalise)
   );
 
+// The first error after the first failed test's name, which names no assertion.
+const thrownOf = (lines: readonly string[]) =>
+  pipe(
+    Array.findFirstIndex(lines, (line) =>
+      FAILED_TEST.some((pattern) => pattern.test(line))
+    ),
+    Option.flatMap((at) =>
+      Array.findFirst(lines.slice(at + 1), (line) => THROWN.test(line))
+    ),
+    Option.map(normalise)
+  );
+
 const fromOutput = (exit: RunExit): Diagnosis => {
   const output = `${exit.stdout}\n${exit.stderr}`.replaceAll(ANSI, "");
-  const lines = output.split("\n").map(String.trim);
+
+  const lines = output
+    .split("\n")
+    .map((line) => String.trim(line.replace(TASK_PREFIX, "")));
+
   const assertion = assertionOf(lines);
 
   if (Option.isSome(assertion)) {
@@ -138,6 +166,7 @@ const fromOutput = (exit: RunExit): Diagnosis => {
       signature: Option.some(
         names === "" ? assertion.value : `${names}: ${assertion.value}`
       ),
+      threw: Option.none(),
     });
   }
 
@@ -149,7 +178,20 @@ const fromOutput = (exit: RunExit): Diagnosis => {
     return Diagnosis.LoadError();
   }
 
-  return Diagnosis.Failed({ signature: Option.none() });
+  const names = signatureOf(failedTestsOf(lines)).replaceAll("\n", " | ");
+
+  return Diagnosis.Failed({
+    signature: Option.none(),
+    threw:
+      names === ""
+        ? Option.none()
+        : Option.some(
+            Option.match(thrownOf(lines), {
+              onNone: () => names,
+              onSome: (thrown) => `${names}: ${thrown}`,
+            })
+          ),
+  });
 };
 
 const fromReport = (report: VitestReport, exit: RunExit): Diagnosis => {
@@ -175,12 +217,13 @@ const fromReport = (report: VitestReport, exit: RunExit): Diagnosis => {
   if (Array.isReadonlyArrayNonEmpty(failures)) {
     const byAssertion = failures.every(({ first }) => ASSERTION.test(first));
 
+    const named = signatureOf(
+      failures.map(({ first, name }) => `${name}: ${first}`)
+    );
+
     return Diagnosis.Failed({
-      signature: byAssertion
-        ? Option.some(
-            signatureOf(failures.map(({ first, name }) => `${name}: ${first}`))
-          )
-        : Option.none(),
+      signature: byAssertion ? Option.some(named) : Option.none(),
+      threw: byAssertion ? Option.none() : Option.some(named),
     });
   }
 

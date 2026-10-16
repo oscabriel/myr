@@ -38,7 +38,7 @@ import {
   OutcomeJson,
   runWorkflow,
 } from "../../src/workflows/answer.ts";
-import { failingPathsOf } from "../../src/workflows/answer/lanes.ts";
+import { failingPathsOf, laneLog } from "../../src/workflows/answer/lanes.ts";
 import { runAnswer } from "../../src/workflows/answer/program.ts";
 import { memoSteps } from "../../src/workflows/step.ts";
 import type { StepRunner, WorkflowSteps } from "../../src/workflows/step.ts";
@@ -883,6 +883,32 @@ describe(runAnswer, () => {
         expect(inProcess).toStrictEqual([viaProgram]);
       })
   );
+});
+
+describe(laneLog, () => {
+  it("keeps what a failed test threw when nothing asserted, so a timeout names its test", () => {
+    expect(
+      laneLog(
+        {
+          command: "bun run test",
+          durationMs: 404_409,
+          lane: unit,
+          result: "failed",
+        },
+        Option.some({
+          lane: unit,
+          threw:
+            "test/week.test.ts > week > parses a week: Error: Test timed out in <duration>.",
+        })
+      )
+    ).toBe(
+      [
+        "unit: failed in 404409 ms",
+        "$ bun run test",
+        "test/week.test.ts > week > parses a week: Error: Test timed out in <duration>.",
+      ].join("\n")
+    );
+  });
 });
 
 describe(failingPathsOf, () => {

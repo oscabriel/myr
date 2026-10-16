@@ -2,12 +2,19 @@ import { describe, expect, it } from "@effect/vitest";
 import { LaneName } from "@repo/protocol/ids";
 import { Option } from "effect";
 
-import { classifyRun, failureSignature } from "../src/classify.ts";
+import {
+  classifyRun,
+  diagnose,
+  Diagnosis,
+  failureSignature,
+} from "../src/classify.ts";
 import type { RunExit } from "../src/classify.ts";
 import bunAssertion from "./fixtures/runs/bun-assertion.json" with { type: "json" };
 import bunLoadError from "./fixtures/runs/bun-load-error.json" with { type: "json" };
 import bunNoTests from "./fixtures/runs/bun-no-tests.json" with { type: "json" };
 import nodeSyntaxError from "./fixtures/runs/node-syntax-error.json" with { type: "json" };
+import turboVitestAssertion from "./fixtures/runs/turbo-vitest-assertion.json" with { type: "json" };
+import turboVitestTimeout from "./fixtures/runs/turbo-vitest-timeout.json" with { type: "json" };
 import vitestAssertion from "./fixtures/runs/vitest-assertion.json" with { type: "json" };
 import vitestLoadError from "./fixtures/runs/vitest-load-error.json" with { type: "json" };
 import vitestNoTests from "./fixtures/runs/vitest-no-tests.json" with { type: "json" };
@@ -125,6 +132,10 @@ describe(classifyRun, () => {
       expect(classifyRun(unit, bunNoTests)).toBe("loadError");
     });
 
+    it("is failed when a test timed out under turbo", () => {
+      expect(classifyRun(unit, turboVitestTimeout)).toBe("failed");
+    });
+
     it("is failed when a nonzero exit says nothing more", () => {
       expect(
         classifyRun(LaneName.make("lint"), {
@@ -161,6 +172,35 @@ describe(classifyRun, () => {
         stdout: "",
       })
     ).toBe("blocked");
+  });
+});
+
+describe(diagnose, () => {
+  it("names a test that timed out, and what it threw, through turbo's task prefix", () => {
+    expect(diagnose(turboVitestTimeout)).toStrictEqual(
+      Diagnosis.Failed({
+        signature: Option.none(),
+        threw: Option.some(
+          "test/week.test.ts > week > parses a week: Error: Test timed out in <duration>."
+        ),
+      })
+    );
+  });
+
+  it("names a test that threw rather than asserted, from bun's output", () => {
+    expect(
+      diagnose({
+        code: 1,
+        stderr:
+          "TypeError: weekOf is not a function\n(fail) weekOf > reads the first week of a year [0.40ms]",
+        stdout: "",
+      })
+    ).toStrictEqual(
+      Diagnosis.Failed({
+        signature: Option.none(),
+        threw: Option.some("weekOf > reads the first week of a year"),
+      })
+    );
   });
 });
 
@@ -215,6 +255,18 @@ describe(failureSignature, () => {
     expect(
       failureSignature(exit("/work/datekit", "3ms", "0x7f00aa"))
     ).toStrictEqual(first);
+  });
+
+  it("is none for a test that timed out, which asserted nothing", () => {
+    expect(failureSignature(turboVitestTimeout)).toStrictEqual(Option.none());
+  });
+
+  it("names every failed test beside the assertion, through turbo's task prefix", () => {
+    expect(failureSignature(turboVitestAssertion)).toStrictEqual(
+      Option.some(
+        "test/week.test.ts > week > adds a day | test/week.test.ts > week > parses a week: AssertionError: expected 2 to be 3 // Object.is equality"
+      )
+    );
   });
 
   it("is none for a run that failed to load", () => {

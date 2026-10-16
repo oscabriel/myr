@@ -743,8 +743,10 @@ export const check = Command.make(
       );
 
       for (const evidence of run.evidence) {
-        if (evidence.signature !== undefined) {
-          yield* output.note(`${evidence.lane} failed: ${evidence.signature}`);
+        const said = evidence.signature ?? evidence.threw;
+
+        if (said !== undefined) {
+          yield* output.note(`${evidence.lane} failed: ${said}`);
         }
       }
 
