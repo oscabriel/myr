@@ -166,6 +166,45 @@ describe("a defect", () => {
         expect(JSON.stringify(errors)).not.toContain(repo);
       })
   );
+
+  it.effect(
+    "keeps a port's error code beside its name where the code is a constant's, and no other",
+    () =>
+      Effect.gen(function* () {
+        const repo = "alice--datekit--private";
+
+        const { errors } = yield* reported(
+          Effect.forEach(
+            ["INTERNAL_ERROR", 10_400, `NOT_FOUND ${repo}`],
+            (code) =>
+              Effect.die(
+                Object.assign(new Error(`no commit in ${repo}`), {
+                  code,
+                  name: "ArtifactsError",
+                })
+              ).pipe(boundary, Effect.exit)
+          ),
+          [],
+          "name"
+        );
+
+        expect(errors).toMatchObject([
+          {
+            level: "error",
+            message: "ArtifactsError: <withheld> (INTERNAL_ERROR)",
+          },
+          { level: "error", message: "ArtifactsError: <withheld> (10400)" },
+          { level: "error", message: "ArtifactsError: <withheld>" },
+        ]);
+        expect(errors[0]).toHaveProperty(
+          "cause",
+          expect.stringMatching(
+            /^ArtifactsError: <withheld> \(INTERNAL_ERROR\)\n\s+at /u
+          )
+        );
+        expect(JSON.stringify(errors)).not.toContain(repo);
+      })
+  );
 });
 
 describe("a refusal", () => {

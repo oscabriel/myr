@@ -342,6 +342,44 @@ const blobOrCommit = (name: RepoName, repo: ArtifactsRepo, id: string) =>
     )
   );
 
+/** `readBlob` answers `null` for any other kind, and `readTree` throws for a non-tree. */
+const blobOrTree = (name: RepoName, repo: ArtifactsRepo, id: string) =>
+  call(name, () => repo.readBlob(id)).pipe(
+    Effect.flatMap((blob) =>
+      blob === null
+        ? attempt(() => repo.readTree(id)).pipe(
+            Effect.map((tree) => tree !== null),
+            Effect.catchIf(threw("INTERNAL_ERROR"), () =>
+              Effect.succeed(false)
+            ),
+            Effect.catchTag("Thrown", (thrown) =>
+              fromArtifactsError(name, thrown)
+            )
+          )
+        : Effect.succeed(true)
+    )
+  );
+
+/**
+ * Artifacts throws `INTERNAL_ERROR` for an object that is no commit
+ * (workers-types), as a full SHA in a URL may name a tree or a blob: that is
+ * no commit, as a missing one is.
+ */
+const commitAt = (name: RepoName, repo: ArtifactsRepo, sha: string) =>
+  attempt(() => repo.readCommit(sha)).pipe(
+    Effect.flatMap((found) =>
+      found === null ? Effect.succeedNone : Effect.asSome(commitOf(found))
+    ),
+    Effect.catchIf(threw("INTERNAL_ERROR"), ({ error }) =>
+      blobOrTree(name, repo, sha).pipe(
+        Effect.flatMap((other) =>
+          other ? Effect.succeedNone : Effect.die(error)
+        )
+      )
+    ),
+    Effect.catchTag("Thrown", (thrown) => fromArtifactsError(name, thrown))
+  );
+
 /** Artifacts throws `INTERNAL_ERROR` for an object that is no tree (workers-types). */
 const treeAt = (name: RepoName, repo: ArtifactsRepo, tree: string) =>
   attempt(() => repo.readTree(tree)).pipe(
@@ -529,15 +567,7 @@ const make = (binding: Artifacts) =>
           )
         ),
       readCommit: (name, sha) =>
-        read(name, (repo) =>
-          call(name, () => repo.readCommit(sha)).pipe(
-            Effect.flatMap((found) =>
-              found === null
-                ? Effect.succeedNone
-                : Effect.asSome(commitOf(found))
-            )
-          )
-        ),
+        read(name, (repo) => commitAt(name, repo, sha)),
       readFile: (name, at, path) =>
         read(name, (repo) =>
           call(name, () => repo.readFile({ path, ref: refOf(at) })).pipe(

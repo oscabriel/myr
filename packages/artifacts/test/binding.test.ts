@@ -96,6 +96,14 @@ const olderGitMovedReply = (ref: RefName, tip: string, base: string) =>
     { headers: { "content-type": "application/x-git-receive-pack-result" } }
   );
 
+/** What the binding throws for an unexpected read, as workers-types gives it. */
+const internalError = () =>
+  Object.assign(new Error("An internal error occurred."), {
+    code: "INTERNAL_ERROR",
+    name: "ArtifactsError",
+    numericCode: 10_400,
+  });
+
 const busyReply = () =>
   new Response(fatal("artifacts_git_receive_pack_busy\n"), {
     headers: { "content-type": "application/x-git-receive-pack-result" },
@@ -604,15 +612,87 @@ describe("the Workers binding's surprises, typed", () => {
 
               return Option.isNone(tree) &&
                 (Option.isSome(blob) || Option.isSome(commit))
-                ? yield* Effect.die(
-                    Object.assign(new Error("An internal error occurred."), {
-                      code: "INTERNAL_ERROR",
-                      name: "ArtifactsError",
-                      numericCode: 10_400,
-                    })
-                  )
+                ? yield* Effect.die(internalError())
                 : tree;
             }),
+        }),
+      }
+    )
+  );
+
+  // A full SHA in a raw URL or a code read may name a tree or a blob, which
+  // the binding's `readCommit` throws `INTERNAL_ERROR` for, as its `readTree`
+  // does for a commit or a blob.
+  it.live("reads no commit at a tree's id or a blob's id", () =>
+    within(
+      () =>
+        Effect.gen(function* () {
+          const repos = yield* RepoHost;
+          const name = RepoName.make("kinds");
+          const { first } = yield* seeded(name);
+
+          const commit = yield* repos
+            .readCommit(name, first)
+            .pipe(Effect.orDie);
+
+          const tree = Option.getOrThrow(
+            Option.map(commit, (read) => read.tree)
+          );
+
+          const entries = yield* repos.readTree(name, tree).pipe(Effect.orDie);
+          const blob = Option.getOrThrow(entries)[0]?.sha ?? tree;
+
+          expect(blob).not.toBe(tree);
+          expect(
+            yield* Effect.exit(repos.readCommit(name, CommitSha.make(tree)))
+          ).toStrictEqual(Exit.succeed(Option.none()));
+          expect(
+            yield* Effect.exit(repos.readCommit(name, CommitSha.make(blob)))
+          ).toStrictEqual(Exit.succeed(Option.none()));
+        }),
+      {
+        wrap: (host) => ({
+          ...host,
+          readCommit: (repo, sha) =>
+            Effect.gen(function* () {
+              const tree = yield* host.readTree(repo, ObjectId.make(sha));
+              const blob = yield* host.readBlob(repo, ObjectId.make(sha));
+
+              return Option.isSome(tree) || Option.isSome(blob)
+                ? yield* Effect.die(internalError())
+                : yield* host.readCommit(repo, sha);
+            }),
+          readTree: (repo, sha) =>
+            Effect.gen(function* () {
+              const tree = yield* host.readTree(repo, sha);
+              const blob = yield* host.readBlob(repo, sha);
+
+              return Option.isNone(tree) && Option.isSome(blob)
+                ? yield* Effect.die(internalError())
+                : tree;
+            }),
+        }),
+      }
+    )
+  );
+
+  it.live("still dies where the object it could not read is none of them", () =>
+    within(
+      () =>
+        Effect.gen(function* () {
+          const repos = yield* RepoHost;
+          const name = RepoName.make("failing");
+          const { first } = yield* seeded(name);
+
+          const read = yield* Effect.exit(repos.readCommit(name, first));
+
+          expect(Exit.hasDies(read)).toBeTruthy();
+        }),
+      {
+        wrap: (host) => ({
+          ...host,
+          readCommit: () => Effect.die(internalError()),
+          readTree: () => Effect.die(internalError()),
         }),
       }
     )

@@ -196,6 +196,39 @@ export const describeRepoHost = (
       }).pipe(Effect.provide(host))
     );
 
+    // A full SHA a reader hands in (a raw URL, a code read's `at`) may name any object.
+    it.effect("reads no commit at a tree's id or a blob's id", () =>
+      Effect.gen(function* () {
+        const repos = yield* RepoHost;
+        const client = yield* gitClient(memoryFs());
+        const first = yield* client.commit("v1", [["README.md", "demo"]]);
+        const name = RepoName.make("kinds");
+
+        yield* repos.create(name);
+        yield* repos.push(name, client.source, [
+          { from: Option.none(), ref: main, to: first },
+        ]);
+
+        const tree = Option.getOrThrow(
+          Option.map(
+            yield* repos.readCommit(name, first),
+            (commit) => commit.tree
+          )
+        );
+
+        const blob = Option.getOrThrow(
+          Option.flatMap(yield* repos.readTree(name, tree), (entries) =>
+            Option.fromUndefinedOr(entries[0]?.sha)
+          )
+        );
+
+        expect([
+          yield* repos.readCommit(name, CommitSha.make(tree)),
+          yield* repos.readCommit(name, CommitSha.make(blob)),
+        ]).toStrictEqual([Option.none(), Option.none()]);
+      }).pipe(Effect.provide(host))
+    );
+
     it.effect("reads no tree and no blob at an id the repo lacks", () =>
       Effect.gen(function* () {
         const repos = yield* RepoHost;
