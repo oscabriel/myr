@@ -8,6 +8,7 @@ import {
 } from "@repo/project/visibility/state";
 import { Effect, Layer, Schema } from "effect";
 
+import { disposed } from "../adapters/rpc-result.ts";
 import { AdmissionParams, admissionId } from "../answer-runs.ts";
 import type { PlatformConfig } from "../platform.ts";
 import { layerRepos } from "./layer-repos.ts";
@@ -49,7 +50,8 @@ export const admissionStarts = (
               Effect.tryPromise(() => workflow.get(id)).pipe(
                 Effect.mapError(() => error)
               )
-            )
+            ),
+            Effect.flatMap(disposed)
           );
         }).pipe(Effect.orDie),
     })

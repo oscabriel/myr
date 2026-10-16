@@ -5,6 +5,7 @@ import { Effect, Layer, Ref } from "effect";
 
 import { RateLimits } from "../rate-limits.ts";
 import type { Limited } from "../rate-limits.ts";
+import { disposed } from "./rpc-result.ts";
 
 export type Limits = Readonly<Record<Limited, number>>;
 
@@ -39,6 +40,7 @@ export const WorkerRateLimits = (
             key: handle.toLowerCase(),
           })
         ).pipe(
+          Effect.flatMap(disposed),
           Effect.orDie,
           Effect.flatMap(({ success }) =>
             success ? Effect.void : Effect.fail(capped(WorkerCaps, kind))

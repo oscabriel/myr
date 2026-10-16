@@ -16,6 +16,7 @@ import { blocked, check } from "./checker/run.ts";
 import { hasGateways, SdkChecker } from "./checker/sdk.ts";
 import { answerJob } from "./job.ts";
 import type { Job } from "./job.ts";
+import { disposed } from "./rpc-result.ts";
 import { jobTelemetry } from "./telemetry.ts";
 
 const DEFAULT_IMAGE = "checker:default";
@@ -152,6 +153,7 @@ export const runCheck = (
     Effect.tryPromise(() =>
       env.CHECKER.get(env.CHECKER.newUniqueId()).check(wire)
     ).pipe(
+      Effect.flatMap(disposed),
       Effect.flatMap(Schema.decodeEffect(CheckExit)),
       Effect.tapError((failure) =>
         Effect.logError("the Checker could not be reached").pipe(

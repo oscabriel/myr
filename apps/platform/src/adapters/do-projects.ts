@@ -17,6 +17,7 @@ import type {
   ProjectMethod,
   SuccessOf,
 } from "../project-calls.ts";
+import { disposed } from "./rpc-result.ts";
 
 export interface ProjectStub {
   readonly call: (request: typeof CallRequest.Encoded) => Promise<ExitEncoded>;
@@ -51,6 +52,7 @@ const remote =
 
       // A DO that cannot answer (reset, storage gone) is a defect.
       const reply = yield* Effect.tryPromise(() => stub.call(request)).pipe(
+        Effect.flatMap(disposed),
         Effect.orDie
       );
 

@@ -26,6 +26,7 @@ import {
 
 import { Box } from "../src/box.ts";
 import { Lander, landerJobs, runMerge } from "../src/lander.ts";
+import type { LanderJobs } from "../src/lander.ts";
 import { bundleRules, compose, land, merge } from "../src/lander/run.ts";
 import { landScript, mergeScript } from "../src/lander/script.ts";
 import {
@@ -1095,7 +1096,54 @@ const idleMerge = {
   },
 };
 
+const notThisJob = () => Promise.reject(new Error("not this job"));
+
 describe("the Lander's Durable Objects", () => {
+  it.effect(
+    "passes on a copy of the Lander's reply, with no disposer for the platform to call, and disposes the reply itself",
+    () =>
+      Effect.gen(function* () {
+        const disposals: string[] = [];
+
+        const reply = yield* Schema.encodeEffect(MergeExit)(
+          Exit.fail(
+            new StaleBase({
+              base: idleMerge.job.base,
+              conflicts: [],
+              main: idleMerge.job.main,
+            })
+          )
+        );
+
+        // The runtime gives each object an RPC call returns a disposer of its
+        // own, which holds the far side's call open until it is called.
+        const jobs: LanderJobs = {
+          bundleRules: notThisJob,
+          compose: notThisJob,
+          land: notThisJob,
+          merge: () =>
+            Promise.resolve(
+              Object.defineProperty(structuredClone(reply), Symbol.dispose, {
+                enumerable: false,
+                value: () => {
+                  disposals.push("merge");
+                },
+              })
+            ),
+        };
+
+        const wire = yield* Schema.encodeEffect(MergeWire)(idleMerge);
+
+        const passed = yield* Effect.promise(() =>
+          runMerge({ LANDER: { getByName: () => jobs } }, wire)
+        );
+
+        expect(passed).toStrictEqual(reply);
+        expect(Predicate.hasProperty(passed, Symbol.dispose)).toBeFalsy();
+        expect(disposals).toStrictEqual(["merge"]);
+      })
+  );
+
   it.live(
     "runs each job in the Lander named by the job's canonical repo: the wire decoded, the job run, its Exit encoded",
     () =>
