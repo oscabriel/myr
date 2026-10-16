@@ -60,6 +60,42 @@ const fatal = (message: string) => {
   return new Uint8Array([...new TextEncoder().encode(length), ...payload]);
 };
 
+const pktOf = (payload: Uint8Array) => {
+  const length = (payload.length + 4).toString(16).padStart(4, "0");
+
+  return new Uint8Array([...new TextEncoder().encode(length), ...payload]);
+};
+
+const banded = (channel: number, payload: Uint8Array) =>
+  pktOf(new Uint8Array([channel, ...payload]));
+
+const text = (line: string) => new TextEncoder().encode(line);
+
+const flush = text("0000");
+
+/** git 2.47's receive-pack when a ref moved under a push: the reason in a message, the status only "failed". */
+const olderGitMovedReply = (ref: RefName, tip: string, base: string) =>
+  new Response(
+    new Uint8Array([
+      ...banded(
+        2,
+        text(
+          `error: cannot lock ref '${ref}': is at ${tip} but expected ${base}\n`
+        )
+      ),
+      ...banded(
+        1,
+        new Uint8Array([
+          ...pktOf(text("unpack ok\n")),
+          ...pktOf(text(`ng ${ref} failed to update ref\n`)),
+          ...flush,
+        ])
+      ),
+      ...flush,
+    ]),
+    { headers: { "content-type": "application/x-git-receive-pack-result" } }
+  );
+
 const busyReply = () =>
   new Response(fatal("artifacts_git_receive_pack_busy\n"), {
     headers: { "content-type": "application/x-git-receive-pack-result" },
@@ -401,6 +437,51 @@ describe("the Workers binding's surprises, typed", () => {
                   { from: Option.some(first), ref: main, to: theirs },
                 ])
                 .pipe(Effect.orDie, Effect.as(Option.none()))
+            )
+          );
+
+          expect(
+            yield* repos
+              .push(name, client.source, [
+                { from: Option.some(first), ref: main, to: ours },
+              ])
+              .pipe(Effect.orDie)
+          ).toStrictEqual([
+            RefOutcome.Stale({ ref: main, tip: Option.some(theirs) }),
+          ]);
+        })
+      )
+  );
+
+  it.live(
+    "reports a ref an older git found moved as Stale at its new tip, from the reason only its message gives",
+    () =>
+      within(({ intercept, store }) =>
+        Effect.gen(function* () {
+          const repos = yield* RepoHost;
+          const name = RepoName.make("raced-older");
+          const { client, first } = yield* seeded(name);
+          const ours = yield* client.commit("ours", [["a.txt", "2"]], [first]);
+
+          const theirs = yield* client.commit(
+            "theirs",
+            [["a.txt", "3"]],
+            [first]
+          );
+
+          yield* Ref.set(
+            intercept,
+            Option.some(() =>
+              store
+                .push(name, client.source, [
+                  { from: Option.some(first), ref: main, to: theirs },
+                ])
+                .pipe(
+                  Effect.orDie,
+                  Effect.as(
+                    Option.some(olderGitMovedReply(main, theirs, first))
+                  )
+                )
             )
           );
 

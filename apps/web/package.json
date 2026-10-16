@@ -14,7 +14,7 @@
     "routes": "bun scripts/route-tree.ts",
     "types": "wrangler types --include-runtime=false --strict-vars=false",
     "typecheck": "bun run routes && tsc --noEmit -p tsconfig.json",
-    "test": "vitest run",
+    "test": "bun run routes && vitest run",
     "e2e": "playwright test -c playwright.config.ts"
   },
   "dependencies": {
