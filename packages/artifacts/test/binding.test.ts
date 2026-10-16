@@ -17,6 +17,7 @@ import {
   FileSystem,
   Layer,
   Option,
+  Predicate,
   Redacted,
   Ref,
 } from "effect";
@@ -721,6 +722,133 @@ describe("tokens and handles the binding takes", () => {
           expect(counts.disposed).toBe(counts.gets);
         })
       )
+  );
+});
+
+// The runtime gives each object an RPC call returns a disposer of its own,
+// which holds the far side's call open until it is called. This wrapper gives
+// one to every object the binding returns, a repo's handle aside, and records
+// each one given and each one called.
+const disposing = (binding: Artifacts) => {
+  const given: string[] = [];
+  const disposals: string[] = [];
+
+  const marked = <X>(method: string, call: () => Promise<X>): Promise<X> =>
+    Effect.runPromise(
+      Effect.map(Effect.promise(call), (result) => {
+        if (!Predicate.isObjectKeyword(result)) {
+          return result;
+        }
+
+        given.push(method);
+
+        return Object.defineProperty(result, Symbol.dispose, {
+          configurable: true,
+          enumerable: false,
+          value: () => {
+            disposals.push(method);
+          },
+        });
+      })
+    );
+
+  const wrapped: Artifacts = {
+    ...binding,
+    create: (name, opts) => marked("create", () => binding.create(name, opts)),
+    get: (name) =>
+      Effect.runPromise(
+        Effect.map(
+          Effect.promise(() => binding.get(name)),
+          (repo): ArtifactsRepo => ({
+            ...repo,
+            createToken: (scope, ttl) =>
+              marked("createToken", () => repo.createToken(scope, ttl)),
+            fork: (forked, opts) =>
+              marked("fork", () => repo.fork(forked, opts)),
+            info: () => marked("info", () => repo.info()),
+            listTokens: () => marked("listTokens", () => repo.listTokens()),
+            log: (opts) => marked("log", () => repo.log(opts)),
+            readBlob: (hash) => marked("readBlob", () => repo.readBlob(hash)),
+            readCommit: (hash) =>
+              marked("readCommit", () => repo.readCommit(hash)),
+            readFile: (args) => marked("readFile", () => repo.readFile(args)),
+            readTree: (hash) => marked("readTree", () => repo.readTree(hash)),
+            revokeToken: (token) =>
+              marked("revokeToken", () => repo.revokeToken(token)),
+          })
+        )
+      ),
+    import: (params) => marked("import", () => binding.import(params)),
+  };
+
+  return { disposals, given, wrapped };
+};
+
+describe("results the binding gives back", () => {
+  it.live(
+    "are each disposed once read, so no call holds Artifacts' side open",
+    () =>
+      Effect.gen(function* () {
+        const made = yield* world();
+        const { disposals, given, wrapped } = disposing(made.binding);
+
+        yield* Effect.gen(function* () {
+          const repos = yield* RepoHost;
+          const name = RepoName.make("results");
+          const { first } = yield* seeded(name);
+          const at = Revision.Branch({ name: BranchName.make("main") });
+
+          yield* repos.refs(name).pipe(Effect.orDie);
+          yield* repos.remote(name).pipe(Effect.orDie);
+          yield* repos
+            .readFile(name, at, RepoPath.make("a.txt"))
+            .pipe(Effect.orDie);
+          yield* repos.log(name, at, 5).pipe(Effect.orDie);
+
+          const commit = yield* repos
+            .readCommit(name, first)
+            .pipe(Effect.orDie);
+
+          const tree = Option.getOrThrow(
+            Option.map(commit, (read) => read.tree)
+          );
+
+          const entries = yield* repos.readTree(name, tree).pipe(Effect.orDie);
+          const blob = Option.getOrThrow(entries)[0]?.sha ?? tree;
+
+          yield* repos.readBlob(name, blob).pipe(Effect.orDie);
+
+          const token = yield* repos
+            .mintToken(name, "read", Duration.minutes(5))
+            .pipe(Effect.orDie);
+
+          yield* repos.revokeToken(name, token.id).pipe(Effect.orDie);
+          yield* repos
+            .fork(name, RepoName.make("results--fork"))
+            .pipe(Effect.orDie);
+        }).pipe(
+          Effect.provide(
+            RepoHostBinding.layer(wrapped).pipe(
+              Layer.provide(Layer.succeed(Fetch, made.fetch))
+            )
+          )
+        );
+
+        expect(new Set(given)).toStrictEqual(
+          new Set([
+            "create",
+            "createToken",
+            "fork",
+            "info",
+            "log",
+            "readBlob",
+            "readCommit",
+            "readFile",
+            "readTree",
+          ])
+        );
+        expect(disposals.toSorted()).toStrictEqual(given.toSorted());
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
   );
 });
 

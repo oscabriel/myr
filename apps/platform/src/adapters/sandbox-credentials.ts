@@ -18,6 +18,8 @@ import {
   Schema,
 } from "effect";
 
+import { disposed } from "./rpc-result.ts";
+
 // Each token is revoked when its job ends, so this bounds only a revoke that failed.
 export const jobTokenTtl = Duration.minutes(5);
 
@@ -147,7 +149,7 @@ export const sandboxJob = <W, WI, A, E, X>(
         catch: (cause) =>
           new Unreached({ detail: String(cause), failure: "rejected" }),
         try: () => call.send(encoded),
-      })
+      }).pipe(Effect.flatMap(disposed))
     ),
     Effect.flatMap((outcome) =>
       Schema.decodeEffect(call.exit)(outcome).pipe(

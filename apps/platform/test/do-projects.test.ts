@@ -20,7 +20,16 @@ import {
 } from "@repo/protocol/ids";
 import { ProjectExists, UnknownProject } from "@repo/protocol/refusal";
 import { advanceTo } from "@repo/testkit/clock";
-import { Effect, Fiber, Layer, Option, Redacted, Ref, Schema } from "effect";
+import {
+  Effect,
+  Fiber,
+  Layer,
+  Option,
+  Predicate,
+  Redacted,
+  Ref,
+  Schema,
+} from "effect";
 
 import { DoProjects } from "../src/adapters/do-projects.ts";
 import type { ProjectNamespace } from "../src/adapters/do-projects.ts";
@@ -199,6 +208,38 @@ const script = Effect.gen(function* () {
   };
 });
 
+// The runtime gives each object an RPC call returns a disposer of its own,
+// which holds the far side's call open until it is called.
+const disposing = (
+  namespace: ProjectNamespace,
+  disposals: string[]
+): ProjectNamespace => ({
+  get: (id) => {
+    const stub = namespace.get(id);
+
+    return {
+      call: (request) =>
+        Effect.runPromise(
+          Effect.tap(
+            Effect.promise(() => stub.call(request)),
+            (reply) =>
+              Effect.sync(() => {
+                if (Predicate.isObjectKeyword(reply)) {
+                  Object.defineProperty(reply, Symbol.dispose, {
+                    enumerable: false,
+                    value: () => {
+                      disposals.push(request.method);
+                    },
+                  });
+                }
+              })
+          )
+        ),
+    };
+  },
+  idFromName: (name) => namespace.idFromName(name),
+});
+
 describe("Projects over the Project DO namespace", () => {
   it("takes the Worker's PROJECT binding", () => {
     expectTypeOf<Env["PROJECT"]>().toExtend<ProjectNamespace>();
@@ -292,6 +333,27 @@ describe("Projects over the Project DO namespace", () => {
           `${keyOf(project)} status`,
           `${keyOf(other)} listAsks`,
         ]);
+      }).pipe(Effect.provide(world))
+  );
+
+  it.effect(
+    "disposes each reply once it is read, so no call holds the DO's own open",
+    () =>
+      Effect.gen(function* () {
+        const { namespace } = yield* namespaceOf;
+        const disposals: string[] = [];
+        const recording = disposing(namespace, disposals);
+
+        yield* Effect.gen(function* () {
+          const made = yield* (yield* Projects).create(project);
+
+          yield* made.initProject(alice, {});
+          yield* made.status(bob);
+        }).pipe(
+          Effect.provide(DoProjects(recording).pipe(Layer.provide(unlisted)))
+        );
+
+        expect(disposals).toStrictEqual(["listAsks", "initProject", "status"]);
       }).pipe(Effect.provide(world))
   );
 

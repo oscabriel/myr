@@ -3,6 +3,7 @@ import type { ProjectName } from "@repo/protocol/ids";
 import { Effect, Layer, Schema } from "effect";
 
 import { AnswerParams } from "../answer-runs.ts";
+import { disposed } from "./rpc-result.ts";
 
 export interface AnswerInstance {
   readonly id: string;
@@ -29,7 +30,9 @@ const ended: ReadonlySet<InstanceStatus["status"]> = new Set([
 
 const runAgain = (instance: AnswerInstance) =>
   Effect.gen(function* () {
-    const { status } = yield* Effect.tryPromise(() => instance.status());
+    const { status } = yield* Effect.tryPromise(() => instance.status()).pipe(
+      Effect.flatMap(disposed)
+    );
 
     if (ended.has(status)) {
       yield* Effect.tryPromise(() => instance.restart());
@@ -50,11 +53,14 @@ export const AnswerRunsWorkflow = (
           yield* Effect.tryPromise(() =>
             workflow.create({ id: requestId, params })
           ).pipe(
+            Effect.flatMap(disposed),
             // The id is taken: the run was started before.
             Effect.catch((error) =>
               Effect.tryPromise(() => workflow.get(requestId)).pipe(
                 Effect.mapError(() => error),
-                Effect.flatMap(runAgain)
+                Effect.flatMap((instance) =>
+                  runAgain(instance).pipe(Effect.ensuring(disposed(instance)))
+                )
               )
             )
           );
