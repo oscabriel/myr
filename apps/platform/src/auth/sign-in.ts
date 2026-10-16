@@ -64,6 +64,7 @@ import {
   withoutSession,
   withSession,
 } from "./platform-session.ts";
+import { authorizeNamingPlatform, tokenNamingPlatform } from "./resource.ts";
 import {
   AuthRequest,
   openState,
@@ -555,11 +556,14 @@ const signInOrDropped = (
 const showSignIn = (request: HttpServerRequest.HttpServerRequest) =>
   Effect.gen(function* () {
     const api = yield* oauthApi;
+    const { origin } = yield* Authorization;
     const { cookieKey } = yield* SignInKeys;
 
     const web = yield* HttpServerRequest.toWeb(request).pipe(Effect.orDie);
 
-    const parsed = yield* provider(() => api.parseAuthRequest(web));
+    const parsed = yield* provider(() =>
+      api.parseAuthRequest(authorizeNamingPlatform(web, origin))
+    );
 
     const account = yield* sessionAccount(cookieKey, request);
 
@@ -1492,11 +1496,14 @@ const cliCode = Effect.gen(function* () {
 
 const authorizationServer = (request: HttpServerRequest.HttpServerRequest) =>
   Effect.gen(function* () {
-    const { context, server } = yield* Authorization;
+    const { context, origin, server } = yield* Authorization;
 
     const store = yield* OAuthStore;
 
-    const web = yield* HttpServerRequest.toWeb(request).pipe(Effect.orDie);
+    const web = yield* HttpServerRequest.toWeb(request).pipe(
+      Effect.orDie,
+      Effect.flatMap((sent) => tokenNamingPlatform(sent, origin))
+    );
 
     const response = yield* Effect.promise(() =>
       server.fetch(web, { OAUTH_KV: store }, context)
