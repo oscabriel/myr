@@ -166,13 +166,83 @@ describe("the spans bridge", () => {
     "records a defect by its name alone where its text may quote what no trace may hold",
     () =>
       Effect.gen(function* () {
+        const [kept] =
+          (yield* died({ defects: "name", scrub: scrubberOf([]) })) ?? [];
+
         expect([
-          yield* died({ defects: "name", scrub: scrubberOf([]) }),
+          kept === undefined
+            ? undefined
+            : { message: kept.message, name: kept.name, text: kept.text },
           (yield* died(whole([])))?.map(({ message }) => message),
         ]).toStrictEqual([
-          [{ name: "TypeError" }],
+          {
+            message: "<withheld>",
+            name: "TypeError",
+            text: "TypeError: <withheld>",
+          },
           ["no file at secret/plan.md"],
         ]);
+        expect(kept?.stack).toMatch(/^TypeError: <withheld>\n\s+at /u);
+        expect(JSON.stringify(kept)).not.toContain("secret/plan.md");
+      })
+  );
+
+  // A port's own error class (Artifacts' `ArtifactsError`) carries a code
+  // from a closed set, which tells one failure from another and quotes nothing.
+  it.effect(
+    "records a defect as an Error, never as [object Object], with its code where that is a constant's name",
+    () =>
+      Effect.gen(function* () {
+        const recording = recordingTracing();
+        const repo = "alice--datekit--private";
+
+        const artifactsError = (code: string) =>
+          Object.assign(new Error(`no commit in ${repo}`), {
+            code,
+            name: "ArtifactsError",
+          });
+
+        yield* Effect.forEach(
+          [artifactsError("INTERNAL_ERROR"), artifactsError(repo)],
+          (defect) =>
+            Effect.die(defect).pipe(
+              Effect.withSpan("Project.land"),
+              Effect.withTracer(
+                tracerOver(recording.tracing, {
+                  defects: "name",
+                  scrub: scrubberOf([]),
+                })
+              ),
+              Effect.exit
+            )
+        );
+
+        const exceptions = recording
+          .spans()
+          .flatMap(({ exceptions: each }) => each);
+
+        expect(
+          exceptions.map(({ code, message, name, text }) => ({
+            code,
+            message,
+            name,
+            text,
+          }))
+        ).toStrictEqual([
+          {
+            code: "INTERNAL_ERROR",
+            message: "<withheld> (INTERNAL_ERROR)",
+            name: "ArtifactsError",
+            text: "ArtifactsError: <withheld> (INTERNAL_ERROR)",
+          },
+          {
+            code: undefined,
+            message: "<withheld>",
+            name: "ArtifactsError",
+            text: "ArtifactsError: <withheld>",
+          },
+        ]);
+        expect(JSON.stringify(exceptions)).not.toContain(repo);
       })
   );
 
@@ -235,7 +305,7 @@ describe(recordingTracing, () => {
 
     span.end();
     span.setAttribute("lane", "lint");
-    span.recordException({ name: "TypeError" });
+    span.recordException(new TypeError("handed after its end"));
 
     expect([before, span.isTraced, recording.spans()[1]]).toStrictEqual([
       true,

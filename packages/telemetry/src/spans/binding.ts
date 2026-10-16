@@ -6,6 +6,7 @@
 // the nesting; the trace shows each span's name, timing, ids and failures.
 import { Array, Cause, Exit, Layer, Predicate, Tracer } from "effect";
 
+import { keptByName, prettyOf, withCode } from "../defects.ts";
 import type { DefectKeeping } from "../defects.ts";
 import type { Scrub } from "../logger.ts";
 import { INVOCATION_KEYS, InvocationSpan, SPAN_KEYS } from "../spans.ts";
@@ -31,10 +32,24 @@ export interface Keeping {
   readonly defects: DefectKeeping;
 }
 
+/** All of a defect, scrubbed, as an `Error`, with its code where `codeOf` keeps one. */
+const scrubbed = (reason: Cause.Die, scrub: Scrub): Error => {
+  const error = prettyOf(reason);
+  const kept = new Error(scrub(error?.message ?? ""));
+
+  kept.name = error?.name ?? "Error";
+  kept.stack = scrub(error?.stack ?? "");
+
+  return withCode(kept, reason);
+};
+
 // A typed failure is a refusal or a port's error, the product working: its
 // tag goes on the span as `failure`. workerd logs each recorded exception at
 // error level, where Issues, smoke and the alerts count it, so only a defect
-// is recorded as one, with its message and stack, scrubbed.
+// is recorded as one, with its message and stack, scrubbed, or its name and
+// frames alone. It is handed an `Error`, so the error line reads it as
+// `ArtifactsError: <withheld>`: a plain object read there as `[object Object]`,
+// with no message.
 const recordFailures = <A, E>(
   span: WorkerSpan,
   exit: Exit.Exit<A, E>,
@@ -67,17 +82,9 @@ const recordFailures = <A, E>(
 
   for (const reason of exit.cause.reasons) {
     if (Cause.isDieReason(reason)) {
-      for (const error of Cause.prettyErrors(Cause.fromReasons([reason]))) {
-        span.recordException(
-          defects === "name"
-            ? { name: error.name }
-            : {
-                message: scrub(error.message),
-                name: error.name,
-                stack: scrub(error.stack ?? ""),
-              }
-        );
-      }
+      span.recordException(
+        defects === "name" ? keptByName(reason) : scrubbed(reason, scrub)
+      );
     }
   }
 };

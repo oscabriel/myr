@@ -115,7 +115,10 @@ describe("a sandbox job", () => {
           Effect.die(new TypeError(`no file at ${sealedPath}`))
         );
 
-        expect(spans[1]?.exceptions).toStrictEqual([{ name: "TypeError" }]);
+        expect(
+          spans[1]?.exceptions.map(({ name, text }) => ({ name, text }))
+        ).toStrictEqual([{ name: "TypeError", text: "TypeError: <withheld>" }]);
+        expect(JSON.stringify(spans[1]?.exceptions)).not.toContain(sealedPath);
       })
   );
 

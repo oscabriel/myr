@@ -14,11 +14,13 @@ export interface WorkerSpan {
   /** False when the invocation was not sampled: every call is then a no-op. */
   readonly isTraced: boolean;
   readonly setAttribute: (key: string, value: SpanValue) => void;
-  readonly recordException: (exception: {
-    readonly name: string;
-    readonly message?: string;
-    readonly stack?: string;
-  }) => void;
+  /**
+   * An `Error`, never a plain object: workerd logs the exception's own text
+   * on an error line, where a plain object reads as `[object Object]`.
+   */
+  readonly recordException: (
+    exception: Error & { readonly code?: string | number }
+  ) => void;
   readonly end: () => void;
 }
 

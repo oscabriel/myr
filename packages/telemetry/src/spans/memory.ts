@@ -10,8 +10,15 @@ import type { Keeping } from "./binding.ts";
 
 export interface RecordedException {
   readonly name: string;
-  readonly message?: string;
-  readonly stack?: string;
+  readonly message: string | undefined;
+  readonly stack: string | undefined;
+  readonly code: string | number | undefined;
+  /**
+   * The exception as text, as workerd writes it on the error line it logs.
+   * ASSUMPTION: that text is `String(exception)`; a plain object's name was
+   * seen there with the text `[object Object]`.
+   */
+  readonly text: string;
 }
 
 export interface RecordedSpan {
@@ -66,7 +73,13 @@ export const recordingTracing = (traced = true): RecordingTracing => {
       },
       recordException: (exception) => {
         if (tracing()) {
-          span.exceptions.push(exception);
+          span.exceptions.push({
+            code: exception.code,
+            message: exception.message,
+            name: exception.name,
+            stack: exception.stack,
+            text: String(exception),
+          });
         }
       },
       setAttribute: (key, value) => {
