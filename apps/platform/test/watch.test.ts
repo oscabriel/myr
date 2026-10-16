@@ -35,6 +35,7 @@ import type { ProjectNamespace } from "../src/adapters/do-projects.ts";
 import { decodeEnv } from "../src/platform.ts";
 import { workerPorts } from "../src/ports.ts";
 import {
+  closeEnd,
   ProjectSockets,
   WATCH_TAG,
   WatchFrame,
@@ -559,6 +560,62 @@ describe("a Project DO's watch room, over a fake state and a real shell", () => 
 
         expect(framed(yield* watched.frames)).toStrictEqual(["4 Claimed"]);
       }).pipe(Effect.provide(doWorld))
+  );
+});
+
+// Records every `close()`, and refuses a code a close only reports, as workerd does.
+const closingSocket = () => {
+  const closes: (readonly [number | undefined, string | undefined])[] = [];
+
+  const socket = untouchable<WebSocket>("WebSocket", {
+    close: (code?: number, reason?: string) => {
+      closes.push([code, reason]);
+
+      if (code === 1005 || code === 1006 || code === 1015) {
+        throw new DOMException(
+          `Invalid WebSocket close code: ${code}.`,
+          "InvalidAccessError"
+        );
+      }
+    },
+  });
+
+  return { closes, socket };
+};
+
+describe("a Project DO's answer to a watch socket's close", () => {
+  it.effect(
+    "answers a clean close with the peer's code, and one that carried no code with 1000",
+    () =>
+      Effect.gen(function* () {
+        const { closes, socket } = closingSocket();
+
+        yield* closeEnd(socket, { code: 1000, reason: "bye", wasClean: true });
+        yield* closeEnd(socket, { code: 4000, reason: "", wasClean: true });
+        yield* closeEnd(socket, { code: 1005, reason: "", wasClean: true });
+
+        expect(closes).toStrictEqual([
+          [1000, "bye"],
+          [4000, ""],
+          [1000, ""],
+        ]);
+      })
+  );
+
+  it.effect(
+    "lets a socket that went without a close frame (1006) go without calling close: there is no peer left to answer",
+    () =>
+      Effect.gen(function* () {
+        const { closes, socket } = closingSocket();
+
+        yield* closeEnd(socket, {
+          code: 1006,
+          reason: "WebSocket disconnected without sending Close frame.",
+          wasClean: false,
+        });
+
+        expect(closes).toStrictEqual([]);
+      })
   );
 });
 
