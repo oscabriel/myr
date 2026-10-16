@@ -78,12 +78,52 @@ const install = () =>
     });
   });
 
+/** Only each package's resolved id (`name@version`, or `name@workspace:path`) is read. */
+const BunLock = Schema.Struct({
+  packages: Schema.Record(
+    Schema.String,
+    Schema.TupleWithRest(Schema.Tuple([Schema.String]), [Schema.Unknown])
+  ),
+});
+
+/** A Bun lockfile is JSON with trailing commas. */
+const pinnedIn = (lockfile: string) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+
+    const text = yield* fs.readFileString(path.join(yield* repoRoot, lockfile));
+
+    const lock = yield* Schema.decodeEffect(Schema.fromJsonString(BunLock))(
+      text.replaceAll(/,(?=\s*[\]}])/gu, "")
+    );
+
+    return Object.values(lock.packages)
+      .map(([id]) => id)
+      .filter((id) => !id.includes("@workspace:"));
+  });
+
 const packageOf = (filename: string) =>
   /(?:^|\/)packages\/(?<name>[^/]+)\/src\//u.exec(filename)?.groups?.name;
 
 const TIMEOUT = 180_000;
 
 describe("examples/burrow", () => {
+  // A Checker's setup installs the root's packages with the network on, and
+  // its lanes run these cases with it off: a package only burrow pins is a
+  // failed install in every lane, which a cache an earlier setup kept hides.
+  it.effect(
+    "pins only packages the root's lockfile pins, so its install needs no network",
+    () =>
+      Effect.gen(function* () {
+        const root = new Set(yield* pinnedIn("bun.lock"));
+        const burrow = yield* pinnedIn(`${example}/bun.lock`);
+
+        expect(burrow.length).toBeGreaterThan(0);
+        expect(burrow.filter((id) => !root.has(id))).toStrictEqual([]);
+      }).pipe(Effect.provide(NodeServices.layer))
+  );
+
   it.live(
     "lints to exactly six module-level lets, one in each package's src/",
     () =>
